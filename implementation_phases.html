@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231B2A3A%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%231F8A87%22 stroke-width=%223%22/%3E%3Cpath d=%22M18 32h24M34 23l9 9-9 9%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>Implementation phases</title>
+<style>
+  :root {
+    --ink: #1B2A3A;
+    --slate: #5E6E7B;
+    --paper: #F4F6F3;
+    --line: #C9D2DC;
+    --c1: #5E6E7B;   /* understand */
+    --c2: #1F8A87;   /* core */
+    --c3: #4B7BB0;   /* stage */
+    --c4: #5B4B8A;   /* grpc */
+    --c5: #D9822B;   /* prd */
+    --c6: #2E8B57;   /* rollout */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 48px 24px 64px; background: var(--paper); color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 {
+    display: inline-block; margin: 0 0 40px; padding-bottom: 10px; border-bottom: 2px solid var(--c2);
+    font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 28px; font-weight: 400; letter-spacing: .3px;
+  }
+
+  ol.timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+  /* the spine that joins the phases */
+  ol.timeline::before {
+    content: ""; position: absolute; left: 23px; top: 24px; bottom: 24px; width: 2px;
+    background: linear-gradient(to bottom, var(--c1), var(--c2), var(--c3), var(--c4), var(--c5), var(--c6));
+    opacity: .55; border-radius: 2px;
+  }
+  ol.timeline > li { position: relative; padding: 0 0 28px 72px; }
+  ol.timeline > li:last-child { padding-bottom: 0; }
+
+  .node {
+    position: absolute; left: 0; top: 0; width: 48px; height: 48px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--c); color: #fff; box-shadow: 0 0 0 6px var(--paper), 0 4px 10px rgba(27,42,58,.2);
+    font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 20px;
+  }
+  .card {
+    background: #fff; border-radius: 14px; border: 1px solid var(--line); border-left: 4px solid var(--c);
+    padding: 18px 22px 20px; box-shadow: 0 6px 18px rgba(27,42,58,.07);
+  }
+  .card h2 {
+    margin: 0 0 4px; font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    font-size: 20px; font-weight: 400; color: var(--c);
+  }
+  .card p { margin: 6px 0 0; color: var(--ink); font-size: 14.5px; }
+  .card ul { margin: 10px 0 0; padding: 0; list-style: none; }
+  .card li { position: relative; padding: 3px 0 3px 18px; font-size: 14px; }
+  .card li::before { content: ""; position: absolute; left: 2px; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+  .card a { color: var(--c); text-underline-offset: 3px; }
+  .card a:hover { text-decoration-thickness: 2px; }
+  .note { margin-top: 10px; font-size: 13px; color: var(--slate); }
+  .sub { margin-top: 12px; padding-left: 14px; border-left: 2px solid var(--line); }
+  .sub b { display: block; font-weight: 600; font-size: 13.5px; color: var(--c); margin-bottom: 2px; }
+  .sub p { margin: 0; font-size: 13.5px; }
+
+  li:nth-child(1) { --c: var(--c1); } li:nth-child(2) { --c: var(--c2); } li:nth-child(3) { --c: var(--c3); }
+  li:nth-child(4) { --c: var(--c4); } li:nth-child(5) { --c: var(--c5); } li:nth-child(6) { --c: var(--c6); }
+  /* nested lists inside cards must not re-trigger the colours above */
+  .card li { --c: inherit; }
+
+  .card .tablewrap { overflow-x: auto; margin-top: 12px; }
+  .card table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .card th { text-align: left; font-weight: 600; color: var(--c); padding: 6px 12px 6px 0; border-bottom: 1.5px solid var(--line); }
+  .card td { padding: 8px 12px 8px 0; border-bottom: 1px solid #EDF0F3; vertical-align: top; }
+  .card tr:last-child td { border-bottom: none; }
+  .card td:first-child { font-weight: 600; white-space: nowrap; }
+  .card code { font-size: 12px; background: #F1F4F7; padding: 1px 6px; border-radius: 4px; }
+
+  .bottom-note { margin: 36px 0 0 72px; padding: 14px 18px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--c2);
+                 border-radius: 10px; font-size: 14px; }
+  .bottom-note b { font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-weight: 400; color: var(--c2); }
+
+  @media (max-width: 520px) {
+    ol.timeline > li { padding-left: 60px; }
+    .bottom-note { margin-left: 60px; }
+    .node { width: 40px; height: 40px; font-size: 17px; }
+    ol.timeline::before { left: 19px; }
+  }
+  .back-link { position: absolute; top: 5px; left: 40px; z-index: 5; display: inline-block; margin: 0; padding: 4px 12px; border: 1px solid #D5DCE3; border-radius: 999px; background: #fff;
+               font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.4; color: #5E6E7B; text-decoration: none; }
+  .back-link:hover, .back-link:focus-visible { color: #0F5F5C; border-color: #1F8A87; outline: none; }
+  .backbar { display: contents; }
+  main { position: relative; }
+  main .back-link { top: -43px; left: 0; }
+</style>
+</head>
+<body>
+<main>
+<a class="back-link" href="index.html">Back</a>
+<h1>Implementation phases</h1>
+
+<ol class="timeline">
+
+  <li>
+    <div class="node">1</div>
+    <section class="card">
+      <h2>Understanding the current system</h2>
+      <p>Read how the services work today, before changing anything.</p>
+      <ul>
+        <li><a href="system.html">system.html</a>: the endpoints, config, code structure, database and known issues</li>
+      </ul>
+    </section>
+  </li>
+
+  <li>
+    <div class="node">2</div>
+    <section class="card">
+      <h2>AI implements the core</h2>
+      <p>Everything the service needs before it has any business logic:</p>
+      <ul>
+        <li>Config</li>
+        <li>Database</li>
+        <li>Logging</li>
+        <li>Monitoring (Prometheus, Grafana and the like)</li>
+        <li>gRPC gateway and server, with a hello endpoint</li>
+      </ul>
+    </section>
+  </li>
+
+  <li>
+    <div class="node">3</div>
+    <section class="card">
+      <h2>Stage pipeline</h2>
+      <p>Build and deploy the core to stage.</p>
+    </section>
+  </li>
+
+  <li>
+    <div class="node">4</div>
+    <section class="card">
+      <h2>AI implement gRPC endpoints and providers</h2>
+      <p>Build everything qabz serves and everything it calls. The messages come from the current PB files.</p>
+
+      <div class="sub">
+        <b>Inbound: what qabz serves</b>
+        <ul>
+          <li>Inquiry and order for each bill type: water, electricity, gas, landline, mobile, and bill ID + pay ID</li>
+          <li>Saved bills (My Bills)</li>
+          <li>The list of bill types</li>
+          <li><code>PaymentComplete/OrderComplete</code>, called by the payment service after the user pays</li>
+        </ul>
+      </div>
+
+      <div class="sub">
+        <b>Outbound: what qabz calls</b>
+        <p>The providers below. Each one implements <code>ProviderInterface</code>, and the inbound endpoints reach a provider only through it.</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Provider</th><th>Implementation</th><th>How qabz reaches it</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td>Parsian</td><td><code>ParsianProxy</code></td><td>gRPC to the existing <code>parsian-v2</code> service</td><td>Inquiry, order, status check</td></tr>
+              <tr><td>Jiring Switch</td><td><code>JiringProxy</code></td><td>gRPC to the existing <code>jiring-switch</code> service</td><td>Inquiry, order (only if Parsian is out of service), status check</td></tr>
+              <tr><td>Irancell</td><td><code>IrancellProxy</code></td><td>The existing <code>irancell</code> service: gRPC for inquiry and status, NATS for payment</td><td>Inquiry, order, status check</td></tr>
+              <tr><td>Qabzino</td><td><code>Qabzino</code></td><td>Built into qabz</td><td>Inquiry</td></tr>
+              <tr><td>Tavanir</td><td><code>Tavanir</code></td><td>Built into qabz</td><td>Inquiry, bill document</td></tr>
+              <tr><td>Karashab</td><td><code>Karashab</code></td><td>Third party, over HTTP</td><td>Inquiry and settlement, landline only</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </li>
+
+  <li>
+    <div class="node">5</div>
+    <section class="card">
+      <h2>Production pipeline</h2>
+      <p>Prepare the production pipeline, deploy, and test.</p>
+    </section>
+  </li>
+
+  <li>
+    <div class="node">6</div>
+    <section class="card">
+      <h2>Opening up the endpoints</h2>
+      <div class="sub">
+        <b>First, the inquiry endpoints</b>
+        <p>Opened one by one.</p>
+      </div>
+      <div class="sub">
+        <b>Then, the order endpoints</b>
+        <p>Opened one by one, after some time. Management decides when.</p>
+      </div>
+    </section>
+  </li>
+
+</ol>
+
+<p class="bottom-note"><b>Note:</b> The service must have full monitoring using Prometheus and Grafana.</p>
+</main>
+</body>
+</html>

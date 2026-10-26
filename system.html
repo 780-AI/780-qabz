@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231B2A3A%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%231F8A87%22 stroke-width=%223%22/%3E%3Cpath d=%22M18 32h24M34 23l9 9-9 9%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>System</title>
+<style>
+  :root { --ink:#1B2A3A; --slate:#5E6E7B; --paper:#F4F6F3; --line:#D5DCE3; --teal:#1F8A87; --teal-dk:#0F5F5C; --violet:#5B4B8A; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.65; font-size: 15px; }
+  .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; max-width: 1400px; margin: 0 auto; padding: 40px 32px 80px; }
+  nav.toc { position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; padding-right: 8px; }
+  nav.toc b { display: block; margin-bottom: 10px; font-family: Palatino, "Palatino Linotype", Georgia, serif; font-weight: 400; font-size: 15px; color: var(--slate); }
+  nav.toc a { display: block; padding: 4px 0 4px 12px; border-left: 2px solid var(--line); color: var(--slate); text-decoration: none; font-size: 13.5px; }
+  nav.toc a.l3 { padding-left: 26px; font-size: 13px; }
+  nav.toc a:hover { color: var(--teal-dk); border-left-color: var(--teal); }
+  main { min-width: 0; max-width: 1000px; }
+  h1 { margin: 0 0 28px; padding-bottom: 12px; border-bottom: 2px solid var(--teal); font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 32px; font-weight: 400; letter-spacing: .3px; }
+  h2 { margin: 52px 0 14px; padding-top: 6px; font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 24px; font-weight: 400; color: var(--teal-dk); }
+  h2::after { content: ""; display: block; width: 36px; height: 2px; margin-top: 8px; background: var(--teal); border-radius: 2px; }
+  h3, h4 { margin: 34px 0 10px; font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 19px; font-weight: 400; }
+  h4 { font-size: 16px; }
+  p { margin: 10px 0; max-width: 78ch; }
+  ul, ol { margin: 10px 0 14px; max-width: 80ch; }
+  ul { padding: 0; list-style: none; }
+  ol { padding-left: 22px; }
+  ul li { position: relative; padding: 4px 0 4px 20px; }
+  ul li::before { content: ""; position: absolute; left: 4px; top: 13px; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+  ol li { padding: 4px 0 4px 4px; }
+  blockquote { margin: 14px 0; padding: 6px 18px; border-left: 3px solid var(--teal); background: #fff; border-radius: 0 8px 8px 0; color: var(--slate); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+  a { color: var(--teal-dk); text-underline-offset: 3px; }
+  code { font-family: Menlo, Consolas, "Liberation Mono", monospace; font-size: .86em; background: #E9EEF2; padding: 1px 6px; border-radius: 5px; color: #243B53; }
+
+  /* tables: every row has the same height, long text is cut with an ellipsis */
+  .tablewrap { margin: 16px 0 22px; overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 4px 14px rgba(27,42,58,.05); }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13.5px; }
+  th, td { padding: 0 16px; text-align: left; }
+  th { height: 40px; background: #EEF2F5; color: var(--slate); font-weight: 600; font-size: 12.5px; border-bottom: 1px solid var(--line); }
+  td { height: 42px; border-bottom: 1px solid #EDF0F3; }
+  tbody tr:nth-child(even) td { background: #FAFBFC; }
+  tbody tr:hover td { background: #F1F7F7; }
+  tbody tr:last-child td { border-bottom: none; }
+  .cell { height: 100%; line-height: 42px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  th .cell { line-height: 40px; }
+  th[aria-sort] { cursor: pointer; user-select: none; position: relative; padding-right: 30px; }
+  th[aria-sort]:hover { background: #E4EAEF; color: var(--ink); }
+  th[aria-sort]:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+  th[aria-sort]::after { content: "\2195"; position: absolute; right: 12px; top: 0; line-height: 40px; font-size: 12px; opacity: .35; }
+  th[aria-sort="ascending"]::after { content: "\2191"; opacity: 1; color: var(--teal-dk); }
+  th[aria-sort="descending"]::after { content: "\2193"; opacity: 1; color: var(--teal-dk); }
+  .cell.over { cursor: help; }
+  .cell.over:focus { outline: 2px solid var(--teal); outline-offset: -2px; border-radius: 4px; }
+  td code { white-space: nowrap; background: #EEF2F5; }
+  .pill { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 20px; vertical-align: middle; background: #E9EEF2; color: var(--slate); }
+  .pill-inquiry { background: #E1F1F0; color: var(--teal-dk); }
+  .pill-order { background: #F7E9CF; color: #8A5A06; }
+  .pill-grpc { background: #E8E3F3; color: var(--violet); }
+  .pill-rest { background: #E1ECF6; color: #2F5E8F; }
+  .pill-nats, .pill-http { background: #EDE7E0; color: #6B5A45; }
+
+  #tip { position: fixed; z-index: 20; max-width: 560px; padding: 9px 13px; background: #15202C; color: #E8EEF3; border-radius: 8px; box-shadow: 0 8px 24px rgba(21,32,44,.3);
+         font-size: 12.5px; line-height: 1.5; word-break: break-word; pointer-events: none; opacity: 0; transition: opacity .1s ease; }
+  #tip.on { opacity: 1; }
+
+  pre.code { margin: 16px 0 24px; padding: 20px 24px; background: #15202C; color: #D6E2EC; border-radius: 12px; overflow-x: auto; font-size: 13px; line-height: 1.6; box-shadow: 0 8px 22px rgba(21,32,44,.2); }
+  pre.code code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .tk-kw { color: #C792EA; } .tk-ty { color: #82AAFF; } .tk-fn { color: #7FDBCA; } .tk-st { color: #ECC48D; }
+  .tk-nm { color: #F78C6C; } .tk-cm { color: #6B7F94; font-style: italic; } .tk-pn { color: #9FB3C8; }
+  .tk-dir { color: #82AAFF; } .tk-br { color: #4E6176; }
+
+  a.gap-badge { text-decoration: none; }
+  p:target { background: #FCE8F0; border-radius: 8px; box-shadow: 0 0 0 6px #FCE8F0; }
+  .gap-badge { display: inline-block; margin-right: 8px; padding: 1px 11px; border-radius: 999px; background: #C8175E; color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; vertical-align: 1px; }
+  .note { margin: 40px 0; padding: 18px 22px; background: #fff; border: 1px solid var(--line); border-left: 4px solid #C9962B; border-radius: 10px; }
+  .note pre { margin: 10px 0 0; padding: 10px 14px; background: #15202C; color: #D6E2EC; border-radius: 8px; font-size: 13px; overflow-x: auto; }
+
+  .to-top { position: fixed; right: 24px; bottom: 24px; z-index: 10; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--line); border-radius: 50%; background: #fff; color: var(--slate); cursor: pointer; box-shadow: 0 6px 18px rgba(27,42,58,.12);
+            transition: color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+  .to-top:hover, .to-top:focus-visible { color: var(--teal-dk); border-color: var(--teal); box-shadow: 0 8px 22px rgba(27,42,58,.18); outline: none; }
+  .to-top svg { width: 18px; height: 18px; }
+  @media (max-width: 960px) {
+    .layout { display: block; padding: 28px 18px 60px; }
+    nav.toc { display: none; }
+    h1 { font-size: 26px; }
+  }
+  .back-link { position: absolute; top: 5px; left: 40px; z-index: 5; display: inline-block; margin: 0; padding: 4px 12px; border: 1px solid #D5DCE3; border-radius: 999px; background: #fff;
+               font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.4; color: #5E6E7B; text-decoration: none; }
+  .back-link:hover, .back-link:focus-visible { color: #0F5F5C; border-color: #1F8A87; outline: none; }
+  .backbar { display: contents; }
+  .layout { position: relative; }
+  .layout .back-link { top: 8px; left: 32px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <a class="back-link" href="index.html">Back</a>
+  <nav class="toc" id="toc" aria-label="Contents"></nav>
+  <main id="content"></main>
+</div>
+<div id="tip" role="tooltip"></div>
+<button class="to-top" id="to-top" type="button" aria-label="Top" title="Top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+</button>
+
+<!-- The copy of system.md below is written by sync_system.py. Do not edit it by hand. -->
+<script type="text/markdown" id="md-source">
+# System
+
+The refactor makes no database changes. What is merged is described in the Overview.
+
+## Overview
+
+`bill` is refactored into a new service named `qabz`. Together with it, `qabz` includes `Tavanir` and `Qabzino`. The rest stays the same for the time being.
+
+## Endpoints
+
+The following are all endpoints involved in the inquiry and ordering of the bills of various types. Their associated endpoint after the refactor is also written.
+
+| Service | Kind | Endpoint | New Endpoint | Action | Bill types |
+|---|---|---|---|---|---|
+| `bill` | REST | `POST /v1/water/inquiry` | `POST /v3/water/inquiry` | Inquiry | Water |
+| `bill` | REST | `POST /v1/water/order` | `POST /v3/water/order` | Order | Water |
+| `bill` | REST | `POST /v2/water/order` | `POST /v3/water/order` | Order | Water |
+| `bill` | REST | `POST /v1/electricity/inquiry` | `POST /v3/electricity/inquiry` | Inquiry | Electricity |
+| `bill` | REST | `POST /v1/electricity/inquiry/document` | `POST /v3/electricity/inquiry/document` | Inquiry | Electricity |
+| `bill` | REST | `POST /v1/electricity/order` | `POST /v3/electricity/order` | Order | Electricity |
+| `bill` | REST | `POST /v2/electricity/order` | `POST /v3/electricity/order` | Order | Electricity |
+| `bill` | REST | `POST /v1/gas/inquiry` | `POST /v3/gas/inquiry` | Inquiry | Gas |
+| `bill` | REST | `POST /v1/gas/order` | `POST /v3/gas/order` | Order | Gas |
+| `bill` | REST | `POST /v2/gas/order` | `POST /v3/gas/order` | Order | Gas |
+| `bill` | REST | `POST /v1/tel/inquiry` | `POST /v3/tel/inquiry` | Inquiry | Landline |
+| `bill` | REST | `POST /v1/tel/order` | `POST /v3/tel/order` | Order | Landline |
+| `bill` | REST | `POST /v2/tel/order` | `POST /v3/tel/order` | Order | Landline |
+| `bill` | REST | `POST /v1/mobile/inquiry` | `POST /v3/mobile/inquiry` | Inquiry | MCI, `Irancell` and Rightel mobile (by the `operator` field) |
+| `bill` | REST | `POST /v1/mobile/order` | `POST /v3/mobile/order` | Order | MCI, `Irancell` and Rightel mobile |
+| `bill` | REST | `POST /v2/mobile/order` | `POST /v3/mobile/order` | Order | MCI, `Irancell` and Rightel mobile |
+| `bill` | REST | `POST /v1/services/order` | `POST /v3/services/order` | Order | Bill ID + pay ID |
+| `bill` | REST | `POST /v2/services/order` | `POST /v3/services/order` | Order | Bill ID + pay ID |
+| `bill` | REST | `GET /v1/services` | `GET /v3/services` | N/A | All |
+| `bill` | REST | `GET /v1/mybill` | `GET /v3/mybill` | N/A | Saved bills |
+| `bill` | REST | `POST /v1/mybill` | `POST /v3/mybill` | N/A | Saved bills |
+| `bill` | REST | `PATCH /v1/mybill/{id}` | `PATCH /v3/mybill/{id}` | N/A | Saved bills |
+| `bill` | REST | `DELETE /v1/mybill/{id}` | `DELETE /v3/mybill/{id}` | N/A | Saved bills |
+| `bill` | REST | `POST /v1/mybill/inquiry` | `POST /v3/mybill/inquiry` | Inquiry | Saved bills |
+| `bill` | REST | `POST /v1/mybill/order` | `POST /v3/mybill/order` | Order | Saved bills |
+| `bill` | REST | `POST /v2/mybill/order` | `POST /v3/mybill/order` | Order | Saved bills |
+| `bill` | gRPC | `haf80.api.bill.PaymentComplete/OrderComplete` | unchanged (the payment service is the client) | Order | All (called by the payment service, port 8082) |
+| `parsian-v2` | gRPC | `haf80.api.parsian_v2.TopBill/Inquiry` | internal | Inquiry | Water, Electricity, Gas, Landline, MCI mobile |
+| `parsian-v2` | gRPC | `haf80.api.parsian_v2.TopBill/Pay` | internal | Order | Water, Electricity, Gas, Landline, MCI mobile, Rightel mobile, Bill ID + pay ID |
+| `parsian-v2` | gRPC | `haf80.api.parsian_v2.TopBill/OrderInquiry` | internal | Order | Water, Electricity, Gas, Landline, MCI mobile, Rightel mobile, Bill ID + pay ID |
+| `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/BillInquiry` | internal | Inquiry | MCI mobile |
+| `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/PayBill` | internal | Order | MCI mobile |
+| `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | MCI mobile |
+| `qabzino` | gRPC | `haf80.api.qabzino.Inquiry/BillInquiry` | internal | Inquiry | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
+| `irancell` | gRPC | `pb.InternalService/BillInquiry` | internal | Inquiry | `Irancell` mobile |
+| `irancell` | gRPC | `pb.InternalService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | `Irancell` mobile (also called by `recharge`, so it has to stay) |
+| `irancell` | NATS | `irancell-bill` | internal | Order | `Irancell` mobile payment |
+| `tavanir` | gRPC | `haf80.api.tavanir.InternalInquiryService/BillInquiry` | internal | Inquiry | Electricity |
+| `tavanir` | gRPC | `haf80.api.tavanir.InternalInquiryService/BillDocument` | internal | Inquiry | Electricity |
+| `Karashab` (outside our projects) | HTTP | inquiry URL, called by `bill` (`BillInquiry`) | internal | Inquiry | Landline |
+| `Karashab` (outside our projects) | HTTP | payment URL, called by `bill` (`SendPaymentInfo`) | internal | Order | Landline |
+
+`Parsian` and `Irancell`: from the app's perspective, the call is internal. Inside `qabz`, `Parsian` proxies the call to its current microservice, and so does `Irancell`.
+
+## Config
+
+Config now contains more entries. It must include the config entries of every provider as well.
+
+Every provider has its own block under `provider`. Example, for `parsian`:
+
+```yaml
+provider:
+  parsian:
+    url: parsian-v2:8081
+    timeout: 30s
+```
+
+Rules:
+- **Services that stay.** `parsian-v2`, `jiring-switch` and `irancell` keep their own config. `Parsian` and `Irancell` also have other clients (Issue #3).
+- **Database.** The config database section is required to connect to any database. The `providers` table stays unchanged and still decides which provider serves which bill type.
+- **Secrets.** Usernames, passwords, tokens and client secrets keep their key names but do not go into `config.example.yaml`; the example files today hold real-looking values.
+
+### Hot Reload
+
+**Gap.** The current system reads its config once, when it starts. Changing a config value needs a restart. Only the JWT public keys (through etcd) and the error messages (every hour) are refreshed while it runs.
+
+Only certain configs are hot reloadable. The new system must say which, and treat the rest as startup-only.
+
+| Config | Hot reloadable | Why |
+|---|---|---|
+| Provider order, status and priority (the `providers` table) | Yes | It is read from the database, so a change needs no restart |
+| Switch demotion period | Yes | It is read each time a provider is demoted |
+| Cron intervals and the order time window | Yes | The runner can re-read them before each run |
+| Circuit breaker thresholds | Yes | Applied to the breaker's next count |
+| Log level | Yes | A runtime flag |
+| Fee rules (the `fees` table) | Yes | It is read from the database |
+| JWT public keys | Yes | Already reloaded through etcd |
+| Provider URLs and timeouts | No | Held by the client built at startup |
+| Credentials and tokens | No | Held by the client built at startup |
+| Database, Redis, Kafka and NATS connections | No | The connections are made once, at startup |
+| Ports and the listening addresses | No | Bound once, at startup |
+
+## Code
+
+### Provider Adapter Interface
+
+Every provider inside the new service is defined as a Go package. Every provider has to implement `ProviderInterface`.
+
+Both `Parsian` and `Irancell` are also used by other services (see Issue #3), so they cannot be shut down. For this reason, the current adapter implementations of `Parsian` and `Irancell` actually proxy the calls to the existing provider services (`parsian-v2` and `irancell`). Hence they are named `ParsianProxy` and `IrancellProxy`.
+
+```go
+type ProviderInterface interface {
+	Name() entity.InternalProvider
+	Inquiry(ctx context.Context, req InquiryRequest) (*InquiryResponse, error)
+	Pay(ctx context.Context, req PaymentRequest) (*PaymentResponse, error)
+	Status(ctx context.Context, req StatusRequest) (*StatusResponse, error)
+	GetDocument(ctx context.Context, req DocumentRequest) (*DocumentResponse, error)
+	Settle(ctx context.Context, req SettleRequest) (*SettleResponse, error)
+}
+
+type ProviderRegistry interface {
+	Register(p ProviderInterface) error
+	Get(name entity.InternalProvider) (ProviderInterface, bool)
+}
+```
+
+### Provider Switcher
+
+**Gap.** The current system has no automatic provider switcher. The new system must have one.
+
+`ProviderSwitcher` switches a call to a new provider if the current one doesn't respond. Every provider has a circuit breaker. An open breaker means the provider is skipped, without waiting for a timeout.
+
+**Gap.** `bill` has no circuit breaker. Only `irancell` and `tavanir` have one. The new system must have one for every provider.
+
+A circuit breaker counts the recent failures of one provider. When too many calls fail, it opens and stops sending calls to that provider, so requests don't wait for a timeout one by one. After a short time it lets one test call through. If the test succeeds, it closes and the provider is used again.
+
+A switch temporarily re-orders the providers: the provider that failed moves to the end of the order. It comes back to its original order after a set duration. The original order itself, the `priority` of the `providers` table, is not changed.
+
+```go
+type ProviderSwitcher interface {
+	Call(ctx context.Context, billType entity.BillType, action entity.Action, fn func(ctx context.Context, p ProviderInterface) error) error
+	Order(ctx context.Context, billType entity.BillType, action entity.Action) ([]entity.InternalProvider, error)
+	Demote(ctx context.Context, name entity.InternalProvider, billType entity.BillType, action entity.Action, period time.Duration) error
+}
+```
+
+How a provider switches back to normal:
+
+1. **Demoted.** A provider that doesn't respond moves to the end of the order for the given `period`.
+2. **Trial.** When the `period` ends, one test request goes to it (the half-open state of its circuit breaker). All other requests keep using the working provider.
+3. **Back to normal.** If the test succeeds, the provider returns to its original place. If it fails, it is demoted again.
+
+The test request is never a payment. Inquiry and status check calls are used instead.
+
+### Cron Interface
+
+Every cron job is a type that implements `CronInterface`. The crons are registered once, at startup, in the registry.
+
+```go
+type CronInterface interface {
+	Name() string
+	Interval() time.Duration
+	Lock() *LockPolicy
+	Run(ctx context.Context) error
+}
+
+// For demonstration purposes only: in the real implementation
+// CronRegistry is a struct, not an interface.
+type CronRegistry interface {
+	Register(c CronInterface) error
+	Get(name string) (CronInterface, bool)
+	All() []CronInterface
+}
+```
+
+Crons:
+
+| Cron | Interval | Orders it handles | Action |
+|---|---|---|---|
+| `Jiring Switch` get-status | 5s | `pending` and `in-progress`, MCI | Asks `jiring-switch` for the status and saves `success` or `failed` |
+| `Parsian` get-status | 15m | `pending` and `in-progress`, all other bills paid via `Parsian` | Asks `parsian-v2` |
+| `Irancell` get-status | In config | `pending` and `in-progress`, `Irancell` | Asks `irancell` |
+| Landline confirm | In config | `success` landline orders `Karashab` hasn't confirmed | Sends `Karashab` the payment info and marks the order confirmed |
+
+### Directory Structure
+
+```
+qabz/
+│
+├── pb/                          git submodule: shared protos (read-only)
+├── api/pb/                      generated Go code (git-ignored)
+│
+├── cmd/                         start-app, migrate
+├── config/                      settings, incl. provider.<name>.*
+├── migrations/                  not used until the older bill service stops
+│
+├── system/                      what the service connects to
+│   ├── postgres/                connection
+│   ├── redis/                   cache and the cron lock
+│   ├── kafka/                   payment topics
+│   ├── nats/                    request/reply, subscriptions
+│   └── etcd/                    JWT public keys (needed for auth)
+│
+├── common/                      shared by every package
+│   ├── logging/
+│   │   ├── zap/                 the logger
+│   │   └── logstash/            log shipping
+│   ├── monitoring/
+│   │   ├── jaeger/              tracing
+│   │   └── prometheus/          metrics
+│   ├── errors/                  error handling, error messages, languages
+│   ├── auth/                    JWT verification
+│   ├── validation/              request validators
+│   ├── crypto/                  order token signing
+│   └── helpers/                 phone numbers, bill ID checks, small utilities
+│
+├── core/
+│   ├── order/                   Order type and its rules, create / complete
+│   ├── inquiry/                 inquiry flow
+│   ├── savedbill/               My Bills
+│   ├── fee/                     fee rules and resolver
+│   ├── reconcile/               what the crons run
+│   └── billtype/                shared types: BillType, Status, Operator
+│
+├── provider/
+│   ├── provider.go              ProviderInterface
+│   ├── registry.go              provider name → implementation
+│   ├── selector.go              ProviderSelector: picks the provider for a bill type
+│   ├── parsianproxy/            ParsianProxy
+│   ├── jiring/
+│   ├── irancellproxy/           IrancellProxy
+│   ├── qabzino/                 part of qabz
+│   ├── tavanir/                 part of qabz
+│   └── karashop/                third-party HTTP client
+│
+└── entry/
+    ├── http/                    http-server: the /v3 routes
+    ├── grpc/                    grpc-server: PaymentComplete/OrderComplete
+    └── cron/                    cron: CronInterface, the four crons
+```
+
+Directory notes:
+- **Migrations.** `qabz` runs none until it is fully released and in use. Until then the old `bill` owns them.
+
+### Entry Points
+
+`qabz` has two commands, `start-app` and `migrate`. `start-app` starts everything in a single process:
+
+| Part | What it does |
+|---|---|
+| http-server | The `/qabz/v1/` or `/v3` REST routes |
+| grpc-server | `PaymentComplete/OrderComplete`, called by the payment service |
+| cron | The crons, registered in the `CronRegistry` |
+| migrate | Unused until the older `bill` service stops |
+
+## Database
+
+Every database is kept and is used. No data migration is planned for the time being.
+
+Current `bill` and `qabzino` database are connected to. Migrations are added only if a new feature requires them.
+
+Since we are using AI coding, there is no need to slow down performance by using ORMs. **We better have raw queries.**
+
+## Logs, Metrics and Alerts
+
+**Gap.** The current system severely lacks custom metrics. This part needs to be covered in the new system.
+
+Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names start with `qabz_`, and times are in seconds. Any of them can be **alertable**.
+
+### Requests and orders
+
+| Metric | Type | What it tells you |
+|---|---|---|
+| `qabz_inquiries_total` | counter | Inquiries per bill type, provider and outcome |
+| `qabz_orders_total` | counter | Every order status change (the state machine) |
+| `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |
+| `qabz_order_complete_duration_seconds` | histogram | How long `OrderComplete` takes |
+
+### Providers
+
+| Metric | Type | What it tells you |
+|---|---|---|
+| `qabz_provider_call_duration_seconds` | histogram | Latency of each provider call |
+| `qabz_provider_calls_total` | counter | Calls and errors per provider |
+| `qabz_provider_timeouts_total` | counter | Timeouts, which trigger a switch |
+
+### Circuit breaker and switcher
+
+| Metric | Type | What it tells you |
+|---|---|---|
+| `qabz_circuit_breaker_state` | gauge | Breaker state per provider: closed, half-open or open |
+| `qabz_circuit_breaker_transitions_total` | counter | How often a breaker trips and recovers |
+| `qabz_provider_switches_total` | counter | Calls that moved to another provider |
+| `qabz_provider_demoted` | gauge | Providers demoted right now |
+| `qabz_provider_trial_total` | counter | Test calls that decide if a provider returns |
+
+### Crons and settlement
+
+| Metric | Type | What it tells you |
+|---|---|---|
+| `qabz_cron_runs_total` | counter | Cron runs, by result |
+| `qabz_cron_duration_seconds` | histogram | How long a cron run takes |
+| `qabz_cron_orders_processed_total` | counter | What each run did with the orders it picked |
+| `qabz_pending_orders` | gauge | Orders waiting right now |
+| `qabz_oldest_pending_order_age_seconds` | gauge | Age of the oldest pending order, against the 10-hour deadline |
+| `qabz_karashab_unconfirmed_orders` | gauge | Landline orders not yet confirmed |
+
+### Infrastructure
+
+| Metric | Type | What it tells you |
+|---|---|---|
+| `qabz_dependency_up` | gauge | 1 if Postgres, Redis, Kafka, NATS or etcd answers |
+| `qabz_dependency_check_duration_seconds` | gauge | Response time of that check |
+| `qabz_db_query_duration_seconds` | histogram | Duration of the main queries |
+
+### Logs
+
+`qabz` uses the same log packages as the `bill` service (`pkg/log` and `pkg/logger`), built on `zap`. Logs are shipped to Logstash, and the gRPC interceptor puts the logger into the request context.
+
+**Tracing is used.** Every request and every call to a provider is a span, sent to Jaeger. One payment can be followed from the request of the app to the answer of the provider.
+
+## Tests
+
+Tests are divided into two sections: unit tests and feature tests.
+
+- **Unit tests.** Test one piece of code on its own.
+- **Feature tests.** Test a whole feature from the entry point. They work on a temporary database and mocked providers.
+
+## Gaps
+
+Where the current system falls short, and where the new one must cover it. Each item links to the gap in the page.
+
+| Gap | Section |
+|---|---|
+| [Config is not hot reloadable](#gap-1) | Hot Reload |
+| [No automatic provider switcher](#gap-2) | Provider Switcher |
+| [No circuit breaker](#gap-3) | Provider Switcher |
+| [Almost no custom metrics](#gap-4) | Logs, Metrics and Alerts |
+
+## Issues
+
+### Issue #1 (new version problem in URL)
+
+Due to inconsistency between version numbers, we either have to use `v3` for the new implementation or use a new URL slug (like `qabz`, for example) to escape version confusion.
+
+If a new URL slug is used (my own recommendation), `v1` should be used naturally.
+
+### Issue #2 (database)
+
+Current `bill`'s database is used. No change. Migrations are added on demand. This service cannot start on a new database. The cost, specially at this phase is not worth the trouble.
+
+### Issue #3 (Backward compatibility)
+
+Services such as `Parsian` and `Irancell` have other clients than `bill` (traffic and `recharge`). We cannot shut them down fully, and we cannot touch the database until the other clients are decided.
+
+### Issue #4 (Proxy)
+
+The `Irancell` and `Parsian` implementations (`IrancellProxy` and `ParsianProxy`) only proxy requests to the current `Irancell` and `Parsian` microservices. This is necessary to keep other services using `Parsian` and `Irancell` up and running.
+</script>
+
+<script>
+var SOURCE = document.getElementById("md-source").textContent.replace(/<\\\/script/gi, "</script");
+
+function esc(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function slug(t) {
+  return t.replace(/[`*]/g, "").toLowerCase().replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
+}
+
+function inline(t) {
+  var parts = t.split("`"), out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var p = esc(parts[i]);
+    if (i % 2) {
+      out.push("<code>" + p + "</code>");
+    } else {
+      p = p.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      p = p.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (all, text, href) {
+        return /^\s*javascript:/i.test(href) ? text : '<a href="' + href + '">' + text + "</a>";
+      });
+      out.push(p);
+    }
+  }
+  return out.join("");
+}
+
+function splitRow(line) {
+  var cells = [], cur = "", tick = false;
+  line = line.trim();
+  line = line.replace(/^\|/, "").replace(/\|$/, "");
+  for (var i = 0; i < line.length; i++) {
+    var ch = line.charAt(i);
+    if (ch === "`") tick = !tick;
+    if (ch === "|" && !tick) { cells.push(cur.trim()); cur = ""; }
+    else cur += ch;
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
+function plain(t) { return t.replace(/`|\*\*/g, ""); }
+
+function renderTable(rows) {
+  var head = splitRow(rows[0]);
+  var data = [];
+  for (var r = 2; r < rows.length; r++) {
+    var cells = splitRow(rows[r]);
+    while (cells.length < head.length) cells.push("");
+    data.push(cells.slice(0, head.length));
+  }
+  // column widths follow the longest text in each column, within a sensible range
+  var lens = head.map(function (h, k) {
+    var m = plain(h).length;
+    data.forEach(function (row) { m = Math.max(m, plain(row[k]).length); });
+    return Math.min(Math.max(m, h === "Kind" || h === "Action" ? 12 : 7), 46);
+  });
+  var total = lens.reduce(function (a, b) { return a + b; }, 0);
+  var cols = lens.map(function (l) { return '<col style="width:' + (100 * l / total).toFixed(2) + '%">'; }).join("");
+  var minWidth = Math.round(total * 7.4 + head.length * 34);
+  var pill = head.map(function (h) { return h === "Action" || h === "Kind"; });
+  var th = head.map(function (h) { return '<th aria-sort="none" tabindex="0" role="columnheader" title="Click to sort"><div class="cell">' + inline(h) + "</div></th>"; }).join("");
+  var idx = 0;
+  var trs = data.map(function (row) {
+    return '<tr data-i="' + (idx++) + '">' + row.map(function (c, k) {
+      var cell = inline(c);
+      if (pill[k] && c) cell = '<span class="pill pill-' + c.toLowerCase().replace(/[^a-z]/g, "") + '">' + cell + "</span>";
+      return '<td><div class="cell">' + cell + "</div></td>";
+    }).join("") + "</tr>";
+  }).join("");
+  return '<div class="tablewrap"><table style="min-width:' + minWidth + 'px"><colgroup>' + cols + "</colgroup><thead><tr>" + th + "</tr></thead><tbody>" + trs + "</tbody></table></div>";
+}
+
+/* ---- syntax highlighting: built in, nothing to download ---- */
+var GO_KEYWORDS = { "break":1, "case":1, "chan":1, "const":1, "continue":1, "default":1, "defer":1, "else":1, "fallthrough":1, "for":1, "func":1, "go":1, "goto":1, "if":1, "import":1, "interface":1, "map":1, "package":1, "range":1, "return":1, "select":1, "struct":1, "switch":1, "type":1, "var":1 };
+var GO_TYPES = { "string":1, "int":1, "int32":1, "int64":1, "uint":1, "uint32":1, "uint64":1, "bool":1, "byte":1, "rune":1, "error":1, "float32":1, "float64":1, "any":1, "nil":1, "true":1, "false":1 };
+function span(cls, text) { return '<span class="tk-' + cls + '">' + esc(text) + "</span>"; }
+
+function highlightGo(code) {
+  var re = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\\n]|\\.)*"|`[^`]*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)|([\s\S])/g;
+  var out = "", m, prev = "";
+  while ((m = re.exec(code))) {
+    if (m[1]) out += span("cm", m[1]);
+    else if (m[2]) out += span("st", m[2]);
+    else if (m[3]) out += span("nm", m[3]);
+    else if (m[4]) {
+      var w = m[4], rest = code.slice(re.lastIndex).match(/^\s*\(/);
+      if (GO_KEYWORDS[w]) out += span("kw", w);
+      else if (GO_TYPES[w]) out += span("ty", w);
+      else if (prev === "." && rest) out += span("fn", w);
+      else if (rest) out += span("fn", w);
+      else if (/^[A-Z]/.test(w) || prev === "*" || prev === "&") out += span("ty", w);
+      else out += esc(w);
+      prev = w; continue;
+    } else {
+      var c = m[5];
+      out += /[(){}\[\],;:.*&<>=+\-!|\/]/.test(c) ? span("pn", c) : esc(c);
+      if (!/\s/.test(c)) prev = c;
+      continue;
+    }
+    prev = "";
+  }
+  return out;
+}
+
+var SQL_KEYWORDS = { "select":1, "from":1, "where":1, "and":1, "or":1, "not":1, "in":1, "is":1, "null":1, "as":1, "on":1, "join":1, "left":1, "right":1, "inner":1, "outer":1, "group":1, "by":1, "order":1, "having":1, "limit":1, "offset":1, "insert":1, "into":1, "values":1, "update":1, "set":1, "delete":1, "create":1, "table":1, "alter":1, "add":1, "column":1, "drop":1, "index":1, "primary":1, "key":1, "default":1, "unique":1, "constraint":1, "with":1, "union":1, "all":1, "distinct":1, "case":1, "when":1, "then":1, "else":1, "end":1, "exists":1, "between":1, "like":1, "asc":1, "desc":1, "over":1, "partition":1, "returning":1, "if":1, "begin":1, "commit":1, "rollback":1, "true":1, "false":1 };
+var SQL_TYPES = { "uuid":1, "varchar":1, "text":1, "integer":1, "int":1, "bigint":1, "smallint":1, "boolean":1, "bool":1, "jsonb":1, "json":1, "timestamp":1, "timestamptz":1, "numeric":1, "date":1 };
+
+function highlightSql(code) {
+  var re = /(--[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^'\\]|\\.|'')*')|("(?:[^"]|"")*")|(\$\d+|\?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)|([\s\S])/g;
+  var out = "", m;
+  while ((m = re.exec(code))) {
+    if (m[1]) out += span("cm", m[1]);
+    else if (m[2]) out += span("st", m[2]);
+    else if (m[3]) out += span("ty", m[3]);
+    else if (m[4]) out += span("nm", m[4]);
+    else if (m[5]) out += span("nm", m[5]);
+    else if (m[6]) {
+      var w = m[6], lw = w.toLowerCase(), isCall = /^\s*\(/.test(code.slice(re.lastIndex));
+      if (SQL_KEYWORDS[lw]) out += span("kw", w);
+      else if (SQL_TYPES[lw]) out += span("ty", w);
+      else if (isCall) out += span("fn", w);
+      else out += esc(w);
+    } else {
+      var c = m[7];
+      out += /[(){}\[\],;:.*<>=+\-!|\/]/.test(c) ? span("pn", c) : esc(c);
+    }
+  }
+  return out;
+}
+
+function highlightYamlValue(v) {
+  var c = /^(.*?)(\s+#.*)?$/.exec(v), val = c[1], com = c[2] || "";
+  var out;
+  if (!val) out = "";
+  else if (/^("(?:[^"\\]|\\.)*"|'[^']*')$/.test(val)) out = span("st", val);
+  else if (/^(true|false|null|yes|no)$/i.test(val)) out = span("kw", val);
+  else if (/^-?\d+(\.\d+)?[a-z%]*$/i.test(val)) out = span("nm", val);
+  else out = span("st", val);
+  return out + (com ? span("cm", com) : "");
+}
+
+function highlightYaml(code) {
+  return code.split("\n").map(function (line) {
+    if (/^\s*#/.test(line)) return span("cm", line);
+    var m = /^(\s*)(- )?([A-Za-z_][\w.\-]*)(\s*:)(\s*)(.*)$/.exec(line);
+    if (m) return esc(m[1]) + (m[2] ? span("pn", m[2]) : "") + span("fn", m[3]) + span("pn", m[4]) + esc(m[5]) + highlightYamlValue(m[6]);
+    var l = /^(\s*)- (.*)$/.exec(line);
+    if (l) return esc(l[1]) + span("pn", "- ") + highlightYamlValue(l[2]);
+    return esc(line);
+  }).join("\n");
+}
+
+function highlightTree(code) {
+  return code.split("\n").map(function (line) {
+    var m = /^([\s│├└─]*)(\S.*?)(\s{2,}(.*))?$/.exec(line);
+    if (!m) return esc(line);
+    var lead = m[1], name = m[2], gap = (m[3] || "").match(/^\s*/)[0], comment = m[4];
+    var rails = lead.replace(/[│├└─]+/g, function (r) { return '<span class="tk-br">' + r + "</span>"; });
+    var nameHtml = /\/$/.test(name) ? span("dir", name) : span("fn", name);
+    return rails + nameHtml + (comment ? gap + span("cm", comment) : "");
+  }).join("\n");
+}
+
+function highlight(lang, code) {
+  if (lang === "go") return highlightGo(code);
+  if (lang === "yaml" || lang === "yml") return highlightYaml(code);
+  if (lang === "sql" || lang === "pgsql" || lang === "postgresql") return highlightSql(code);
+  if (lang === "text" && /[├└]/.test(code)) return highlightTree(code);
+  return esc(code);
+}
+
+function renderMarkdown(src) {
+  var lines = src.replace(/\r\n/g, "\n").split("\n");
+  var body = [], toc = [], seen = {}, i = 0, n = lines.length, m, gapCount = 0;
+  var block = /^(#{1,6} |```|\||\s*[-*] |\s*\d+\. |> |-{3,}\s*$)/;
+  while (i < n) {
+    var line = lines[i];
+    if (!line.trim()) { i++; continue; }
+
+    if ((m = /^(#{1,6}) +(.+)$/.exec(line))) {
+      var lvl = m[1].length, text = m[2], id = slug(text);
+      if (seen[id] !== undefined) { seen[id]++; id += "-" + seen[id]; } else { seen[id] = 0; }
+      if (lvl === 2 || lvl === 3) toc.push('<a class="l' + lvl + '" href="#' + id + '">' + inline(text) + "</a>");
+      body.push("<h" + lvl + ' id="' + id + '">' + inline(text) + "</h" + lvl + ">");
+      i++; continue;
+    }
+    if (/^```/.test(line)) {
+      var lang = line.slice(3).trim() || "text", code = [];
+      i++;
+      while (i < n && !/^```/.test(lines[i])) { code.push(lines[i]); i++; }
+      i++;
+      body.push('<pre class="code ' + esc(lang) + '"><code>' + highlight(lang, code.join("\n")) + "</code></pre>");
+      continue;
+    }
+    if (/^\|/.test(line)) {
+      var rows = [];
+      while (i < n && /^\|/.test(lines[i])) { rows.push(lines[i]); i++; }
+      if (rows.length >= 2 && /^\|[\s:|-]+\|?\s*$/.test(rows[1])) body.push(renderTable(rows));
+      else body.push("<p>" + inline(rows.join(" ")) + "</p>");
+      continue;
+    }
+    if (/^(-{3,}|\*{3,})\s*$/.test(line)) { body.push("<hr>"); i++; continue; }
+    if (/^> ?/.test(line)) {
+      var q = [];
+      while (i < n && /^> ?/.test(lines[i])) { q.push(lines[i].replace(/^> ?/, "")); i++; }
+      body.push("<blockquote>" + inline(q.join(" ")) + "</blockquote>");
+      continue;
+    }
+    if (/^\s*[-*] /.test(line)) {
+      var ul = [];
+      while (i < n && /^\s*[-*] /.test(lines[i])) { ul.push(lines[i].replace(/^\s*[-*] /, "")); i++; }
+      body.push("<ul>" + ul.map(function (t) { return "<li>" + inline(t) + "</li>"; }).join("") + "</ul>");
+      continue;
+    }
+    if (/^\s*\d+\. /.test(line)) {
+      var ol = [];
+      while (i < n && /^\s*\d+\. /.test(lines[i])) { ol.push(lines[i].replace(/^\s*\d+\. /, "")); i++; }
+      body.push("<ol>" + ol.map(function (t) { return "<li>" + inline(t) + "</li>"; }).join("") + "</ol>");
+      continue;
+    }
+    var para = [];
+    while (i < n && lines[i].trim() && !block.test(lines[i])) { para.push(lines[i]); i++; }
+    if (!para.length) { para.push(lines[i]); i++; }
+    var gapHtml = inline(para.join(" "));
+    if (/^<strong>Gap\.<\/strong>/.test(gapHtml)) {
+      gapCount++;
+      body.push('<p id="gap-' + gapCount + '">' + gapHtml.replace(/^<strong>Gap\.<\/strong>/, '<a class="gap-badge" href="#gap-' + gapCount + '">Gap</a>') + "</p>");
+    } else {
+      body.push("<p>" + gapHtml + "</p>");
+    }
+  }
+  return { html: body.join("\n"), toc: toc.join("\n") };
+}
+
+/* ---- sorting: pure functions, no page needed ---- */
+var collator = (typeof Intl !== "undefined") ? new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }) : null;
+function compareText(a, b) {
+  if (a === "" && b !== "") return 1;      // empty cells always last
+  if (b === "" && a !== "") return -1;
+  return collator ? collator.compare(a, b) : (a < b ? -1 : a > b ? 1 : 0);
+}
+/* values: the text of one column; state: "ascending", "descending" or "none".
+   Returns the original row positions in the order the rows should be shown. */
+function sortedOrder(values, state) {
+  var order = values.map(function (v, i) { return i; });
+  if (state === "none") return order;
+  var sign = state === "ascending" ? 1 : -1;
+  order.sort(function (x, y) {
+    var a = values[x], b = values[y];
+    var c = (a === "" || b === "") ? compareText(a, b) : sign * compareText(a, b);
+    return c || (x - y);                   // equal rows keep their original order
+  });
+  return order;
+}
+function nextState(state) { return state === "none" ? "ascending" : state === "ascending" ? "descending" : "none"; }
+
+/* ---- browser only ---- */
+if (typeof document !== "undefined") {
+  var content = document.getElementById("content"), nav = document.getElementById("toc"), tip = document.getElementById("tip");
+  document.getElementById("to-top").addEventListener("click", function () { window.scrollTo({ top: 0, behavior: "smooth" }); });
+
+  function markOverflow() {
+    var cells = document.querySelectorAll(".cell");
+    for (var k = 0; k < cells.length; k++) {
+      var over = cells[k].scrollWidth > cells[k].clientWidth + 1;
+      cells[k].classList.toggle("over", over);
+      if (over) cells[k].setAttribute("tabindex", "0"); else cells[k].removeAttribute("tabindex");
+    }
+  }
+
+  function showTip(cell) {
+    if (!cell.classList.contains("over")) return;
+    tip.textContent = cell.textContent;
+    tip.style.left = "0px"; tip.style.top = "0px";
+    var r = cell.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    var left = Math.max(8, Math.min(r.left, document.documentElement.clientWidth - w - 8));
+    var top = r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8;
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+    tip.classList.add("on");
+  }
+  function hideTip() { tip.classList.remove("on"); }
+
+  document.addEventListener("mouseover", function (e) { var c = e.target.closest && e.target.closest(".cell"); if (c) showTip(c); });
+  document.addEventListener("mouseout", function (e) { if (e.target.closest && e.target.closest(".cell")) hideTip(); });
+  document.addEventListener("focusin", function (e) { var c = e.target.closest && e.target.closest(".cell"); if (c) showTip(c); });
+  document.addEventListener("focusout", hideTip);
+  window.addEventListener("resize", markOverflow);
+
+  function sortBy(th) {
+    var table = th.closest("table"), ths = Array.prototype.slice.call(th.parentNode.children), col = ths.indexOf(th);
+    var state = nextState(th.getAttribute("aria-sort"));
+    ths.forEach(function (x) { x.setAttribute("aria-sort", "none"); });
+    th.setAttribute("aria-sort", state);
+    var body = table.tBodies[0], rows = Array.prototype.slice.call(body.rows);
+    rows.sort(function (a, b) { return a.getAttribute("data-i") - b.getAttribute("data-i"); });   // start from the original order
+    var values = rows.map(function (r) { return r.cells[col].textContent.trim(); });
+    sortedOrder(values, state).forEach(function (i) { body.appendChild(rows[i]); });
+  }
+  document.addEventListener("click", function (e) { var th = e.target.closest && e.target.closest("th[aria-sort]"); if (th) sortBy(th); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var th = e.target.closest && e.target.closest("th[aria-sort]");
+    if (th) { e.preventDefault(); sortBy(th); }
+  });
+
+  var out = renderMarkdown(SOURCE);
+  content.innerHTML = out.html;
+  nav.innerHTML = "<b>Contents</b>" + out.toc;
+  markOverflow();
+  if (location.hash) { var target = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (target) target.scrollIntoView(); }
+}
+
+if (typeof module !== "undefined") module.exports = { renderMarkdown: renderMarkdown, sortedOrder: sortedOrder, nextState: nextState, highlightGo: highlightGo, highlightSql: highlightSql, highlightYaml: highlightYaml, highlightTree: highlightTree };
+</script>
+</body>
+</html>

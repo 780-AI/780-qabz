@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231B2A3A%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%231F8A87%22 stroke-width=%223%22/%3E%3Cpath d=%22M18 32h24M34 23l9 9-9 9%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>Databases</title>
+<style>
+  body { margin: 0; padding: 36px 40px 28px; background: #F4F6F3; color: #1B2A3A; font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; }
+  h1 { display: inline-block; margin: 0 0 18px; padding-bottom: 10px; border-bottom: 2px solid #7D8FA3;
+       font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 24px; font-weight: 400; }
+  #tip { position: absolute; z-index: 10; padding: 10px 14px 12px; background: #fff; border-radius: 10px; border-top: 3px solid #7D8FA3;
+         box-shadow: 0 8px 24px rgba(27,42,58,.18); pointer-events: none; opacity: 0; transition: opacity .12s ease; font-size: 12.5px; }
+  #tip.on { opacity: 1; }
+  #tip b { display: block; margin-bottom: 2px; font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 15px; font-weight: 400; }
+  #tip small { display: block; margin-bottom: 7px; color: #5E6E7B; }
+  #tip ul { margin: 0; padding: 0; list-style: none; }
+  #tip ul.two { columns: 2; column-gap: 22px; }
+  #tip li { white-space: nowrap; padding: 1px 0; break-inside: avoid; }
+  #tip li i { color: #7A8A92; font-style: normal; margin-left: 6px; }
+  .back-link { position: absolute; top: 5px; left: 40px; z-index: 5; display: inline-block; margin: 0; padding: 4px 12px; border: 1px solid #D5DCE3; border-radius: 999px; background: #fff;
+               font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.4; color: #5E6E7B; text-decoration: none; }
+  .back-link:hover, .back-link:focus-visible { color: #0F5F5C; border-color: #1F8A87; outline: none; }
+  .backbar { display: contents; }
+</style>
+</head>
+<body>
+<a class="back-link" href="index.html">Back</a>
+<h1>Databases</h1>
+<svg xmlns="http://www.w3.org/2000/svg" width="2370" height="640" viewBox="0 0 2370 640" style="max-width:100%;height:auto">
+<defs>
+<linearGradient id="bill-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3F5F8"/><stop offset="1" stop-color="#E6EBF1"/></linearGradient>
+<radialGradient id="bill-centre" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#34465A"/><stop offset="1" stop-color="#131D29"/></radialGradient>
+<linearGradient id="parsian-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF8EC"/><stop offset="1" stop-color="#FDEBCF"/></linearGradient>
+<radialGradient id="parsian-centre" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#D9822B"/><stop offset="1" stop-color="#A8530A"/></radialGradient>
+<linearGradient id="irancell-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F3FB"/><stop offset="1" stop-color="#E8E2F4"/></linearGradient>
+<radialGradient id="irancell-centre" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#7B66B8"/><stop offset="1" stop-color="#3F2F6B"/></radialGradient>
+<linearGradient id="qabzino-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0F8F7"/><stop offset="1" stop-color="#DDEFED"/></linearGradient>
+<radialGradient id="qabzino-centre" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#2FA29C"/><stop offset="1" stop-color="#0F5F5C"/></radialGradient>
+<filter id="soft" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2A3A" flood-opacity=".14"/></filter>
+<filter id="liftsoft" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1B2A3A" flood-opacity=".1"/></filter>
+<filter id="lift" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#1B2A3A" flood-opacity=".28"/></filter>
+</defs>
+<style>
+  text { fill: #1B2A3A; }
+  .title { font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 20px; letter-spacing: .4px; }
+  .satt { font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 600; }
+  .centt { font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 22px; letter-spacing: .5px; fill: #fff; }
+  .bill-panel{fill:url(#bill-panel);stroke:#C9D2DC;stroke-width:1} .bill-sat{fill:#fff;stroke:#7D8FA3;stroke-width:1.4;filter:url(#soft)} .bill-spoke{stroke:#7D8FA3;stroke-width:1;stroke-opacity:.55} .bill-orbit{fill:none;stroke:#7D8FA3;stroke-width:1;stroke-opacity:.35;stroke-dasharray:1 5;stroke-linecap:round} .bill-halo{fill:none;stroke:#7D8FA3;stroke-width:1;stroke-opacity:.45} .bill-title{fill:#1B2A3A} .bill-rule{stroke:#7D8FA3;stroke-width:2;stroke-linecap:round} .bill-centre{fill:url(#bill-centre);filter:url(#lift)} .bill-glow{fill:#7D8FA3}
+.parsian-panel{fill:url(#parsian-panel);stroke:#F2D3A0;stroke-width:1} .parsian-sat{fill:#fff;stroke:#E8922A;stroke-width:1.4;filter:url(#soft)} .parsian-spoke{stroke:#E8922A;stroke-width:1;stroke-opacity:.55} .parsian-orbit{fill:none;stroke:#E8922A;stroke-width:1;stroke-opacity:.35;stroke-dasharray:1 5;stroke-linecap:round} .parsian-halo{fill:none;stroke:#E8922A;stroke-width:1;stroke-opacity:.45} .parsian-title{fill:#9A5106} .parsian-rule{stroke:#E8922A;stroke-width:2;stroke-linecap:round} .parsian-centre{fill:url(#parsian-centre);filter:url(#liftsoft)} .parsian-glow{fill:#E8922A}
+.irancell-panel{fill:url(#irancell-panel);stroke:#D0C6E6;stroke-width:1} .irancell-sat{fill:#fff;stroke:#7B68B5;stroke-width:1.4;filter:url(#soft)} .irancell-spoke{stroke:#7B68B5;stroke-width:1;stroke-opacity:.55} .irancell-orbit{fill:none;stroke:#7B68B5;stroke-width:1;stroke-opacity:.35;stroke-dasharray:1 5;stroke-linecap:round} .irancell-halo{fill:none;stroke:#7B68B5;stroke-width:1;stroke-opacity:.45} .irancell-title{fill:#43336F} .irancell-rule{stroke:#7B68B5;stroke-width:2;stroke-linecap:round} .irancell-centre{fill:url(#irancell-centre);filter:url(#liftsoft)} .irancell-glow{fill:#7B68B5}
+.qabzino-panel{fill:url(#qabzino-panel);stroke:#B7D9D5;stroke-width:1} .qabzino-sat{fill:#fff;stroke:#2FA29C;stroke-width:1.4;filter:url(#soft)} .qabzino-spoke{stroke:#2FA29C;stroke-width:1;stroke-opacity:.55} .qabzino-orbit{fill:none;stroke:#2FA29C;stroke-width:1;stroke-opacity:.35;stroke-dasharray:1 5;stroke-linecap:round} .qabzino-halo{fill:none;stroke:#2FA29C;stroke-width:1;stroke-opacity:.45} .qabzino-title{fill:#0F5F5C} .qabzino-rule{stroke:#2FA29C;stroke-width:2;stroke-linecap:round} .qabzino-centre{fill:url(#qabzino-centre);filter:url(#liftsoft)} .qabzino-glow{fill:#2FA29C}
+  .glow { transform-box: fill-box; transform-origin: center; animation: glow 5.5s ease-in-out infinite; }
+  @keyframes glow { 0%, 100% { opacity: 0; transform: scale(1); } 50% { opacity: .22; transform: scale(1.12); } }
+  @media (prefers-reduced-motion: reduce) { .glow { animation: none; opacity: .1; } }
+  .dep { cursor: default; outline: none; }
+  .dep circle { transition: stroke-width .15s ease; }
+  .dep:hover circle, .dep:focus circle { stroke-width: 2.8; }
+</style>
+<rect class="bill-panel" x="20" y="20" width="560" height="600" rx="22"/>
+<text class="title bill-title" x="300.0" y="66" text-anchor="middle">bill database</text>
+<line class="bill-rule" x1="278.0" y1="80" x2="322.0" y2="80"/>
+<circle class="bill-orbit" cx="300.0" cy="340" r="190"/>
+<line class="bill-spoke" x1="300" y1="264" x2="300" y2="202"/>
+<line class="bill-spoke" x1="354" y1="286" x2="398" y2="242"/>
+<line class="bill-spoke" x1="376" y1="340" x2="438" y2="340"/>
+<line class="bill-spoke" x1="354" y1="394" x2="398" y2="438"/>
+<line class="bill-spoke" x1="300" y1="416" x2="300" y2="478"/>
+<line class="bill-spoke" x1="246" y1="394" x2="202" y2="438"/>
+<line class="bill-spoke" x1="224" y1="340" x2="162" y2="340"/>
+<line class="bill-spoke" x1="246" y1="286" x2="202" y2="242"/>
+<g class="dep" tabindex="0" data-key="bill.orders"><circle class="bill-sat" cx="300" cy="150" r="52"/><text class="satt" x="300" y="154" text-anchor="middle">orders</text></g>
+<g class="dep" tabindex="0" data-key="bill.bill_inquiries"><circle class="bill-sat" cx="434" cy="206" r="52"/><text class="satt" x="434" y="204" text-anchor="middle">bill_</text><text class="satt" x="434" y="220" text-anchor="middle">inquiries</text></g>
+<g class="dep" tabindex="0" data-key="bill.bill_inquiry_requests"><circle class="bill-sat" cx="490" cy="330" r="52"/><text class="satt" x="490" y="338" text-anchor="middle">bill_inquiry_</text><text class="satt" x="490" y="354" text-anchor="middle">requests</text></g>
+<g class="dep" tabindex="0" data-key="bill.providers"><circle class="bill-sat" cx="434" cy="474" r="52"/><text class="satt" x="434" y="479" text-anchor="middle">providers</text></g>
+<g class="dep" tabindex="0" data-key="bill.fees"><circle class="bill-sat" cx="300" cy="530" r="52"/><text class="satt" x="300" y="534" text-anchor="middle">fees</text></g>
+<g class="dep" tabindex="0" data-key="bill.services"><circle class="bill-sat" cx="166" cy="474" r="52"/><text class="satt" x="166" y="479" text-anchor="middle">services</text></g>
+<g class="dep" tabindex="0" data-key="bill.bills"><circle class="bill-sat" cx="110" cy="330" r="52"/><text class="satt" x="110" y="344" text-anchor="middle">bills</text></g>
+<g class="dep" tabindex="0" data-key="bill.errors"><circle class="bill-sat" cx="166" cy="206" r="52"/><text class="satt" x="166" y="210" text-anchor="middle">errors</text></g>
+<circle class="glow bill-glow" cx="300.0" cy="340" r="92"/>
+<circle class="bill-halo" cx="300.0" cy="340" r="76"/>
+<circle class="bill-centre" cx="300.0" cy="340" r="64"/>
+<text class="centt" x="300.0" y="348" text-anchor="middle">bill</text>
+<rect class="parsian-panel" x="610" y="20" width="560" height="600" rx="22"/>
+<text class="title parsian-title" x="890.0" y="66" text-anchor="middle">parsian2 database</text>
+<line class="parsian-rule" x1="868.0" y1="80" x2="912.0" y2="80"/>
+<circle class="parsian-orbit" cx="890.0" cy="340" r="190"/>
+<line class="parsian-spoke" x1="890" y1="264" x2="890" y2="202"/>
+<line class="parsian-spoke" x1="966" y1="340" x2="1028" y2="340"/>
+<line class="parsian-spoke" x1="890" y1="416" x2="890" y2="478"/>
+<line class="parsian-spoke" x1="814" y1="340" x2="752" y2="340"/>
+<g class="dep" tabindex="0" data-key="parsian.bill_inquiry_requests"><circle class="parsian-sat" cx="890" cy="150" r="52"/><text class="satt" x="890" y="148" text-anchor="middle">bill_inquiry_</text><text class="satt" x="890" y="164" text-anchor="middle">requests</text></g>
+<g class="dep" tabindex="0" data-key="parsian.bill_inquiries"><circle class="parsian-sat" cx="1080" cy="330" r="52"/><text class="satt" x="1080" y="338" text-anchor="middle">bill_</text><text class="satt" x="1080" y="354" text-anchor="middle">inquiries</text></g>
+<g class="dep" tabindex="0" data-key="parsian.bill_orders"><circle class="parsian-sat" cx="890" cy="530" r="52"/><text class="satt" x="890" y="528" text-anchor="middle">bill_</text><text class="satt" x="890" y="544" text-anchor="middle">orders</text></g>
+<g class="dep" tabindex="0" data-key="parsian.inquiry_logs"><circle class="parsian-sat" cx="700" cy="330" r="52"/><text class="satt" x="700" y="338" text-anchor="middle">inquiry_</text><text class="satt" x="700" y="354" text-anchor="middle">logs</text></g>
+<circle class="glow parsian-glow" cx="890.0" cy="340" r="92"/>
+<circle class="parsian-halo" cx="890.0" cy="340" r="76"/>
+<circle class="parsian-centre" cx="890.0" cy="340" r="64"/>
+<text class="centt" x="890.0" y="348" text-anchor="middle">parsian</text>
+<rect class="irancell-panel" x="1200" y="20" width="560" height="600" rx="22"/>
+<text class="title irancell-title" x="1480.0" y="66" text-anchor="middle">irancell database</text>
+<line class="irancell-rule" x1="1458.0" y1="80" x2="1502.0" y2="80"/>
+<circle class="irancell-orbit" cx="1480.0" cy="340" r="190"/>
+<line class="irancell-spoke" x1="1480" y1="264" x2="1480" y2="202"/>
+<line class="irancell-spoke" x1="1480" y1="416" x2="1480" y2="478"/>
+<g class="dep" tabindex="0" data-key="irancell.charge_orders"><circle class="irancell-sat" cx="1480" cy="150" r="52"/><text class="satt" x="1480" y="148" text-anchor="middle">charge_</text><text class="satt" x="1480" y="164" text-anchor="middle">orders</text></g>
+<g class="dep" tabindex="0" data-key="irancell.inquiry_logs"><circle class="irancell-sat" cx="1480" cy="530" r="52"/><text class="satt" x="1480" y="528" text-anchor="middle">inquiry_</text><text class="satt" x="1480" y="544" text-anchor="middle">logs</text></g>
+<circle class="glow irancell-glow" cx="1480.0" cy="340" r="92"/>
+<circle class="irancell-halo" cx="1480.0" cy="340" r="76"/>
+<circle class="irancell-centre" cx="1480.0" cy="340" r="64"/>
+<text class="centt" x="1480.0" y="348" text-anchor="middle">irancell</text>
+<rect class="qabzino-panel" x="1790" y="20" width="560" height="600" rx="22"/>
+<text class="title qabzino-title" x="2070.0" y="66" text-anchor="middle">micro database</text>
+<line class="qabzino-rule" x1="2048.0" y1="80" x2="2092.0" y2="80"/>
+<circle class="qabzino-orbit" cx="2070.0" cy="340" r="190"/>
+<line class="qabzino-spoke" x1="2070" y1="264" x2="2070" y2="202"/>
+<g class="dep" tabindex="0" data-key="qabzino.inquiries"><circle class="qabzino-sat" cx="2070" cy="150" r="52"/><text class="satt" x="2070" y="154" text-anchor="middle">inquiries</text></g>
+<circle class="glow qabzino-glow" cx="2070.0" cy="340" r="92"/>
+<circle class="qabzino-halo" cx="2070.0" cy="340" r="76"/>
+<circle class="qabzino-centre" cx="2070.0" cy="340" r="64"/>
+<text class="centt" x="2070.0" y="348" text-anchor="middle">qabzino</text>
+</svg>
+<div id="tip" role="tooltip"></div>
+<script>
+(function () {
+  var DATA = {"bill.orders": {"name": "orders", "pal": "bill", "acc": "#7D8FA3", "cols": [["uuid", "uuid, pk"], ["order_id", "uuid"], ["user_id", "uuid"], ["bill_type", "varchar(64)"], ["bill_id", "varchar(32)"], ["pay_id", "varchar(32)"], ["option", "varchar(32)"], ["price", "integer"], ["base_price", "bigint"], ["fee", "bigint"], ["fee_type", "varchar(16)"], ["fee_config", "jsonb"], ["fee_id", "integer"], ["provider_fee", "bigint"], ["data", "varchar(256)"], ["ref_id", "varchar(32)"], ["provider_id", "integer"], ["provider_name", "varchar(64)"], ["rrn", "varchar(64)"], ["message", "varchar(256)"], ["status", "varchar(32)"], ["status_code", "integer"], ["is_raw", "boolean"], ["provider_confirmed", "boolean"], ["bill_inquiry_id", "varchar(36)"], ["created_at", "timestamp"], ["updated_at", "timestamptz"]]}, "bill.bill_inquiries": {"name": "bill_inquiries", "pal": "bill", "acc": "#7D8FA3", "cols": [["id", "uuid, pk"], ["user_id", "uuid"], ["inquiry_id", "varchar(15)"], ["provider_id", "bigint"], ["provider_name", "varchar(15)"], ["bill_type", "varchar(20)"], ["tid", "varchar(50)"], ["inquiry_type", "varchar(10)"], ["bill_id", "varchar(15)"], ["pay_id", "varchar(15)"], ["payment_deadline", "varchar(10)"], ["amount", "bigint"], ["extra_data", "jsonb"], ["is_cached", "boolean"], ["is_paid", "boolean"], ["updated_at", "timestamptz"], ["created_at", "timestamptz"]]}, "bill.bill_inquiry_requests": {"name": "bill_inquiry_requests", "pal": "bill", "acc": "#7D8FA3", "cols": [["id", "varchar(26), pk"], ["provider_name", "varchar(64)"], ["user_id", "uuid"], ["dialer", "varchar(12)"], ["inquiry_id", "varchar(15)"], ["bill_type", "varchar(50)"], ["tid", "varchar(30)"], ["provider_trace_id", "varchar(100)"], ["status", "varchar(30)"], ["created_at", "timestamptz"]]}, "bill.providers": {"name": "providers", "pal": "bill", "acc": "#7D8FA3", "cols": [["id", "integer, pk"], ["name", "varchar(64)"], ["subject", "varchar(64)"], ["bill_type", "varchar(64)"], ["action", "varchar(16)"], ["type", "varchar(32)"], ["priority", "smallint"], ["timeout", "integer"], ["status", "varchar(32)"], ["use_nats", "boolean"], ["inquiry_step", "smallint"], ["provider_fee", "bigint"], ["updated_at", "timestamp"]]}, "bill.fees": {"name": "fees", "pal": "bill", "acc": "#7D8FA3", "cols": [["id", "integer, pk"], ["title", "varchar(128)"], ["provider_id", "integer"], ["type", "varchar(16)"], ["config", "jsonb"], ["user_id", "uuid"], ["created_at", "timestamp"], ["updated_at", "timestamp"], ["deleted_at", "timestamptz"]]}, "bill.services": {"name": "services", "pal": "bill", "acc": "#7D8FA3", "cols": [["id", "integer, pk"], ["name", "varchar(64)"], ["type", "varchar(32)"], ["tag", "varchar(32)"], ["order", "smallint"], ["is_active", "boolean"], ["lang", "varchar(32)"], ["inquiry", "boolean"], ["icon", "varchar"], ["updated_at", "timestamp"]]}, "bill.bills": {"name": "bills", "pal": "bill", "acc": "#7D8FA3", "cols": [["id", "uuid, pk"], ["user_id", "uuid"], ["name", "varchar(128)"], ["type", "varchar(32)"], ["bill_id", "varchar(32)"], ["payment_deadline", "varchar(32)"], ["status", "varchar(32)"], ["last_order_date", "varchar"], ["data", "varchar(100)"], ["json_data", "jsonb"], ["created_at", "timestamp"]]}, "bill.errors": {"name": "errors", "pal": "bill", "acc": "#7D8FA3", "cols": [["id", "bigint, pk"], ["message", "varchar"], ["description", "varchar"], ["response_code", "integer"], ["service_code", "integer"], ["http_code", "integer"], ["lang", "varchar"], ["status", "varchar"]]}, "parsian.bill_inquiry_requests": {"name": "bill_inquiry_requests", "pal": "parsian", "acc": "#E8922A", "cols": [["id", "varchar(26), pk"], ["user_id", "uuid"], ["dialer", "varchar(12)"], ["inquiry_id", "varchar(15)"], ["bill_type", "bill_type enum"], ["reference_id", "varchar(30)"], ["tracking_id", "varchar(30)"], ["provider_trace_id", "bigint"], ["status", "status enum"], ["created_at", "timestamptz"]]}, "parsian.bill_inquiries": {"name": "bill_inquiries", "pal": "parsian", "acc": "#E8922A", "cols": [["id", "varchar(26), pk"], ["user_id", "uuid"], ["tracking_id", "varchar(30)"], ["inquiry_id", "varchar(15)"], ["bill_type", "bill_type enum"], ["inquiry_type", "varchar(10)"], ["bill_id", "varchar(15)"], ["pay_id", "varchar(50)"], ["payment_deadline", "varchar(10)"], ["amount", "bigint"], ["extra_data", "jsonb"], ["created_at", "timestamptz"]]}, "parsian.bill_orders": {"name": "bill_orders", "pal": "parsian", "acc": "#E8922A", "cols": [["id", "varchar(26), pk"], ["user_id", "uuid"], ["order_id", "uuid"], ["provider_order_id", "bigint"], ["dialer", "varchar(12)"], ["inquiry_id", "varchar(15)"], ["bill_type", "bill_type enum"], ["inquiry_type", "varchar(10)"], ["bill_id", "varchar(15)"], ["pay_id", "varchar(50)"], ["amount", "bigint"], ["payment_rrn", "varchar(20)"], ["provider_trace_id", "bigint"], ["status", "status enum"], ["created_at", "timestamptz"]]}, "parsian.inquiry_logs": {"name": "inquiry_logs", "pal": "parsian", "acc": "#E8922A", "cols": [["id", "varchar(26), pk"], ["order_id", "uuid"], ["purchase_type", "varchar(32)"], ["response", "text"], ["created_at", "timestamptz"]]}, "irancell.charge_orders": {"name": "charge_orders", "pal": "irancell", "acc": "#7B68B5", "cols": [["id", "uuid, pk"], ["dialer", "varchar(20)"], ["phone", "varchar(20)"], ["rrn", "varchar(128)"], ["price", "integer"], ["method", "varchar(32)"], ["data", "varchar"], ["tid", "varchar(32)"], ["provider_trace_id", "varchar(128)"], ["order_id", "varchar(128)"], ["status", "varchar"], ["status_code", "integer"], ["created_at", "timestamp"]]}, "irancell.inquiry_logs": {"name": "inquiry_logs", "pal": "irancell", "acc": "#7B68B5", "cols": [["id", "uuid, pk"], ["order_id", "varchar(128)"], ["purchase_type", "varchar(32)"], ["response", "text"], ["created_at", "timestamptz"]]}, "qabzino.inquiries": {"name": "inquiries", "pal": "qabzino", "acc": "#2FA29C", "cols": [["id", "uuid, pk"], ["bill_id", "varchar(64)"], ["pay_id", "varchar(128)"], ["trace_number", "uuid"], ["status", "varchar(20)"], ["bill_type", "varchar(32)"], ["inquiry_type", "varchar(10)"], ["inquiry_id", "varchar(15)"], ["data", "jsonb"], ["amount", "bigint"], ["message", "varchar(256)"], ["error_code", "varchar(50)"], ["created_at", "timestamp"]]}};
+  var tip = document.getElementById("tip");
+  function show(g) {
+    var d = DATA[g.getAttribute("data-key")], cols = d.cols;
+    tip.innerHTML = "<b>" + d.name + "</b><small>" + cols.length + " columns</small><ul" + (cols.length > 12 ? ' class="two"' : "") + ">" +
+      cols.map(function (c) { return "<li>" + c[0] + "<i>" + c[1] + "</i></li>"; }).join("") + "</ul>";
+    tip.style.borderTopColor = d.acc;
+    tip.style.left = "0px"; tip.style.top = "0px";
+    var r = g.querySelector("circle").getBoundingClientRect();
+    var x = r.left + r.width / 2 + window.scrollX, h = tip.offsetHeight, w = tip.offsetWidth;
+    var above = r.top - h - 12 > 0;
+    tip.style.left = Math.max(8, Math.min(x - w / 2, document.documentElement.clientWidth - w - 8)) + "px";
+    tip.style.top = (above ? r.top + window.scrollY - h - 12 : r.bottom + window.scrollY + 12) + "px";
+    tip.classList.add("on");
+  }
+  function hide() { tip.classList.remove("on"); }
+  Array.prototype.forEach.call(document.querySelectorAll(".dep"), function (g) {
+    g.addEventListener("mouseenter", function () { show(g); });
+    g.addEventListener("mouseleave", hide);
+    g.addEventListener("focus", function () { show(g); });
+    g.addEventListener("blur", hide);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231B2A3A%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%231F8A87%22 stroke-width=%223%22/%3E%3Cpath d=%22M18 32h24M34 23l9 9-9 9%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>Crons</title>
+<style>
+  :root { --ink:#1B2A3A; --slate:#5E6E7B; --teal:#1F8A87; --teal-dk:#0F5F5C; --gold:#C9962B; --line:#C3CFCD; --paper:#F4F6F3; }
+  body { margin: 0; padding: 36px 40px 28px; background: var(--paper); color: var(--ink);
+         font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; }
+  h1 { display: inline-block; margin: 0 0 22px; padding-bottom: 10px; border-bottom: 2px solid var(--teal);
+       font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+       font-size: 24px; font-weight: 400; letter-spacing: .3px; }
+  svg text { font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 13px; fill: var(--ink); }
+  svg .cap { font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11px; fill: var(--slate); letter-spacing: .2px; }
+  svg .fn  { font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11.5px; font-weight: 600; fill: var(--teal-dk); letter-spacing: .2px; }
+  svg .onink { fill: #fff; font-size: 15px; letter-spacing: .4px; }
+  .box   { fill: #fff; stroke: #9FB0B0; stroke-width: 1; }
+  .ext   { fill: #fff; stroke: #9FB0B0; stroke-width: 1; stroke-dasharray: 4 3; }
+  .grp   { fill: none; stroke: var(--line); stroke-width: 1; }
+  .hub   { fill: var(--ink); stroke: none; }
+  .badge-bg { fill: #C9962B; }
+  .badge-tx { font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .3px; fill: #1B2A3A; }
+  .small { fill: #fff; stroke: var(--line); stroke-width: 1; }
+  .arrow { fill: none; stroke: var(--teal); stroke-width: 1.5; marker-end: url(#a); }
+  .arrow.dash  { stroke: #7A8A92; stroke-dasharray: 5 3; marker-end: url(#a-grey); }
+  .arrow.async { stroke: var(--gold); marker-end: url(#a-gold); }
+  .note { margin-top: 14px; max-width: 1050px; font-size: 12px; line-height: 1.6; color: var(--slate); }
+  .key  { margin-top: 10px; font-size: 12px; color: var(--slate); }
+  .key span { display: inline-block; width: 26px; border-top: 2px solid var(--teal); vertical-align: middle; margin: 0 6px 0 18px; }
+  .key span:first-child { margin-left: 0; }
+  .key span.d { border-top: 2px dashed #7A8A92; }
+  .key span.g { border-top-color: var(--gold); }
+  .back-link { position: absolute; top: 5px; left: 40px; z-index: 5; display: inline-block; margin: 0; padding: 4px 12px; border: 1px solid #D5DCE3; border-radius: 999px; background: #fff;
+               font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.4; color: #5E6E7B; text-decoration: none; }
+  .back-link:hover, .back-link:focus-visible { color: #0F5F5C; border-color: #1F8A87; outline: none; }
+  .backbar { display: contents; }
+</style>
+</head>
+<body>
+<a class="back-link" href="index.html">Back</a>
+<h1>Crons</h1>
+<svg width="1280" height="595" viewBox="0 0 1280 595" style="max-width:100%;height:auto">
+  <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1F8A87"/></marker>
+    <marker id="a-grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7A8A92"/></marker>
+    <marker id="a-gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C9962B"/></marker>
+    <symbol id="db-light" viewBox="0 0 14 16">
+      <path d="M1,3 V13 A6,2.5 0 0 0 13,13 V3" fill="none" stroke="#fff" stroke-width="1.1"/>
+      <path d="M1,8 A6,2.5 0 0 0 13,8" fill="none" stroke="#fff" stroke-width="1.1"/>
+      <ellipse cx="7" cy="3" rx="3" ry="2.5" fill="none" stroke="#fff" stroke-width="1.1"/>
+    </symbol>
+    <symbol id="db" viewBox="0 0 14 16">
+      <path d="M1,3 V13 A6,2.5 0 0 0 13,13 V3" fill="#fff" stroke="#1B2A3A" stroke-width="1.1"/>
+      <path d="M1,8 A6,2.5 0 0 0 13,8" fill="none" stroke="#1B2A3A" stroke-width="1.1"/>
+      <ellipse cx="7" cy="3" rx="3" ry="2.5" fill="#fff" stroke="#1B2A3A" stroke-width="1.1"/>
+    </symbol>
+  </defs>
+
+  <!-- captions -->
+  <text class="cap" x="104"  y="50">bill, cron jobs</text>
+  <text class="cap" x="1000" y="50">Providers</text>
+
+  <!-- qabz group with four crons -->
+  <rect class="hub" x="20" y="60" width="340" height="250" rx="3"/>
+  <rect class="small" x="34" y="74"  width="312" height="46" rx="4"/>
+  <text x="46" y="94">Jiring Switch get-status</text><text class="cap" x="46" y="110">every 5s · pending / in-progress · MCI</text>
+  <rect class="small" x="34" y="130" width="312" height="46" rx="4"/>
+  <text x="46" y="150">Parsian get-status</text><text class="cap" x="46" y="166">every 15m · pending / in-progress · other bills</text>
+  <rect class="small" x="34" y="186" width="312" height="46" rx="4"/>
+  <text x="46" y="206">Irancell get-status</text><text class="cap" x="46" y="222">interval in config · pending / in-progress</text>
+  <rect class="small" x="34" y="242" width="312" height="46" rx="4"/>
+  <text x="46" y="262">Landline confirm</text><text class="cap" x="46" y="278">interval in config · success, not yet confirmed</text>
+  <use href="#db-light" x="336" y="64" width="14" height="16"/>
+
+  <!-- badge: the crons in this box are retryable -->
+  <g transform="translate(20,60)">
+    <rect class="badge-bg" x="-8" y="-12" width="82" height="22" rx="11"/>
+    <text class="badge-tx" x="33" y="3" text-anchor="middle">retryable</text>
+  </g>
+
+  <!-- providers -->
+  <rect class="box" x="1000" y="74"  width="150" height="46" rx="3"/><text x="1075" y="102" text-anchor="middle">jiring-switch</text>
+  <rect class="box" x="1000" y="130" width="150" height="46" rx="3"/><text x="1075" y="158" text-anchor="middle">parsian-v2</text>
+  <rect class="box" x="1000" y="186" width="150" height="46" rx="3"/><text x="1075" y="214" text-anchor="middle">irancell</text>
+  <rect class="ext" x="1000" y="242" width="150" height="46" rx="3"/><text x="1075" y="270" text-anchor="middle">Karashab</text>
+  <use href="#db" x="1132" y="78"  width="14" height="16"/>
+  <use href="#db" x="1132" y="134" width="14" height="16"/>
+  <use href="#db" x="1132" y="190" width="14" height="16"/>
+
+  <!-- arrows: crons -> providers -->
+  <path class="arrow" d="M346,97 H1000"/>
+  <text class="cap" x="520" y="90">gRPC</text>
+  <text class="fn"  x="560" y="90">InternalInquiryService/GetStatus</text>
+
+  <path class="arrow" d="M346,153 H1000"/>
+  <text class="cap" x="520" y="146">gRPC</text>
+  <text class="fn"  x="560" y="146">TopBill/OrderInquiry</text>
+
+  <path class="arrow" d="M346,209 H1000"/>
+  <text class="cap" x="520" y="202">gRPC</text>
+  <text class="fn"  x="560" y="202">InternalService/GetStatus</text>
+
+  <path class="arrow" d="M346,265 H1000"/>
+  <text class="cap" x="520" y="258">HTTP POST</text>
+  <text class="fn"  x="520" y="283">SendPaymentInfo</text>
+
+  <!-- what the get-status crons do with the provider's answer -->
+  <path class="arrow dash" d="M190,310 V350"/>
+  <text class="cap" x="200" y="334">provider answer for each scanned order</text>
+
+  <!-- decision boxes -->
+  <rect class="box" x="20"  y="350" width="320" height="78" rx="3"/>
+  <text x="34" y="372">pending</text>
+  <text class="cap" x="34" y="390">nothing is sent,</text>
+  <text class="cap" x="34" y="406">order is scanned again next run</text>
+
+  <rect class="box" x="380" y="350" width="320" height="78" rx="3"/>
+  <text x="394" y="372">success  /  failed</text>
+  <text class="cap" x="394" y="390">order saved with the final status,</text>
+  <text class="cap" x="394" y="406">status sent to the payment service</text>
+
+  <rect class="ext" x="740" y="350" width="320" height="78" rx="3"/>
+  <text x="754" y="372">older than the reverse deadline</text>
+  <text class="cap" x="754" y="390">order saved with the message</text>
+  <text class="cap" x="754" y="406">reverse_deadline_exceeded, nothing is sent</text>
+  <use href="#db" x="1036" y="354" width="14" height="16"/>
+  <use href="#db" x="676"  y="354" width="14" height="16"/>
+
+  <!-- success/failed -> payment service -->
+  <rect class="box" x="380" y="490" width="320" height="46" rx="3"/>
+  <text x="540" y="518" text-anchor="middle">Payment service</text>
+  <path class="arrow async" d="M540,428 V490"/>
+  <text class="cap" x="556" y="456">Kafka (async), topic paymentwriter</text>
+  <text class="fn"  x="556" y="474">status: success | failed</text>
+
+  <!-- what the payment service does with it -->
+  <text class="cap" x="740" y="508">The message carries only the status. The payment service</text>
+  <text class="cap" x="740" y="524">decides whether to confirm (success) or refund (failed);</text>
+  <text class="cap" x="740" y="540">this is not in bill's code.</text>
+
+  <!-- landline confirm (separate) -->
+  <text class="cap" x="1090" y="360">Landline confirm cron</text>
+  <text class="cap" x="1090" y="376">is separate: it never talks to</text>
+  <text class="cap" x="1090" y="392">the payment service. It only</text>
+  <text class="cap" x="1090" y="408">settles with Karashab.</text>
+
+  <!-- legend -->
+  <use href="#db" x="20" y="568" width="14" height="16"/>
+  <text class="cap" x="40" y="581">writes to its own database</text>
+</svg>
+
+<div class="key"><span></span>synchronous call<span class="d"></span>response<span class="g"></span>async</div>
+<div class="note">
+  Every cron takes a Redis lock, so only one instance runs it at a time. The three get-status crons ask the provider for the order's status and save the final answer on bill's order.
+  Orders older than the reverse deadline are saved with the message reverse_deadline_exceeded and are not reported. Qabzino has no cron: it only does inquiries.
+</div>
+</body>
+</html>

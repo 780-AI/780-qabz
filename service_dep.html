@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231B2A3A%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%231F8A87%22 stroke-width=%223%22/%3E%3Cpath d=%22M18 32h24M34 23l9 9-9 9%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>Service Dep</title>
+<style>
+  body { margin: 0; padding: 36px 40px 28px; background: #F4F6F3; color: #1B2A3A;
+         font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; }
+  h1 { display: inline-block; margin: 0 0 8px; padding-bottom: 10px; border-bottom: 2px solid #1F8A87;
+       font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 24px; font-weight: 400; }
+  p { margin: 8px 0 18px; color: #5E6E7B; font-size: 13px; }
+  #tip { position: absolute; z-index: 10; min-width: 150px; padding: 10px 14px 12px; background: #fff; border-radius: 10px;
+         border-top: 3px solid var(--acc, #7D8FA3); box-shadow: 0 8px 24px rgba(27,42,58,.18); pointer-events: none;
+         opacity: 0; transition: opacity .12s ease; font-size: 13px; }
+  #tip.on { opacity: 1; }
+  #tip b { display: block; margin-bottom: 6px; font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 15px; font-weight: 400; }
+  #tip ul { margin: 0; padding: 0; list-style: none; }
+  #tip li { white-space: nowrap; padding: 2px 0 2px 14px; position: relative; color: #1B2A3A; }
+  #tip li::before { content: ""; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; border-radius: 50%; background: var(--acc, #7D8FA3); }
+  .back-link { position: absolute; top: 5px; left: 40px; z-index: 5; display: inline-block; margin: 0; padding: 4px 12px; border: 1px solid #D5DCE3; border-radius: 999px; background: #fff;
+               font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.4; color: #5E6E7B; text-decoration: none; }
+  .back-link:hover, .back-link:focus-visible { color: #0F5F5C; border-color: #1F8A87; outline: none; }
+  .backbar { display: contents; }
+</style>
+</head>
+<body>
+<a class="back-link" href="index.html">Back</a>
+<h1>Service Dep</h1>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="620" viewBox="0 0 1800 620" style="max-width:100%;height:auto">
+<defs>
+<linearGradient id="p1-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3F5F8"/><stop offset="1" stop-color="#E6EBF1"/></linearGradient>
+<radialGradient id="p1-centre" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#34465A"/><stop offset="1" stop-color="#131D29"/></radialGradient>
+<linearGradient id="p2-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF8EC"/><stop offset="1" stop-color="#FDEBCF"/></linearGradient>
+<radialGradient id="p2-centre" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#D9822B"/><stop offset="1" stop-color="#A8530A"/></radialGradient>
+<linearGradient id="p3-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F3FB"/><stop offset="1" stop-color="#E8E2F4"/></linearGradient>
+<radialGradient id="p3-centre" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#7B66B8"/><stop offset="1" stop-color="#3F2F6B"/></radialGradient>
+<filter id="soft" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2A3A" flood-opacity=".14"/></filter>
+<filter id="liftsoft" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1B2A3A" flood-opacity=".1"/></filter>
+<filter id="lift" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#1B2A3A" flood-opacity=".28"/></filter>
+</defs>
+<style>
+  text { fill: #1B2A3A; }
+  .title { font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 21px; letter-spacing: .4px; }
+  .satt { font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13.5px; font-weight: 600; letter-spacing: .25px; }
+  .centt { font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 26px; letter-spacing: .6px; fill: #fff; }
+  .p1-panel{fill:url(#p1-panel);stroke:#C9D2DC;stroke-width:1} .p1-sat{fill:#fff;stroke:#7D8FA3;stroke-width:1.4;filter:url(#soft)} .p1-spoke{stroke:#7D8FA3;stroke-width:1;stroke-opacity:.55} .p1-orbit{fill:none;stroke:#7D8FA3;stroke-width:1;stroke-opacity:.35;stroke-dasharray:1 5;stroke-linecap:round} .p1-halo{fill:none;stroke:#7D8FA3;stroke-width:1;stroke-opacity:.45} .p1-title{fill:#1B2A3A} .p1-rule{stroke:#7D8FA3;stroke-width:2;stroke-linecap:round} .p1-centre{fill:url(#p1-centre);filter:url(#lift)}
+.p2-panel{fill:url(#p2-panel);stroke:#F2D3A0;stroke-width:1} .p2-sat{fill:#fff;stroke:#E8922A;stroke-width:1.4;filter:url(#soft)} .p2-spoke{stroke:#E8922A;stroke-width:1;stroke-opacity:.55} .p2-orbit{fill:none;stroke:#E8922A;stroke-width:1;stroke-opacity:.35;stroke-dasharray:1 5;stroke-linecap:round} .p2-halo{fill:none;stroke:#E8922A;stroke-width:1;stroke-opacity:.45} .p2-title{fill:#9A5106} .p2-rule{stroke:#E8922A;stroke-width:2;stroke-linecap:round} .p2-centre{fill:url(#p2-centre);filter:url(#liftsoft)}
+.p3-panel{fill:url(#p3-panel);stroke:#D0C6E6;stroke-width:1} .p3-sat{fill:#fff;stroke:#7B68B5;stroke-width:1.4;filter:url(#soft)} .p3-spoke{stroke:#7B68B5;stroke-width:1;stroke-opacity:.55} .p3-orbit{fill:none;stroke:#7B68B5;stroke-width:1;stroke-opacity:.35;stroke-dasharray:1 5;stroke-linecap:round} .p3-halo{fill:none;stroke:#7B68B5;stroke-width:1;stroke-opacity:.45} .p3-title{fill:#43336F} .p3-rule{stroke:#7B68B5;stroke-width:2;stroke-linecap:round} .p3-centre{fill:url(#p3-centre);filter:url(#liftsoft)}
+  @keyframes glow {
+    0%, 100% { opacity: 0; transform: scale(1); }
+    50%      { opacity: .22; transform: scale(1.12); }
+  }
+  .glow { transform-box: fill-box; transform-origin: center; animation: glow 5.5s ease-in-out infinite; }
+  .p1-glow { fill: #7D8FA3; } .p2-glow { fill: #F6B04A; } .p3-glow { fill: #7B68B5; }
+  @media (prefers-reduced-motion: reduce) { .glow { animation: none; opacity: .1; } }
+
+  .dep { cursor: default; outline: none; }
+  .dep circle { transition: stroke-width .15s ease; }
+  .dep:hover circle, .dep:focus circle { stroke-width: 2.8; }
+  .dep:focus-visible circle { stroke-dasharray: 4 3; }
+</style>
+<rect class="p1-panel" x="20" y="16" width="560" height="588" rx="22"/>
+<text class="title p1-title" x="300" y="62" text-anchor="middle">bill service (now)</text>
+<line class="p1-rule" x1="278" y1="76" x2="322" y2="76"/>
+<circle class="p1-orbit" cx="300" cy="340" r="190"/>
+<line class="p1-spoke" x1="300" y1="264" x2="300" y2="198"/>
+<line class="p1-spoke" x1="366" y1="302" x2="423" y2="269"/>
+<line class="p1-spoke" x1="366" y1="378" x2="423" y2="411"/>
+<line class="p1-spoke" x1="300" y1="416" x2="300" y2="482"/>
+<line class="p1-spoke" x1="234" y1="378" x2="177" y2="411"/>
+<line class="p1-spoke" x1="234" y1="302" x2="177" y2="269"/>
+<g class="dep" tabindex="0" data-name="Payment service" data-pal="p1"><circle class="p1-sat" cx="300" cy="150" r="48"/><text class="satt" x="300" y="148" text-anchor="middle">Payment</text><text class="satt" x="300" y="164" text-anchor="middle">service</text></g>
+<g class="dep" tabindex="0" data-name="Parsian" data-pal="p1"><circle class="p1-sat" cx="465" cy="245" r="48"/><text class="satt" x="465" y="250" text-anchor="middle">Parsian</text></g>
+<g class="dep" tabindex="0" data-name="Jiring Switch" data-pal="p1"><circle class="p1-sat" cx="465" cy="435" r="48"/><text class="satt" x="465" y="438" text-anchor="middle">Jiring</text><text class="satt" x="465" y="454" text-anchor="middle">Switch</text></g>
+<g class="dep" tabindex="0" data-name="Irancell" data-pal="p1"><circle class="p1-sat" cx="300" cy="530" r="48"/><text class="satt" x="300" y="534" text-anchor="middle">Irancell</text></g>
+<g class="dep" tabindex="0" data-name="Tavanir" data-pal="p1"><circle class="p1-sat" cx="135" cy="435" r="48"/><text class="satt" x="135" y="440" text-anchor="middle">Tavanir</text></g>
+<g class="dep" tabindex="0" data-name="Qabzino" data-pal="p1"><circle class="p1-sat" cx="135" cy="245" r="48"/><text class="satt" x="135" y="250" text-anchor="middle">Qabzino</text></g>
+<circle class="glow p1-glow" cx="300" cy="340" r="92"/>
+<circle class="p1-halo" cx="300" cy="340" r="76"/>
+<circle class="p1-centre" cx="300" cy="340" r="64"/>
+<text class="centt" x="300" y="344" text-anchor="middle">bill</text>
+<rect class="p2-panel" x="620" y="16" width="560" height="588" rx="22"/>
+<text class="title p2-title" x="900" y="62" text-anchor="middle">qabz (refactored)</text>
+<line class="p2-rule" x1="878" y1="76" x2="922" y2="76"/>
+<circle class="p2-orbit" cx="900" cy="340" r="190"/>
+<line class="p2-spoke" x1="900" y1="264" x2="900" y2="198"/>
+<line class="p2-spoke" x1="966" y1="302" x2="1023" y2="269"/>
+<line class="p2-spoke" x1="966" y1="378" x2="1023" y2="411"/>
+<line class="p2-spoke" x1="900" y1="416" x2="900" y2="482"/>
+<g class="dep" tabindex="0" data-name="Payment service" data-pal="p2"><circle class="p2-sat" cx="900" cy="150" r="48"/><text class="satt" x="900" y="148" text-anchor="middle">Payment</text><text class="satt" x="900" y="164" text-anchor="middle">service</text></g>
+<g class="dep" tabindex="0" data-name="Parsian" data-pal="p2"><circle class="p2-sat" cx="1065" cy="245" r="48"/><text class="satt" x="1065" y="250" text-anchor="middle">Parsian</text></g>
+<g class="dep" tabindex="0" data-name="Jiring Switch" data-pal="p2"><circle class="p2-sat" cx="1065" cy="435" r="48"/><text class="satt" x="1065" y="438" text-anchor="middle">Jiring</text><text class="satt" x="1065" y="454" text-anchor="middle">Switch</text></g>
+<g class="dep" tabindex="0" data-name="Irancell" data-pal="p2"><circle class="p2-sat" cx="900" cy="530" r="48"/><text class="satt" x="900" y="534" text-anchor="middle">Irancell</text></g>
+<circle class="glow p2-glow" cx="900" cy="340" r="92"/>
+<circle class="p2-halo" cx="900" cy="340" r="76"/>
+<circle class="p2-centre" cx="900" cy="340" r="64"/>
+<text class="centt" x="900" y="344" text-anchor="middle">qabz</text>
+<rect class="p3-panel" x="1220" y="16" width="560" height="588" rx="22"/>
+<text class="title p3-title" x="1500" y="62" text-anchor="middle">qabz (in future)</text>
+<line class="p3-rule" x1="1478" y1="76" x2="1522" y2="76"/>
+<circle class="p3-orbit" cx="1500" cy="340" r="190"/>
+<line class="p3-spoke" x1="1500" y1="264" x2="1500" y2="198"/>
+<g class="dep" tabindex="0" data-name="Payment service" data-pal="p3"><circle class="p3-sat" cx="1500" cy="150" r="48"/><text class="satt" x="1500" y="148" text-anchor="middle">Payment</text><text class="satt" x="1500" y="164" text-anchor="middle">service</text></g>
+<circle class="glow p3-glow" cx="1500" cy="340" r="92"/>
+<circle class="p3-halo" cx="1500" cy="340" r="76"/>
+<circle class="p3-centre" cx="1500" cy="340" r="64"/>
+<text class="centt" x="1500" y="344" text-anchor="middle">qabz</text>
+<g transform="translate(600,340)"><circle r="15" fill="#fff" stroke="#B5C0CB" stroke-width="1"/><path d="M-3,-5 L3,0 L-3,5" fill="none" stroke="#5E6E7B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g><g transform="translate(1200,340)"><circle r="15" fill="#fff" stroke="#B5C0CB" stroke-width="1"/><path d="M-3,-5 L3,0 L-3,5" fill="none" stroke="#5E6E7B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+</svg>
+<div id="tip" role="tooltip"></div>
+<script>
+(function () {
+  var DATA = {"Parsian": ["Inquiry", "Order"], "Jiring Switch": ["Inquiry", "Order (only if Parsian is out of service)"], "Irancell": ["Inquiry", "Order"], "Qabzino": ["Inquiry"], "Tavanir": ["Inquiry", "Bill document"], "Payment service": ["Payment"]};
+  var ACC = { p1: "#7D8FA3", p2: "#E8922A", p3: "#7B68B5" };
+  var tip = document.getElementById("tip");
+  function show(g) {
+    var name = g.getAttribute("data-name");
+    var items = DATA[name] || [];
+    tip.innerHTML = "<b>" + name + "</b><ul>" + items.map(function (t) { return "<li>" + t + "</li>"; }).join("") + "</ul>";
+    tip.style.setProperty("--acc", ACC[g.getAttribute("data-pal")]);
+    tip.style.left = "0px"; tip.style.top = "0px";
+    var r = g.querySelector("circle").getBoundingClientRect();
+    var x = r.left + r.width / 2 + window.scrollX;
+    var h = tip.offsetHeight, w = tip.offsetWidth;
+    var above = r.top - h - 12 > 0;
+    var left = Math.max(8, Math.min(x - w / 2, document.documentElement.clientWidth - w - 8));
+    tip.style.left = left + "px";
+    tip.style.top = (above ? r.top + window.scrollY - h - 12 : r.bottom + window.scrollY + 12) + "px";
+    tip.classList.add("on");
+  }
+  function hide() { tip.classList.remove("on"); }
+  Array.prototype.forEach.call(document.querySelectorAll(".dep"), function (g) {
+    g.addEventListener("mouseenter", function () { show(g); });
+    g.addEventListener("mouseleave", hide);
+    g.addEventListener("focus", function () { show(g); });
+    g.addEventListener("blur", hide);
+  });
+})();
+</script>
+
+</body>
+</html>
