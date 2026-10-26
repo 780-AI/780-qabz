@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231B2A3A%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%231F8A87%22 stroke-width=%223%22/%3E%3Cpath d=%22M18 32h24M34 23l9 9-9 9%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>Payment flow</title>
+<style>
+  :root { --ink:#1B2A3A; --slate:#5E6E7B; --teal:#1F8A87; --teal-dk:#0F5F5C; --gold:#C9962B; --line:#C3CFCD; --paper:#F4F6F3; }
+  body { margin: 0; padding: 36px 40px 28px; background: var(--paper); color: var(--ink);
+         font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; }
+  h1 { display: inline-block; margin: 0 0 22px; padding-bottom: 10px; border-bottom: 2px solid var(--teal);
+       font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+       font-size: 24px; font-weight: 400; letter-spacing: .3px; }
+  svg text { font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 13px; fill: var(--ink); }
+  svg .cap { font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11px; fill: var(--slate); letter-spacing: .2px; }
+  svg .fn  { font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11.5px; font-weight: 600; fill: var(--teal-dk); letter-spacing: .2px; }
+  svg .onink { fill: #fff; font-size: 15px; letter-spacing: .4px; }
+  .box   { fill: #fff; stroke: #9FB0B0; stroke-width: 1; }
+  .ext   { fill: #fff; stroke: #9FB0B0; stroke-width: 1; stroke-dasharray: 4 3; }
+  .grp   { fill: none; stroke: var(--line); stroke-width: 1; }
+  .hub   { fill: var(--ink); stroke: none; }
+  .small { fill: #fff; stroke: var(--line); stroke-width: 1; }
+  .arrow { fill: none; stroke: var(--teal); stroke-width: 1.5; marker-end: url(#a); }
+  .arrow.dash  { stroke: #7A8A92; stroke-dasharray: 5 3; marker-end: url(#a-grey); }
+  .arrow.async { stroke: var(--gold); marker-end: url(#a-gold); }
+  .note { margin-top: 14px; max-width: 1050px; font-size: 12px; line-height: 1.6; color: var(--slate); }
+  .key  { margin-top: 10px; font-size: 12px; color: var(--slate); }
+  .key span { display: inline-block; width: 26px; border-top: 2px solid var(--teal); vertical-align: middle; margin: 0 6px 0 18px; }
+  .key span:first-child { margin-left: 0; }
+  .key span.d { border-top: 2px dashed #7A8A92; }
+  .key span.g { border-top-color: var(--gold); }
+  .back-link { position: absolute; top: 5px; left: 40px; z-index: 5; display: inline-block; margin: 0; padding: 4px 12px; border: 1px solid #D5DCE3; border-radius: 999px; background: #fff;
+               font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.4; color: #5E6E7B; text-decoration: none; }
+  .back-link:hover, .back-link:focus-visible { color: #0F5F5C; border-color: #1F8A87; outline: none; }
+  .backbar { display: contents; }
+</style>
+</head>
+<body>
+<a class="back-link" href="index.html">Back</a>
+<h1>Payment flow</h1>
+<svg width="1560" height="445" viewBox="0 0 1560 445" style="max-width:100%;height:auto">
+  <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1F8A87"/></marker>
+    <marker id="a-grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7A8A92"/></marker>
+    <marker id="a-gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C9962B"/></marker>
+    <symbol id="db-light" viewBox="0 0 14 16">
+      <path d="M1,3 V13 A6,2.5 0 0 0 13,13 V3" fill="none" stroke="#fff" stroke-width="1.1"/>
+      <path d="M1,8 A6,2.5 0 0 0 13,8" fill="none" stroke="#fff" stroke-width="1.1"/>
+      <ellipse cx="7" cy="3" rx="3" ry="2.5" fill="none" stroke="#fff" stroke-width="1.1"/>
+    </symbol>
+    <symbol id="db" viewBox="0 0 14 16">
+      <path d="M1,3 V13 A6,2.5 0 0 0 13,13 V3" fill="#fff" stroke="#1B2A3A" stroke-width="1.1"/>
+      <path d="M1,8 A6,2.5 0 0 0 13,8" fill="none" stroke="#1B2A3A" stroke-width="1.1"/>
+      <ellipse cx="7" cy="3" rx="3" ry="2.5" fill="#fff" stroke="#1B2A3A" stroke-width="1.1"/>
+    </symbol>
+  </defs>
+
+  <!-- captions -->
+  <text class="cap" x="20"   y="108">Client</text>
+  <text class="cap" x="390"  y="108">API layer</text>
+  <text class="cap" x="860"  y="108">Payment layer</text>
+  <text class="cap" x="1130" y="52">Provider layer</text>
+  <text class="cap" x="1400" y="108">External</text>
+
+  <!-- boxes -->
+  <rect class="box" x="20" y="120" width="110" height="60" rx="3"/>
+  <text x="75" y="155" text-anchor="middle">App</text>
+
+  <rect class="hub" x="390" y="120" width="130" height="60" rx="3"/>
+  <text class="onink" x="455" y="155" text-anchor="middle">bill</text>
+
+  <rect class="box" x="860" y="120" width="140" height="60" rx="3"/>
+  <text x="930" y="148" text-anchor="middle">Payment service</text>
+  <text class="cap" x="930" y="166" text-anchor="middle">bank redirect</text>
+
+  <rect class="grp" x="1130" y="60" width="170" height="180" rx="3"/>
+  <rect class="small" x="1142" y="72"  width="146" height="34" rx="4"/><text x="1210" y="94"  text-anchor="middle">parsian-v2</text>
+  <rect class="small" x="1142" y="114" width="146" height="34" rx="4"/><text x="1210" y="136" text-anchor="middle">jiring-switch</text>
+  <rect class="small" x="1142" y="156" width="146" height="34" rx="4"/><text x="1210" y="178" text-anchor="middle">irancell</text>
+  <rect class="small" x="1142" y="198" width="146" height="34" rx="4"/><text x="1210" y="220" text-anchor="middle">qabzino</text>
+
+  <rect class="ext" x="1400" y="120" width="110" height="60" rx="3"/>
+  <text x="1455" y="148" text-anchor="middle">Karashab</text>
+  <text class="cap" x="1455" y="166" text-anchor="middle">landline only</text>
+
+  <!-- database icons: services that write to a database -->
+  <use href="#db-light" x="498"  y="126" width="14" height="16"/>
+  <use href="#db" x="1268" y="82"  width="14" height="16"/>
+  <use href="#db" x="1268" y="124" width="14" height="16"/>
+  <use href="#db" x="1268" y="166" width="14" height="16"/>
+  <use href="#db" x="1268" y="208" width="14" height="16"/>
+
+  <!-- 1: app -> bill -->
+  <path class="arrow" d="M130,150 H390"/>
+  <text class="cap" x="260" y="128" text-anchor="middle">1  REST</text>
+  <text class="fn"  x="260" y="142" text-anchor="middle">POST /v1/{type}/order</text>
+
+  <!-- 2: app -> payment (token) -->
+  <path class="arrow" d="M75,120 V70 H980 V120"/>
+  <text class="cap" x="527" y="62" text-anchor="middle">2  order token, user pays at the bank (not in our code)</text>
+
+  <!-- 3: payment -> bill -->
+  <path class="arrow" d="M860,138 H520"/>
+  <text class="cap" x="690" y="116" text-anchor="middle">3  gRPC</text>
+  <text class="fn"  x="690" y="130" text-anchor="middle">PaymentComplete/OrderComplete</text>
+
+  <!-- 5: bill -> payment (result) -->
+  <path class="arrow dash" d="M520,166 H860"/>
+  <text class="cap" x="690" y="184" text-anchor="middle">5  response of OrderComplete</text>
+
+  <!-- 4: bill -> providers -->
+  <path class="arrow" d="M470,180 V300 H1090 V89 H1142"/>
+  <text class="cap" x="490" y="294">4  gRPC</text>
+  <text class="fn"  x="535" y="294">TopBill/Pay</text>
+
+  <path class="arrow" d="M440,180 V322 H1100 V131 H1142"/>
+  <text class="cap" x="490" y="316">4  gRPC</text>
+  <text class="fn"  x="535" y="316">InternalInquiryService/PayBill</text>
+
+  <path class="arrow" d="M410,180 V344 H1110 V173 H1142"/>
+  <text class="cap" x="490" y="338">4  NATS</text>
+  <text class="fn"  x="535" y="338">request, subject irancell-bill</text>
+
+  <!-- 6: bill -> Karashab (landline) -->
+  <path class="arrow dash async" d="M395,180 V374 H1455 V180"/>
+  <text class="cap" x="490" y="368">6  landline, HTTP POST, async</text>
+  <text class="fn"  x="680" y="368">SendPaymentInfo</text>
+
+  <!-- state strip and legend -->
+  <text x="20" y="410">Order state:  initial → in-progress → success | failed | pending   (crons settle pending)</text>
+  <use href="#db" x="20" y="418" width="14" height="16"/>
+  <text class="cap" x="40" y="431">writes to its own database</text>
+</svg>
+
+<div class="key"><span></span>synchronous call<span class="d"></span>response<span class="g"></span>async</div>
+<div class="note">
+  1 App asks bill to create the order (returns a signed token) · 2 App gives the token to the payment service · 3 Payment service calls bill ·
+  4 bill pays the provider for the bill type (Parsian and Jiring Switch over gRPC, Irancell over NATS) · 5 bill returns the result in the response to 3 ·
+  6 Landline only: bill sends the payment info to Karashab. Qabzino is inquiry only, so no payment arrow.
+</div>
+</body>
+</html>

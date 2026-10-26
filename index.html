@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22%231B2A3A%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%231F8A87%22 stroke-width=%223%22/%3E%3Cpath d=%22M18 32h24M34 23l9 9-9 9%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>Refactoring bill to Qabz</title>
+<style>
+  :root { --ink: #1B2A3A; --slate: #5E6E7B; --paper: #F4F6F3; --line: #D5DCE3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 56px 24px 72px; background: var(--paper); color: var(--ink);
+         font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.5; }
+  main { max-width: 920px; margin: 0 auto; }
+  h1 { display: inline-block; margin: 0 0 36px; padding-bottom: 12px; border-bottom: 2px solid #1F8A87;
+       font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 32px; font-weight: 400; letter-spacing: .3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 20px; }
+  a.card { --c: #5E6E7B; display: block; padding: 22px 24px 24px; background: #fff; color: inherit; text-decoration: none;
+           border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 14px; box-shadow: 0 6px 18px rgba(27,42,58,.06);
+           transition: transform .15s ease, box-shadow .15s ease; }
+  a.card:hover, a.card:focus-visible { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(27,42,58,.12); outline: none; }
+  a.card:focus-visible { box-shadow: 0 0 0 3px var(--c), 0 12px 26px rgba(27,42,58,.12); }
+  .card h2 { margin: 0 0 6px; font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif; font-size: 20px; font-weight: 400; color: var(--c); }
+  .card p { margin: 0; font-size: 14px; color: var(--slate); }
+  .c1 { --c: #C86A0C; } .c2 { --c: #1B2A3A; } .c3 { --c: #1F8A87; } .c4 { --c: #4B7BB0; } .c5 { --c: #5B4B8A; } .c6 { --c: #2E8B57; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { a.card { transition: none; } a.card:hover { transform: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Refactoring bill to Qabz</h1>
+  <div class="grid">
+
+    <a class="card c1" href="system.html">
+      <h2>System</h2>
+      <p>The endpoints, config, code structure, database and known issues.</p>
+    </a>
+
+    <a class="card c2" href="service_dep.html">
+      <h2>Service Dep</h2>
+      <p>bill today and qabz after the refactor, side by side, with who each one talks to.</p>
+    </a>
+
+    <a class="card c3" href="qabz-diagram.html">
+      <h2>Payment flow</h2>
+      <p>One bill payment, from the app to the providers, with the endpoint on each arrow.</p>
+    </a>
+
+    <a class="card c4" href="qabz-cron-diagram.html">
+      <h2>Crons</h2>
+      <p>The cron jobs, and what happens to each order they check.</p>
+    </a>
+
+    <a class="card c5" href="database.html">
+      <h2>Databases</h2>
+      <p>The tables of each database. Hover a table to see its columns.</p>
+    </a>
+
+    <a class="card c6" href="implementation_phases.html">
+      <h2>Implementation phases</h2>
+      <p>The six phases, from understanding the system to opening the endpoints.</p>
+    </a>
+
+  </div>
+</main>
+</body>
+</html>
