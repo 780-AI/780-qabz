@@ -1,4 +1,4 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 0.2 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -13,10 +13,10 @@
 | # | Title | Version | Category | Path |
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.0 | Governance | `CLAUDE.md` |
-| 2 | Project README | - | Docs | `README.md` |
-| 3 | Changelog | v1.0 | Governance | `CHANGELOG.md` |
-| 4 | Docs README | - | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.1 | Governance | `docs/documents_manifest.md` |
+| 2 | Project README | v1.1 | Docs | `README.md` |
+| 3 | Changelog | v1.1 | Governance | `CHANGELOG.md` |
+| 4 | Docs README | v1.1 | Docs | `docs/README.md` |
+| 5 | Document & Code Manifest | v0.2 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.1 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -36,6 +36,6 @@
 ## Last Updated
 
 - **Date**: 2026-10-28
-- **Change**: Initial manifest created at project bootstrap (Standard Set v2.8).
-- **Previous change**: none
+- **Change**: Version cells for entries #2 `README.md` and #4 `docs/README.md` corrected `-` → v1.1 to match their VERSION headers; #3 `CHANGELOG.md` v1.0 → v1.1; #5 manifest v0.1 → v0.2.
+- **Previous change**: 2026-10-28 — Initial manifest created at project bootstrap (Standard Set v2.8).
 - **Previous audit**: none
