@@ -1,8 +1,9 @@
-<!-- VERSION: 1.0 -->
+<!-- VERSION: 1.1 -->
 <!-- Last Updated: 2026-10-28 -->
 <!-- Source: docs/standards/ (this repo). Bootstrapped from Standard Set v2.8 (vault commit 8c152cf) on 2026-10-28. -->
 <!--
 CHANGE LOG
+v1.1 — 2026-10-28 — § 4 + § 13: critical design docs moved to docs/initial-discovery/.
 v1.0 — 2026-10-28 — Project bootstrap (Standard Set v2.8).
 -->
 
@@ -326,8 +327,8 @@ See `archive/LESSONS.md` L067 for the incident that motivated this rule.
 ```
 docs/documents_manifest.md           # the version index — always Major
 CLAUDE.md                            # the operating contract — always Major
-docs/system.html                     # system architecture reference — always Major
-docs/database.html                   # database design reference — always Major
+docs/initial-discovery/system.html   # system architecture reference — always Major
+docs/initial-discovery/database.html # database design reference — always Major
 ```
 
 **Drift rule (customize):** when the behavior or design described by a critical document changes, the code and the matching document under `docs/` MUST be updated in the same commit. The code is the dispositive truth; the doc is the navigable reference. If the two disagree, that's a defect — fix one or the other.
@@ -669,7 +670,7 @@ When a pushed commit fails CI:
 - **Cross-cutting project history:** `CHANGELOG.md` (root)
 - **Folder layout authoritative reference:** `docs/folder_structure.md`
 <!-- PROJECT-OWNED:BEGIN (sync preserves this block) -->
-- **Domain behavior:** `docs/system.html` and `docs/database.html` (the design references) until Go source lands; then the domain packages, with the docs kept in sync per § 4
+- **Domain behavior:** `docs/initial-discovery/system.html` and `docs/initial-discovery/database.html` (the design references) until Go source lands; then the domain packages, with the docs kept in sync per § 4
 <!-- PROJECT-OWNED:END -->
 
 If you find content in multiple places, that is a **defect**. Resolve it: keep the canonical one, replace the others with pointers.

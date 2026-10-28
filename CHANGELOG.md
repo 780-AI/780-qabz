@@ -1,12 +1,19 @@
-<!-- VERSION: 1.1 -->
+<!-- VERSION: 1.2 -->
 <!-- Last Updated: 2026-10-28 -->
 <!--
 CHANGE LOG
+v1.2 — 2026-10-28 — Added initial-discovery move + HTML versioning entry.
 v1.1 — 2026-10-28 — Added manifest README version-cell fix entry.
 v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-10-28] — Design docs: move to docs/initial-discovery/, version and register HTML
+- **Type:** Major (Critical File edits: CLAUDE.md, manifest, system.html, database.html) / Docs / Governance
+- **Files:** `docs/initial-discovery/*.html` (7 files moved from `docs/`; each gains a hidden `<!-- VERSION: 1.0 -->` header + CHANGE LOG after the doctype — page content unchanged), `docs/autocharge_feature.html` (deleted by operator decision), `CLAUDE.md` (v1.1; § 4 critical-file paths and § 13 domain-behavior pointer updated), `docs/folder_structure.md` (v0.2; `docs/*.html` → `docs/initial-discovery/`), `docs/README.md` (v1.2; index link), `docs/documents_manifest.md` (v0.3; entries #21–27 added, version cells bumped, Last Updated rotated), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — no code exists yet. Bookmarks or links to the old `docs/*.html` paths break; links between the discovery pages are relative and keep working. Governance scripts do not yet enforce VERSION headers on `.html`; the manifest stamps are maintained by hand.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-10-28] — Manifest: README version cells match their headers
 - **Type:** Major (Critical File edit) / Governance / Manifest
