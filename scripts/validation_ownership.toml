@@ -1,0 +1,13 @@
+# Per VALIDATION_STANDARDS § 4 — ownership map for source files → tests + docs.
+# Add rules as the project's monitored paths grow (Go packages, their tests, their docs).
+#
+# Example rule (adapt for this project):
+# [rules.example]
+# source_paths = ["internal/billing/inquiry.go"]
+# test_paths   = ["internal/billing/inquiry_test.go"]
+# doc_paths    = ["docs/system.html"]
+# strictness   = "strict"
+# require_docs = true
+# reason       = "Billing inquiry — behavior must be tested and documented."
+
+# (empty — no monitored paths at bootstrap)

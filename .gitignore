@@ -3,3 +3,5 @@
 tmp
 .DS_Store
 .claude
+settings.local.json
+docs/Plans/OPEN_TASKS.md
