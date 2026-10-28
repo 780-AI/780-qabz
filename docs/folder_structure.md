@@ -1,7 +1,8 @@
-<!-- VERSION: 0.3 -->
+<!-- VERSION: 0.4 -->
 <!-- Last Updated: 2026-10-28 -->
 <!--
 CHANGE LOG
+v0.4 — 2026-10-28 — OPEN_TASKS.md is committed to git (project deviation from L046).
 v0.3 — 2026-10-28 — Tree brought in line with the repo: every file listed, Critical files marked, branch glyphs fixed.
 v0.2 — 2026-10-28 — Discovery HTML docs moved to docs/initial-discovery/.
 v0.1 — 2026-10-28 — Initial layout at project bootstrap (Standard Set v2.8).
@@ -37,7 +38,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   │   └── VALIDATION_STANDARDS.md
 │   ├── Plans/                         # committed plans (Rule 1)
 │   │   ├── .gitkeep
-│   │   └── OPEN_TASKS.md              # local-only register; gitignored
+│   │   └── OPEN_TASKS.md              # open-tasks register (committed; deviates from L046)
 │   └── initial-discovery/             # discovery and design documents (HTML)
 │       ├── index.html                 # entry page linking the others
 │       ├── system.html                # system architecture (Critical)

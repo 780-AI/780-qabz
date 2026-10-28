@@ -1,9 +1,10 @@
-<!-- VERSION: 1.1 -->
-<!-- Last Updated: 2026-08-17 -->
+<!-- VERSION: 1.2 -->
+<!-- Last Updated: 2026-10-28 -->
 <!-- Source: standards-source/ (canonical, domain-neutral). -->
 <!-- TEMPLATE — the delivery skill copies this to docs/STANDARDS_LOG.md and removes the example entry. -->
 <!--
 CHANGE LOG
+v1.2 — 2026-10-28 — Entry E001 (open-tasks register committed to git).
 v1.1 — 2026-08-17 — Standard Set Version v2.0 (PLAN-009): template banner + instantiation note
 retargeted SETUP.md → the delivery skill (the skill copies this template and removes the example
 entry).
@@ -71,4 +72,11 @@ or, when not adopted:
 
 > Newest at the bottom (append-only).
 
-_(no entries yet)_
+## E001 — Allow the open-tasks register to be committed
+- Date:        2026-10-28
+- Area:        governance
+- Status:      open
+- Context:     The operator chose to commit `docs/Plans/OPEN_TASKS.md` to git instead of keeping it gitignored (L046). The project has a single operator, is single-agent, and its folder is synced between machines (Rule 14).
+- Learned:     For a single-operator repo, L046's gitignored default buys no merge-conflict protection but loses the register's history and leaves it outside the remote.
+- Suggested:   Make "tracked vs local-only" an adopter choice in L046, SESSION_OPENER § 1.3, SESSION_CLOSER § 1.4 and the bootstrap `.gitignore` step.
+- Portability: general

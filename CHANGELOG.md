@@ -1,7 +1,8 @@
-<!-- VERSION: 1.3 -->
+<!-- VERSION: 1.4 -->
 <!-- Last Updated: 2026-10-28 -->
 <!--
 CHANGE LOG
+v1.4 — 2026-10-28 — Added OPEN_TASKS-committed entry.
 v1.3 — 2026-10-28 — Added folder_structure full-tree entry.
 v1.2 — 2026-10-28 — Added initial-discovery move + HTML versioning entry.
 v1.1 — 2026-10-28 — Added manifest README version-cell fix entry.
@@ -9,6 +10,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-10-28] — Open-tasks register: commit to git
+- **Type:** Major (Critical File edits: CLAUDE.md, manifest) / Governance
+- **Files:** `.gitignore` (OPEN_TASKS exclusion removed), `docs/Plans/OPEN_TASKS.md` (now tracked, v1.0 header), `CLAUDE.md` (v1.2; § 1 PROJECT-OWNED note recording the deviation from L046), `docs/documents_manifest.md` (v0.5; #28 added, #1/#3/#5/#6/#9 bumped, Last Updated rotated), `docs/folder_structure.md` (v0.4; tree comment), `docs/STANDARDS_LOG.md` (v1.2; E001 proposes the option upstream), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — governance only. The register is now versioned and pushed; register edits ride in the same commit as the work they record. Suite-owned text (SESSION_OPENER/CLOSER, LESSONS L046) still says "gitignored"; the CLAUDE.md § 1 note overrides it locally until the vault adopts E001.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-10-28] — Folder structure: list every file in the repo
 - **Type:** Major (Critical File edit: manifest) / Docs / Governance

@@ -1,4 +1,4 @@
-<!-- VERSION: 0.4 -->
+<!-- VERSION: 0.5 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -8,20 +8,21 @@
 | Governance + project docs (contract, standards, session docs, READMEs) | 1-17 |
 | Scripts | 18-20 |
 | Initial-discovery design docs (HTML) | 21-27 |
+| Plans (register) | 28 |
 
 ## Manifest Table
 
 | # | Title | Version | Category | Path |
 |---|---|---|---|---|
-| 1 | Operating Contract | v1.1 | Governance | `CLAUDE.md` |
+| 1 | Operating Contract | v1.2 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.3 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.4 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.4 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.3 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.5 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.4 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
-| 9 | Standards Log | v1.1 | Governance | `docs/STANDARDS_LOG.md` |
+| 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
 | 10 | Set Version Adopted | v0.1 | Governance | `docs/SET_VERSION_ADOPTED.md` |
 | 11 | Machine Migration | v0.1 | Governance | `docs/MACHINE_MIGRATION.md` |
 | 12 | CI/CD Standards | v1.1 | Governance | `docs/standards/CICD_STANDARDS.md` |
@@ -40,10 +41,11 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
+| 28 | Open Tasks Register | v1.0 | Governance | `docs/Plans/OPEN_TASKS.md` |
 
 ## Last Updated
 
 - **Date**: 2026-10-28
-- **Change**: #6 `docs/folder_structure.md` v0.2 → v0.3 (tree lists every file in the repo); #3 CHANGELOG v1.3; #5 manifest v0.4.
-- **Previous change**: 2026-10-28 — Added entries #21–27 for the HTML design docs in `docs/initial-discovery/` (moved from `docs/`, VERSION headers added at v1.0; `docs/autocharge_feature.html` removed by the operator, never manifest-listed). Bumped #1 CLAUDE.md v1.1, #3 CHANGELOG v1.2, #4 docs/README v1.2, #5 manifest v0.3, #6 folder_structure v0.2. Quick Index range added.
+- **Change**: Added #28 `docs/Plans/OPEN_TASKS.md` v1.0 (register now committed to git; project deviation from L046). Bumped #1 CLAUDE.md v1.2, #3 CHANGELOG v1.4, #5 manifest v0.5, #6 folder_structure v0.4, #9 STANDARDS_LOG v1.2. Quick Index row added.
+- **Previous change**: 2026-10-28 — #6 `docs/folder_structure.md` v0.2 → v0.3 (tree lists every file in the repo); #3 CHANGELOG v1.3; #5 manifest v0.4.
 - **Previous audit**: none
