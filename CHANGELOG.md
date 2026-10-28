@@ -1,13 +1,20 @@
-<!-- VERSION: 1.2 -->
+<!-- VERSION: 1.3 -->
 <!-- Last Updated: 2026-10-28 -->
 <!--
 CHANGE LOG
+v1.3 — 2026-10-28 — Added folder_structure full-tree entry.
 v1.2 — 2026-10-28 — Added initial-discovery move + HTML versioning entry.
 v1.1 — 2026-10-28 — Added manifest README version-cell fix entry.
 v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-10-28] — Folder structure: list every file in the repo
+- **Type:** Major (Critical File edit: manifest) / Docs / Governance
+- **Files:** `docs/folder_structure.md` (v0.3; tree now lists each file, including the seven `docs/initial-discovery/` pages, `docs/README.md`, the `scripts/*.toml` configs and `.github/workflows/governance.yml`; Critical files marked; `└──` branch glyphs corrected), `docs/documents_manifest.md` (v0.4; #3, #5, #6 bumped; Last Updated rotated), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — layout documentation only.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-10-28] — Design docs: move to docs/initial-discovery/, version and register HTML
 - **Type:** Major (Critical File edits: CLAUDE.md, manifest, system.html, database.html) / Docs / Governance
