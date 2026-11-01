@@ -1,7 +1,8 @@
-<!-- VERSION: 0.4 -->
-<!-- Last Updated: 2026-10-28 -->
+<!-- VERSION: 0.5 -->
+<!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.5 — 2026-11-01 — Added `pb/` (git submodule), `.gitmodules` and `Implementation_Plan.md` to the tree.
 v0.4 — 2026-10-28 — OPEN_TASKS.md is committed to git (project deviation from L046).
 v0.3 — 2026-10-28 — Tree brought in line with the repo: every file listed, Critical files marked, branch glyphs fixed.
 v0.2 — 2026-10-28 — Discovery HTML docs moved to docs/initial-discovery/.
@@ -18,6 +19,8 @@ Authoritative layout reference (CLAUDE.md § 13).
 ├── README.md                          # project entry point
 ├── CHANGELOG.md                       # cross-cutting project history
 ├── .gitignore
+├── .gitmodules                        # git submodule config (pb)
+├── pb/                                # git submodule: shared protobuf definitions (read-only; not manifest-tracked)
 ├── archive/                           # historical material; not manifest-tracked
 │   └── LESSONS.md                     # numbered lessons (L0NN) behind the rules
 ├── docs/
@@ -38,6 +41,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   │   └── VALIDATION_STANDARDS.md
 │   ├── Plans/                         # committed plans (Rule 1)
 │   │   ├── .gitkeep
+│   │   ├── Implementation_Plan.md     # step list for the Qabz implementation (PLAN-001 draft)
 │   │   └── OPEN_TASKS.md              # open-tasks register (committed; deviates from L046)
 │   └── initial-discovery/             # discovery and design documents (HTML)
 │       ├── index.html                 # entry page linking the others

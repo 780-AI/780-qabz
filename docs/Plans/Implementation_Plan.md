@@ -1,0 +1,139 @@
+<!-- VERSION: 0.3 -->
+<!-- Last Updated: 2026-11-01 -->
+<!--
+CHANGE LOG
+v0.3 — 2026-11-01 — Step 2 done: `pb` submodule added; decided details recorded.
+v0.2 — 2026-10-28 — Step list changed from a table to one section per step.
+v0.1 — 2026-10-28 — Skeleton created. Step 1 recorded as skipped (already done). Further steps to be added later.
+-->
+
+# Implementation Plan
+
+**Status:** DRAFT (sketching steps)
+**Related:** `docs/Plans/OPEN_TASKS.md` (PLAN-001 entry), `docs/initial-discovery/implementation_phases.html`
+
+> This file holds the step list for the Qabz implementation. Each step has its own section.
+> Each step starts as a short summary. Detail (transformation rules, ALLOWLIST, QA, rollback, acceptance) is added just before the step starts.
+
+---
+
+## Step 1 — Bootstrap the project using Standard DocSet
+
+**Status:** ⏭ skipped (already done)
+
+The project is already bootstrapped with Standard DocSet. This step is recorded for documentation only. No work is needed.
+
+---
+
+## Step 2 — Add the protobuf repository as a git submodule
+
+**Status:** ✅ done (2026-11-01)
+
+Add `https://p-source.780.ir/general/backend/pb` to this repository as a git submodule. The submodule gives the project the protobuf definitions it needs before any Go code starts.
+
+Decided and done (2026-11-01):
+- Branch: `qabz_service`. The operator ran `git submodule add` and checked out this branch. `.gitmodules` has no `branch =` line, so the pin (not the branch name) controls the version.
+- Commit pinned: `dde218e14be8815b060c1cc93d64ae6ebdedd2cb` ("qabz service:: duplicated bill directory to start qabz service from there on").
+- Path: `pb/` at the repository root (`system.html`, "Directory Structure").
+- Subdirectory for protobuf files: not decided. `pb/` has a `proto/` directory. Step 3 confirms the base path.
+
+QA scenario (Rule 11): see `OPEN_TASKS.md`, "Pending verification". Verification of the new behavior (Rule 15): a fresh clone with `--recurse-submodules` shows the pinned commit.
+
+---
+
+## Step 3 — Add a Makefile to generate Go code from the protobuf files
+
+**Status:** ⏸ pending
+
+Add a `Makefile` with a target that generates Go code from the `.proto` files of the Step 2 submodule. The generated code is the base for the gRPC server and the providers in the next steps.
+
+Details are not decided yet. They are set when this step starts:
+- Generation tool (`protoc` or `buf`)
+- Output directory for the generated Go code
+- Go module path (it sets the `go_package` mapping)
+- Whether the generated code is committed or generated at build time
+
+---
+
+## Step 4 — Add a docker-compose file for local development
+
+**Status:** ⏸ pending
+
+Add a `docker-compose.yml` with three services:
+- `postgres` — the database
+- `redis` — the cache
+- `qabz` — the service itself. The service is completed in the steps that follow. At this step it is only a placeholder entry.
+
+Details are not decided yet. They are set when this step starts:
+- Image versions for `postgres` and `redis`
+- Ports, volumes and credentials (environment variables, not committed secrets)
+- How the `qabz` image is built (Dockerfile location)
+- Health checks and start order between the services
+
+---
+
+## Step 5 — Code: base skeleton and system modules
+
+**Status:** ⏸ pending
+
+Create the base code skeleton of the service and the system modules that connect it to its infrastructure. The structure follows the "Directory Structure" section of `docs/initial-discovery/system.html`:
+- `cmd/` — `start-app` and `migrate` commands
+- `config/` — settings
+- `system/` — `postgres`, `redis`, `kafka`, `nats`, `etcd` (connections, made once at startup)
+- `common/` — shared packages needed by the system modules (for example logging)
+- `common/monitoring/` — the base of the monitoring package (`prometheus/` and `jaeger/`): setup and registration only. The use of it in middleware belongs to Step 6. The Jaeger part is to be decided later.
+
+**Prometheus switch (mandatory, 2026-10-28):** Prometheus comes with a setting in `config/`. A call to record a metric has an effect only when the setting is on. When the setting is off, every call has no effect: nothing is recorded and no metric is registered. The setting is on by default. It is off only when it is explicitly set to off. A test must show this for the default, the explicit on and the explicit off. Tests can also turn metrics off, so a test can run without any metric registered.
+
+**Testable app (mandatory, 2026-10-28):** the service has an app object that tests can construct anywhere. The app receives its dependencies from the caller. Dependencies are injectable: the databases (Postgres, Redis and the others), the config, and the other external services. The app does not read global state or create its own connections inside its constructor. A test passes a test database, a test config or a mock in the same way that `start-app` passes the real ones.
+
+**Logging policy (mandatory, 2026-10-28):** logs report serious errors only. Metrics handle most errors, not logs. This avoids log spam.
+- Allowed: error-level logs for serious errors, and info logs for bootstrapping (for example "Database connected successfully").
+- Not allowed: info or debug logs in request paths or loops.
+- Each layer decides which errors are serious enough for a log and which only need a metric.
+
+Layout decision (2026-10-28): the layout is the one in the design doc. All folders stay at the repository root. There is no `internal/` folder.
+
+The database layer uses raw queries. It does not use an ORM (`system.html`, section "Database").
+
+Details are not decided yet. They are set when this step starts:
+- Which `common/` packages belong to this step and which go to a later step
+- Which system modules to build now (all five, or a first set)
+- Go module path and Go version
+- Libraries for each connection (for example the Postgres driver and the Kafka client)
+- Whether the `.go` files carry a VERSION header (CLAUDE.md § 7 covers `.py` and `.sh` only)
+
+---
+
+## Step 6 — Code: Endpoints implementation
+
+**Status:** ⏸ pending
+
+This is the longest step. Implement the endpoints one by one, according to the docs and specifications. The sources are `docs/initial-discovery/system.html` and `docs/initial-discovery/implementation_phases.html` (phase 4). The protobuf messages come from the Step 2 submodule.
+
+Each endpoint is its own sub-task. Each sub-task has its own QA scenario (Rule 11) and its own verification of the new behavior (Rule 15). Because the step is long, it needs the sibling tracker `PLAN-001_tracker.md` (CLAUDE.md § 15.7).
+
+**Test requirement (mandatory, 2026-10-28):** every endpoint must have aggressive test coverage. An endpoint is not done until both kinds of test exist and pass:
+- **Unit tests** — cover the endpoint logic, including edge cases and error paths.
+- **Integration tests** — run against a real database and against mocks of the outbound providers and other external services.
+
+An endpoint without both kinds of test does not close its sub-task.
+
+**Middleware requirement (mandatory, 2026-10-28):** every endpoint is bundled with these middleware:
+- **Prometheus request duration** — records the duration of each request as a metric (`qabz_` prefix, time in seconds, per `system.html`).
+- **Recovery** — catches a panic in the handler and returns an error instead of crashing the process.
+- **Tracing** — creates a trace span for each request. The Jaeger details are to be decided later.
+
+The middleware tests are part of the endpoint test requirement above. The base of `common/monitoring/` is built in Step 5. This step uses it and invokes it in the middleware. The Prometheus middleware follows the Prometheus switch from Step 5: with the switch off, it has no effect.
+
+**Monitoring requirement (mandatory, 2026-10-28):** every feature comes with the monitoring it needs. A feature is not done without it. The implementer decides what each layer needs, and states it in the sub-task.
+- **Prometheus** — metrics for the behavior of the feature (counts, errors, durations). Names follow `system.html`: `qabz_` prefix, time in seconds. Errors are handled by metrics first.
+- **Logs** — follow the Step 5 logging policy: serious errors only. No info logs in request paths.
+- **Jaeger** — to be decided later. Do not design the Jaeger part until the operator decides it.
+
+Each sub-task lists the metrics and the logs it adds. The tests check the metrics (CLAUDE.md Rule 15 evidence). Tests that construct the app turn metrics off or use a test config, per the Step 5 rules.
+
+Details are not decided yet. They are set when this step starts:
+- The list of endpoints and their order
+- Whether the outbound providers (`ParsianProxy`, `JiringProxy`, `IrancellProxy`, `Qabzino`, `Tavanir`) are sub-tasks of this step or a separate step
+- The spec source for each endpoint

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.0 -->
-<!-- Last Updated: 2026-10-28 -->
+<!-- VERSION: 1.1 -->
+<!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.1 — 2026-11-01 — Code-layout decision recorded; Implementation_Plan Step 2 (pb submodule) done; Pending verification section added.
 v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 -->
 
@@ -21,13 +22,18 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 ## Operator decisions needed (before PLAN-001 Step 2.1 detail)
 
 - Plan structure: A (one plan, detailed in stages — recommended) or B (roadmap + one plan per step).
-- Code layout: standard Go layout at repo root — `cmd/qabz/`, `internal/`, `api/proto/`,
-  `migrations/`, `deploy/`; no `src/` (recommended 2026-10-28; not confirmed).
+- Code layout: DECIDED 2026-10-28 — follow the "Directory Structure" in `system.html` as written.
+  All folders at the repo root; no `internal/`. No doc change needed for the layout.
 - Go module path, Go version, gRPC port.
 - DB engine + migration tool (check `database.html` first); grpc-gateway or plain gRPC only;
-  where the existing `.proto` files live.
+  (the `.proto` files live in the `pb/` submodule — Step 2 done.)
 - `.go` versioning: VERSION header per file, or git history + tags (recommended). Affects
   CLAUDE.md § 7 and Rule 8.
+
+## Pending verification (Rule 11)
+
+- ⏸ Step 2 `pb` submodule — fresh clone check. Run `git clone --recurse-submodules <qabz repo URL> /tmp/qabz-check`.
+  Pass: `/tmp/qabz-check/pb/proto` exists and `git -C /tmp/qabz-check/pb rev-parse HEAD` prints `dde218e14be8815b060c1cc93d64ae6ebdedd2cb`.
 
 ## Maintenance / housekeeping
 

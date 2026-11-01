@@ -1,7 +1,8 @@
-<!-- VERSION: 1.4 -->
-<!-- Last Updated: 2026-10-28 -->
+<!-- VERSION: 1.5 -->
+<!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.5 — 2026-11-01 — Added pb-submodule entry.
 v1.4 — 2026-10-28 — Added OPEN_TASKS-committed entry.
 v1.3 — 2026-10-28 — Added folder_structure full-tree entry.
 v1.2 — 2026-10-28 — Added initial-discovery move + HTML versioning entry.
@@ -10,6 +11,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — Implementation Plan Step 2: add `pb` protobuf repository as a git submodule
+- **Type:** Major (new top-level area; Critical File edit: manifest) / Dependency
+- **Files:** `.gitmodules` (new), `pb` (gitlink, pinned to `dde218e`, branch `qabz_service`), `docs/Plans/Implementation_Plan.md` (v0.3; new in git, Step 2 marked done), `docs/Plans/OPEN_TASKS.md` (v1.1; layout decision, QA scenario), `docs/folder_structure.md` (v0.5), `docs/documents_manifest.md` (v0.6; #29 added), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — no Go code exists yet. A clone now needs `git clone --recurse-submodules` (or `git submodule update --init`) to get `pb/`. The submodule URL needs access to `p-source.780.ir`. The GitHub Actions governance workflow does not fetch submodules; it does not need them.
+- **QA scenarios:** ⏸ Fresh clone with `--recurse-submodules`: `pb/proto` exists and `pb` is at `dde218e14be8815b060c1cc93d64ae6ebdedd2cb`.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-10-28] — Open-tasks register: commit to git
 - **Type:** Major (Critical File edits: CLAUDE.md, manifest) / Governance
