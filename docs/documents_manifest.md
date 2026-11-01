@@ -1,4 +1,4 @@
-<!-- VERSION: 0.8 -->
+<!-- VERSION: 0.9 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -17,9 +17,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.3 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.7 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.8 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.8 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.9 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.7 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -49,8 +49,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-01
-- **Change**: Added #30 `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` v0.1 (shared definitions incl. hot path, memory pool and Poolable, JSON policy). Bumped #1 CLAUDE.md v1.3, #3 CHANGELOG v1.7, #5 manifest v0.8, #6 folder_structure v0.7, #29 plan v0.5. Quick Index row added.
-- **Previous change**: 2026-11-01 — Added #29 `docs/Plans/Implementation_Plan.md` v0.4 (Step 2 done: `pb` submodule; Step 3 `Makefile` added). Bumped #3 CHANGELOG v1.6, #5 manifest v0.7, #6 folder_structure v0.6, #28 OPEN_TASKS v1.2. Quick Index row updated. The `pb/` submodule is not manifest-tracked (external repository content).
+- **Change**: History rewrite entry (author email change; Rule 3 waived). Bumped #3 CHANGELOG v1.8, #5 manifest v0.9.
+- **Previous change**: 2026-11-01 — Added #30 `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` v0.1 (shared definitions incl. hot path, memory pool and Poolable, JSON policy). Bumped #1 CLAUDE.md v1.3, #3 CHANGELOG v1.7, #5 manifest v0.8, #6 folder_structure v0.7, #29 plan v0.5. Quick Index row added.
+- **Earlier change**: 2026-11-01 — Added #29 `docs/Plans/Implementation_Plan.md` v0.4 (Step 2 done: `pb` submodule; Step 3 `Makefile` added). Bumped #3 CHANGELOG v1.6, #5 manifest v0.7, #6 folder_structure v0.6, #28 OPEN_TASKS v1.2. Quick Index row updated. The `pb/` submodule is not manifest-tracked (external repository content).
 - **Earlier change**: 2026-10-28 — Added #28 `docs/Plans/OPEN_TASKS.md` v1.0 (register now committed to git; project deviation from L046). Bumped #1 CLAUDE.md v1.2, #3 CHANGELOG v1.4, #5 manifest v0.5, #6 folder_structure v0.4, #9 STANDARDS_LOG v1.2. Quick Index row added.
 - **Earlier change**: 2026-10-28 — #6 `docs/folder_structure.md` v0.2 → v0.3 (tree lists every file in the repo); #3 CHANGELOG v1.3; #5 manifest v0.4.
 - **Previous audit**: none

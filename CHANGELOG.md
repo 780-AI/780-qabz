@@ -1,7 +1,8 @@
-<!-- VERSION: 1.7 -->
+<!-- VERSION: 1.8 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.8 — 2026-11-01 — Added history-rewrite entry.
 v1.7 — 2026-11-01 — Added project-conventions entry.
 v1.6 — 2026-11-01 — Added Makefile (`make proto`) entry.
 v1.5 — 2026-11-01 — Added pb-submodule entry.
@@ -13,6 +14,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — History rewrite: author and committer email changed
+- **Type:** Major (history rewrite of pushed commits; operator-authorized waiver of Rule 3)
+- **Files:** none — only commit metadata changed (the old Gmail address to `mostafa.t@780.team`, author and committer, all commits on `main`). `CHANGELOG.md` (this entry), `docs/documents_manifest.md` (v0.9)
+- **Impact:** No runtime impact. Every commit SHA on `main` changed and `main` was force-pushed (`--force-with-lease`). Other clones must reset to the new `main`; old SHA links break. Rule 3 (no force-push of pushed commits) was waived by the operator for this one operation, on 2026-11-01. Backup of the old history: local branch `backup/pre-email-rewrite-2026-11-01` (not pushed).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — Project conventions: JSON unmarshalling policy
 - **Type:** Major (Critical File edit: CLAUDE.md, manifest; new standards file)
