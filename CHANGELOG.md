@@ -1,7 +1,8 @@
-<!-- VERSION: 1.13 -->
+<!-- VERSION: 1.14 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.14 — 2026-11-01 — Added yml_to_env upper-case-flag entry.
 v1.13 — 2026-11-01 — Added encoding/json-ban entry.
 v1.12 — 2026-11-01 — Added yml_to_env entry.
 v1.11 — 2026-11-01 — Added docker-compose entry.
@@ -19,6 +20,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — scripts/yml_to_env: -u / --upper-case flag; names lower case by default
+- **Type:** Major (CLI change; the default output changes)
+- **Files:** `scripts/yml_to_env/yml_to_env.sh` (v0.2), `scripts/yml_to_env/yml_to_env_test.sh` (v0.2), `docs/Plans/Implementation_Plan.md` (v0.9), `docs/Plans/OPEN_TASKS.md` (v1.7), `docs/documents_manifest.md` (v0.15; #31, #32, #28, #29 bumped), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, the default behavior changes. Before: variable names kept the key case of the YAML (`DB: {Host: x}` gave `DB_Host=x`). Now: names are lower case by default (`db_host=x`); `-u` or `--upper-case` gives `DB_HOST=x`. Values never change. If the case change makes two names equal (`Db` and `db`), the tool stops with exit 1 and writes nothing. The tool has no user in the repository yet (`docker-compose.yml` does not call it), so no migration is needed. `docker-compose.yml` and `.env.example` use upper-case names, so a future call must use `-u`. Exit code 2 (usage) for an unknown option, including `--upper-case=value`.
+- **QA scenarios:** ⏸ See `OPEN_TASKS.md`, "Pending verification" (yml_to_env). **Verification run (Rule 15, 2026-11-01):** `bash scripts/yml_to_env/yml_to_env_test.sh` printed `102 passed, 0 failed` on bash 3.2.57 (macOS), 4.4.23 and 5.2.37 (Docker images). Deliberate-failure check: `-u` set to do nothing made 10 checks fail. Manual run: `-u` on `db: {Host: localhost, pass: p w}` gave `DB_HOST=localhost` and `DB_PASS='p w'`; without the flag, `db_host=localhost`. Not run: `shellcheck` (not installed).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — Convention: `encoding/json` (v1) is forbidden; the code-reviewer rejects it
 - **Type:** Major (binding convention; Critical File edit: manifest)

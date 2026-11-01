@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================
-# VERSION: 0.1
+# VERSION: 0.2
 # Tests for yml_to_env.sh. Plain bash, no test framework.
 #
 # Usage:
@@ -9,6 +9,7 @@
 # Run it with the oldest bash you support (macOS /bin/bash is 3.2) and with a new bash.
 #
 # CHANGE LOG
+# v0.2 — 2026-11-01 18:30 — Tests for -u / --upper-case; the default key case is now lower.
 # v0.1 — 2026-11-01 17:00 — Initial version.
 # ==============================================================
 set -u
@@ -83,7 +84,9 @@ t_out "CRLF line endings" $'a=1\nb_c=2\n' $'a: 1\r\nb:\r\n  c: 2\r\n'
 t_out "underscore start" $'_x=1\n' $'_x: 1\n'
 t_out "numeric key after a prefix" $'a_1=x\n' $'a:\n  1: x\n'
 t_out "value with colons" $'url=http://a:80/b\n' $'url: http://a:80/b\n'
-t_out "key case is kept" $'DB_Host=h\n' $'DB:\n  Host: h\n'
+t_out "key case is lowered by default" $'db_host=h\n' $'DB:\n  Host: h\n'
+t_out "lower case: digits and _ stay, list index kept" $'srv_0_host_2=x\n' $'SRV:\n  - Host_2: x\n'
+t_out "lower case: values are not changed" $'k=ABC\nv=\'Mixed Case\'\n' $'K: ABC\nV: Mixed Case\n'
 
 # --- quoting ----------------------------------------------------------------
 t_out "plain safe value" $'k=a/b:c,d.e-f_g@h+i%j=k\n' $'k: a/b:c,d.e-f_g@h+i%j=k\n'
@@ -134,6 +137,36 @@ t_err "list item under a value" "unexpected list item" $'a: 1\n- x\n'
 t_err "key without colon" "expected 'key: value'" $'a:b\n'
 t_err "error names the line" "line 3" $'a: 1\nb: 2\nc d: 3\n'
 
+# --- letter case flag -------------------------------------------------------
+# t_flag NAME EXPECTED_STDOUT INPUT FLAGS...
+t_flag() {
+  local name=$1 want=$2 input=$3
+  shift 3
+  convert "$input" "$@"
+  if [[ $CODE -ne 0 ]]; then bad "$name" "exit code $CODE, stderr: $STDERR"; return; fi
+  if [[ $STDOUT != "$want" ]]; then bad "$name" "want: $(printf '%q' "$want")" "got:  $(printf '%q' "$STDOUT")"; return; fi
+  pass
+}
+UP_IN=$'db:\n  Host: h\n  ports:\n    - 1\nSrv_Name: Mixed Case\n'
+UP_OUT=$'DB_HOST=h\nDB_PORTS_0=1\nSRV_NAME=\'Mixed Case\'\n'
+LOW_OUT=$'db_host=h\ndb_ports_0=1\nsrv_name=\'Mixed Case\'\n'
+t_flag "-u gives upper case names, values kept" "$UP_OUT" "$UP_IN" -u
+t_flag "--upper-case gives upper case names" "$UP_OUT" "$UP_IN" --upper-case
+t_flag "no flag gives lower case names" "$LOW_OUT" "$UP_IN"
+t_flag "-u after a name that is already upper case" $'A_B=1\n' $'A:\n  B: 1\n' -u
+t_flag "-u keeps digits and underscore" $'_X1_Y=1\n' $'_x1:\n  y: 1\n' -u
+t_flag "-u and --upper-case together" $'A=1\n' $'a: 1\n' -u --upper-case
+t_err_flag() { # NAME MESSAGE_FRAGMENT INPUT FLAGS...
+  local name=$1 frag=$2 input=$3
+  shift 3
+  convert "$input" "$@"
+  if [[ $CODE -ne 1 || -n $STDOUT || $STDERR != *"$frag"* ]]; then bad "$name" "exit $CODE, stdout: $STDOUT, stderr: $STDERR"; return; fi
+  pass
+}
+t_err_flag "case change makes two names equal (lower)" "same variable name 'db'" $'Db: 1\ndb: 2\n'
+t_err_flag "case change makes two names equal (upper)" "same variable name 'DB'" $'Db: 1\ndb: 2\n' -u
+t_err_flag "names that differ only by case, nested" "same variable name 'a_b'" $'A_b: 1\na:\n  B: 2\n'
+
 # --- command line -----------------------------------------------------------
 CFG="$TMP/config.yml"
 printf 'db:\n  host: h\n' >"$CFG"
@@ -169,6 +202,21 @@ out=$(bash "$TOOL" "$CFG" "$CFG" 2>&1); code=$?
 if [[ $code -eq 2 ]]; then pass; else bad "cli: two input files" "exit $code"; fi
 out=$(bash "$TOOL" -o 2>&1); code=$?
 if [[ $code -eq 2 ]]; then pass; else bad "cli: -o without a value" "exit $code"; fi
+
+out=$(bash "$TOOL" -u "$CFG" 2>&1); code=$?
+if [[ $code -eq 0 && $out == 'DB_HOST=h' ]]; then pass; else bad "cli: -u with a file" "exit $code, output: $out"; fi
+out=$(bash "$TOOL" --upper-case -o "$TMP/up.env" "$CFG" 2>&1); code=$?
+if [[ $code -eq 0 && -z $out && $(cat "$TMP/up.env") == 'DB_HOST=h' ]]; then pass; else bad "cli: --upper-case with -o" "exit $code, output: $out"; fi
+out=$(bash "$TOOL" -uo "$TMP/joined.env" "$CFG" 2>&1); code=$?
+if [[ $code -eq 0 && -z $out && $(cat "$TMP/joined.env") == 'DB_HOST=h' ]]; then pass; else bad "cli: -uo joined flags" "exit $code, output: $out"; fi
+out=$(bash "$TOOL" -o "$TMP/lo.env" -u "$CFG" 2>&1); code=$?
+if [[ $code -eq 0 && $(cat "$TMP/lo.env") == 'DB_HOST=h' ]]; then pass; else bad "cli: -o before -u" "exit $code, output: $out"; fi
+out=$(bash "$TOOL" --lower-case "$CFG" 2>&1); code=$?
+if [[ $code -eq 2 && $out == *"usage"* ]]; then pass; else bad "cli: unknown long option" "exit $code, output: $out"; fi
+out=$(bash "$TOOL" --upper-case=1 "$CFG" 2>&1); code=$?
+if [[ $code -eq 2 && $out == *"usage"* ]]; then pass; else bad "cli: --upper-case with a value" "exit $code, output: $out"; fi
+out=$(bash "$TOOL" -u 2>&1); code=$?
+if [[ $code -eq 2 && $out == *"usage"* ]]; then pass; else bad "cli: -u without an input file" "exit $code, output: $out"; fi
 
 printf '\n%d passed, %d failed (bash %s)\n' "$passed" "$failed" "$BASH_VERSION"
 if [[ $failed -ne 0 ]]; then exit 1; fi

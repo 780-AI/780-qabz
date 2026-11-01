@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 # ==============================================================
-# VERSION: 0.1
+# VERSION: 0.2
 # yml_to_env — convert a YAML config file into environment variables (.env format).
 #
 # Usage:
 #   bash scripts/yml_to_env/yml_to_env.sh config.yml          # print to stdout
 #   bash scripts/yml_to_env/yml_to_env.sh -o .env config.yml  # write a file (mode 0600)
+#   bash scripts/yml_to_env/yml_to_env.sh -u config.yml       # upper-case names (DB_HOST=x)
 #   cat config.yml | bash scripts/yml_to_env/yml_to_env.sh -  # read stdin
 #
+# Options:
+#   -o FILE             write to FILE (mode 0600) instead of stdout
+#   -u, --upper-case    make the variable names upper case (default: lower case)
+#
 # Rules:
-#   - Nested keys join with "_":  db: {host: x}  ->  db_host=x   (key case is kept)
+#   - Nested keys join with "_":  db: {host: x}  ->  db_host=x
+#   - Names are lower case by default (DB: {Host: x} -> db_host=x); -u / --upper-case gives
+#     DB_HOST=x. Only the names change, never the values. If the case change makes two
+#     names equal (Db and db), the tool stops with an error.
 #   - A list item gets its index:  db: [a, b]  ->  db_0=a  db_1=b ;  - host: x  ->  srv_0_host=x
 #   - A null (key: , key: ~, key: null) gives an empty value. {} and [] give nothing.
 #   - Values keep their YAML text (1.10 stays 1.10). A value with a space or a special
@@ -26,6 +34,7 @@
 # Exit codes: 0 ok, 1 input/conversion error (no output written), 2 usage error.
 #
 # CHANGE LOG
+# v0.2 — 2026-11-01 18:30 — Add -u / --upper-case. Variable names are now lower case by default (was: key case kept).
 # v0.1 — 2026-11-01 17:00 — Initial version.
 # ==============================================================
 set -euo pipefail
@@ -36,6 +45,9 @@ re_key='^([^:]+):([[:space:]]+(.*))?$'
 re_name='^[A-Za-z_][A-Za-z0-9_]*$'
 re_part='^[A-Za-z0-9_]+$'
 re_plain='^[A-Za-z0-9_@%+=:,./-]*$'
+LOWER_CHARS=abcdefghijklmnopqrstuvwxyz
+UPPER_CHARS=ABCDEFGHIJKLMNOPQRSTUVWXYZ
+UPPER=0    # 1 = upper-case variable names (-u)
 
 OUT=""
 NAMES=$'\n'
@@ -56,7 +68,22 @@ PATHV=""
 die() { printf '%s: %s\n' "$SELF" "$*" >&2; exit 1; }
 fail() { die "line $LINE_NO: $*"; }
 
-usage() { printf 'usage: yml_to_env.sh [-o file] <file.yml | ->\n' >&2; }
+usage() { printf 'usage: yml_to_env.sh [-u|--upper-case] [-o file] <file.yml | ->\n' >&2; }
+
+# fold_case NAME -> sets FOLDED. Lower case, or upper case when UPPER=1. Pure bash (no tr):
+# bash 3.2 has no ${var^^}. The name is already checked, so it holds only A-Z, a-z, 0-9 and _.
+fold_case() {
+  local s=$1 from=$UPPER_CHARS to=$LOWER_CHARS ch pre i
+  if ((UPPER == 1)); then from=$LOWER_CHARS; to=$UPPER_CHARS; fi
+  FOLDED=""
+  for ((i = 0; i < ${#s}; i++)); do
+    ch=${s:i:1}
+    case $from in
+      *"$ch"*) pre=${from%%"$ch"*}; ch=${to:${#pre}:1} ;;
+    esac
+    FOLDED+=$ch
+  done
+}
 
 push() { # col seg kind
   S_col[depth]=$1; S_seg[depth]=$2; S_kind[depth]=$3; S_pend[depth]=0; S_cnt[depth]=0; S_item[depth]=0
@@ -95,6 +122,8 @@ quote_value() {
 emit() { # name value
   local name=$1
   [[ $name =~ $re_name ]] || fail "'$name' is not a valid variable name (use letters, digits and _; do not start with a digit)"
+  fold_case "$name"
+  name=$FOLDED
   case $NAMES in
     *$'\n'"$name"$'\n'*) fail "two keys give the same variable name '$name'" ;;
   esac
@@ -271,9 +300,16 @@ process() {
 main() {
   local opt outfile="" tmp
   OPTIND=1
-  while getopts ":o:" opt; do
+  while getopts ":o:u-:" opt; do
     case $opt in
       o) outfile=$OPTARG ;;
+      u) UPPER=1 ;;
+      -) # long option: getopts gives opt='-' and OPTARG='upper-case'
+        case $OPTARG in
+          upper-case) UPPER=1 ;;
+          *) usage; exit 2 ;;
+        esac
+        ;;
       *) usage; exit 2 ;;
     esac
   done

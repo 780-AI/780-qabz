@@ -1,4 +1,4 @@
-<!-- VERSION: 0.14 -->
+<!-- VERSION: 0.15 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -42,17 +42,18 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.6 | Governance | `docs/Plans/OPEN_TASKS.md` |
-| 29 | Implementation Plan | v0.8 | Plan | `docs/Plans/Implementation_Plan.md` |
+| 28 | Open Tasks Register | v1.7 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 29 | Implementation Plan | v0.9 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.3 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
-| 31 | YAML to env converter | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env.sh` |
-| 32 | YAML to env converter tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.sh` |
+| 31 | YAML to env converter | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.sh` |
+| 32 | YAML to env converter tests | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env_test.sh` |
 
 ## Last Updated
 
 - **Date**: 2026-11-01
-- **Change**: `encoding/json` (v1) forbidden: #30 conventions v0.3. Bumped #3 CHANGELOG v1.13, #5 manifest v0.14.
-- **Previous change**: 2026-11-01 — Added #31 `scripts/yml_to_env/yml_to_env.sh` and #32 `yml_to_env_test.sh` (Bash). Bumped #3 CHANGELOG v1.12, #5 manifest v0.13, #6 folder_structure v0.11, #28 OPEN_TASKS v1.6, #29 plan v0.8.
+- **Change**: `yml_to_env` gets `-u` / `--upper-case`; names lower case by default: #31 and #32 v0.2. Bumped #3 CHANGELOG v1.14, #5 manifest v0.15, #28 OPEN_TASKS v1.7, #29 plan v0.9.
+- **Previous change**: 2026-11-01 — `encoding/json` (v1) forbidden: #30 conventions v0.3. Bumped #3 CHANGELOG v1.13, #5 manifest v0.14.
+- **Earlier change**: 2026-11-01 — Added #31 `scripts/yml_to_env/yml_to_env.sh` and #32 `yml_to_env_test.sh` (Bash). Bumped #3 CHANGELOG v1.12, #5 manifest v0.13, #6 folder_structure v0.11, #28 OPEN_TASKS v1.6, #29 plan v0.8.
 - **Earlier change**: 2026-11-01 — Step 4 `docker-compose.yml` added. Bumped #3 CHANGELOG v1.11, #5 manifest v0.12, #6 folder_structure v0.10, #28 OPEN_TASKS v1.5, #29 plan v0.7.
 - **Earlier change**: 2026-11-01 — Go modules rule: #30 conventions v0.2, `vendor/` git-ignored. Bumped #3 CHANGELOG v1.10, #5 manifest v0.11, #6 folder_structure v0.9, #28 OPEN_TASKS v1.4.
 - **Earlier change**: 2026-11-01 — Go module added (`go.mod`, `go.sum`). Bumped #3 CHANGELOG v1.9, #5 manifest v0.10, #6 folder_structure v0.8, #28 OPEN_TASKS v1.3, #29 plan v0.6.
