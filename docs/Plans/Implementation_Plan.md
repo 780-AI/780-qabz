@@ -1,7 +1,8 @@
-<!-- VERSION: 0.3 -->
+<!-- VERSION: 0.4 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.4 — 2026-11-01 — Step 3: `Makefile` with `make proto` added; details recorded.
 v0.3 — 2026-11-01 — Step 2 done: `pb` submodule added; decided details recorded.
 v0.2 — 2026-10-28 — Step list changed from a table to one section per step.
 v0.1 — 2026-10-28 — Skeleton created. Step 1 recorded as skipped (already done). Further steps to be added later.
@@ -43,15 +44,16 @@ QA scenario (Rule 11): see `OPEN_TASKS.md`, "Pending verification". Verification
 
 ## Step 3 — Add a Makefile to generate Go code from the protobuf files
 
-**Status:** ⏸ pending
+**Status:** ✅ done (2026-11-01), with open points below
 
 Add a `Makefile` with a target that generates Go code from the `.proto` files of the Step 2 submodule. The generated code is the base for the gRPC server and the providers in the next steps.
 
-Details are not decided yet. They are set when this step starts:
-- Generation tool (`protoc` or `buf`)
-- Output directory for the generated Go code
-- Go module path (it sets the `go_package` mapping)
-- Whether the generated code is committed or generated at build time
+Decided and done (2026-11-01):
+- Tool: `protoc` with `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway` and `protoc-gen-openapiv2`. The options follow the legacy projects' command.
+- Scope: `pb/proto/qabz` only (`services.proto`, `internalservices.proto`). The variable `PB_DIR` selects another directory.
+- Output: `api/pb/` (Go code) and `api/swagger/` (OpenAPI), both git-ignored. Developers run `make proto` after every fresh pull. The target deletes the old output of the directory first.
+- Not decided: the Go module path. The `qabz` protos set `go_package = "micro/pb/proto/bill;bill"` and import only Google packages, so the generated code does not depend on the module path now. A later directory that imports other `pb/` packages needs `M` overrides and the module path.
+- Not decided: whether `make proto` also runs in CI or in the Docker build (Step 4).
 
 ---
 

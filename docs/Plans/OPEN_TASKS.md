@@ -1,7 +1,8 @@
-<!-- VERSION: 1.1 -->
+<!-- VERSION: 1.2 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.2 — 2026-11-01 — Step 3 QA scenario added.
 v1.1 — 2026-11-01 — Code-layout decision recorded; Implementation_Plan Step 2 (pb submodule) done; Pending verification section added.
 v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 -->
@@ -34,6 +35,9 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 
 - ⏸ Step 2 `pb` submodule — fresh clone check. Run `git clone --recurse-submodules <qabz repo URL> /tmp/qabz-check`.
   Pass: `/tmp/qabz-check/pb/proto` exists and `git -C /tmp/qabz-check/pb rev-parse HEAD` prints `dde218e14be8815b060c1cc93d64ae6ebdedd2cb`.
+- ⏸ Step 3 `make proto`. Run `make proto` from a fresh clone with the submodule, twice.
+  Pass: both runs exit 0; `api/pb/qabz/` has 5 `.go` files and `api/swagger/qabz/` has 2 `.json` files; `git status` does not list `api/`.
+  Also pass: `PB_DIR=nope make proto` exits non-zero and prints the `git submodule update --init` hint.
 
 ## Maintenance / housekeeping
 

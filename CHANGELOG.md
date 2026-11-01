@@ -1,7 +1,8 @@
-<!-- VERSION: 1.5 -->
+<!-- VERSION: 1.6 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.6 — 2026-11-01 — Added Makefile (`make proto`) entry.
 v1.5 — 2026-11-01 — Added pb-submodule entry.
 v1.4 — 2026-10-28 — Added OPEN_TASKS-committed entry.
 v1.3 — 2026-10-28 — Added folder_structure full-tree entry.
@@ -11,6 +12,14 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — Implementation Plan Step 3: `make proto` generates Go code from `pb/proto/qabz`
+- **Type:** Major (new file, new top-level area `api/`) / Tooling
+- **Files:** `Makefile` (new), `.gitignore` (`api/pb/`, `api/swagger/`), `docs/Plans/Implementation_Plan.md` (v0.4), `docs/Plans/OPEN_TASKS.md` (v1.2), `docs/folder_structure.md` (v0.6), `docs/documents_manifest.md` (v0.7), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — no Go code uses the output yet. A developer now needs `protoc` and four plugins on `PATH` and runs `make proto` after each fresh pull. The `Makefile` is not manifest-tracked (Rule 8 covers `.py`/`.sh` with a VERSION header).
+- **QA scenarios:** ⏸ See `OPEN_TASKS.md`, "Pending verification" (Step 3).
+- **Verification run (Rule 15, 2026-11-01):** `make proto` ran twice, exit 0 both times; it wrote 5 files in `api/pb/qabz/` and 2 in `api/swagger/qabz/`; `git status` did not list `api/`. `PB_DIR=nope make proto` exited 2 with the hint.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — Implementation Plan Step 2: add `pb` protobuf repository as a git submodule
 - **Type:** Major (new top-level area; Critical File edit: manifest) / Dependency
