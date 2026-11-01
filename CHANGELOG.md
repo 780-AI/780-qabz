@@ -1,7 +1,8 @@
-<!-- VERSION: 1.11 -->
+<!-- VERSION: 1.12 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.12 — 2026-11-01 — Added yml_to_env entry.
 v1.11 — 2026-11-01 — Added docker-compose entry.
 v1.10 — 2026-11-01 — Added Go-modules-rule entry.
 v1.9 — 2026-11-01 — Added Go-module entry.
@@ -17,6 +18,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — scripts/yml_to_env: YAML config to .env variables (Bash)
+- **Type:** Major (new scripts; new top-level area under `scripts/`)
+- **Files:** `scripts/yml_to_env/yml_to_env.sh` (new, v0.1), `scripts/yml_to_env/yml_to_env_test.sh` (new, v0.1), `docs/Plans/Implementation_Plan.md` (v0.8), `docs/Plans/OPEN_TASKS.md` (v1.6), `docs/folder_structure.md` (v0.11), `docs/documents_manifest.md` (v0.13; #31 and #32 added), `CHANGELOG.md` (this entry). A first Go version of the tool was written and removed the same day, before any commit; `go.mod` and `go.sum` have no trace of it.
+- **Impact:** No runtime impact — a developer tool; the service does not use it. Nested keys become `a_b` names, list items get an index (`a_0`), and the output is `NAME=value` lines in the `.env` format. It reads a strict YAML subset and stops with an error on anything else (anchors, flow collections with content, block scalars, tabs, several documents). `docker-compose.yml` does not use the tool yet.
+- **QA scenarios:** ⏸ See `OPEN_TASKS.md`, "Pending verification" (yml_to_env). **Verification run (Rule 15, 2026-11-01):** `bash scripts/yml_to_env/yml_to_env_test.sh` printed `84 passed, 0 failed` on bash 3.2.57 (macOS), 4.4.23 and 5.3.20 (Docker images); changing the `_` join to `.` made 20 checks fail (deliberate-failure check) and restoring it made them pass again. A YAML file with 13 values (spaces, `#`, `$`, `"`, `'`, `\`, line break, empty, null, a list) was converted and read back through `docker compose config`: every value matched. Not run: `shellcheck` (not installed).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — Implementation Plan Step 4: docker-compose for local development
 - **Type:** Major (new top-level files; CI/Docker area)

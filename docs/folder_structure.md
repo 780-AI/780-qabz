@@ -1,7 +1,8 @@
-<!-- VERSION: 0.10 -->
+<!-- VERSION: 0.11 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.11 — 2026-11-01 — Added scripts/yml_to_env/.
 v0.10 — 2026-11-01 — Added docker-compose.yml, .env.example, .env (git-ignored).
 v0.9 — 2026-11-01 — Added vendor/ (generated, git-ignored).
 v0.8 — 2026-11-01 — Added go.mod.
@@ -71,7 +72,10 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── check_test_coverage_drift.py   # governance: test coverage drift (Rule 2)
 │   ├── doc_coverage_allowlist.toml    # justified doc-coverage exceptions
 │   ├── validation_ownership.toml      # source → tests + docs ownership map
-│   └── claude_project_data.sh         # project-data locality tool (Rule 14)
+│   ├── claude_project_data.sh         # project-data locality tool (Rule 14)
+│   └── yml_to_env/                    # Bash tool: YAML config to .env variables
+│       ├── yml_to_env.sh              # the converter (bash 3.2+)
+│       └── yml_to_env_test.sh         # its tests
 ├── .github/
 │   └── workflows/
 │       └── governance.yml             # governance CI

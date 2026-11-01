@@ -1,7 +1,8 @@
-<!-- VERSION: 1.5 -->
+<!-- VERSION: 1.6 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.6 — 2026-11-01 — yml_to_env QA scenario added.
 v1.5 — 2026-11-01 — Step 4 QA scenario added.
 v1.4 — 2026-11-01 — Go modules rule QA scenario added.
 v1.3 — 2026-11-01 — Go module path and version decided (qabz, go 1.27.3).
@@ -47,7 +48,9 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: all commands exit 0 and `vendor/` is not listed.
 - ⏸ Step 4 docker-compose. Copy `.env.example` to `.env`, set `POSTGRES_PASSWORD`, run `docker compose up -d --wait`, then `docker compose ps`.
   Pass: `postgres` and `redis` are `healthy`; `docker compose exec redis redis-cli ping` prints `PONG`; `docker compose config` without `POSTGRES_PASSWORD` fails. Run `docker compose down -v` after.
-
+- ⏸ `scripts/yml_to_env`. Run `bash scripts/yml_to_env/yml_to_env_test.sh`, then
+  `printf 'db:\n  host: localhost\n  pass: p w\n' | bash scripts/yml_to_env/yml_to_env.sh -`.
+  Pass: the tests print `84 passed, 0 failed` and exit 0; the output is `db_host=localhost` and `db_pass='p w'`.
 
 ## Maintenance / housekeeping
 

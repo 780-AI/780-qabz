@@ -1,7 +1,8 @@
-<!-- VERSION: 0.7 -->
+<!-- VERSION: 0.8 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.8 — 2026-11-01 — Step 4: `scripts/yml_to_env/` tool (YAML to .env, Bash) added and recorded.
 v0.7 — 2026-11-01 — Step 4: app (`qabz`) named as a Docker service; `docker-compose.yml` added; details recorded.
 v0.6 — 2026-11-01 — Step 5: Go module `qabz` created (go 1.27.3); decided details recorded.
 v0.5 — 2026-11-01 — Step 5: pointer to the JSON policy in PROJECT_SPECIFIC_CONVENTIONS.md § 1.
@@ -77,6 +78,15 @@ Decided and done (2026-11-01):
 - Health checks: `pg_isready` and `redis-cli ping`, every 5 seconds.
 - Start order: `qabz` waits for `postgres` and `redis` to be healthy (`depends_on` with `service_healthy`).
 - The `qabz` service has the profile `app` and builds from `Dockerfile` in the repository root. The Dockerfile does not exist yet, so `docker compose up -d` starts only `postgres` and `redis`. `docker compose --profile app up -d --build` starts the app after the Dockerfile exists.
+
+Tool `scripts/yml_to_env/` (added 2026-11-01, operator request): converts a YAML config file into environment variables in the `.env` format, so Compose can read them.
+- Language: Bash, in `scripts/yml_to_env/yml_to_env.sh`. A first version in Go was removed on the same day; the operator chose Bash because it is portable and needs no build. It needs bash 3.2 or newer (the macOS default) and no other tool, except `mktemp` for `-o`.
+- Usage: `bash scripts/yml_to_env/yml_to_env.sh [-o out.env] <file.yml | ->`. Output goes to stdout, or to a file with mode 0600. A bad input writes nothing and leaves an existing output file untouched.
+- Names: nested keys join with `_` (`db:` with `host:` gives `db_host`). The case of the keys is kept. A list item gets its index (`db_0`, `srv_0_host`). A null gives an empty value. `{}` and `[]` give nothing.
+- Values: written as they are in the YAML text (`1.10` stays `1.10`). A value with a space or a special character is single-quoted; a value with `'` or a line break is double-quoted with escapes. Checked with Docker Compose 5.5.1: every test value came back unchanged.
+- Supported YAML is a strict subset, because a full YAML parser cannot be written in plain Bash: block mappings and block lists with space indentation; plain, single-quoted and double-quoted scalars; inline comments; one document. Anything else stops with an error and a line number (exit 1): anchors and aliases, tags, merge keys, block scalars (`|`, `>`), flow collections with content (`[a, b]`), quoted keys, tabs, several documents, a top level that is not a mapping, an invalid variable name (`my-key`), two keys with the same name.
+- Tests: `scripts/yml_to_env/yml_to_env_test.sh` (84 checks). They pass on bash 3.2.57 (macOS), 4.4.23 and 5.3.20 (Docker images). A deliberate break of the `_` rule made 20 checks fail.
+- Not decided: whether `docker-compose.yml` and the `.env` setup use this tool. The names keep the YAML case, but the compose file uses upper-case names (`POSTGRES_PASSWORD`). Also open: a `make` target that runs the tool, and an upper-case option.
 
 Not decided (open points):
 - The Dockerfile, the app's own settings and ports for the `qabz` service: Step 5 and later steps.
