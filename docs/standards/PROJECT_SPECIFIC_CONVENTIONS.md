@@ -1,7 +1,8 @@
-<!-- VERSION: 0.2 -->
+<!-- VERSION: 0.3 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.3 — 2026-11-01 — Section 1: `encoding/json` (v1) is forbidden everywhere; the `code-reviewer` rejects it.
 v0.2 — 2026-11-01 — Section 2: Go modules (`go mod tidy && go mod vendor`; `vendor/` git-ignored).
 v0.1 — 2026-11-01 — Created. Definitions section, not numbered (hot path, memory pool, `Poolable`). Section 1: JSON unmarshalling policy (moved out of Implementation_Plan.md Step 5).
 -->
@@ -50,6 +51,8 @@ This rule covers unmarshalling only. It does not cover marshalling. It uses the 
 **In a hot path:** unmarshal with `github.com/valyala/fastjson`.
 - Take the parser from a `fastjson.ParserPool` and return it after use.
 - Do not keep a parsed value after the parser goes back to the pool.
+
+**Forbidden.** The standard `encoding/json` (v1) is illegal everywhere in the repository, in a hot path and outside it, in code and in tests. The `code-reviewer` agent finds every import of it and rejects the change.
 
 **Outside a hot path:** unmarshal with the standard `encoding/json/v2`. This covers work that runs one time, for example reading the config at bootstrap.
 

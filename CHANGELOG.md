@@ -1,7 +1,8 @@
-<!-- VERSION: 1.12 -->
+<!-- VERSION: 1.13 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.13 — 2026-11-01 — Added encoding/json-ban entry.
 v1.12 — 2026-11-01 — Added yml_to_env entry.
 v1.11 — 2026-11-01 — Added docker-compose entry.
 v1.10 — 2026-11-01 — Added Go-modules-rule entry.
@@ -18,6 +19,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — Convention: `encoding/json` (v1) is forbidden; the code-reviewer rejects it
+- **Type:** Major (binding convention; Critical File edit: manifest)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.3; § 1 "Forbidden"), `docs/documents_manifest.md` (v0.14; #30 bumped), `CHANGELOG.md` (this entry). The `code-reviewer` agent (`.claude/agents/code-reviewer.md`) also changed; it is local and git-ignored, so it is not in this commit.
+- **Impact:** No runtime impact — no Go code exists yet. `encoding/json` (v1) is illegal in all Go code, in hot paths and outside them, in tests too. The `code-reviewer` agent greps for the import path on every review and returns NOT READY on any hit; `encoding/json/v2` stays allowed outside hot paths.
+- **QA scenarios:** none that need the operator — documentation plus a local agent rule (Rule 11 exempt for the docs). **Verification run (Rule 15, 2026-11-01):** the agent's grep was run on a fixture folder: it reported a plain import, an aliased import and a grouped import in a test file, and it reported nothing for `encoding/json/v2`, `vendor/` and `pb/`. The repository has no hit.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — scripts/yml_to_env: YAML config to .env variables (Bash)
 - **Type:** Major (new scripts; new top-level area under `scripts/`)
