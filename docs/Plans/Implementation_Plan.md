@@ -1,7 +1,8 @@
-<!-- VERSION: 0.4 -->
+<!-- VERSION: 0.5 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.5 — 2026-11-01 — Step 5: pointer to the JSON policy in PROJECT_SPECIFIC_CONVENTIONS.md § 1.
 v0.4 — 2026-11-01 — Step 3: `Makefile` with `make proto` added; details recorded.
 v0.3 — 2026-11-01 — Step 2 done: `pb` submodule added; decided details recorded.
 v0.2 — 2026-10-28 — Step list changed from a table to one section per step.
@@ -94,6 +95,8 @@ Create the base code skeleton of the service and the system modules that connect
 - Not allowed: info or debug logs in request paths or loops.
 - Each layer decides which errors are serious enough for a log and which only need a metric.
 
+**JSON policy (mandatory, 2026-11-01):** the rule lives in `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` § 1 (the term "hot path" is defined in its "Definitions" section) and applies to all code, not only this step. Each sub-task states which of its JSON reads are hot.
+
 Layout decision (2026-10-28): the layout is the one in the design doc. All folders stay at the repository root. There is no `internal/` folder.
 
 The database layer uses raw queries. It does not use an ORM (`system.html`, section "Database").
@@ -103,6 +106,8 @@ Details are not decided yet. They are set when this step starts:
 - Which system modules to build now (all five, or a first set)
 - Go module path and Go version
 - Libraries for each connection (for example the Postgres driver and the Kafka client)
+- How the JSON policy is enforced automatically (open point in `PROJECT_SPECIFIC_CONVENTIONS.md` § 1)
+- Whether the other Step 5 policies (Prometheus switch, testable app, logging) also move to `PROJECT_SPECIFIC_CONVENTIONS.md`
 - Whether the `.go` files carry a VERSION header (CLAUDE.md § 7 covers `.py` and `.sh` only)
 
 ---

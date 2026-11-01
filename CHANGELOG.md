@@ -1,7 +1,8 @@
-<!-- VERSION: 1.6 -->
+<!-- VERSION: 1.7 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.7 — 2026-11-01 — Added project-conventions entry.
 v1.6 — 2026-11-01 — Added Makefile (`make proto`) entry.
 v1.5 — 2026-11-01 — Added pb-submodule entry.
 v1.4 — 2026-10-28 — Added OPEN_TASKS-committed entry.
@@ -12,6 +13,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — Project conventions: JSON unmarshalling policy
+- **Type:** Major (Critical File edit: CLAUDE.md, manifest; new standards file)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (new, v0.1; "Definitions" section (not numbered) incl. "hot path", "memory pool" and "Poolable", § 1 JSON policy), `CLAUDE.md` (v1.3; § 1 link inside the PROJECT-OWNED block), `docs/Plans/Implementation_Plan.md` (v0.5; Step 5 points to the policy), `docs/folder_structure.md` (v0.7), `docs/documents_manifest.md` (v0.8; #30 added, #1/#3/#5/#6 bumped), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — no Go code exists yet. Future code must unmarshal JSON with `github.com/valyala/fastjson` in hot paths and with `encoding/json/v2` elsewhere. The rule is binding and does not expire with the plan.
+- **QA scenarios:** none — documentation only (Rule 11 exempt). An automatic check is an open point in the new file.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — Implementation Plan Step 3: `make proto` generates Go code from `pb/proto/qabz`
 - **Type:** Major (new file, new top-level area `api/`) / Tooling

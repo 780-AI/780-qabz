@@ -1,7 +1,8 @@
-<!-- VERSION: 0.6 -->
+<!-- VERSION: 0.7 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.7 — 2026-11-01 — Added docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md.
 v0.6 — 2026-11-01 — Added `Makefile`; `api/pb/` and `api/swagger/` (generated, git-ignored).
 v0.5 — 2026-11-01 — Added `pb/` (git submodule), `.gitmodules` and `Implementation_Plan.md` to the tree.
 v0.4 — 2026-10-28 — OPEN_TASKS.md is committed to git (project deviation from L046).
@@ -37,11 +38,12 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── STANDARDS_LOG.md               # standards-suite adoption log
 │   ├── SET_VERSION_ADOPTED.md         # adopted Standard Set version
 │   ├── MACHINE_MIGRATION.md           # out-of-folder state catalog (Rule 14)
-│   ├── standards/                     # the six topical standards
+│   ├── standards/                     # the six topical standards + project conventions
 │   │   ├── CICD_STANDARDS.md
 │   │   ├── ENGINEERING_STANDARDS.md
 │   │   ├── MEMORY_PROTOCOL.md
 │   │   ├── PROJECT_STANDARDS.md
+│   │   ├── PROJECT_SPECIFIC_CONVENTIONS.md  # project-owned binding code conventions
 │   │   ├── PROMPT_STANDARDS.md
 │   │   └── VALIDATION_STANDARDS.md
 │   ├── Plans/                         # committed plans (Rule 1)

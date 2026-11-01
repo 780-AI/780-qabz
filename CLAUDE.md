@@ -1,8 +1,9 @@
-<!-- VERSION: 1.2 -->
-<!-- Last Updated: 2026-10-28 -->
+<!-- VERSION: 1.3 -->
+<!-- Last Updated: 2026-11-01 -->
 <!-- Source: docs/standards/ (this repo). Bootstrapped from Standard Set v2.8 (vault commit 8c152cf) on 2026-10-28. -->
 <!--
 CHANGE LOG
+v1.3 — 2026-11-01 — § 1: link to docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md (binding project conventions).
 v1.2 — 2026-10-28 — § 1: open-tasks register is committed to git (project deviation from L046).
 v1.1 — 2026-10-28 — § 4 + § 13: critical design docs moved to docs/initial-discovery/.
 v1.0 — 2026-10-28 — Project bootstrap (Standard Set v2.8).
@@ -25,6 +26,7 @@ If a rule below conflicts with a request, **refuse or propose a compliant altern
 **Deployment shape:** `Dockerized, CI via GitHub Actions`
 **Multi-agent:** `no — single-agent (§ 14 is a "NOT IN USE" stub)`
 **Open-tasks register:** `docs/Plans/OPEN_TASKS.md` is **committed to git** (deviates from L046's gitignored default). Wherever suite text says "local-only / gitignored / if present", read it as tracked; register edits ride in the same commit as the work they record.
+**Project conventions:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` is **binding** for all code in this repository. Load it before writing or reviewing code. It is project-owned: a suite sync does not change it.
 <!-- PROJECT-OWNED:END -->
 
 ---
