@@ -1,7 +1,8 @@
-<!-- VERSION: 1.4 -->
+<!-- VERSION: 1.5 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.5 — 2026-11-01 — Step 4 QA scenario added.
 v1.4 — 2026-11-01 — Go modules rule QA scenario added.
 v1.3 — 2026-11-01 — Go module path and version decided (qabz, go 1.27.3).
 v1.2 — 2026-11-01 — Step 3 QA scenario added.
@@ -44,6 +45,8 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: `go version` prints `go1.27.3` (the toolchain downloads by itself); after `make proto`, `go build ./...` and `go vet ./...` exit 0.
 - ⏸ Go modules rule. In the repository root run `go mod tidy && go mod vendor && go build ./... && go vet ./...`, then `git status --short`.
   Pass: all commands exit 0 and `vendor/` is not listed.
+- ⏸ Step 4 docker-compose. Copy `.env.example` to `.env`, set `POSTGRES_PASSWORD`, run `docker compose up -d --wait`, then `docker compose ps`.
+  Pass: `postgres` and `redis` are `healthy`; `docker compose exec redis redis-cli ping` prints `PONG`; `docker compose config` without `POSTGRES_PASSWORD` fails. Run `docker compose down -v` after.
 
 
 ## Maintenance / housekeeping

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.10 -->
+<!-- VERSION: 1.11 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.11 — 2026-11-01 — Added docker-compose entry.
 v1.10 — 2026-11-01 — Added Go-modules-rule entry.
 v1.9 — 2026-11-01 — Added Go-module entry.
 v1.8 — 2026-11-01 — Added history-rewrite entry.
@@ -16,6 +17,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — Implementation Plan Step 4: docker-compose for local development
+- **Type:** Major (new top-level files; CI/Docker area)
+- **Files:** `docker-compose.yml` (new), `.env.example` (new), `.gitignore` (`.env`), `docs/Plans/Implementation_Plan.md` (v0.7; Step 4 names the app `qabz` as a Docker service), `docs/Plans/OPEN_TASKS.md` (v1.5), `docs/folder_structure.md` (v0.10), `docs/documents_manifest.md` (v0.12), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — no service code exists yet. Developers can start Postgres 18 and Redis 8 with `docker compose up -d`; `POSTGRES_PASSWORD` must be set in `.env`. The `qabz` service is a placeholder behind the profile `app` and needs a Dockerfile (Step 5 and later).
+- **QA scenarios:** ⏸ See `OPEN_TASKS.md`, "Pending verification" (Step 4). **Verification run (Rule 15, 2026-11-01):** `docker compose config` without `POSTGRES_PASSWORD` exit 1, with it exit 0; with test values and host ports 15432/16379, `up -d --wait` made `postgres` and `redis` healthy, Postgres 18.6 answered `select version()`, Redis answered `PONG`, and `down -v` removed everything. The first run on the default ports failed: host port 6379 was already in use by another container on the developer machine.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — Convention: always `go mod tidy && go mod vendor`; `vendor/` git-ignored
 - **Type:** Major (binding convention; Critical File edit: manifest)

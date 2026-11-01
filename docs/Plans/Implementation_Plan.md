@@ -1,7 +1,8 @@
-<!-- VERSION: 0.6 -->
+<!-- VERSION: 0.7 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.7 — 2026-11-01 — Step 4: app (`qabz`) named as a Docker service; `docker-compose.yml` added; details recorded.
 v0.6 — 2026-11-01 — Step 5: Go module `qabz` created (go 1.27.3); decided details recorded.
 v0.5 — 2026-11-01 — Step 5: pointer to the JSON policy in PROJECT_SPECIFIC_CONVENTIONS.md § 1.
 v0.4 — 2026-11-01 — Step 3: `Makefile` with `make proto` added; details recorded.
@@ -61,18 +62,25 @@ Decided and done (2026-11-01):
 
 ## Step 4 — Add a docker-compose file for local development
 
-**Status:** ⏸ pending
+**Status:** ✅ done (2026-11-01), with open points below
 
-Add a `docker-compose.yml` with three services:
+Add a `docker-compose.yml` with three Docker services. The app itself is one of them:
 - `postgres` — the database
 - `redis` — the cache
-- `qabz` — the service itself. The service is completed in the steps that follow. At this step it is only a placeholder entry.
+- `qabz` — **the app itself**, run as a Docker service next to its dependencies. The service is completed in the steps that follow. At this step it is only a placeholder entry.
 
-Details are not decided yet. They are set when this step starts:
-- Image versions for `postgres` and `redis`
-- Ports, volumes and credentials (environment variables, not committed secrets)
-- How the `qabz` image is built (Dockerfile location)
-- Health checks and start order between the services
+Decided and done (2026-11-01):
+- Images: `postgres:18-alpine` and `redis:8-alpine` (major-version tags; the latest majors on Docker Hub on 2026-11-01).
+- Credentials: variables in `.env` (git-ignored). `.env.example` is committed and has an empty `POSTGRES_PASSWORD`. The compose file stops with an error if `POSTGRES_PASSWORD` is not set. User, database and ports have defaults (`qabz`, `qabz`, 5432, 6379).
+- Ports: published on `127.0.0.1` only. Host ports are set with `POSTGRES_PORT` and `REDIS_PORT`.
+- Volumes: named volumes `postgres_data` and `redis_data`. The Postgres volume is mounted at `/var/lib/postgresql`, as Postgres 18 requires.
+- Health checks: `pg_isready` and `redis-cli ping`, every 5 seconds.
+- Start order: `qabz` waits for `postgres` and `redis` to be healthy (`depends_on` with `service_healthy`).
+- The `qabz` service has the profile `app` and builds from `Dockerfile` in the repository root. The Dockerfile does not exist yet, so `docker compose up -d` starts only `postgres` and `redis`. `docker compose --profile app up -d --build` starts the app after the Dockerfile exists.
+
+Not decided (open points):
+- The Dockerfile, the app's own settings and ports for the `qabz` service: Step 5 and later steps.
+- Whether Kafka, NATS and etcd also get services: they are outside this step.
 
 ---
 
