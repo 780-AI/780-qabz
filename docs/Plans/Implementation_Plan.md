@@ -1,7 +1,8 @@
-<!-- VERSION: 0.5 -->
+<!-- VERSION: 0.6 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.6 — 2026-11-01 — Step 5: Go module `qabz` created (go 1.27.3); decided details recorded.
 v0.5 — 2026-11-01 — Step 5: pointer to the JSON policy in PROJECT_SPECIFIC_CONVENTIONS.md § 1.
 v0.4 — 2026-11-01 — Step 3: `Makefile` with `make proto` added; details recorded.
 v0.3 — 2026-11-01 — Step 2 done: `pb` submodule added; decided details recorded.
@@ -53,7 +54,7 @@ Decided and done (2026-11-01):
 - Tool: `protoc` with `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway` and `protoc-gen-openapiv2`. The options follow the legacy projects' command.
 - Scope: `pb/proto/qabz` only (`services.proto`, `internalservices.proto`). The variable `PB_DIR` selects another directory.
 - Output: `api/pb/` (Go code) and `api/swagger/` (OpenAPI), both git-ignored. Developers run `make proto` after every fresh pull. The target deletes the old output of the directory first.
-- Not decided: the Go module path. The `qabz` protos set `go_package = "micro/pb/proto/bill;bill"` and import only Google packages, so the generated code does not depend on the module path now. A later directory that imports other `pb/` packages needs `M` overrides and the module path.
+- Go module path: `qabz` (decided 2026-11-01, see Step 5). The `qabz` protos set `go_package = "micro/pb/proto/bill;bill"` and import only Google packages, so the generated code does not depend on the module path now. A later directory that imports other `pb/` packages needs `M` overrides that map to `qabz/api/pb/<dir>`.
 - Not decided: whether `make proto` also runs in CI or in the Docker build (Step 4).
 
 ---
@@ -97,6 +98,8 @@ Create the base code skeleton of the service and the system modules that connect
 
 **JSON policy (mandatory, 2026-11-01):** the rule lives in `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` § 1 (the term "hot path" is defined in its "Definitions" section) and applies to all code, not only this step. Each sub-task states which of its JSON reads are hot.
 
+Go module (decided 2026-11-01): `go.mod` at the repository root. Module path `qabz`. Go version `go 1.27.3`, the latest stable release on 2026-11-01. Go 1.27.3 includes `encoding/json/v2` without a flag (checked on 1.27.1). A machine with an older Go downloads the toolchain by itself (`GOTOOLCHAIN=auto`; checked on 2026-11-01). `go mod tidy` added `google.golang.org/grpc`, `google.golang.org/protobuf`, `github.com/grpc-ecosystem/grpc-gateway/v2` and `google.golang.org/genproto/googleapis/api`, because the generated `api/pb` code imports them. Open point: `api/pb/` is git-ignored, so `go mod tidy` on a clone without `make proto` removes these requirements. Whether `make proto` runs `go mod tidy` is not decided.
+
 Layout decision (2026-10-28): the layout is the one in the design doc. All folders stay at the repository root. There is no `internal/` folder.
 
 The database layer uses raw queries. It does not use an ORM (`system.html`, section "Database").
@@ -104,7 +107,6 @@ The database layer uses raw queries. It does not use an ORM (`system.html`, sect
 Details are not decided yet. They are set when this step starts:
 - Which `common/` packages belong to this step and which go to a later step
 - Which system modules to build now (all five, or a first set)
-- Go module path and Go version
 - Libraries for each connection (for example the Postgres driver and the Kafka client)
 - How the JSON policy is enforced automatically (open point in `PROJECT_SPECIFIC_CONVENTIONS.md` § 1)
 - Whether the other Step 5 policies (Prometheus switch, testable app, logging) also move to `PROJECT_SPECIFIC_CONVENTIONS.md`

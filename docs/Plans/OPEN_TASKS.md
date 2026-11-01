@@ -1,7 +1,8 @@
-<!-- VERSION: 1.2 -->
+<!-- VERSION: 1.3 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.3 — 2026-11-01 — Go module path and version decided (qabz, go 1.27.3).
 v1.2 — 2026-11-01 — Step 3 QA scenario added.
 v1.1 — 2026-11-01 — Code-layout decision recorded; Implementation_Plan Step 2 (pb submodule) done; Pending verification section added.
 v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
@@ -25,7 +26,7 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 - Plan structure: A (one plan, detailed in stages — recommended) or B (roadmap + one plan per step).
 - Code layout: DECIDED 2026-10-28 — follow the "Directory Structure" in `system.html` as written.
   All folders at the repo root; no `internal/`. No doc change needed for the layout.
-- Go module path, Go version, gRPC port.
+- gRPC port. (Go module `qabz` and `go 1.27.3`: DECIDED 2026-11-01.)
 - DB engine + migration tool (check `database.html` first); grpc-gateway or plain gRPC only;
   (the `.proto` files live in the `pb/` submodule — Step 2 done.)
 - `.go` versioning: VERSION header per file, or git history + tags (recommended). Affects
@@ -38,6 +39,9 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 - ⏸ Step 3 `make proto`. Run `make proto` from a fresh clone with the submodule, twice.
   Pass: both runs exit 0; `api/pb/qabz/` has 5 `.go` files and `api/swagger/qabz/` has 2 `.json` files; `git status` does not list `api/`.
   Also pass: `PB_DIR=nope make proto` exits non-zero and prints the `git submodule update --init` hint.
+- ⏸ Go module `qabz`. Run `go version` and `go build ./...` in the repository root.
+  Pass: `go version` prints `go1.27.3` (the toolchain downloads by itself); after `make proto`, `go build ./...` and `go vet ./...` exit 0.
+
 
 ## Maintenance / housekeeping
 

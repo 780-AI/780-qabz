@@ -1,7 +1,8 @@
-<!-- VERSION: 1.8 -->
+<!-- VERSION: 1.9 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.9 — 2026-11-01 — Added Go-module entry.
 v1.8 — 2026-11-01 — Added history-rewrite entry.
 v1.7 — 2026-11-01 — Added project-conventions entry.
 v1.6 — 2026-11-01 — Added Makefile (`make proto`) entry.
@@ -14,6 +15,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — Initialize the Go module `qabz`
+- **Type:** Major (new top-level file; decides plan Step 5 details)
+- **Files:** `go.mod` (new: `module qabz`, `go 1.27.3`; `go mod tidy` added the four direct requirements the generated `api/pb` code imports: `google.golang.org/grpc` v1.85.0, `google.golang.org/protobuf` v1.36.12, `github.com/grpc-ecosystem/grpc-gateway/v2` v2.33.0, `google.golang.org/genproto/googleapis/api`), `go.sum` (new), `docs/Plans/Implementation_Plan.md` (v0.6), `docs/Plans/OPEN_TASKS.md` (v1.3), `docs/folder_structure.md` (v0.8), `docs/documents_manifest.md` (v0.10), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact — no Go code exists yet. `go 1.27.3` is the latest stable Go release on 2026-11-01. A machine with an older Go downloads the 1.27.3 toolchain by itself (`GOTOOLCHAIN=auto`; checked on 2026-11-01, it works). With `GOTOOLCHAIN=local` and Go 1.27.1, `go build` stops with "go.mod requires go >= 1.27.3". The requirements in `go.mod` come from the generated code in `api/pb/` (git-ignored): on a fresh clone, run `make proto` first, and run `go mod tidy` after any change to the generated imports (without `api/pb/`, tidy would remove them). The `code-reviewer` coverage gate now applies once `.go` files exist.
+- **QA scenarios:** ⏸ `go version` in the repository prints `go1.27.3` and, after `make proto`, `go build ./...` and `go vet ./...` exit 0. **Verification run (Rule 15, 2026-11-01):** `go version` printed `go1.27.3`; `go build ./...` and `go vet ./...` exited 0 with the generated `api/pb/qabz` present; the first build, before `go mod tidy`, failed with "no required module provides package" and the tidy fixed it.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — History rewrite: author and committer email changed
 - **Type:** Major (history rewrite of pushed commits; operator-authorized waiver of Rule 3)
