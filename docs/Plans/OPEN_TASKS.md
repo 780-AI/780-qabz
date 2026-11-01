@@ -1,7 +1,8 @@
-<!-- VERSION: 1.3 -->
+<!-- VERSION: 1.4 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.4 — 2026-11-01 — Go modules rule QA scenario added.
 v1.3 — 2026-11-01 — Go module path and version decided (qabz, go 1.27.3).
 v1.2 — 2026-11-01 — Step 3 QA scenario added.
 v1.1 — 2026-11-01 — Code-layout decision recorded; Implementation_Plan Step 2 (pb submodule) done; Pending verification section added.
@@ -41,6 +42,8 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Also pass: `PB_DIR=nope make proto` exits non-zero and prints the `git submodule update --init` hint.
 - ⏸ Go module `qabz`. Run `go version` and `go build ./...` in the repository root.
   Pass: `go version` prints `go1.27.3` (the toolchain downloads by itself); after `make proto`, `go build ./...` and `go vet ./...` exit 0.
+- ⏸ Go modules rule. In the repository root run `go mod tidy && go mod vendor && go build ./... && go vet ./...`, then `git status --short`.
+  Pass: all commands exit 0 and `vendor/` is not listed.
 
 
 ## Maintenance / housekeeping

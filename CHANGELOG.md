@@ -1,7 +1,8 @@
-<!-- VERSION: 1.9 -->
+<!-- VERSION: 1.10 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v1.10 — 2026-11-01 — Added Go-modules-rule entry.
 v1.9 — 2026-11-01 — Added Go-module entry.
 v1.8 — 2026-11-01 — Added history-rewrite entry.
 v1.7 — 2026-11-01 — Added project-conventions entry.
@@ -15,6 +16,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-01] — Convention: always `go mod tidy && go mod vendor`; `vendor/` git-ignored
+- **Type:** Major (binding convention; Critical File edit: manifest)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.2; new § 2 Go modules), `.gitignore` (`vendor/`), `docs/folder_structure.md` (v0.9), `docs/documents_manifest.md` (v0.11; #30 bumped), `CHANGELOG.md` (this entry)
+- **Impact:** No runtime impact. Developers, CI and Docker builds must run `go mod tidy && go mod vendor` (never `go mod tidy` alone). `vendor/` is not committed, so a fresh clone runs `make proto`, then `go mod tidy && go mod vendor`, before the first build. CI and the Docker image (Step 4) must do the same.
+- **QA scenarios:** ⏸ In the repository root run `go mod tidy && go mod vendor && go build ./... && go vet ./...`, then `git status --short`. Pass: all commands exit 0 and `vendor/` is not listed. **Verification run (Rule 15, 2026-11-01):** the commands exited 0 (vendor/ is 15 MB) and `git check-ignore` matched `.gitignore:9:vendor/`.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — Initialize the Go module `qabz`
 - **Type:** Major (new top-level file; decides plan Step 5 details)
