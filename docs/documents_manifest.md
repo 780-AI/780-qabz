@@ -1,4 +1,4 @@
-<!-- VERSION: 0.30 -->
+<!-- VERSION: 0.31 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.6 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.29 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.30 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.30 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.31 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.18 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-02
-- **Change**: Task file `004_use_yml_config.md` updated to v0.4 (panic on missing config; not manifest-tracked). Bumped #3 CHANGELOG v1.29, #5 manifest v0.30.
-- **Previous change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.3 with the operator answers (not manifest-tracked). Bumped #3 CHANGELOG v1.28, #5 manifest v0.29.
+- **Change**: Task file `004_use_yml_config.md` updated to v0.5 (key mapping table; not manifest-tracked). Bumped #3 CHANGELOG v1.30, #5 manifest v0.31.
+- **Previous change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.4 (panic on missing config; not manifest-tracked). Bumped #3 CHANGELOG v1.29, #5 manifest v0.30.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.3 with the operator answers (not manifest-tracked). Bumped #3 CHANGELOG v1.28, #5 manifest v0.29.
 - **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.2 (not manifest-tracked). Bumped #3 CHANGELOG v1.27, #5 manifest v0.28.
 - **Earlier change**: 2026-11-02 — Task IDs now start the task name (CLAUDE.md v1.6, template v0.3); task files renamed; new task `004_use_yml_config` (not manifest-tracked). Bumped #1 CLAUDE.md v1.6, #3 CHANGELOG v1.26, #5 manifest v0.27, #33 template v0.3.
 - **Earlier change**: 2026-11-02 — No down migrations. #21 system.html v1.2. Bumped #3 CHANGELOG v1.25, #5 manifest v0.26, #6 folder_structure v0.18, #28 OPEN_TASKS v1.11.

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.29 -->
+<!-- VERSION: 1.30 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.30 — 2026-11-02 — Added 004-task-key-mapping entry.
 v1.29 — 2026-11-02 — Added 004-task-panic-rule entry.
 v1.28 — 2026-11-02 — Added 004-task-answers entry.
 v1.27 — 2026-11-02 — Added 004-task-update entry.
@@ -35,6 +36,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task update: 004_use_yml_config (key mapping)
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.5), `docs/documents_manifest.md` (v0.31), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 004 now has the explicit mapping `POSTGRES_X` to `database.postgres.x` and `REDIS_X` to `database.redis.x` (8 keys), with a YAML example.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task update: 004_use_yml_config (panic on missing config)
 - **Type:** Minor (docs only; a task file edit)
