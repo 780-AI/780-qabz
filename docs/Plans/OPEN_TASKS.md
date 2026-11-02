@@ -1,7 +1,8 @@
-<!-- VERSION: 1.8 -->
+<!-- VERSION: 1.9 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.9 — 2026-11-02 — App bootstrap QA scenario added.
 v1.8 — 2026-11-02 — Project base skeleton QA scenario added; Go paths under src/.
 v1.7 — 2026-11-01 — yml_to_env QA scenario extended for -u / --upper-case.
 v1.6 — 2026-11-01 — yml_to_env QA scenario added.
@@ -55,6 +56,12 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: the tests print `102 passed, 0 failed` and exit 0; the output is `db_host=localhost` and `db_pass='p w'`; with `-u` it is `DB_HOST=localhost` and `DB_PASS='p w'`.
 - ⏸ Project base skeleton. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./... && go run .`, then `git status --short`.
   Pass: all commands exit 0; the last one prints `hello world`; `src/vendor/` is not listed; `src/go.mod` lists `pgx/v5`, `go-redis/v9`, `prometheus/client_golang`, `zap` and `go.opentelemetry.io/otel`.
+- ⏸ App bootstrap. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./... && go test ./...`.
+  Pass: all exit 0, no test fails. Then run the service against compose (feature ON, Rule 15): `POSTGRES_PASSWORD=x docker compose up -d --wait postgres redis`,
+  `POSTGRES_PASSWORD=x go run .` (set `POSTGRES_PORT` / `REDIS_PORT` if the defaults are taken), `curl localhost:9090/metrics`, then Ctrl-C.
+  Pass: log lines `postgres ok`, `redis ok`, `metrics started`, `app started`, `app stopping`; `/metrics` returns `go_goroutines`; the log has no password; exit code 0.
+  Also pass: without `POSTGRES_PASSWORD` the binary prints `config: POSTGRES_PASSWORD is required` and exits 2; with compose stopped it logs `postgres ping failed` and exits 1.
+  Done 2026-11-02 by the implementer on ports 55432 / 56379: all pass (awaiting operator confirmation).
 
 ## Maintenance / housekeeping
 

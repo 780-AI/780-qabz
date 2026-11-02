@@ -1,7 +1,8 @@
-<!-- VERSION: 0.4 -->
+<!-- VERSION: 0.5 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.5 — 2026-11-02 — Section 3: test assertions MUST use `github.com/stretchr/testify/assert`.
 v0.4 — 2026-11-02 — Section 2: all Go code and `go.mod` live in `src/`; Go commands run there.
 v0.3 — 2026-11-01 — Section 1: `encoding/json` (v1) is forbidden everywhere; the `code-reviewer` rejects it.
 v0.2 — 2026-11-01 — Section 2: Go modules (`go mod tidy && go mod vendor`; `vendor/` git-ignored).
@@ -77,3 +78,8 @@ This rule covers unmarshalling only. It does not cover marshalling. It uses the 
 
 **Builds.** A Go build uses `vendor/` when it exists. CI and Docker builds run `go mod tidy && go mod vendor` before they build.
 
+---
+
+## 3. Test assertions
+
+**Assertions MUST use `github.com/stretchr/testify/assert`.** Do not write manual `if got != want { t.Errorf(...) }` checks in place of an assertion. The `code-reviewer` agent rejects a test that does not use `assert` for its assertions.

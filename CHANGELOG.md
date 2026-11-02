@@ -1,7 +1,8 @@
-<!-- VERSION: 1.19 -->
+<!-- VERSION: 1.20 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.20 — 2026-11-02 — Added app-bootstrap entry.
 v1.19 — 2026-11-02 — Added task-counter entry.
 v1.18 — 2026-11-02 — Added CLAUDE.md-tasks-rule entry.
 v1.17 — 2026-11-02 — Added app-bootstrap-task entry.
@@ -25,6 +26,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — App bootstrap (`app_bootstrap_002`)
+- **Type:** Major (new package, new config keys, `main.go` change)
+- **Files:** `src/app/` (App, Builder, `NewDefaultBuilder`, tests, README), `src/config/`, `src/common/logging/zap/`, `src/common/monitoring/{prometheus,jaeger}/`, `src/system/{postgres,redis}/`, `src/cmd/start-app/start.go`, `src/main.go`, `src/go.mod` / `go.sum`; task file moved to `done_tasks/`; `docs/folder_structure.md` (v0.16), `docs/documents_manifest.md` (v0.21), `docs/Plans/OPEN_TASKS.md` (v1.9), this entry.
+- **Impact:** Yes. The binary now loads `Config` from ENV (`POSTGRES_PASSWORD` required; `SERVICE_NAME`, `LOG_LEVEL`, `POSTGRES_HOST/PORT/USER/DB`, `REDIS_HOST/PORT/PASSWORD`, `METRICS_ADDR`, `OTLP_ENDPOINT` optional), pings Postgres and Redis, serves `/metrics`, and stops on SIGINT/SIGTERM. `main.go` no longer prints hello world. `App` uses interfaces only (except `Config`) and is made with a `Builder`. Metrics use `prometheus/common/expfmt` instead of `promhttp`, because `promhttp` needs `klauspost/compress`, which the module proxy refused (403) on 2026-11-02.
+- **QA scenarios:** see `docs/Plans/OPEN_TASKS.md`, "App bootstrap".
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task counter
 - **Type:** Major (Critical File edit: `CLAUDE.md`)

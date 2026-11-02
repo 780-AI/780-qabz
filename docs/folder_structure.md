@@ -1,7 +1,8 @@
-<!-- VERSION: 0.15 -->
+<!-- VERSION: 0.16 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v0.16 — 2026-11-02 — Added src/app/ (README.md, app, builder, defaults, tests); code in config/, common/logging/zap, common/monitoring/{prometheus,jaeger}, system/{postgres,redis}, cmd/start-app; main.go is one line.
 v0.15 — 2026-11-02 — Added pending_tasks/task_counter.json.
 v0.14 — 2026-11-02 — No layout change (version skipped; task files are not listed here).
 v0.13 — 2026-11-02 — Added src/ (go.mod, go.sum, vendor/, main.go, api/ moved in, and the code folders; no system/etcd). cmd/ holds entry points, not main.go.
@@ -36,17 +37,21 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── go.mod                         # Go module `qabz` (go 1.27.3)
 │   ├── go.sum                         # module checksums
 │   ├── vendor/                        # `go mod vendor` output; git-ignored
-│   ├── main.go                        # hello-world main; blank imports of the base packages
+│   ├── main.go                        # one-line main: runs cmd/start-app
+│   ├── app/                           # App bootstrap: builder, lifecycle, interfaces (see its README.md)
+│   │   ├── README.md
+│   │   ├── app.go  builder.go  defaults.go
+│   │   └── app_test.go  defaults_test.go
 │   ├── cmd/                           # entry points (no main.go here)
-│   │   ├── start-app/
+│   │   ├── start-app/                 # start.go: Run() loads config, builds and runs the App
 │   │   └── migrate/                   # not used until the older bill service stops
-│   ├── config/                        # settings
+│   ├── config/                        # settings: Config mapped from ENV (config.go, config_test.go)
 │   ├── migrations/                    # not used until the older bill service stops
 │   ├── system/                        # what the service connects to
-│   │   └── postgres/  redis/  kafka/  nats/
+│   │   └── postgres/  redis/          # pgx pool, go-redis client (kafka/, nats/ still empty)
 │   ├── common/                        # shared by every package
-│   │   ├── logging/                   # zap/ (logger), logstash/ (log shipping)
-│   │   ├── monitoring/                # jaeger/ (tracing), prometheus/ (metrics)
+│   │   ├── logging/                   # zap/ (logger, done), logstash/ (log shipping, empty)
+│   │   ├── monitoring/                # jaeger/ (tracing), prometheus/ (metrics endpoint)
 │   │   └── errors/  auth/  validation/  crypto/  helpers/
 │   ├── core/                          # order, inquiry, savedbill, fee, reconcile, billtype
 │   ├── provider/                      # parsianproxy, jiring, irancellproxy, qabzino, tavanir, karashop
