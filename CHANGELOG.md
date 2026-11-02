@@ -1,7 +1,8 @@
-<!-- VERSION: 1.16 -->
+<!-- VERSION: 1.17 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.17 — 2026-11-02 — Added app-bootstrap-task entry.
 v1.16 — 2026-11-02 — Added project-base-skeleton entry.
 v1.15 — 2026-11-02 — Added task-folders entry.
 v1.14 — 2026-11-01 — Added yml_to_env upper-case-flag entry.
@@ -22,6 +23,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — New task: app_bootstrap_002
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/app_bootstrap_002.md` (v0.1, new), `docs/documents_manifest.md` (v0.18), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task file is not in the manifest, as with the other task files (open question from the task-folders entry).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Project base: folder structure, hello-world main, base packages
 - **Type:** Major (new packages and folders; new requirements in `go.mod`; `folder_structure.md` change)
