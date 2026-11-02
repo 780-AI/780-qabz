@@ -1,7 +1,8 @@
-<!-- VERSION: 1.26 -->
+<!-- VERSION: 1.27 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.27 — 2026-11-02 — Added 004-task-update entry.
 v1.26 — 2026-11-02 — Added task-ID-prefix and 004-task entry.
 v1.25 — 2026-11-02 — Added no-down-migrations entry.
 v1.24 — 2026-11-02 — Added config-hot-reload entry.
@@ -32,6 +33,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task update: 004_use_yml_config
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.2), `docs/documents_manifest.md` (v0.28), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task now says all existing ENV keys (15 keys, listed in the task) move to the YAML config, and `Config` no longer reads ENV.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task IDs move to the start of the name; new task 004
 - **Type:** Major (Critical File edit: `CLAUDE.md`)
