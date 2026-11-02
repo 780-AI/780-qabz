@@ -1,7 +1,8 @@
-<!-- VERSION: 0.11 -->
-<!-- Last Updated: 2026-11-01 -->
+<!-- VERSION: 0.12 -->
+<!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v0.12 — 2026-11-02 — Added docs/Plans/pending_tasks/, in-progress_tasks/, done_tasks/.
 v0.11 — 2026-11-01 — Added scripts/yml_to_env/.
 v0.10 — 2026-11-01 — Added docker-compose.yml, .env.example, .env (git-ignored).
 v0.9 — 2026-11-01 — Added vendor/ (generated, git-ignored).
@@ -58,7 +59,13 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── Plans/                         # committed plans (Rule 1)
 │   │   ├── .gitkeep
 │   │   ├── Implementation_Plan.md     # step list for the Qabz implementation (PLAN-001 draft)
-│   │   └── OPEN_TASKS.md              # open-tasks register (committed; deviates from L046)
+│   │   ├── OPEN_TASKS.md              # open-tasks register (committed; deviates from L046)
+│   │   ├── pending_tasks/             # task files not started
+│   │   │   └── task_template.md       # task file rules and format (template lives only here)
+│   │   ├── in-progress_tasks/         # task files being worked on
+│   │   │   └── .gitkeep
+│   │   └── done_tasks/                # finished task files
+│   │       └── .gitkeep
 │   └── initial-discovery/             # discovery and design documents (HTML)
 │       ├── index.html                 # entry page linking the others
 │       ├── system.html                # system architecture (Critical)

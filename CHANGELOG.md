@@ -1,7 +1,8 @@
-<!-- VERSION: 1.14 -->
-<!-- Last Updated: 2026-11-01 -->
+<!-- VERSION: 1.15 -->
+<!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.15 — 2026-11-02 — Added task-folders entry.
 v1.14 — 2026-11-01 — Added yml_to_env upper-case-flag entry.
 v1.13 — 2026-11-01 — Added encoding/json-ban entry.
 v1.12 — 2026-11-01 — Added yml_to_env entry.
@@ -20,6 +21,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — docs/Plans: task folders and task template
+- **Type:** Major (new top-level areas under `docs/Plans/`; Critical File edit: manifest) / Docs / Governance
+- **Files:** `docs/Plans/pending_tasks/task_template.md` (v0.1, new), `docs/Plans/in-progress_tasks/.gitkeep`, `docs/Plans/done_tasks/.gitkeep` (new), `docs/documents_manifest.md` (v0.16; #33 added, #3 and #6 bumped, Last Updated rotated), `docs/folder_structure.md` (v0.12), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact — docs only. Task files (`*.md` in the three task folders) are not given manifest rows: they move between folders, and a row per task would need a manifest edit on each move. **This is an open question for the operator:** Rule 8 says every committed `.md` file must be in the manifest, so either record an exception or track the tasks. The manifest cell for #3 CHANGELOG said v1.13 while the header said v1.14; it is corrected to v1.15 here.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs). Check: `python3 scripts/check_doc_coverage.py` exits 0.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-01] — scripts/yml_to_env: -u / --upper-case flag; names lower case by default
 - **Type:** Major (CLI change; the default output changes)

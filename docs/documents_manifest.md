@@ -1,4 +1,4 @@
-<!-- VERSION: 0.15 -->
+<!-- VERSION: 0.16 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -8,7 +8,7 @@
 | Governance + project docs (contract, standards, session docs, READMEs) | 1-17 |
 | Scripts | 18-20, 31-32 |
 | Initial-discovery design docs (HTML) | 21-27 |
-| Plans (register, implementation plan) | 28-29 |
+| Plans (register, implementation plan, task template) | 28-29, 33 |
 | Project conventions | 30 |
 
 ## Manifest Table
@@ -17,10 +17,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.3 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.13 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.15 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.14 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.11 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.16 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.12 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -47,12 +47,14 @@
 | 30 | Project Specific Conventions | v0.3 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env converter | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.sh` |
 | 32 | YAML to env converter tests | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env_test.sh` |
+| 33 | Task Template | v0.1 | Plan | `docs/Plans/pending_tasks/task_template.md` |
 
 ## Last Updated
 
-- **Date**: 2026-11-01
-- **Change**: `yml_to_env` gets `-u` / `--upper-case`; names lower case by default: #31 and #32 v0.2. Bumped #3 CHANGELOG v1.14, #5 manifest v0.15, #28 OPEN_TASKS v1.7, #29 plan v0.9.
-- **Previous change**: 2026-11-01 — `encoding/json` (v1) forbidden: #30 conventions v0.3. Bumped #3 CHANGELOG v1.13, #5 manifest v0.14.
+- **Date**: 2026-11-02
+- **Change**: Added #33 `docs/Plans/pending_tasks/task_template.md` v0.1 (task folders `pending_tasks/`, `in-progress_tasks/`, `done_tasks/`). Bumped #3 CHANGELOG v1.15, #5 manifest v0.16, #6 folder_structure v0.12. Quick Index row updated. Task files themselves are not manifest-tracked (see CHANGELOG impact).
+- **Earlier change**: 2026-11-01 — `yml_to_env` gets `-u` / `--upper-case`; names lower case by default: #31 and #32 v0.2. Bumped #3 CHANGELOG v1.14, #5 manifest v0.15, #28 OPEN_TASKS v1.7, #29 plan v0.9.
+- **Earlier change**: 2026-11-01 — `encoding/json` (v1) forbidden: #30 conventions v0.3. Bumped #3 CHANGELOG v1.13, #5 manifest v0.14.
 - **Earlier change**: 2026-11-01 — Added #31 `scripts/yml_to_env/yml_to_env.sh` and #32 `yml_to_env_test.sh` (Bash). Bumped #3 CHANGELOG v1.12, #5 manifest v0.13, #6 folder_structure v0.11, #28 OPEN_TASKS v1.6, #29 plan v0.8.
 - **Earlier change**: 2026-11-01 — Step 4 `docker-compose.yml` added. Bumped #3 CHANGELOG v1.11, #5 manifest v0.12, #6 folder_structure v0.10, #28 OPEN_TASKS v1.5, #29 plan v0.7.
 - **Earlier change**: 2026-11-01 — Go modules rule: #30 conventions v0.2, `vendor/` git-ignored. Bumped #3 CHANGELOG v1.10, #5 manifest v0.11, #6 folder_structure v0.9, #28 OPEN_TASKS v1.4.
