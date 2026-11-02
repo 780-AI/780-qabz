@@ -1,5 +1,5 @@
 <!-- VERSION: 0.1 -->
-# project_base_first_001 — folder structure, main file and base packages
+# 001_project_base_first — folder structure, main file and base packages
 
 Status: done
 

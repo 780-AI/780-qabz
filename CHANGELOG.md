@@ -1,7 +1,8 @@
-<!-- VERSION: 1.25 -->
+<!-- VERSION: 1.26 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.26 — 2026-11-02 — Added task-ID-prefix and 004-task entry.
 v1.25 — 2026-11-02 — Added no-down-migrations entry.
 v1.24 — 2026-11-02 — Added config-hot-reload entry.
 v1.23 — 2026-11-02 — Added config-hot-reload-task-reorder entry.
@@ -31,6 +32,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task IDs move to the start of the name; new task 004
+- **Type:** Major (Critical File edit: `CLAUDE.md`)
+- **Files:** `CLAUDE.md` (v1.6, § 1 Tasks), `docs/Plans/pending_tasks/task_template.md` (v0.3), `docs/Plans/pending_tasks/task_counter.json` (`next_task_id` = `005`), `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.1, new), task files renamed in `done_tasks/` (`001_project_base_first.md`, `002_app_bootstrap.md`, `003_config_hot_reload.md`), `docs/documents_manifest.md` (v0.27), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. A task name is now `<ID>_name.md`; this rule replaces the earlier rule that put the ID at the end. Older CHANGELOG and manifest entries keep the old names as history. New task `004_use_yml_config`: the App loads its config from a YAML file (default and only source for now), fields map to entries with the tag `path:"a.b.c"`, `config.example.yml` is committed, `.env.example` is removed. The task text says how the App gets the YAML path needs a design step.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — No down migrations
 - **Type:** Major (command removed; Critical File edit: `system.html`)

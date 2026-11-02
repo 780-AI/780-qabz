@@ -1,5 +1,5 @@
 <!-- VERSION: 0.4 -->
-# config_hot_reload_003 — Config with hot-reload
+# 003_config_hot_reload — Config with hot-reload
 
 Status: done
 

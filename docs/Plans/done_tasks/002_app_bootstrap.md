@@ -1,5 +1,5 @@
 <!-- VERSION: 0.1 -->
-# app_bootstrap_002 — App bootstrap
+# 002_app_bootstrap — App bootstrap
 
 Status: done
 

@@ -1,9 +1,9 @@
-<!-- VERSION: 0.2 -->
+<!-- VERSION: 0.3 -->
 In this directory (expected to be {{project}}/docs/Plans/{{pending|in-progress|done}}_tasks/) we put tasks files (md files).
 
 Each task's name must be lowercase and/or numbers with _.
 
-Each new task gets an ID from `task_counter.json` (in this directory). The name ends with `_<ID>`, for example `app_bootstrap_002.md`. Read `next_task_id`, use it, then increment it by one (3 digits, zero padded) in the same commit that creates the task. Never reuse an ID.
+Each new task gets an ID from `task_counter.json` (in this directory). The name starts with `<ID>_`, for example `002_app_bootstrap.md`. Read `next_task_id`, use it, then increment it by one (3 digits, zero padded) in the same commit that creates the task. Never reuse an ID.
 
 Each task's content must have:
 - A heading

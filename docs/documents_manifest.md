@@ -1,4 +1,4 @@
-<!-- VERSION: 0.26 -->
+<!-- VERSION: 0.27 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -16,11 +16,11 @@
 
 | # | Title | Version | Category | Path |
 |---|---|---|---|---|
-| 1 | Operating Contract | v1.5 | Governance | `CLAUDE.md` |
+| 1 | Operating Contract | v1.6 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.25 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.26 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.26 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.27 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.18 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -48,14 +48,15 @@
 | 30 | Project Specific Conventions | v0.5 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env converter | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.sh` |
 | 32 | YAML to env converter tests | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env_test.sh` |
-| 33 | Task Template | v0.2 | Plan | `docs/Plans/pending_tasks/task_template.md` |
+| 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
 | 34 | App module README | v0.2 | Docs | `src/app/README.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-02
-- **Change**: No down migrations. #21 system.html v1.2. Bumped #3 CHANGELOG v1.25, #5 manifest v0.26, #6 folder_structure v0.18, #28 OPEN_TASKS v1.11.
-- **Previous change**: 2026-11-02 — Config hot-reload and migrations (`config_hot_reload_003` done). #21 system.html v1.1, #34 app README v0.2. Bumped #3 CHANGELOG v1.24, #5 manifest v0.25, #6 folder_structure v0.17, #28 OPEN_TASKS v1.10.
+- **Change**: Task IDs now start the task name (CLAUDE.md v1.6, template v0.3); task files renamed; new task `004_use_yml_config` (not manifest-tracked). Bumped #1 CLAUDE.md v1.6, #3 CHANGELOG v1.26, #5 manifest v0.27, #33 template v0.3.
+- **Previous change**: 2026-11-02 — No down migrations. #21 system.html v1.2. Bumped #3 CHANGELOG v1.25, #5 manifest v0.26, #6 folder_structure v0.18, #28 OPEN_TASKS v1.11.
+- **Earlier change**: 2026-11-02 — Config hot-reload and migrations (`config_hot_reload_003` done). #21 system.html v1.1, #34 app README v0.2. Bumped #3 CHANGELOG v1.24, #5 manifest v0.25, #6 folder_structure v0.17, #28 OPEN_TASKS v1.10.
 - **Earlier change**: 2026-11-02 — Task file `config_hot_reload_003.md` reordered to v0.3 (migration first; not manifest-tracked). Bumped #3 CHANGELOG v1.23, #5 manifest v0.24.
 - **Earlier change**: 2026-11-02 — Task file `config_hot_reload_003.md` updated to v0.2 (not manifest-tracked). Bumped #3 CHANGELOG v1.22, #5 manifest v0.23.
 - **Earlier change**: 2026-11-02 — New task file `config_hot_reload_003.md` (not manifest-tracked). Bumped #3 CHANGELOG v1.21, #5 manifest v0.22.
