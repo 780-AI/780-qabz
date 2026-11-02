@@ -1,7 +1,8 @@
-<!-- VERSION: 1.30 -->
+<!-- VERSION: 1.31 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.31 — 2026-11-02 — Added 005-task entry.
 v1.30 — 2026-11-02 — Added 004-task-key-mapping entry.
 v1.29 — 2026-11-02 — Added 004-task-panic-rule entry.
 v1.28 — 2026-11-02 — Added 004-task-answers entry.
@@ -36,6 +37,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — New task: 005_yml_to_env_generator
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/005_yml_to_env_generator.md` (v0.1, new), `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.6, points to task 005 for compose), `docs/Plans/pending_tasks/task_counter.json` (`next_task_id` = `006`), `docs/documents_manifest.md` (v0.32), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 005: an env file is auto-generated from the YAML config, has a name and header that show it is generated, is git-ignored, and is what `docker-compose.yml` reads. This answers the open compose question of task 004.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task update: 004_use_yml_config (key mapping)
 - **Type:** Minor (docs only; a task file edit)

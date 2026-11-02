@@ -1,4 +1,4 @@
-<!-- VERSION: 0.5 -->
+<!-- VERSION: 0.6 -->
 # 004_use_yml_config — Use a YAML config file
 
 Status: pending
@@ -52,7 +52,7 @@ The task comes with a good amount of unit tests. The tests cover YAML keys of di
 - The App uses the YAML source by default. No other source is used.
 - The YAML file has `database.postgres.*` and, as a sibling, `database.redis.*`, with the key names in the table of the Description (`POSTGRES_HOST` is `database.postgres.host`, and so on). The loader reads these paths into the `Config` fields.
 - Every `hot_reload:"true"` field has a sensible default. A hot field without a default makes the App fail at start. A test proves the failure, and a test proves that a failed reload leaves the default.
-- A committed `config.example.yml` shows all entries (every key in the list above); the real config file is git-ignored; `.env.example` is removed, and the docs that referred to it are updated.
+- A committed `config.example.yml` shows all entries (every key in the list above); the real config file is git-ignored; `.env.example` is removed, and the docs that referred to it are updated. `docker-compose.yml` gets its variables from an env file generated from the YAML (task `005_yml_to_env_generator`).
 - Unit tests cover: flat keys, a single key, nested maps (several levels), arrays (of scalars and of maps), maps with different value types (string, int, bool, duration, float), a missing path, a wrong type, an empty file, and each failure of `--config` (flag missing, file missing, file unreadable, invalid YAML), which must panic.
 - The tests keep the existing behavior of the hot-reload tag, the migrations and the secret masking.
 - `go mod tidy && go mod vendor`, `go build ./...` and `go vet ./...` exit 0.
