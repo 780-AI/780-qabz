@@ -1,7 +1,8 @@
-<!-- VERSION: 1.20 -->
+<!-- VERSION: 1.21 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.21 — 2026-11-02 — Added config-hot-reload-task entry.
 v1.20 — 2026-11-02 — Added app-bootstrap entry.
 v1.19 — 2026-11-02 — Added task-counter entry.
 v1.18 — 2026-11-02 — Added CLAUDE.md-tasks-rule entry.
@@ -26,6 +27,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — New task: config_hot_reload_003
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/config_hot_reload_003.md` (v0.1, new), `docs/Plans/pending_tasks/task_counter.json` (`next_task_id` = `004`), `docs/documents_manifest.md` (v0.22), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task file is not in the manifest, as with the other task files.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — App bootstrap (`app_bootstrap_002`)
 - **Type:** Major (new package, new config keys, `main.go` change)

@@ -1,4 +1,4 @@
-<!-- VERSION: 0.21 -->
+<!-- VERSION: 0.22 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.5 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.20 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.21 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.21 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.22 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.16 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-02
-- **Change**: App bootstrap (`app_bootstrap_002` done). Added #34 `src/app/README.md` v0.1. Bumped #3 CHANGELOG v1.20, #5 manifest v0.21, #6 folder_structure v0.16, #28 OPEN_TASKS v1.9. Go files have no VERSION header (Go versioning rule still open), so they have no rows.
-- **Previous change**: 2026-11-02 — Task counter: `task_counter.json` added (not manifest-tracked, not `.md`); #33 task template v0.2. Bumped #1 CLAUDE.md v1.5, #3 CHANGELOG v1.19, #5 manifest v0.20, #6 folder_structure v0.15.
+- **Change**: New task file `config_hot_reload_003.md` (not manifest-tracked). Bumped #3 CHANGELOG v1.21, #5 manifest v0.22.
+- **Previous change**: 2026-11-02 — App bootstrap (`app_bootstrap_002` done). Added #34 `src/app/README.md` v0.1. Bumped #3 CHANGELOG v1.20, #5 manifest v0.21, #6 folder_structure v0.16, #28 OPEN_TASKS v1.9. Go files have no VERSION header (Go versioning rule still open), so they have no rows.
+- **Earlier change**: 2026-11-02 — Task counter: `task_counter.json` added (not manifest-tracked, not `.md`); #33 task template v0.2. Bumped #1 CLAUDE.md v1.5, #3 CHANGELOG v1.19, #5 manifest v0.20, #6 folder_structure v0.15.
 - **Earlier change**: 2026-11-02 — CLAUDE.md v1.4 (§ 1 Tasks rule). Bumped #1 CLAUDE.md v1.4, #3 CHANGELOG v1.18, #5 manifest v0.19.
 - **Earlier change**: 2026-11-02 — New task file `app_bootstrap_002.md` (not manifest-tracked). Bumped #3 CHANGELOG v1.17, #5 manifest v0.18.
 - **Earlier change**: 2026-11-02 — Project base skeleton (folders, `src/` with `main.go`, `go.mod`, base packages). Bumped #3 CHANGELOG v1.16, #5 manifest v0.17, #6 folder_structure v0.13, #28 OPEN_TASKS v1.8, #29 plan v0.10, #30 conventions v0.4. `main.go` has no VERSION header (the Go versioning rule is still open), so it has no manifest row.
