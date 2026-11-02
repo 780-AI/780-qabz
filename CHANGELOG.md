@@ -1,7 +1,8 @@
-<!-- VERSION: 1.17 -->
+<!-- VERSION: 1.18 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.18 — 2026-11-02 — Added CLAUDE.md-tasks-rule entry.
 v1.17 — 2026-11-02 — Added app-bootstrap-task entry.
 v1.16 — 2026-11-02 — Added project-base-skeleton entry.
 v1.15 — 2026-11-02 — Added task-folders entry.
@@ -23,6 +24,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — CLAUDE.md: tasks rule
+- **Type:** Major (Critical File edit: `CLAUDE.md`)
+- **Files:** `CLAUDE.md` (v1.4; § 1 gets a "Tasks" paragraph), `docs/documents_manifest.md` (v0.19), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Process rule: a task is defined in `docs/Plans/{pending|in-progress|done}_tasks/`, and its status and folder are updated after each task operation, in the same commit.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — New task: app_bootstrap_002
 - **Type:** Minor (docs only; a new task file)
