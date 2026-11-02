@@ -1,7 +1,8 @@
-<!-- VERSION: 1.31 -->
+<!-- VERSION: 1.32 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.32 — 2026-11-02 — Added 005-task-update entry.
 v1.31 — 2026-11-02 — Added 005-task entry.
 v1.30 — 2026-11-02 — Added 004-task-key-mapping entry.
 v1.29 — 2026-11-02 — Added 004-task-panic-rule entry.
@@ -37,6 +38,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task update: 005_yml_to_env_generator
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/005_yml_to_env_generator.md` (v0.2), `docs/documents_manifest.md` (v0.33), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 005 now fixes the file name `config_generated.env`, a `make compose` target with two steps (autogenerate, then `docker compose up`), and a header comment that also says the file is mainly used by `docker-compose`.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — New task: 005_yml_to_env_generator
 - **Type:** Minor (docs only; a new task file)
