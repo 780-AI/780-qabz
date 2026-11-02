@@ -1,4 +1,4 @@
-<!-- VERSION: 0.24 -->
+<!-- VERSION: 0.25 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.5 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.23 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.24 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.24 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.16 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.25 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.17 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -36,26 +36,27 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v1.0 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v1.1 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.9 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.10 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.10 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.5 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env converter | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.sh` |
 | 32 | YAML to env converter tests | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env_test.sh` |
 | 33 | Task Template | v0.2 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.1 | Docs | `src/app/README.md` |
+| 34 | App module README | v0.2 | Docs | `src/app/README.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-02
-- **Change**: Task file `config_hot_reload_003.md` reordered to v0.3 (migration first; not manifest-tracked). Bumped #3 CHANGELOG v1.23, #5 manifest v0.24.
-- **Previous change**: 2026-11-02 — Task file `config_hot_reload_003.md` updated to v0.2 (not manifest-tracked). Bumped #3 CHANGELOG v1.22, #5 manifest v0.23.
+- **Change**: Config hot-reload and migrations (`config_hot_reload_003` done). #21 system.html v1.1, #34 app README v0.2. Bumped #3 CHANGELOG v1.24, #5 manifest v0.25, #6 folder_structure v0.17, #28 OPEN_TASKS v1.10.
+- **Previous change**: 2026-11-02 — Task file `config_hot_reload_003.md` reordered to v0.3 (migration first; not manifest-tracked). Bumped #3 CHANGELOG v1.23, #5 manifest v0.24.
+- **Earlier change**: 2026-11-02 — Task file `config_hot_reload_003.md` updated to v0.2 (not manifest-tracked). Bumped #3 CHANGELOG v1.22, #5 manifest v0.23.
 - **Earlier change**: 2026-11-02 — New task file `config_hot_reload_003.md` (not manifest-tracked). Bumped #3 CHANGELOG v1.21, #5 manifest v0.22.
 - **Earlier change**: 2026-11-02 — App bootstrap (`app_bootstrap_002` done). Added #34 `src/app/README.md` v0.1. Bumped #3 CHANGELOG v1.20, #5 manifest v0.21, #6 folder_structure v0.16, #28 OPEN_TASKS v1.9. Go files have no VERSION header (Go versioning rule still open), so they have no rows.
 - **Earlier change**: 2026-11-02 — Task counter: `task_counter.json` added (not manifest-tracked, not `.md`); #33 task template v0.2. Bumped #1 CLAUDE.md v1.5, #3 CHANGELOG v1.19, #5 manifest v0.20, #6 folder_structure v0.15.

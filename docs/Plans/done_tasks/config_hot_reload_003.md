@@ -1,7 +1,7 @@
-<!-- VERSION: 0.3 -->
+<!-- VERSION: 0.4 -->
 # config_hot_reload_003 — Config with hot-reload
 
-Status: pending
+Status: done
 
 ## Description
 

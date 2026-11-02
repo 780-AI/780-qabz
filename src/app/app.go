@@ -42,6 +42,17 @@ type Metrics interface {
 	Stop(ctx context.Context) error
 }
 
+// Migrator applies the SQL migrations. Many containers may call Up at the same time.
+type Migrator interface {
+	Up(ctx context.Context) error
+}
+
+// ConfigReloader reloads the hot-reloadable config entries at an interval.
+type ConfigReloader interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
 // Tracer exports traces.
 type Tracer interface {
 	Shutdown(ctx context.Context) error
@@ -50,19 +61,21 @@ type Tracer interface {
 // App owns every long-lived dependency. It starts and stops them in a fixed order.
 // Make one with NewBuilder.
 type App struct {
-	cfg     config.Config
-	logger  Logger
-	db      Database
-	cache   Cache
-	metrics Metrics
-	tracer  Tracer // nil when tracing is off
+	cfg      *config.Holder[config.Config]
+	logger   Logger
+	db       Database
+	cache    Cache
+	metrics  Metrics
+	tracer   Tracer         // nil when tracing is off
+	migrator Migrator       // nil: no migration at start
+	reloader ConfigReloader // nil: no hot-reload
 
 	mu      sync.Mutex
 	started bool
 }
 
-// Config returns the settings the App was built with.
-func (a *App) Config() config.Config { return a.cfg }
+// Config returns a copy of the current settings. Hot-reloadable entries can change between calls, so do not keep the copy.
+func (a *App) Config() config.Config { return a.cfg.Get() }
 
 // Logger returns the shared logger.
 func (a *App) Logger() Logger { return a.logger }
@@ -73,25 +86,43 @@ func (a *App) Database() Database { return a.db }
 // Cache returns the key-value store.
 func (a *App) Cache() Cache { return a.cache }
 
-// Start checks the database and the cache with a ping and starts the metrics endpoint.
-// If a step fails, Start stops what it opened and returns the error.
+// Start pings the database and the cache, runs the migrations (when enabled), starts the config
+// reloader and the metrics endpoint. If a step fails, Start stops what it opened and returns the error.
 func (a *App) Start(ctx context.Context) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.started {
 		return errors.New("app: already started")
 	}
-	if err := a.ping(ctx, "postgres", a.cfg.PostgresTarget(), a.db); err != nil {
+	cfg := a.cfg.Get()
+	if err := a.ping(ctx, "postgres", cfg.PostgresTarget(), a.db); err != nil {
 		return a.abort(err)
 	}
-	if err := a.ping(ctx, "redis", a.cfg.RedisAddr(), a.cache); err != nil {
+	if err := a.ping(ctx, "redis", cfg.RedisAddr(), a.cache); err != nil {
 		return a.abort(err)
+	}
+	if a.migrator != nil && cfg.MigrateOnStart {
+		mctx, cancel := context.WithTimeout(ctx, cfg.MigrateTimeout)
+		err := a.migrator.Up(mctx)
+		cancel()
+		if err != nil {
+			a.logger.Error("migration failed", "error", err)
+			return a.abort(err)
+		}
+		a.logger.Info("migrations ok")
+	}
+	if a.reloader != nil {
+		if err := a.reloader.Start(ctx); err != nil {
+			a.logger.Error("config reloader start failed", "error", err)
+			return a.abort(fmt.Errorf("config reloader: %w", err))
+		}
+		a.logger.Info("config reloader started", "interval", cfg.HotReloadInterval.String())
 	}
 	if err := a.metrics.Start(ctx); err != nil {
-		a.logger.Error("metrics start failed", "addr", a.cfg.MetricsAddr, "error", err)
-		return a.abort(fmt.Errorf("metrics: %w", err))
+		a.logger.Error("metrics start failed", "addr", cfg.MetricsAddr, "error", err)
+		return a.abort(fmt.Errorf("metrics: %w", err), true)
 	}
-	a.logger.Info("metrics started", "addr", a.cfg.MetricsAddr)
+	a.logger.Info("metrics started", "addr", cfg.MetricsAddr)
 	a.started = true
 	a.logger.Info("app started")
 	return nil
@@ -106,7 +137,7 @@ func (a *App) Stop(ctx context.Context) error {
 	}
 	a.started = false
 	a.logger.Info("app stopping")
-	return a.release(ctx, true)
+	return a.release(ctx, true, true)
 }
 
 // Run starts the App, waits until ctx is done, then stops it.
@@ -132,17 +163,21 @@ func (a *App) ping(ctx context.Context, name, target string, c Connection) error
 }
 
 // abort releases the dependencies after a failed Start.
-func (a *App) abort(cause error) error {
+// reloaderRunning is true when the failure came after the reloader started.
+func (a *App) abort(cause error, reloaderRunning ...bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
 	defer cancel()
-	return errors.Join(cause, a.release(ctx, false))
+	return errors.Join(cause, a.release(ctx, false, len(reloaderRunning) > 0 && reloaderRunning[0]))
 }
 
-// release stops the metrics endpoint only if it runs, so a failed Start does not stop what never started.
-func (a *App) release(ctx context.Context, metricsRunning bool) error {
+// release stops the metrics endpoint and the reloader only if they run, so a failed Start does not stop what never started.
+func (a *App) release(ctx context.Context, metricsRunning, reloaderRunning bool) error {
 	var errs []error
 	if metricsRunning {
 		errs = append(errs, a.metrics.Stop(ctx))
+	}
+	if a.reloader != nil && reloaderRunning {
+		errs = append(errs, a.reloader.Stop(ctx))
 	}
 	if a.tracer != nil {
 		errs = append(errs, a.tracer.Shutdown(ctx))

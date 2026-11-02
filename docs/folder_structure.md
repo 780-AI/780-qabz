@@ -1,7 +1,8 @@
-<!-- VERSION: 0.16 -->
+<!-- VERSION: 0.17 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v0.17 — 2026-11-02 — Added config/hot.go, migrations/ (embedded SQL), system/postgres migrator + config repository, cmd/run.go and cmd/migrate/; main.go dispatches by argument.
 v0.16 — 2026-11-02 — Added src/app/ (README.md, app, builder, defaults, tests); code in config/, common/logging/zap, common/monitoring/{prometheus,jaeger}, system/{postgres,redis}, cmd/start-app; main.go is one line.
 v0.15 — 2026-11-02 — Added pending_tasks/task_counter.json.
 v0.14 — 2026-11-02 — No layout change (version skipped; task files are not listed here).
@@ -37,18 +38,19 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── go.mod                         # Go module `qabz` (go 1.27.3)
 │   ├── go.sum                         # module checksums
 │   ├── vendor/                        # `go mod vendor` output; git-ignored
-│   ├── main.go                        # one-line main: runs cmd/start-app
+│   ├── main.go                        # one-line main: cmd.Run(os.Args[1:])
 │   ├── app/                           # App bootstrap: builder, lifecycle, interfaces (see its README.md)
 │   │   ├── README.md
 │   │   ├── app.go  builder.go  defaults.go
 │   │   └── app_test.go  defaults_test.go
 │   ├── cmd/                           # entry points (no main.go here)
+│   │   ├── run.go                     # Run(args): start-app (default) or migrate
 │   │   ├── start-app/                 # start.go: Run() loads config, builds and runs the App
-│   │   └── migrate/                   # not used until the older bill service stops
-│   ├── config/                        # settings: Config mapped from ENV (config.go, config_test.go)
-│   ├── migrations/                    # not used until the older bill service stops
+│   │   └── migrate/                   # migrate.go: up, down N, force V, version
+│   ├── config/                        # settings: Config from ENV (config.go); hot-reload: Holder, Reloader (hot.go)
+│   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs up/down
 │   ├── system/                        # what the service connects to
-│   │   └── postgres/  redis/          # pgx pool, go-redis client (kafka/, nats/ still empty)
+│   │   └── postgres/  redis/          # pgx pool, migrator, config repository; go-redis client (kafka/, nats/ still empty)
 │   ├── common/                        # shared by every package
 │   │   ├── logging/                   # zap/ (logger, done), logstash/ (log shipping, empty)
 │   │   ├── monitoring/                # jaeger/ (tracing), prometheus/ (metrics endpoint)

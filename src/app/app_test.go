@@ -157,3 +157,86 @@ func TestBuiltAppIsIsolatedFromBuilder(t *testing.T) {
 	assert.NoError(t, a.Start(context.Background()))
 	assert.Equal(t, "db.ping", r.c.order[0])
 }
+
+type fakeMigrator struct {
+	c   *calls
+	err error
+}
+
+func (f *fakeMigrator) Up(context.Context) error { f.c.add("migrate.up"); return f.err }
+
+type fakeReloader struct {
+	c        *calls
+	startErr error
+}
+
+func (f *fakeReloader) Start(context.Context) error { f.c.add("reloader.start"); return f.startErr }
+func (f *fakeReloader) Stop(context.Context) error  { f.c.add("reloader.stop"); return nil }
+
+func (r *rig) full(migrateOnStart bool) (*App, *fakeMigrator, *fakeReloader) {
+	m, rl := &fakeMigrator{c: r.c}, &fakeReloader{c: r.c}
+	cfg := config.Config{MigrateOnStart: migrateOnStart, MigrateTimeout: time.Second, HotReloadInterval: time.Second}
+	a, _ := r.builder().WithConfig(cfg).WithMigrator(m).WithConfigReloader(rl).Build()
+	return a, m, rl
+}
+
+func TestMigrateThenReloaderThenMetrics(t *testing.T) {
+	r := newRig()
+	a, _, _ := r.full(true)
+	assert.NoError(t, a.Start(context.Background()))
+	assert.Equal(t, []string{"db.ping", "cache.ping", "migrate.up", "reloader.start", "metrics.start"}, r.c.order)
+
+	r.c.order = nil
+	assert.NoError(t, a.Stop(context.Background()))
+	assert.Equal(t, []string{"metrics.stop", "reloader.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+}
+
+func TestMigrateOffSkipsMigration(t *testing.T) {
+	r := newRig()
+	a, _, _ := r.full(false)
+	assert.NoError(t, a.Start(context.Background()))
+	assert.NotContains(t, r.c.order, "migrate.up")
+	assert.Contains(t, r.c.order, "reloader.start")
+}
+
+func TestMigrationFailureStopsStart(t *testing.T) {
+	r := newRig()
+	a, m, _ := r.full(true)
+	m.err = errors.New("dirty")
+	assert.ErrorContains(t, a.Start(context.Background()), "dirty")
+	assert.Equal(t, []string{"db.ping", "cache.ping", "migrate.up", "cache.close", "db.close", "logger.sync"}, r.c.order)
+	assert.Contains(t, r.log.logs, "ERR migration failed")
+}
+
+func TestReloaderStartFailure(t *testing.T) {
+	r := newRig()
+	a, _, rl := r.full(true)
+	rl.startErr = errors.New("boom")
+	assert.ErrorContains(t, a.Start(context.Background()), "config reloader")
+	assert.NotContains(t, r.c.order, "metrics.start")
+	assert.NotContains(t, r.c.order, "reloader.stop")
+}
+
+func TestMetricsFailureStopsReloader(t *testing.T) {
+	r := newRig()
+	a, _, _ := r.full(true)
+	r.metrics.startErr = errors.New("busy")
+	assert.Error(t, a.Start(context.Background()))
+	assert.Contains(t, r.c.order, "reloader.stop")
+	assert.NotContains(t, r.c.order, "metrics.stop")
+}
+
+func TestBuildRequiresConfig(t *testing.T) {
+	r := newRig()
+	_, err := NewBuilder().WithLogger(r.log).WithDatabase(r.db).WithCache(r.cache).WithMetrics(r.metrics).Build()
+	assert.ErrorContains(t, err, "config is required")
+}
+
+func TestConfigReturnsCurrentHolderValue(t *testing.T) {
+	r := newRig()
+	h := config.NewHolder(config.Config{ServiceName: "a"})
+	a, _ := r.builder().WithConfigHolder(h).Build()
+	assert.Equal(t, "a", a.Config().ServiceName)
+	h.Set(config.Config{ServiceName: "b"})
+	assert.Equal(t, "b", a.Config().ServiceName)
+}

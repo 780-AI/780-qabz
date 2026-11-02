@@ -1,7 +1,8 @@
-<!-- VERSION: 1.23 -->
+<!-- VERSION: 1.24 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.24 — 2026-11-02 — Added config-hot-reload entry.
 v1.23 — 2026-11-02 — Added config-hot-reload-task-reorder entry.
 v1.22 — 2026-11-02 — Added config-hot-reload-task-update entry.
 v1.21 — 2026-11-02 — Added config-hot-reload-task entry.
@@ -29,6 +30,14 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Config hot-reload and migrations (`config_hot_reload_003`)
+- **Type:** Major (new migration and runner, new config keys, Critical File edit: `system.html`)
+- **Files:** `src/migrations/` (embed + `000001_app_hot_configs` up/down), `src/system/postgres/{migrator,config_repository}.go`, `src/config/{config,hot}.go`, `src/app/{app,builder,defaults}.go` + tests + README (v0.2), `src/cmd/{run.go,migrate/}`, `src/main.go`, `src/go.mod` / `go.sum` (golang-migrate v4.20.1), `docs/initial-discovery/system.html` (v1.1), `docs/folder_structure.md` (v0.17), `docs/documents_manifest.md` (v0.25), `docs/Plans/OPEN_TASKS.md` (v1.10), task file moved to `done_tasks/`, this entry.
+- **Impact:** Yes. (1) `start-app` now applies pending SQL migrations at start (`MIGRATE_ON_START`, default true; `MIGRATE_TIMEOUT`, default 60s) and creates `app_hot_configs`. Several containers can start together: golang-migrate holds a Postgres advisory lock, state is in `qabz_schema_migrations`. A dirty migration stops the start; an operator runs `migrate force`. (2) New command line: `qabz migrate up | down N | force V | version`; no argument or `start-app` starts the service. (3) `Config` gets `HotReloadInterval` (`HOT_RELOAD_INTERVAL`, default 30s). A field tagged `hot_reload:"true"` (string, int, bool, time.Duration; key = field name in snake case) is reloaded from `app_hot_configs` at that interval; the config sits in a `Holder` (atomic pointer, readers get a copy). **No `Config` field is tagged yet**, so nothing reloads in production until a field is tagged; the reloader is created only when a tagged field exists. (4) `App.Config()` now returns a copy of the current value.
+- **Defaults I chose (operator may change):** `key` is `UNIQUE`; all columns `NOT NULL`; timestamps default `now()`; one binary with a subcommand; the migration state table is `qabz_schema_migrations`; `cnf_type` values are `string`, `int`, `bool`, `duration`.
+- **QA scenarios:** see `docs/Plans/OPEN_TASKS.md`, "Config hot-reload and migrations".
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task reorder: config_hot_reload_003
 - **Type:** Minor (docs only; a task file edit)

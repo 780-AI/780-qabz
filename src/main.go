@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	startapp "qabz/cmd/start-app"
+	"qabz/cmd"
 )
 
-func main() { os.Exit(startapp.Run()) }
+func main() { os.Exit(cmd.Run(os.Args[1:])) }

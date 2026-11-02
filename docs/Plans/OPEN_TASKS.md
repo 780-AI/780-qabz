@@ -1,7 +1,8 @@
-<!-- VERSION: 1.9 -->
+<!-- VERSION: 1.10 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.10 — 2026-11-02 — Config hot-reload and migrations QA scenario added.
 v1.9 — 2026-11-02 — App bootstrap QA scenario added.
 v1.8 — 2026-11-02 — Project base skeleton QA scenario added; Go paths under src/.
 v1.7 — 2026-11-01 — yml_to_env QA scenario extended for -u / --upper-case.
@@ -62,6 +63,15 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: log lines `postgres ok`, `redis ok`, `metrics started`, `app started`, `app stopping`; `/metrics` returns `go_goroutines`; the log has no password; exit code 0.
   Also pass: without `POSTGRES_PASSWORD` the binary prints `config: POSTGRES_PASSWORD is required` and exits 2; with compose stopped it logs `postgres ping failed` and exits 1.
   Done 2026-11-02 by the implementer on ports 55432 / 56379: all pass (awaiting operator confirmation).
+- ⏸ Config hot-reload and migrations. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./... && go test -race ./...`. Start compose
+  (`POSTGRES_PASSWORD=x docker compose up -d --wait postgres redis`, other ports if taken), then run
+  `QABZ_TEST_POSTGRES_DSN=postgres://qabz:x@127.0.0.1:5432/qabz go test -race -count=1 -run Live ./system/postgres/`.
+  Pass: all exit 0; the live tests (8 callers of `Up` at once, repository, end-to-end hot-reload) pass.
+  Then start two `go run .` processes at the same time with different `METRICS_ADDR` on an empty database.
+  Pass: both log `migrations ok` and `app started`; `go run . migrate version` prints `version=1 dirty=false`; `\d app_hot_configs` shows the six columns.
+  Also pass: after `UPDATE qabz_schema_migrations SET dirty=true` the start fails with "Dirty database version 1" and `migrate force 1` fixes it; `MIGRATE_ON_START=false` logs no `migrations ok`; `migrate down 1` removes the table.
+  Done 2026-11-02 by the implementer (ports 55432 / 56379): all pass (awaiting operator confirmation).
+  Not covered: a real tagged `Config` field in the running service (none is tagged yet).
 
 ## Maintenance / housekeeping
 
