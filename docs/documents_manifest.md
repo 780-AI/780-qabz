@@ -1,4 +1,4 @@
-<!-- VERSION: 0.28 -->
+<!-- VERSION: 0.29 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.6 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.27 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.28 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.28 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.29 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.18 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-02
-- **Change**: Task file `004_use_yml_config.md` updated to v0.2 (not manifest-tracked). Bumped #3 CHANGELOG v1.27, #5 manifest v0.28.
-- **Previous change**: 2026-11-02 — Task IDs now start the task name (CLAUDE.md v1.6, template v0.3); task files renamed; new task `004_use_yml_config` (not manifest-tracked). Bumped #1 CLAUDE.md v1.6, #3 CHANGELOG v1.26, #5 manifest v0.27, #33 template v0.3.
+- **Change**: Task file `004_use_yml_config.md` updated to v0.3 with the operator answers (not manifest-tracked). Bumped #3 CHANGELOG v1.28, #5 manifest v0.29.
+- **Previous change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.2 (not manifest-tracked). Bumped #3 CHANGELOG v1.27, #5 manifest v0.28.
+- **Earlier change**: 2026-11-02 — Task IDs now start the task name (CLAUDE.md v1.6, template v0.3); task files renamed; new task `004_use_yml_config` (not manifest-tracked). Bumped #1 CLAUDE.md v1.6, #3 CHANGELOG v1.26, #5 manifest v0.27, #33 template v0.3.
 - **Earlier change**: 2026-11-02 — No down migrations. #21 system.html v1.2. Bumped #3 CHANGELOG v1.25, #5 manifest v0.26, #6 folder_structure v0.18, #28 OPEN_TASKS v1.11.
 - **Earlier change**: 2026-11-02 — Config hot-reload and migrations (`config_hot_reload_003` done). #21 system.html v1.1, #34 app README v0.2. Bumped #3 CHANGELOG v1.24, #5 manifest v0.25, #6 folder_structure v0.17, #28 OPEN_TASKS v1.10.
 - **Earlier change**: 2026-11-02 — Task file `config_hot_reload_003.md` reordered to v0.3 (migration first; not manifest-tracked). Bumped #3 CHANGELOG v1.23, #5 manifest v0.24.

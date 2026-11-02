@@ -1,7 +1,8 @@
-<!-- VERSION: 1.27 -->
+<!-- VERSION: 1.28 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.28 — 2026-11-02 — Added 004-task-answers entry.
 v1.27 — 2026-11-02 — Added 004-task-update entry.
 v1.26 — 2026-11-02 — Added task-ID-prefix and 004-task entry.
 v1.25 — 2026-11-02 — Added no-down-migrations entry.
@@ -33,6 +34,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task update: 004_use_yml_config (operator answers)
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.3), `docs/documents_manifest.md` (v0.29), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 004 now records: the path comes from `--config=path/to/config.yml` (for `start-app` and `migrate`); the YAML has `database.postgres.*` with `database.redis.*` as a sibling; every hot-reloadable entry must have a sensible default, and a hot field without one is a bootstrap error. The hot-reload default rule is placed in task 004, not in the finished task 003.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task update: 004_use_yml_config
 - **Type:** Minor (docs only; a task file edit)
