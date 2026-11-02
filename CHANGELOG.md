@@ -1,7 +1,8 @@
-<!-- VERSION: 1.18 -->
+<!-- VERSION: 1.19 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.19 — 2026-11-02 — Added task-counter entry.
 v1.18 — 2026-11-02 — Added CLAUDE.md-tasks-rule entry.
 v1.17 — 2026-11-02 — Added app-bootstrap-task entry.
 v1.16 — 2026-11-02 — Added project-base-skeleton entry.
@@ -24,6 +25,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task counter
+- **Type:** Major (Critical File edit: `CLAUDE.md`)
+- **Files:** `docs/Plans/pending_tasks/task_counter.json` (new; `next_task_id` = `003` after `app_bootstrap_002` took 002), `docs/Plans/pending_tasks/task_template.md` (v0.2), `CLAUDE.md` (v1.5), `docs/folder_structure.md` (v0.15), `docs/documents_manifest.md` (v0.20), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Each new task name ends with the ID from `task_counter.json`, and the counter is incremented in the same commit. `project_base_first_001` already used ID 001. `app_bootstrap` was made before the counter, so it is renamed to `app_bootstrap_002` and the counter is set to `003`.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — CLAUDE.md: tasks rule
 - **Type:** Major (Critical File edit: `CLAUDE.md`)

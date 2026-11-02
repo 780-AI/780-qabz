@@ -1,8 +1,9 @@
-<!-- VERSION: 1.4 -->
+<!-- VERSION: 1.5 -->
 <!-- Last Updated: 2026-11-02 -->
 <!-- Source: docs/standards/ (this repo). Bootstrapped from Standard Set v2.8 (vault commit 8c152cf) on 2026-10-28. -->
 <!--
 CHANGE LOG
+v1.5 — 2026-11-02 — § 1: task IDs from pending_tasks/task_counter.json.
 v1.4 — 2026-11-02 — § 1: task files rule (define in docs/Plans/*_tasks/, move after each task operation).
 v1.3 — 2026-11-01 — § 1: link to docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md (binding project conventions).
 v1.2 — 2026-10-28 — § 1: open-tasks register is committed to git (project deviation from L046).
@@ -30,6 +31,7 @@ If a rule below conflicts with a request, **refuse or propose a compliant altern
 **Project conventions:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` is **binding** for all code in this repository. Load it before writing or reviewing code. It is project-owned: a suite sync does not change it.
 **Tasks:** every task is defined as a file in `docs/Plans/{pending|in-progress|done}_tasks/` (format: `pending_tasks/task_template.md`).
 After each task operation, update the task status and move the file to the proper folder in the same commit.
+Each new task name ends with the ID from `pending_tasks/task_counter.json`, which is then incremented.
 <!-- PROJECT-OWNED:END -->
 
 ---

@@ -1,7 +1,9 @@
-<!-- VERSION: 0.13 -->
+<!-- VERSION: 0.15 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v0.15 — 2026-11-02 — Added pending_tasks/task_counter.json.
+v0.14 — 2026-11-02 — No layout change (version skipped; task files are not listed here).
 v0.13 — 2026-11-02 — Added src/ (go.mod, go.sum, vendor/, main.go, api/ moved in, and the code folders; no system/etcd). cmd/ holds entry points, not main.go.
 v0.12 — 2026-11-02 — Added docs/Plans/pending_tasks/, in-progress_tasks/, done_tasks/.
 v0.11 — 2026-11-01 — Added scripts/yml_to_env/.
@@ -78,6 +80,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   │   ├── Implementation_Plan.md     # step list for the Qabz implementation (PLAN-001 draft)
 │   │   ├── OPEN_TASKS.md              # open-tasks register (committed; deviates from L046)
 │   │   ├── pending_tasks/             # task files not started
+│   │   │   ├── task_counter.json      # next_task_id; incremented for each new task
 │   │   │   └── task_template.md       # task file rules and format (template lives only here)
 │   │   ├── in-progress_tasks/         # task files being worked on
 │   │   │   └── .gitkeep
