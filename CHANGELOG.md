@@ -1,7 +1,8 @@
-<!-- VERSION: 1.28 -->
+<!-- VERSION: 1.29 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.29 — 2026-11-02 — Added 004-task-panic-rule entry.
 v1.28 — 2026-11-02 — Added 004-task-answers entry.
 v1.27 — 2026-11-02 — Added 004-task-update entry.
 v1.26 — 2026-11-02 — Added task-ID-prefix and 004-task entry.
@@ -34,6 +35,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task update: 004_use_yml_config (panic on missing config)
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.4), `docs/documents_manifest.md` (v0.30), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 004 now says: if `--config` is missing, or the file does not exist or cannot be read or parsed, for any reason, the App panics and fails with a non-zero exit, and never starts with defaults. This closes the earlier open point about a missing flag.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task update: 004_use_yml_config (operator answers)
 - **Type:** Minor (docs only; a task file edit)
