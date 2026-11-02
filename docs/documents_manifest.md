@@ -1,4 +1,4 @@
-<!-- VERSION: 0.16 -->
+<!-- VERSION: 0.17 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -17,10 +17,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.3 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.15 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.16 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.16 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.12 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.17 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.13 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -42,9 +42,9 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.7 | Governance | `docs/Plans/OPEN_TASKS.md` |
-| 29 | Implementation Plan | v0.9 | Plan | `docs/Plans/Implementation_Plan.md` |
-| 30 | Project Specific Conventions | v0.3 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
+| 28 | Open Tasks Register | v1.8 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 29 | Implementation Plan | v0.10 | Plan | `docs/Plans/Implementation_Plan.md` |
+| 30 | Project Specific Conventions | v0.4 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env converter | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.sh` |
 | 32 | YAML to env converter tests | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env_test.sh` |
 | 33 | Task Template | v0.1 | Plan | `docs/Plans/pending_tasks/task_template.md` |
@@ -52,7 +52,8 @@
 ## Last Updated
 
 - **Date**: 2026-11-02
-- **Change**: Added #33 `docs/Plans/pending_tasks/task_template.md` v0.1 (task folders `pending_tasks/`, `in-progress_tasks/`, `done_tasks/`). Bumped #3 CHANGELOG v1.15, #5 manifest v0.16, #6 folder_structure v0.12. Quick Index row updated. Task files themselves are not manifest-tracked (see CHANGELOG impact).
+- **Change**: Project base skeleton (folders, `src/` with `main.go`, `go.mod`, base packages). Bumped #3 CHANGELOG v1.16, #5 manifest v0.17, #6 folder_structure v0.13, #28 OPEN_TASKS v1.8, #29 plan v0.10, #30 conventions v0.4. `main.go` has no VERSION header (the Go versioning rule is still open), so it has no manifest row.
+- **Previous change**: 2026-11-02 — Added #33 `docs/Plans/pending_tasks/task_template.md` v0.1 (task folders `pending_tasks/`, `in-progress_tasks/`, `done_tasks/`). Bumped #3 CHANGELOG v1.15, #5 manifest v0.16, #6 folder_structure v0.12. Quick Index row updated. Task files themselves are not manifest-tracked (see CHANGELOG impact).
 - **Earlier change**: 2026-11-01 — `yml_to_env` gets `-u` / `--upper-case`; names lower case by default: #31 and #32 v0.2. Bumped #3 CHANGELOG v1.14, #5 manifest v0.15, #28 OPEN_TASKS v1.7, #29 plan v0.9.
 - **Earlier change**: 2026-11-01 — `encoding/json` (v1) forbidden: #30 conventions v0.3. Bumped #3 CHANGELOG v1.13, #5 manifest v0.14.
 - **Earlier change**: 2026-11-01 — Added #31 `scripts/yml_to_env/yml_to_env.sh` and #32 `yml_to_env_test.sh` (Bash). Bumped #3 CHANGELOG v1.12, #5 manifest v0.13, #6 folder_structure v0.11, #28 OPEN_TASKS v1.6, #29 plan v0.8.

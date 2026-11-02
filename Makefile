@@ -1,8 +1,8 @@
 PB_DIR    ?= qabz
 PB_PROTO  := pb/proto
 PB_AUX    := pb/aux
-PB_OUT    := api/pb
-SWAG_OUT  := api/swagger
+PB_OUT    := src/api/pb
+SWAG_OUT  := src/api/swagger
 
 .PHONY: proto
 ## proto: regenerate Go, gRPC, gateway and swagger code from pb/proto/$(PB_DIR). Run after every fresh pull.

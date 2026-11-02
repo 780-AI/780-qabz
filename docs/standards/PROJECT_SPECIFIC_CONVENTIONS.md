@@ -1,7 +1,8 @@
-<!-- VERSION: 0.3 -->
+<!-- VERSION: 0.4 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.4 — 2026-11-02 — Section 2: all Go code and `go.mod` live in `src/`; Go commands run there.
 v0.3 — 2026-11-01 — Section 1: `encoding/json` (v1) is forbidden everywhere; the `code-reviewer` rejects it.
 v0.2 — 2026-11-01 — Section 2: Go modules (`go mod tidy && go mod vendor`; `vendor/` git-ignored).
 v0.1 — 2026-11-01 — Created. Definitions section, not numbered (hot path, memory pool, `Poolable`). Section 1: JSON unmarshalling policy (moved out of Implementation_Plan.md Step 5).
@@ -66,10 +67,13 @@ This rule covers unmarshalling only. It does not cover marshalling. It uses the 
 
 ## 2. Go modules
 
+**All Go code is in `src/`.** `go.mod`, `go.sum`, `vendor/`, `main.go` and every code folder are in `src/`. Run every Go command from `src/`.
+
 **Always run `go mod tidy && go mod vendor`.** Never run `go mod tidy` alone. Run both commands together, in this order, after every change of the module requirements or of the imports.
 
-**`vendor/` is git-ignored.** The `vendor/` directory is never committed. `.gitignore` lists `vendor/`. `go.mod` and `go.sum` are committed.
+**`src/vendor/` is git-ignored.** The `vendor/` directory is never committed. `.gitignore` lists `vendor/`. `go.mod` and `go.sum` are committed.
 
-**Fresh clone.** Because `vendor/` is not in git, a fresh clone has no `vendor/`. Run `go mod tidy && go mod vendor` before the first build. The generated code in `api/pb/` is git-ignored too, so run `make proto` first. Otherwise `go mod tidy` removes the requirements that the generated code needs.
+**Fresh clone.** Because `vendor/` is not in git, a fresh clone has no `vendor/`. Run `go mod tidy && go mod vendor` before the first build. The generated code in `src/api/pb/` is git-ignored too, so run `make proto` first. Otherwise `go mod tidy` removes the requirements that the generated code needs.
 
 **Builds.** A Go build uses `vendor/` when it exists. CI and Docker builds run `go mod tidy && go mod vendor` before they build.
+

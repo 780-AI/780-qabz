@@ -1,7 +1,8 @@
-<!-- VERSION: 1.15 -->
+<!-- VERSION: 1.16 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.16 — 2026-11-02 — Added project-base-skeleton entry.
 v1.15 — 2026-11-02 — Added task-folders entry.
 v1.14 — 2026-11-01 — Added yml_to_env upper-case-flag entry.
 v1.13 — 2026-11-01 — Added encoding/json-ban entry.
@@ -21,6 +22,14 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Project base: folder structure, hello-world main, base packages
+- **Type:** Major (new packages and folders; new requirements in `go.mod`; `folder_structure.md` change)
+- **Files:** `src/main.go` (new), `cmd/start-app/.gitkeep`, `.gitkeep` in every empty folder of the "Directory Structure" in `system.html`, except `system/etcd/` (operator: etcd is not used) (new), `src/go.mod`, `src/go.sum` (moved to `src/`; requirements added), `Makefile` (`PB_OUT`, `SWAG_OUT` now under `src/api/`), `.gitignore` (`src/api/…`, `src/vendor/`), `docs/Plans/Implementation_Plan.md` (v0.10), `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.4), `docs/Plans/done_tasks/project_base_first_001.md` (new task file; status done, moved by operator request), `docs/folder_structure.md` (v0.13), `docs/Plans/OPEN_TASKS.md` (v1.8), `docs/documents_manifest.md` (v0.17), `CHANGELOG.md` (this entry).
+- **Impact:** No domain impact. `go run .` (from `src/`) prints `hello world` and does nothing else. `go.mod` now requires `pgx/v5`, `go-redis/v9`, `prometheus/client_golang`, `zap`, and OpenTelemetry (`otel`, `otel/sdk`, OTLP gRPC trace exporter). The OTLP exporter is the Jaeger path: Jaeger accepts OTLP, and the older Jaeger client is deprecated. The five packages are kept by blank imports in `main.go`; the blank imports go when real code uses the packages. The task name `project_base_first-001` is written `project_base_first_001`, because the task template allows only lowercase letters, numbers and `_`.
+- **QA scenarios:** See `OPEN_TASKS.md` "Pending verification" (Project base skeleton). `make proto` writes to `src/api/` now; it is not re-run here (the `protoc` tools may be missing), so the existing QA scenario for it is the check.
+- **Not changed:** `docs/initial-discovery/system.html` (Critical File) still shows `api/pb/` at the root and etcd; the design needs an operator decision.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — docs/Plans: task folders and task template
 - **Type:** Major (new top-level areas under `docs/Plans/`; Critical File edit: manifest) / Docs / Governance

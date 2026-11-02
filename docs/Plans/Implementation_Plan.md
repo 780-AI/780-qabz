@@ -1,7 +1,8 @@
-<!-- VERSION: 0.9 -->
+<!-- VERSION: 0.10 -->
 <!-- Last Updated: 2026-11-01 -->
 <!--
 CHANGE LOG
+v0.10 — 2026-11-02 — Go code, go.mod and generated api/ moved into src/ (Steps 3 and 5 paths).
 v0.9 — 2026-11-01 — yml_to_env: `-u` / `--upper-case` added; names are lower case by default.
 v0.8 — 2026-11-01 — Step 4: `scripts/yml_to_env/` tool (YAML to .env, Bash) added and recorded.
 v0.7 — 2026-11-01 — Step 4: app (`qabz`) named as a Docker service; `docker-compose.yml` added; details recorded.
@@ -56,7 +57,7 @@ Add a `Makefile` with a target that generates Go code from the `.proto` files of
 Decided and done (2026-11-01):
 - Tool: `protoc` with `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway` and `protoc-gen-openapiv2`. The options follow the legacy projects' command.
 - Scope: `pb/proto/qabz` only (`services.proto`, `internalservices.proto`). The variable `PB_DIR` selects another directory.
-- Output: `api/pb/` (Go code) and `api/swagger/` (OpenAPI), both git-ignored. Developers run `make proto` after every fresh pull. The target deletes the old output of the directory first.
+- Output: `src/api/pb/` (Go code) and `src/api/swagger/` (OpenAPI), both git-ignored. Developers run `make proto` after every fresh pull. The target deletes the old output of the directory first.
 - Go module path: `qabz` (decided 2026-11-01, see Step 5). The `qabz` protos set `go_package = "micro/pb/proto/bill;bill"` and import only Google packages, so the generated code does not depend on the module path now. A later directory that imports other `pb/` packages needs `M` overrides that map to `qabz/api/pb/<dir>`.
 - Not decided: whether `make proto` also runs in CI or in the Docker build (Step 4).
 
@@ -117,7 +118,7 @@ Create the base code skeleton of the service and the system modules that connect
 
 **JSON policy (mandatory, 2026-11-01):** the rule lives in `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` § 1 (the term "hot path" is defined in its "Definitions" section) and applies to all code, not only this step. Each sub-task states which of its JSON reads are hot.
 
-Go module (decided 2026-11-01): `go.mod` at the repository root. Module path `qabz`. Go version `go 1.27.3`, the latest stable release on 2026-11-01. Go 1.27.3 includes `encoding/json/v2` without a flag (checked on 1.27.1). A machine with an older Go downloads the toolchain by itself (`GOTOOLCHAIN=auto`; checked on 2026-11-01). `go mod tidy` added `google.golang.org/grpc`, `google.golang.org/protobuf`, `github.com/grpc-ecosystem/grpc-gateway/v2` and `google.golang.org/genproto/googleapis/api`, because the generated `api/pb` code imports them. Open point: `api/pb/` is git-ignored, so `go mod tidy` on a clone without `make proto` removes these requirements. Whether `make proto` runs `go mod tidy` is not decided.
+Go module (decided 2026-11-01): `go.mod` in `src/` (all Go code lives in `src/`). Module path `qabz`. Go version `go 1.27.3`, the latest stable release on 2026-11-01. Go 1.27.3 includes `encoding/json/v2` without a flag (checked on 1.27.1). A machine with an older Go downloads the toolchain by itself (`GOTOOLCHAIN=auto`; checked on 2026-11-01). `go mod tidy` added `google.golang.org/grpc`, `google.golang.org/protobuf`, `github.com/grpc-ecosystem/grpc-gateway/v2` and `google.golang.org/genproto/googleapis/api`, because the generated `api/pb` code imports them. Open point: `api/pb/` is git-ignored, so `go mod tidy` on a clone without `make proto` removes these requirements. Whether `make proto` runs `go mod tidy` is not decided.
 
 Layout decision (2026-10-28): the layout is the one in the design doc. All folders stay at the repository root. There is no `internal/` folder.
 

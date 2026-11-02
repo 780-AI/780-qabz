@@ -4,7 +4,7 @@ tmp
 .DS_Store
 .claude
 settings.local.json
-api/pb/
-api/swagger/
-vendor/
+src/api/pb/
+src/api/swagger/
+src/vendor/
 .env
