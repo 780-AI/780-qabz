@@ -16,7 +16,7 @@ import (
 
 // These tests need a real Postgres. Set QABZ_TEST_POSTGRES_DSN, for example
 // postgres://qabz:pw@127.0.0.1:55432/qabz. The tests use a throw-away schema state:
-// they roll the migrations down at the start and at the end.
+// they drop the tables of the migrations at the start and at the end.
 func liveDSN(t *testing.T) string {
 	t.Helper()
 	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
@@ -26,22 +26,24 @@ func liveDSN(t *testing.T) string {
 	return dsn
 }
 
-func reset(t *testing.T, m *Migrator) {
+// reset drops the tables the migrations create, so each test starts from an empty database.
+// (There are no down migrations.)
+func reset(t *testing.T, dsn string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	v, _, err := m.Version()
+	c, err := New(ctx, dsn)
 	assert.NoError(t, err)
-	if v > 0 {
-		assert.NoError(t, m.Down(ctx, int(v)))
-	}
+	defer c.Close()
+	_, err = c.Pool().Exec(ctx, `DROP TABLE IF EXISTS app_hot_configs, qabz_schema_migrations`)
+	assert.NoError(t, err)
 }
 
 func TestLiveConcurrentUp(t *testing.T) {
 	dsn := liveDSN(t)
 	m := NewMigrator(dsn, migrations.FS)
-	reset(t, m)
-	t.Cleanup(func() { reset(t, m) })
+	reset(t, dsn)
+	t.Cleanup(func() { reset(t, dsn) })
 
 	const n = 8
 	errs := make([]error, n)
@@ -68,10 +70,10 @@ func TestLiveConcurrentUp(t *testing.T) {
 func TestLiveRepositoryLoad(t *testing.T) {
 	dsn := liveDSN(t)
 	m := NewMigrator(dsn, migrations.FS)
-	reset(t, m)
+	reset(t, dsn)
 	ctx := context.Background()
 	assert.NoError(t, m.Up(ctx))
-	t.Cleanup(func() { reset(t, m) })
+	t.Cleanup(func() { reset(t, dsn) })
 
 	c, err := New(ctx, dsn)
 	assert.NoError(t, err)
@@ -120,10 +122,10 @@ func (testLog) Error(string, ...any) {}
 func TestLiveHotReloadEndToEnd(t *testing.T) {
 	dsn := liveDSN(t)
 	m := NewMigrator(dsn, migrations.FS)
-	reset(t, m)
+	reset(t, dsn)
 	ctx := context.Background()
 	assert.NoError(t, m.Up(ctx))
-	t.Cleanup(func() { reset(t, m) })
+	t.Cleanup(func() { reset(t, dsn) })
 
 	c, err := New(ctx, dsn)
 	assert.NoError(t, err)

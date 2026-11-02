@@ -51,12 +51,8 @@ func (m *Migrator) Up(ctx context.Context) error {
 	return m.run(ctx, func(mg *migrate.Migrate) error { return mg.Up() })
 }
 
-// Down rolls back n steps. It is for the manual migrate command only.
-func (m *Migrator) Down(ctx context.Context, n int) error {
-	return m.run(ctx, func(mg *migrate.Migrate) error { return mg.Steps(-n) })
-}
-
 // Force sets the version and clears the dirty flag. It is for the manual migrate command only.
+// The migrations have no down files: there is no rollback. Fix forward with a new migration.
 func (m *Migrator) Force(version int) error {
 	mg, err := m.open()
 	if err != nil {

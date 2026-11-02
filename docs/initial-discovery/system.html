@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 1.1 -->
+<!-- VERSION: 1.2 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v1.2 — 2026-11-02 — No down migrations: only NNNNNN_name.up.sql files; migrate command is up, force V, version.
 v1.1 — 2026-11-02 — Migrations: qabz runs its own migrations (src/migrations, golang-migrate) at start and with the migrate command; hot-reload table app_hot_configs.
 v1.0 — 2026-10-28 — VERSION header added; moved from docs/ to docs/initial-discovery/.
 -->
@@ -352,7 +353,7 @@ qabz/
 ```
 
 Directory notes:
-- **Migrations.** `src/migrations/` holds `qabz` own SQL files (`NNNNNN_name.up.sql` / `.down.sql`), embedded in the binary. The first one creates `app_hot_configs`, the table of hot-reloadable config entries. `start-app` applies pending migrations at start (`MIGRATE_ON_START`, default true). Many containers may start at the same time: golang-migrate takes a Postgres advisory lock, so one applies and the others wait. The state is kept in the table `qabz_schema_migrations`, apart from the old `bill` service. The old `bill` service still owns its own tables.
+- **Migrations.** `src/migrations/` holds `qabz` own SQL files (`NNNNNN_name.up.sql`; there are no down files, so a change is rolled forward with a new migration), embedded in the binary. The first one creates `app_hot_configs`, the table of hot-reloadable config entries. `start-app` applies pending migrations at start (`MIGRATE_ON_START`, default true). Many containers may start at the same time: golang-migrate takes a Postgres advisory lock, so one applies and the others wait. The state is kept in the table `qabz_schema_migrations`, apart from the old `bill` service. The old `bill` service still owns its own tables.
 
 ### Entry Points
 
@@ -363,7 +364,7 @@ Directory notes:
 | http-server | The `/qabz/v1/` or `/v3` REST routes |
 | grpc-server | `PaymentComplete/OrderComplete`, called by the payment service |
 | cron | The crons, registered in the `CronRegistry` |
-| migrate (command) | Manual actions: `up`, `down N`, `force V`, `version`. `start-app` already runs `up` at start |
+| migrate (command) | Manual actions: `up`, `force V`, `version`. `start-app` already runs `up` at start |
 
 ## Database
 

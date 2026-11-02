@@ -1,7 +1,8 @@
-<!-- VERSION: 1.24 -->
+<!-- VERSION: 1.25 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.25 — 2026-11-02 — Added no-down-migrations entry.
 v1.24 — 2026-11-02 — Added config-hot-reload entry.
 v1.23 — 2026-11-02 — Added config-hot-reload-task-reorder entry.
 v1.22 — 2026-11-02 — Added config-hot-reload-task-update entry.
@@ -30,6 +31,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — No down migrations
+- **Type:** Major (command removed; Critical File edit: `system.html`)
+- **Files:** `src/migrations/000001_app_hot_configs.down.sql` (deleted), `src/system/postgres/migrator.go` (`Down` removed), `src/cmd/migrate/migrate.go` (`down` action removed), tests, `src/migrations/migrations.go`, `docs/initial-discovery/system.html` (v1.2), `docs/folder_structure.md` (v0.18), `docs/Plans/OPEN_TASKS.md` (v1.11), `docs/documents_manifest.md` (v0.26), this entry.
+- **Impact:** Yes. There is no rollback. `migrate` has `up`, `force V` and `version`; `migrate down` exits 2. Migration files are `NNNNNN_name.up.sql` only (a test enforces it). A change is rolled forward with a new migration. This supersedes the "up/down" and `down N` wording in the entry below. Live tests now reset the database by dropping the two tables.
+- **QA scenarios:** see `docs/Plans/OPEN_TASKS.md`, "Config hot-reload and migrations". Live run 2026-11-02: live tests pass (81.5%); two binaries at once both log `migrations ok`; `migrate version` is `version=1 dirty=false`; `migrate down 1` exits 2.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Config hot-reload and migrations (`config_hot_reload_003`)
 - **Type:** Major (new migration and runner, new config keys, Critical File edit: `system.html`)

@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"fmt"
 	"io/fs"
 	"regexp"
 	"sort"
@@ -11,31 +10,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var name = regexp.MustCompile(`^(\d{6})_[a-z0-9_]+\.(up|down)\.sql$`)
+var name = regexp.MustCompile(`^(\d{6})_[a-z0-9_]+\.up\.sql$`)
 
-func TestFilesArePairedAndSequential(t *testing.T) {
+func TestFilesAreUpOnlyAndSequential(t *testing.T) {
 	entries, err := fs.ReadDir(FS, ".")
 	assert.NoError(t, err)
-	ups, downs := map[int]string{}, map[int]string{}
+	var nums []int
 	for _, e := range entries {
 		m := name.FindStringSubmatch(e.Name())
-		if !assert.NotNil(t, m, "bad file name %s", e.Name()) {
+		if !assert.NotNil(t, m, "bad file name %s (only NNNNNN_name.up.sql is allowed; no down files)", e.Name()) {
 			continue
 		}
 		n, _ := strconv.Atoi(m[1])
-		if m[2] == "up" {
-			ups[n] = e.Name()
-		} else {
-			downs[n] = e.Name()
-		}
-	}
-	assert.NotEmpty(t, ups)
-	var nums []int
-	for n := range ups {
 		nums = append(nums, n)
-		assert.Contains(t, downs, n, fmt.Sprintf("%06d has no down file", n))
 	}
-	assert.Len(t, downs, len(ups))
+	assert.NotEmpty(t, nums)
 	sort.Ints(nums)
 	for i, n := range nums {
 		assert.Equal(t, i+1, n, "versions must be 1,2,3 without gaps")

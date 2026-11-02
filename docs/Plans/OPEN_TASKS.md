@@ -1,7 +1,8 @@
-<!-- VERSION: 1.10 -->
+<!-- VERSION: 1.11 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.11 — 2026-11-02 — Migration scenario: no down command.
 v1.10 — 2026-11-02 — Config hot-reload and migrations QA scenario added.
 v1.9 — 2026-11-02 — App bootstrap QA scenario added.
 v1.8 — 2026-11-02 — Project base skeleton QA scenario added; Go paths under src/.
@@ -69,7 +70,7 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: all exit 0; the live tests (8 callers of `Up` at once, repository, end-to-end hot-reload) pass.
   Then start two `go run .` processes at the same time with different `METRICS_ADDR` on an empty database.
   Pass: both log `migrations ok` and `app started`; `go run . migrate version` prints `version=1 dirty=false`; `\d app_hot_configs` shows the six columns.
-  Also pass: after `UPDATE qabz_schema_migrations SET dirty=true` the start fails with "Dirty database version 1" and `migrate force 1` fixes it; `MIGRATE_ON_START=false` logs no `migrations ok`; `migrate down 1` removes the table.
+  Also pass: after `UPDATE qabz_schema_migrations SET dirty=true` the start fails with "Dirty database version 1" and `migrate force 1` fixes it; `MIGRATE_ON_START=false` logs no `migrations ok`; `go run . migrate down 1` exits 2 (`unknown action "down"`).
   Done 2026-11-02 by the implementer (ports 55432 / 56379): all pass (awaiting operator confirmation).
   Not covered: a real tagged `Config` field in the running service (none is tagged yet).
 

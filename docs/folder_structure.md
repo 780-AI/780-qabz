@@ -1,7 +1,8 @@
-<!-- VERSION: 0.17 -->
+<!-- VERSION: 0.18 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v0.18 — 2026-11-02 — No down migrations: migrate command is up, force V, version; 000001 has only the up file.
 v0.17 — 2026-11-02 — Added config/hot.go, migrations/ (embedded SQL), system/postgres migrator + config repository, cmd/run.go and cmd/migrate/; main.go dispatches by argument.
 v0.16 — 2026-11-02 — Added src/app/ (README.md, app, builder, defaults, tests); code in config/, common/logging/zap, common/monitoring/{prometheus,jaeger}, system/{postgres,redis}, cmd/start-app; main.go is one line.
 v0.15 — 2026-11-02 — Added pending_tasks/task_counter.json.
@@ -46,9 +47,9 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── cmd/                           # entry points (no main.go here)
 │   │   ├── run.go                     # Run(args): start-app (default) or migrate
 │   │   ├── start-app/                 # start.go: Run() loads config, builds and runs the App
-│   │   └── migrate/                   # migrate.go: up, down N, force V, version
+│   │   └── migrate/                   # migrate.go: up, force V, version
 │   ├── config/                        # settings: Config from ENV (config.go); hot-reload: Holder, Reloader (hot.go)
-│   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs up/down
+│   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs.up.sql (no down files)
 │   ├── system/                        # what the service connects to
 │   │   └── postgres/  redis/          # pgx pool, migrator, config repository; go-redis client (kafka/, nats/ still empty)
 │   ├── common/                        # shared by every package

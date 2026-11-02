@@ -16,7 +16,7 @@ func exec(t *testing.T, args ...string) (int, string) {
 
 func TestUsageErrors(t *testing.T) {
 	t.Setenv("POSTGRES_PASSWORD", "x")
-	for _, args := range [][]string{{}, {"sideways"}, {"down"}, {"down", "0"}, {"down", "x"}, {"force"}, {"force", "-1"}} {
+	for _, args := range [][]string{{}, {"sideways"}, {"down", "1"}, {"force"}, {"force", "-1"}} {
 		code, _ := exec(t, args...)
 		assert.Equal(t, 2, code, "%v", args)
 	}

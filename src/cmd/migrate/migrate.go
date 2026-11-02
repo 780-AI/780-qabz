@@ -1,4 +1,4 @@
-// Package migratecmd is the manual migration command: up, down N, force V, version.
+// Package migratecmd is the manual migration command: up, force V, version.
 package migratecmd
 
 import (
@@ -16,12 +16,12 @@ import (
 )
 
 // Run executes one migration action and returns the process exit code.
-// start-app already runs "up" at start; this command is for down, force and version.
+// start-app already runs "up" at start; this command is for up, force and version.
 func Run(args []string) int { return run(args, os.Stdout, os.Stderr) }
 
 func run(args []string, out, errOut io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "usage: migrate up | down N | force VERSION | version")
+		fmt.Fprintln(errOut, "usage: migrate up | force VERSION | version")
 		return 2
 	}
 	cfg, err := config.Load()
@@ -38,17 +38,6 @@ func run(args []string, out, errOut io.Writer) int {
 	switch args[0] {
 	case "up":
 		err = m.Up(ctx)
-	case "down":
-		n, perr := number(args, "down N")
-		if perr != nil {
-			fmt.Fprintln(errOut, perr)
-			return 2
-		}
-		if n < 1 {
-			fmt.Fprintln(errOut, "down needs N of at least 1")
-			return 2
-		}
-		err = m.Down(ctx, n)
 	case "force":
 		n, perr := number(args, "force VERSION")
 		if perr != nil {

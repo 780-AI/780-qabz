@@ -16,7 +16,6 @@ func TestMigratorErrorsHideThePassword(t *testing.T) {
 	m := NewMigrator(deadDSN, migrations.FS)
 	for name, err := range map[string]error{
 		"up":    m.Up(context.Background()),
-		"down":  m.Down(context.Background(), 1),
 		"force": m.Force(1),
 	} {
 		assert.Error(t, err, name)
