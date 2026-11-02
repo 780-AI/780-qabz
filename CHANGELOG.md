@@ -1,7 +1,8 @@
-<!-- VERSION: 1.21 -->
+<!-- VERSION: 1.22 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.22 — 2026-11-02 — Added config-hot-reload-task-update entry.
 v1.21 — 2026-11-02 — Added config-hot-reload-task entry.
 v1.20 — 2026-11-02 — Added app-bootstrap entry.
 v1.19 — 2026-11-02 — Added task-counter entry.
@@ -27,6 +28,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task update: config_hot_reload_003
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/config_hot_reload_003.md` (v0.2), `docs/documents_manifest.md` (v0.23), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task now names the `ConfigRepository`, the required `hot_reload_interval` entry, the locking need, and the migration for the table `app_hot_configs` (columns `id`, `key`, `cnf_type`, `value`, `created_at`, `updated_at`).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — New task: config_hot_reload_003
 - **Type:** Minor (docs only; a new task file)
