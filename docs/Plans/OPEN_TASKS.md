@@ -1,7 +1,8 @@
-<!-- VERSION: 1.12 -->
-<!-- Last Updated: 2026-11-02 -->
+<!-- VERSION: 1.13 -->
+<!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.13 — 2026-11-04 — Nil-guard QA scenario added.
 v1.12 — 2026-11-02 — Task 005: docker-compose and yml_to_env scenarios now use config.yml, config_generated.env and the Python generator; Config-from-YAML run scenario added.
 v1.11 — 2026-11-02 — Migration scenario: no down command.
 v1.10 — 2026-11-02 — Config hot-reload and migrations QA scenario added.
@@ -75,6 +76,10 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Also pass: after `UPDATE qabz_schema_migrations SET dirty=true` the start fails with "Dirty database version 1" and `migrate force 1` fixes it; `MIGRATE_ON_START=false` logs no `migrations ok`; `go run . migrate down 1` exits 2 (`unknown action "down"`).
   Done 2026-11-02 by the implementer (ports 55432 / 56379): all pass (awaiting operator confirmation).
   Not covered: a real tagged `Config` field in the running service (none is tagged yet).
+- ⏸ Nil guards (2026-11-04). In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./... && go test -race -count=1 ./...`.
+  Pass: all exit 0. Then make one check fail on purpose (for example a `go test -overlay` copy of `config/config.go` whose `Parse` returns a nil error) and run `go test ./config/`.
+  Pass: the output shows `FAIL` with "An error is expected but got nil" and has no `panic: runtime error` line.
+  Done 2026-11-04 by the implementer: all pass (awaiting operator confirmation).
 
 ## Maintenance / housekeeping
 

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.46 -->
+<!-- VERSION: 1.47 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.47 — 2026-11-04 — Added nil-guards entry.
 v1.46 — 2026-11-04 — Added Implementation-Plan-Step-4 entry.
 v1.45 — 2026-11-02 — Added 005-yml-to-env-generator entry.
 v1.44 — 2026-11-02 — Added 005-task-verification entry.
@@ -52,6 +53,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — Nil guards in the Go tests and the config code
+- **Type:** Minor (test hardening; two input guards in the config package)
+- **Files:** `src/config/decode.go`, `src/config/hot.go`, `src/config/decode_test.go`, `src/config/config_test.go`, `src/config/boot_test.go`, `src/config/hot_test.go`, `src/app/app_test.go`, `src/app/defaults_test.go`, `src/system/postgres/live_test.go`, `src/system/postgres/migrator_test.go`, `src/system/postgres/postgres_test.go`, `src/common/monitoring/jaeger/jaeger_test.go`, `src/common/monitoring/prometheus/prometheus_test.go`, `src/common/logging/zap/zap_test.go`, `docs/Plans/OPEN_TASKS.md` (v1.13), `docs/documents_manifest.md` (v0.48), `CHANGELOG.md` (this entry).
+- **Impact:** Small behavior change in two functions; tests only elsewhere. `decodeStruct` returns an error (not a panic) when the target is not a settable struct. `NewReloader` returns an error when the repository, the holder or the logger is nil (before, the nil value crashed later, at the first reload). The App calls both with real values, so the running App does not change. In the tests, every use of a value that can be nil after a failed check is now guarded: `err.Error()` runs only after `assert.Error` passed; a nil `*App`, `*Builder`, `*Client`, `*Reloader`, `*Tracer`, `*Logger` or `*http.Response` stops the test (`if !assert.NoError(...) { return }`, or `t.FailNow()` in the helpers `build`, `defaultApp`, `newClient`, `newRel`); `rows[0]` and `order[0]` run only after a length check; the test helper `decodeDoc` checks its type assertion; `TestBootLoads` wraps `Boot` in `assert.NotPanics`. A failed check now gives a normal test failure, and the other tests still run. All assertions still use testify `assert` (conventions § 3).
+- **QA scenarios:** (1) In `src/` `go build ./... && go vet ./... && go test -race -count=1 ./...`: all pass (done, 2026-11-04). (2) Deliberate failure: a `go test -overlay` copy of `config.go` whose `Parse` returns a nil error gives `FAIL` with "An error is expected but got nil" and 0 `panic: runtime error` lines (done, 2026-11-04). (3) New tests `TestDecodeBadTarget` and the nil cases in `TestHotFieldsErrors` pass (done, 2026-11-04).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — Implementation Plan Step 4: Python generator and config.yml
 - **Type:** Minor (plan text follows the code of task 005)

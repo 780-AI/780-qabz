@@ -18,12 +18,14 @@ func TestMigratorErrorsHideThePassword(t *testing.T) {
 		"up":    m.Up(context.Background()),
 		"force": m.Force(1),
 	} {
-		assert.Error(t, err, name)
-		assert.NotContains(t, err.Error(), "s3cret", name)
+		if assert.Error(t, err, name) {
+			assert.NotContains(t, err.Error(), "s3cret", name)
+		}
 	}
 	_, _, err := m.Version()
-	assert.Error(t, err)
-	assert.NotContains(t, err.Error(), "s3cret")
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "s3cret")
+	}
 }
 
 func TestMigratorAppendsToExistingQuery(t *testing.T) {

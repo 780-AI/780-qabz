@@ -62,7 +62,9 @@ func newRel(t *testing.T, repo Repository, interval time.Duration) (*Reloader[ho
 	h := NewHolder(hotCfg{LogLevel: "info", Workers: 1, Frozen: "keep"})
 	l := &fakeLog{}
 	r, err := NewReloader[hotCfg](repo, h, interval, l)
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) || !assert.NotNil(t, r) {
+		t.FailNow()
+	}
 	return r, h, l
 }
 
@@ -91,6 +93,18 @@ func TestHotFieldsErrors(t *testing.T) {
 	assert.ErrorContains(t, err, "not a struct")
 	_, err = NewReloader[hotCfg](&fakeRepo{}, NewHolder(hotCfg{}), 0, &fakeLog{})
 	assert.ErrorContains(t, err, "must be positive")
+	for name, args := range map[string]struct {
+		repo Repository
+		h    *Holder[hotCfg]
+		log  Logger
+	}{
+		"no repository": {nil, NewHolder(hotCfg{}), &fakeLog{}},
+		"no holder":     {&fakeRepo{}, nil, &fakeLog{}},
+		"no logger":     {&fakeRepo{}, NewHolder(hotCfg{}), nil},
+	} {
+		_, err = NewReloader[hotCfg](args.repo, args.h, time.Second, args.log)
+		assert.ErrorContains(t, err, "needs a repository, a holder and a logger", name)
+	}
 }
 
 func TestReloadAssignsChangedValues(t *testing.T) {
@@ -174,8 +188,9 @@ func TestHasHotFields(t *testing.T) {
 	r, _, _ := newRel(t, &fakeRepo{}, time.Second)
 	assert.True(t, r.HasHotFields())
 	r2, err := NewReloader[Config](&fakeRepo{}, NewHolder(Config{}), time.Second, &fakeLog{})
-	assert.NoError(t, err)
-	assert.False(t, r2.HasHotFields(), "Config has no hot field yet")
+	if assert.NoError(t, err) && assert.NotNil(t, r2) {
+		assert.False(t, r2.HasHotFields(), "Config has no hot field yet")
+	}
 }
 
 // Run with -race: readers call Get while the reloader swaps the value.

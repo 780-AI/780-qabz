@@ -10,7 +10,9 @@ import (
 
 func TestNewAndShutdown(t *testing.T) {
 	tr, err := New(context.Background(), "127.0.0.1:1", "qabz")
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) || !assert.NotNil(t, tr) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	_ = tr.Shutdown(ctx) // the collector is absent: a flush error is allowed, a hang is not

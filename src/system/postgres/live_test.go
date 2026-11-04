@@ -32,11 +32,20 @@ func reset(t *testing.T, dsn string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	c, err := New(ctx, dsn)
-	assert.NoError(t, err)
+	c := newClient(t, ctx, dsn)
 	defer c.Close()
-	_, err = c.Pool().Exec(ctx, `DROP TABLE IF EXISTS app_hot_configs, qabz_schema_migrations`)
+	_, err := c.Pool().Exec(ctx, `DROP TABLE IF EXISTS app_hot_configs, qabz_schema_migrations`)
 	assert.NoError(t, err)
+}
+
+// newClient opens a pool and stops the test if it fails, so no test calls a method on a nil *Client.
+func newClient(t *testing.T, ctx context.Context, dsn string) *Client {
+	t.Helper()
+	c, err := New(ctx, dsn)
+	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
+		t.FailNow()
+	}
+	return c
 }
 
 func TestLiveConcurrentUp(t *testing.T) {
@@ -75,8 +84,7 @@ func TestLiveRepositoryLoad(t *testing.T) {
 	assert.NoError(t, m.Up(ctx))
 	t.Cleanup(func() { reset(t, dsn) })
 
-	c, err := New(ctx, dsn)
-	assert.NoError(t, err)
+	c := newClient(t, ctx, dsn)
 	defer c.Close()
 	repo := NewConfigRepository(c)
 
@@ -88,10 +96,11 @@ func TestLiveRepositoryLoad(t *testing.T) {
 	assert.NoError(t, err)
 	rows, err = repo.Load(ctx)
 	assert.NoError(t, err)
-	assert.Len(t, rows, 1)
-	assert.Equal(t, "log_level", rows[0].Key)
-	assert.Equal(t, "string", rows[0].Type)
-	assert.Equal(t, "debug", rows[0].Value)
+	if assert.Len(t, rows, 1) {
+		assert.Equal(t, "log_level", rows[0].Key)
+		assert.Equal(t, "string", rows[0].Type)
+		assert.Equal(t, "debug", rows[0].Value)
+	}
 
 	_, err = c.Pool().Exec(ctx, `INSERT INTO app_hot_configs (key, cnf_type, value) VALUES ('log_level','string','x')`)
 	assert.Error(t, err, "key is unique")
@@ -102,8 +111,9 @@ func TestMigrateUpTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	err := m.Up(ctx)
-	assert.Error(t, err)
-	assert.NotContains(t, err.Error(), ":p@")
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), ":p@")
+	}
 }
 
 type liveCfg struct {
@@ -127,13 +137,14 @@ func TestLiveHotReloadEndToEnd(t *testing.T) {
 	assert.NoError(t, m.Up(ctx))
 	t.Cleanup(func() { reset(t, dsn) })
 
-	c, err := New(ctx, dsn)
-	assert.NoError(t, err)
+	c := newClient(t, ctx, dsn)
 	defer c.Close()
 
 	holder := config.NewHolder(liveCfg{LogLevel: "info", Workers: 1, Frozen: "keep"})
 	rel, err := config.NewReloader[liveCfg](NewConfigRepository(c), holder, 100*time.Millisecond, testLog{})
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) || !assert.NotNil(t, rel) {
+		return
+	}
 	assert.NoError(t, rel.Start(ctx))
 	defer rel.Stop(ctx)
 	assert.Equal(t, "info", holder.Get().LogLevel, "empty table: nothing changes")

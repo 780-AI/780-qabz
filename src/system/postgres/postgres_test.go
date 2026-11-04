@@ -15,7 +15,9 @@ func TestNewRejectsBadDSN(t *testing.T) {
 
 func TestPingFailsWithoutServer(t *testing.T) {
 	c, err := New(context.Background(), "postgres://u:p@127.0.0.1:1/db")
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
+		return
+	}
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

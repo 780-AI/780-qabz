@@ -8,8 +8,9 @@ import (
 
 func TestNewLevels(t *testing.T) {
 	l, err := New("debug", "qabz")
-	assert.NoError(t, err)
-	assert.NotNil(t, l)
+	if !assert.NoError(t, err) || !assert.NotNil(t, l) {
+		return
+	}
 	l.Debug("d", "k", "v")
 	l.Info("i", "k", "v")
 	l.Warn("w", "k", "v")

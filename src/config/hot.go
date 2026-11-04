@@ -131,6 +131,9 @@ type Reloader[T any] struct {
 
 // NewReloader checks the hot_reload tags of T. A bad tag is an error at bootstrap.
 func NewReloader[T any](repo Repository, holder *Holder[T], interval time.Duration, log Logger) (*Reloader[T], error) {
+	if repo == nil || holder == nil || log == nil {
+		return nil, fmt.Errorf("config: reloader needs a repository, a holder and a logger")
+	}
 	if interval <= 0 {
 		return nil, fmt.Errorf("config: hot_reload_interval must be positive")
 	}
