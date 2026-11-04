@@ -1,7 +1,8 @@
-<!-- VERSION: 0.6 -->
+<!-- VERSION: 0.7 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v0.7 — 2026-11-04 — Section 5: standard library first. Do not write a function that the Go standard library already has.
 v0.6 — 2026-11-04 — Section 4: nil safety. Do not use a value as non-nil without an `if` check or clear evidence in the code; tests stop after a failed guard check.
 v0.5 — 2026-11-02 — Section 3: test assertions MUST use `github.com/stretchr/testify/assert`.
 v0.4 — 2026-11-02 — Section 2: all Go code and `go.mod` live in `src/`; Go commands run there.
@@ -123,3 +124,11 @@ assert.Equal(t, "MockValue", res[0].Name)
 - A check that no later line depends on does not need a guard. Let it fail and let the test continue, so one run shows all failures.
 
 **Review.** The `code-reviewer` agent reads each changed use of a value that can be nil. A use with no `if` check and no clear evidence is a defect.
+
+---
+
+## 5. Standard library first
+
+**Before you write a function (a helper, a utility or any other function), check that the Go standard library does not already have it.** If it does, use the standard library. Example: use `net/url` to escape a URL, not a hand-written escaper.
+
+**Review.** The `code-reviewer` agent rejects a new function that copies a function of the standard library.

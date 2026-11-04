@@ -1,7 +1,8 @@
-<!-- VERSION: 1.49 -->
+<!-- VERSION: 1.50 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.50 — 2026-11-04 — Added standard-library-first entry.
 v1.49 — 2026-11-04 — Added one-active-task entry.
 v1.48 — 2026-11-04 — Added nil-safety-convention entry.
 v1.47 — 2026-11-04 — Added nil-guards entry.
@@ -55,6 +56,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — Conventions § 5: standard library first
+- **Type:** Minor (docs only; a new binding code rule in the project conventions doc)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.7), `docs/documents_manifest.md` (v0.51), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. New rule: before you write a function, check that the Go standard library does not already have it; if it does, use the standard library. The `code-reviewer` agent (local file) checks the rule. Existing case: `urlEscape` in `src/config/config.go` copies `net/url` (not changed here).
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — CLAUDE.md § 1: one active task only
 - **Type:** Major (Critical File edit; docs only)

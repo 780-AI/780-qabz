@@ -1,4 +1,4 @@
-<!-- VERSION: 0.50 -->
+<!-- VERSION: 0.51 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.49 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.50 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.50 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.51 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.20 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -45,7 +45,7 @@
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
 | 28 | Open Tasks Register | v1.13 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.11 | Plan | `docs/Plans/Implementation_Plan.md` |
-| 30 | Project Specific Conventions | v0.6 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
+| 30 | Project Specific Conventions | v0.7 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-04
-- **Change**: CLAUDE.md § 1 one-active-task rule. Bumped #1 CLAUDE.md v1.7, #3 CHANGELOG v1.49, #5 manifest v0.50.
-- **Previous change**: 2026-11-04 — Conventions § 4 nil safety added. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.6, #3 CHANGELOG v1.48, #5 manifest v0.49.
+- **Change**: Conventions § 5 standard library first. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.7, #3 CHANGELOG v1.50, #5 manifest v0.51.
+- **Previous change**: 2026-11-04 — CLAUDE.md § 1 one-active-task rule. Bumped #1 CLAUDE.md v1.7, #3 CHANGELOG v1.49, #5 manifest v0.50.
+- **Earlier change**: 2026-11-04 — Conventions § 4 nil safety added. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.6, #3 CHANGELOG v1.48, #5 manifest v0.49.
 - **Earlier change**: 2026-11-04 — Nil guards in the Go tests and the config code (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.47, #5 manifest v0.48, #28 OPEN_TASKS v1.13.
 - **Earlier change**: 2026-11-04 — Implementation Plan Step 4 follows task 005 (Python generator, `config.yml`). Bumped #29 Implementation Plan v0.11, #3 CHANGELOG v1.46, #5 manifest v0.47.
 - **Earlier change**: 2026-11-02 — Task 005 `yml_to_env_generator` done: Python generator, `make compose`. #31 and #32 are now the Python files (v0.1; the Bash files are removed). Bumped #3 CHANGELOG v1.45, #5 manifest v0.46, #6 folder_structure v0.20, #28 OPEN_TASKS v1.12. Task file moved to `done_tasks/` (not manifest-tracked).
