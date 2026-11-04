@@ -1,7 +1,8 @@
-<!-- VERSION: 0.5 -->
-<!-- Last Updated: 2026-11-01 -->
+<!-- VERSION: 0.6 -->
+<!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v0.6 — 2026-11-04 — Section 4: nil safety. Do not use a value as non-nil without an `if` check or clear evidence in the code; tests stop after a failed guard check.
 v0.5 — 2026-11-02 — Section 3: test assertions MUST use `github.com/stretchr/testify/assert`.
 v0.4 — 2026-11-02 — Section 2: all Go code and `go.mod` live in `src/`; Go commands run there.
 v0.3 — 2026-11-01 — Section 1: `encoding/json` (v1) is forbidden everywhere; the `code-reviewer` rejects it.
@@ -83,3 +84,42 @@ This rule covers unmarshalling only. It does not cover marshalling. It uses the 
 ## 3. Test assertions
 
 **Assertions MUST use `github.com/stretchr/testify/assert`.** Do not write manual `if got != want { t.Errorf(...) }` checks in place of an assertion. The `code-reviewer` agent rejects a test that does not use `assert` for its assertions.
+
+---
+
+## 4. Nil safety
+
+**Do not assume that a value is non-nil.** Use a value that can be nil only after one of these is true on the same code path:
+- An `if` check proves that the value is not nil (or, for an index, that the length is sufficient).
+- The code gives clear evidence that the value cannot be nil. Example: a direct assignment such as `p := &T{}`, `m := make(map[string]int)` or `s := []int{1, 2}` in the same function, with no later assignment that can set it to nil.
+
+A value returned from a function is not evidence. Check it, even when the function "always" returns a value. The function can change later.
+
+**This covers:**
+- Dereferencing a pointer, or reading a field through a pointer.
+- Calling a method on a pointer or an interface value. This includes `err.Error()`: call it only after a check shows that `err` is not nil.
+- Indexing a slice or an array pointer (`res[0]`). Check the length first.
+- Writing to a map. Writing to a nil map panics. Reading from a nil map is safe.
+- A type assertion. Use the two-value form (`v, ok := x.(T)`) and check `ok`, unless a failed assertion must panic.
+
+**In tests.** A failed testify `assert` call does not stop the test. The next line runs. If that line uses a value that the failed check protected, the test panics. The panic stops all other tests in the package and hides the real failure. So, when a later line depends on a check, stop the test if the check fails. Every `assert` function returns `true` on a pass; use that value:
+
+```go
+// Wrong: if err is not nil, res can be nil or empty, and res[0] panics.
+res, err := SomeCall(testMock)
+assert.NoError(t, err)
+assert.Equal(t, "MockValue", res[0].Name)
+
+// Correct: the test stops when a check that a later line needs fails.
+res, err := SomeCall(testMock)
+if !assert.NoError(t, err) || !assert.Len(t, res, 1) {
+	return
+}
+assert.Equal(t, "MockValue", res[0].Name)
+```
+
+- The same applies to the error case: after `assert.Error(t, err)`, call `err.Error()` only inside `if assert.Error(t, err) { ... }`.
+- In a test helper that returns a value to the test, call `t.FailNow()` when the guard check fails. Do not return a nil value to the caller.
+- A check that no later line depends on does not need a guard. Let it fail and let the test continue, so one run shows all failures.
+
+**Review.** The `code-reviewer` agent reads each changed use of a value that can be nil. A use with no `if` check and no clear evidence is a defect.

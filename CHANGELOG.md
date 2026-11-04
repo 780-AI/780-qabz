@@ -1,7 +1,8 @@
-<!-- VERSION: 1.47 -->
+<!-- VERSION: 1.48 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.48 — 2026-11-04 — Added nil-safety-convention entry.
 v1.47 — 2026-11-04 — Added nil-guards entry.
 v1.46 — 2026-11-04 — Added Implementation-Plan-Step-4 entry.
 v1.45 — 2026-11-02 — Added 005-yml-to-env-generator entry.
@@ -53,6 +54,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — Conventions § 4: nil safety
+- **Type:** Minor (docs only; a new binding code rule in the project conventions doc)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.6), `docs/documents_manifest.md` (v0.49), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. New rule for all Go code: use a value that can be nil (pointer, interface, `err`, slice index, map write, type assertion) only after an `if` check, or when the code gives clear evidence that it cannot be nil (a direct non-nil assignment in the same function). A function result is not evidence. In tests, a failed `assert` does not stop the test, so a check that a later line needs is guarded (`if !assert.NoError(t, err) || !assert.Len(t, res, 1) { return }`; `t.FailNow()` in helpers). The `code-reviewer` agent (local file) checks the rule. The nil-guards change of the same date already follows it.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — Nil guards in the Go tests and the config code
 - **Type:** Minor (test hardening; two input guards in the config package)
