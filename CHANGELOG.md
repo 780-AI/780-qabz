@@ -1,7 +1,8 @@
-<!-- VERSION: 1.45 -->
+<!-- VERSION: 1.46 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.46 — 2026-11-04 — Added Implementation-Plan-Step-4 entry.
 v1.45 — 2026-11-02 — Added 005-yml-to-env-generator entry.
 v1.44 — 2026-11-02 — Added 005-task-verification entry.
 v1.43 — 2026-11-02 — Added 005-task-output-name entry.
@@ -51,6 +52,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — Implementation Plan Step 4: Python generator and config.yml
+- **Type:** Minor (plan text follows the code of task 005)
+- **Files:** `docs/Plans/Implementation_Plan.md` (v0.11), `docs/documents_manifest.md` (v0.47), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Step 4 now describes the Python generator `scripts/yml_to_env/yml_to_env.py` (PyYAML 6.0.2, 18 unittest tests, `make venv` / `make env` / `make compose` / `make test-scripts`) in place of the removed Bash tool, and `config.yml` plus the generated `config_generated.env` in place of `.env` and `.env.example`. The "not decided: does compose use this tool" point is closed (task 005 decided it).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-02] — Task 005_yml_to_env_generator: Python generator and `make compose`
 - **Type:** Major (new script, Makefile targets, compose env source, removed files)

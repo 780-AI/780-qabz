@@ -1,4 +1,4 @@
-<!-- VERSION: 0.46 -->
+<!-- VERSION: 0.47 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.6 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.45 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.46 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.46 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.47 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.20 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -44,7 +44,7 @@
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
 | 28 | Open Tasks Register | v1.12 | Governance | `docs/Plans/OPEN_TASKS.md` |
-| 29 | Implementation Plan | v0.10 | Plan | `docs/Plans/Implementation_Plan.md` |
+| 29 | Implementation Plan | v0.11 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.5 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
@@ -53,9 +53,10 @@
 
 ## Last Updated
 
-- **Date**: 2026-11-02
-- **Change**: Task 005 `yml_to_env_generator` done: Python generator, `make compose`. #31 and #32 are now the Python files (v0.1; the Bash files are removed). Bumped #3 CHANGELOG v1.45, #5 manifest v0.46, #6 folder_structure v0.20, #28 OPEN_TASKS v1.12. Task file moved to `done_tasks/` (not manifest-tracked).
-- **Previous change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.5 (Verification section; not manifest-tracked). Bumped #3 CHANGELOG v1.44, #5 manifest v0.45.
+- **Date**: 2026-11-04
+- **Change**: Implementation Plan Step 4 follows task 005 (Python generator, `config.yml`). Bumped #29 Implementation Plan v0.11, #3 CHANGELOG v1.46, #5 manifest v0.47.
+- **Previous change**: 2026-11-02 — Task 005 `yml_to_env_generator` done: Python generator, `make compose`. #31 and #32 are now the Python files (v0.1; the Bash files are removed). Bumped #3 CHANGELOG v1.45, #5 manifest v0.46, #6 folder_structure v0.20, #28 OPEN_TASKS v1.12. Task file moved to `done_tasks/` (not manifest-tracked).
+- **Earlier change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.5 (Verification section; not manifest-tracked). Bumped #3 CHANGELOG v1.44, #5 manifest v0.45.
 - **Earlier change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.4 (default output name, custom output; not manifest-tracked). Bumped #3 CHANGELOG v1.43, #5 manifest v0.44.
 - **Earlier change**: 2026-11-02 — Task 004 `use_yml_config` done: Config from YAML. Bumped #3 CHANGELOG v1.42, #5 manifest v0.43, #6 folder_structure v0.19, #34 app README v0.3. Task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows.
 - **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.14 (Definition of Done: all config tests pass; not manifest-tracked). Bumped #3 CHANGELOG v1.41, #5 manifest v0.42.
