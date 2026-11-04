@@ -1,7 +1,9 @@
-<!-- VERSION: 1.52 -->
+<!-- VERSION: 1.54 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.54 — 2026-11-04 — Added 006-greeting-ping entry.
+v1.53 — 2026-11-04 — Added pb-ownership-convention entry.
 v1.52 — 2026-11-04 — Added 006-task entry.
 v1.51 — 2026-11-04 — Added PostgresDSN-net-url entry.
 v1.50 — 2026-11-04 — Added standard-library-first entry.
@@ -58,6 +60,20 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — Task 006_greeting_ping: gRPC server, HTTP gateway and Greeting
+- **Type:** Major (new packages `entry/grpc` and `entry/http`; new config keys; new public endpoint; `pb` submodule pointer)
+- **Files:** `pb` (submodule pointer to `6f38ff16` on branch `qabz_service`: `Greeting` in `proto/qabz/services.proto`), `src/entry/grpc/` (new: `server.go`, `service.go`, `server_test.go`; `.gitkeep` removed), `src/entry/http/` (new: `gateway.go`, `gateway_test.go`; `.gitkeep` removed), `src/app/` (`app.go`, `builder.go`, `defaults.go`, `app_test.go`, `defaults_test.go`, `README.md` v0.4), `src/config/` (`config.go`, `config_test.go`), `docs/folder_structure.md` (v0.21), `docs/Plans/OPEN_TASKS.md` (v1.15), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.55), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. The App now starts a gRPC server (`server.grpc.addr`, default `:8082`) and a grpc-gateway HTTP server (`server.http.addr`, default `:8080`) after the config reloader and before the metrics endpoint; `Stop` stops them in reverse order, and a failed `Start` stops only the parts that started. The gateway dials the local gRPC server (a listen address with no host or an unspecified IP, also `[::]`, becomes `127.0.0.1`, so it works where IPv6 is off). `haf80.api.bill.Service/Greeting` (`GET /v1/greeting`) returns `{"message":"Hello"}`; the other `Service` methods return Unimplemented (HTTP 501). Config rules: each address is `host:port` with a port from 0 to 65535 (0 picks a free port), and the two addresses must differ. The ports 8080 and 8082 must be free where the App runs.
+- **QA scenarios:** (1) In `src/` `go build ./... && go vet ./... && go test -race -count=1 ./...`: all pass; coverage `app` 90.0%, `config` 96.6%, `entry/grpc` 95.1%, `entry/http` 88.4% (done, 2026-11-04). The JSON read in `gateway_test.go` uses `encoding/json/v2`; it is test code, not a hot path (conventions § 1). (2) Feature ON: the App with `--config=../config.yml` against the compose Postgres and Redis; `curl -i http://127.0.0.1:8080/v1/greeting` gave `HTTP/1.1 200 OK` and `{"message":"Hello"}`; `/v1/services` gave 501; the log shows `grpc started`, `http started`, `app started`, `app stopping` and no password (done, 2026-11-04). (3) The same call from Postman (pending, operator). The push of `pb` commit `6f38ff16` to `origin/qabz_service` failed on 2026-11-04 (`p-source.780.ir:443` not reachable); push `pb` before this repository.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
+
+## [2026-11-04] — Conventions § 6: `pb` submodule ownership
+- **Type:** Minor (docs only; a new project convention)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.8), `docs/documents_manifest.md` (v0.54), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Only `pb/proto/qabz/` is writable by this repo. Every other path in the `pb` submodule (other `pb/proto/*` folders, `pb/aux/`, `pb/testdata/`, the root files) is read-only: no edit, no delete, no tool output, and a `pb` commit has `proto/qabz/` paths only. Reading for `protoc` imports stays allowed. The section gives a check command; the `code-reviewer` agent runs it.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs). The check command was tested on 2026-11-04: on the clean submodule it prints nothing; on a scratch clone with an edit in `proto/bill/` and new files in `aux/` and `proto/qabz/`, it prints the `proto/bill/` and `aux/` paths only.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — New task: 006_greeting_ping
 - **Type:** Minor (docs only; a new task file)

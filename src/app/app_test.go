@@ -46,6 +46,15 @@ type fakeMetrics struct {
 func (f *fakeMetrics) Start(context.Context) error { f.c.add("metrics.start"); return f.startErr }
 func (f *fakeMetrics) Stop(context.Context) error  { f.c.add("metrics.stop"); return f.stopErr }
 
+type fakeServer struct {
+	name     string
+	c        *calls
+	startErr error
+}
+
+func (f *fakeServer) Start(context.Context) error { f.c.add(f.name + ".start"); return f.startErr }
+func (f *fakeServer) Stop(context.Context) error  { f.c.add(f.name + ".stop"); return nil }
+
 type fakeTracer struct{ c *calls }
 
 func (f *fakeTracer) Shutdown(context.Context) error { f.c.add("tracer.shutdown"); return nil }
@@ -250,4 +259,53 @@ func TestConfigReturnsCurrentHolderValue(t *testing.T) {
 	assert.Equal(t, "a", a.Config().ServiceName)
 	h.Set(config.Config{ServiceName: "b"})
 	assert.Equal(t, "b", a.Config().ServiceName)
+}
+
+func (r *rig) servers(t *testing.T) (*App, *fakeServer, *fakeServer) {
+	t.Helper()
+	g, h := &fakeServer{name: "grpc", c: r.c}, &fakeServer{name: "http", c: r.c}
+	cfg := config.Config{MigrateOnStart: false, HotReloadInterval: time.Second}
+	a := build(t, r.builder().WithConfig(cfg).WithConfigReloader(&fakeReloader{c: r.c}).WithGRPCServer(g).WithHTTPServer(h))
+	return a, g, h
+}
+
+func TestServersStartAfterReloaderAndStopBeforeIt(t *testing.T) {
+	r := newRig()
+	a, _, _ := r.servers(t)
+	assert.NoError(t, a.Start(context.Background()))
+	assert.Equal(t, []string{"db.ping", "cache.ping", "reloader.start", "grpc.start", "http.start", "metrics.start"}, r.c.order)
+	assert.Contains(t, r.log.logs, "grpc started")
+	assert.Contains(t, r.log.logs, "http started")
+
+	r.c.order = nil
+	assert.NoError(t, a.Stop(context.Background()))
+	assert.Equal(t, []string{"metrics.stop", "http.stop", "grpc.stop", "reloader.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+}
+
+func TestGRPCStartFailureStopsOnlyStartedParts(t *testing.T) {
+	r := newRig()
+	a, g, _ := r.servers(t)
+	g.startErr = errors.New("port busy")
+	assert.ErrorContains(t, a.Start(context.Background()), "grpc")
+	assert.Equal(t, []string{"db.ping", "cache.ping", "reloader.start", "grpc.start", "reloader.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+	assert.Contains(t, r.log.logs, "ERR grpc start failed")
+}
+
+func TestHTTPStartFailureStopsGRPC(t *testing.T) {
+	r := newRig()
+	a, _, h := r.servers(t)
+	h.startErr = errors.New("port busy")
+	assert.ErrorContains(t, a.Start(context.Background()), "http")
+	assert.Equal(t, []string{"db.ping", "cache.ping", "reloader.start", "grpc.start", "http.start", "grpc.stop", "reloader.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+	assert.Contains(t, r.log.logs, "ERR http start failed")
+}
+
+func TestMetricsFailureStopsServers(t *testing.T) {
+	r := newRig()
+	a, _, _ := r.servers(t)
+	r.metrics.startErr = errors.New("busy")
+	assert.Error(t, a.Start(context.Background()))
+	assert.Contains(t, r.c.order, "http.stop")
+	assert.Contains(t, r.c.order, "grpc.stop")
+	assert.NotContains(t, r.c.order, "metrics.stop")
 }

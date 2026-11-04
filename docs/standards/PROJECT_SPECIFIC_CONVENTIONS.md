@@ -1,7 +1,8 @@
-<!-- VERSION: 0.7 -->
+<!-- VERSION: 0.8 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v0.8 — 2026-11-04 — Section 6: `pb` submodule ownership. Only `pb/proto/qabz/` is writable; every other path in `pb/` is read-only for this repo.
 v0.7 — 2026-11-04 — Section 5: standard library first. Do not write a function that the Go standard library already has.
 v0.6 — 2026-11-04 — Section 4: nil safety. Do not use a value as non-nil without an `if` check or clear evidence in the code; tests stop after a failed guard check.
 v0.5 — 2026-11-02 — Section 3: test assertions MUST use `github.com/stretchr/testify/assert`.
@@ -132,3 +133,31 @@ assert.Equal(t, "MockValue", res[0].Name)
 **Before you write a function (a helper, a utility or any other function), check that the Go standard library does not already have it.** If it does, use the standard library. Example: use `net/url` to escape a URL, not a hand-written escaper.
 
 **Review.** The `code-reviewer` agent rejects a new function that copies a function of the standard library.
+
+---
+
+## 6. `pb` submodule ownership
+
+**Only `pb/proto/qabz/` belongs to this project.** The `pb` submodule is a shared repository. Other teams own every other path in it.
+
+**Writable:** `pb/proto/qabz/` and its contents only.
+
+**Read-only — do not touch:** every other path in `pb/`. This includes every other folder in `pb/proto/` (for example `pb/proto/bill/`, `pb/proto/commons/`), `pb/aux/`, `pb/testdata/`, `pb/README.md` and `pb/azure-pipelines.yml`.
+- Do not create, edit, delete, rename, move or reformat a file there.
+- Do not write tool output there. Generated code goes to `src/api/pb/` and `src/api/swagger/`, never into `pb/`.
+- A commit in the `pb` repository contains paths under `proto/qabz/` only.
+
+**Reading is allowed.** `make proto` reads `pb/proto/` and `pb/aux/` as `protoc` import paths. A proto in `pb/proto/qabz/` can import a proto from another folder. Reading does not change a file.
+
+**Need a change outside `pb/proto/qabz/`?** Do not make it from this repo. Ask the operator. The owner of that folder makes the change.
+
+**Check.** Run from the repo root. The check passes when it prints nothing (`grep` exits 1):
+
+```bash
+{ git -C pb diff --name-only --no-renames "$(git rev-parse HEAD:pb)"; \
+  git -C pb ls-files --others --exclude-standard; } | grep -v '^proto/qabz/'
+```
+
+The first command lists each file changed since the `pb` commit that this repo records (committed or not). The second lists new untracked files. Each printed path is outside `proto/qabz/` and is a defect.
+
+**Review.** The `code-reviewer` agent runs the check on every review. A printed path is a defect.

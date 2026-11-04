@@ -1,7 +1,8 @@
-<!-- VERSION: 1.14 -->
+<!-- VERSION: 1.15 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.15 — 2026-11-04 — Task 006 Greeting QA scenario added.
 v1.14 — 2026-11-04 — PostgresDSN net/url QA scenario added.
 v1.13 — 2026-11-04 — Nil-guard QA scenario added.
 v1.12 — 2026-11-02 — Task 005: docker-compose and yml_to_env scenarios now use config.yml, config_generated.env and the Python generator; Config-from-YAML run scenario added.
@@ -86,6 +87,11 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Then (feature ON) set a `database.postgres.password` with `@`, `/` and `:` in `config.yml`, run `make compose`, then in `src/` `go run . --config=../config.yml`.
   Pass: the log shows `postgres ok` and `app started`.
   Unit checks done 2026-11-04 by the implementer; the compose run is not done (awaiting operator).
+- ⏸ Task 006 Greeting (2026-11-04). In `src/` run `go build ./... && go vet ./... && go test -race -count=1 ./...`.
+  Pass: all exit 0. Then (feature ON) put `server.grpc.addr` and `server.http.addr` in `config.yml`, run `make compose`, then in `src/` `go run . --config=../config.yml`.
+  Send `GET http://localhost:8080/v1/greeting` from Postman.
+  Pass: HTTP status 200 and the body `{"message":"Hello"}`; the log shows `grpc started` and `http started`.
+  Done 2026-11-04 by the implementer with curl: all pass (awaiting the operator Postman call).
 
 ## Maintenance / housekeeping
 

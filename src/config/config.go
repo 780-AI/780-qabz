@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -42,6 +43,11 @@ type Config struct {
 	RedisPort     int    `path:"database.redis.port"`
 	RedisPassword Secret `path:"database.redis.password"`
 
+	// GRPCAddr is the listen address of the gRPC server (host:port; port 0 picks a free port).
+	GRPCAddr string `path:"server.grpc.addr"`
+	// HTTPAddr is the listen address of the grpc-gateway HTTP server (host:port; port 0 picks a free port).
+	HTTPAddr string `path:"server.http.addr"`
+
 	MetricsAddr  string `path:"metrics.prometheus.addr"`
 	OTLPEndpoint string `path:"logs.otlp_endpoint"` // empty: tracing is off
 
@@ -63,6 +69,8 @@ func defaults() Config {
 		PostgresDB:        "qabz",
 		RedisHost:         "localhost",
 		RedisPort:         6379,
+		GRPCAddr:          ":8082",
+		HTTPAddr:          ":8080",
 		MetricsAddr:       ":9090",
 		HotReloadInterval: 30 * time.Second,
 		MigrateOnStart:    true,
@@ -111,12 +119,33 @@ func (c Config) validate() error {
 			errs = append(errs, fmt.Errorf("%s must be a port number (1-65535)", path))
 		}
 	}
+	for _, a := range []struct{ path, addr string }{{"server.grpc.addr", c.GRPCAddr}, {"server.http.addr", c.HTTPAddr}} {
+		if err := checkListenAddr(a.addr); err != nil {
+			errs = append(errs, fmt.Errorf("%s %w", a.path, err))
+		}
+	}
+	if c.GRPCAddr == c.HTTPAddr && checkListenAddr(c.GRPCAddr) == nil && !strings.HasSuffix(c.GRPCAddr, ":0") {
+		errs = append(errs, errors.New("server.grpc.addr and server.http.addr must not be the same address"))
+	}
 	for path, d := range map[string]time.Duration{"hot_reload_interval": c.HotReloadInterval, "database.migration.timeout": c.MigrateTimeout} {
 		if d <= 0 {
 			errs = append(errs, fmt.Errorf("%s must be a positive duration (for example 30s)", path))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// checkListenAddr checks that addr is host:port with a port from 0 to 65535 (0 picks a free port).
+func checkListenAddr(addr string) error {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return errors.New("must be host:port (for example :8080)")
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil || n < 0 || n > 65535 {
+		return errors.New("must have a port from 0 to 65535")
+	}
+	return nil
 }
 
 // PostgresDSN builds the connection string. It contains the password: never log it.

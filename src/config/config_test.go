@@ -163,3 +163,30 @@ func TestPostgresDSNPgxParses(t *testing.T) {
 	assert.Equal(t, "localhost", pc.Host)
 	assert.Equal(t, uint16(5432), pc.Port)
 }
+
+func TestServerAddrs(t *testing.T) {
+	c, err := Parse([]byte(`database: {postgres: {password: x}}`))
+	if assert.NoError(t, err) {
+		assert.Equal(t, ":8082", c.GRPCAddr)
+		assert.Equal(t, ":8080", c.HTTPAddr)
+	}
+
+	c, err = Parse([]byte(`{database: {postgres: {password: x}}, server: {grpc: {addr: "127.0.0.1:0"}, http: {addr: "127.0.0.1:0"}}}`))
+	if assert.NoError(t, err, "port 0 on both servers is allowed (a free port each)") {
+		assert.Equal(t, "127.0.0.1:0", c.GRPCAddr)
+		assert.Equal(t, "127.0.0.1:0", c.HTTPAddr)
+	}
+
+	for name, tc := range map[string]struct{ yml, want string }{
+		"no port":   {`{database: {postgres: {password: x}}, server: {grpc: {addr: "localhost"}}}`, "server.grpc.addr must be host:port"},
+		"bad port":  {`{database: {postgres: {password: x}}, server: {http: {addr: ":http"}}}`, "server.http.addr must have a port from 0 to 65535"},
+		"high port": {`{database: {postgres: {password: x}}, server: {http: {addr: ":70000"}}}`, "server.http.addr must have a port from 0 to 65535"},
+		"empty":     {`{database: {postgres: {password: x}}, server: {grpc: {addr: ""}}}`, "server.grpc.addr must be host:port"},
+		"same addr": {`{database: {postgres: {password: x}}, server: {grpc: {addr: ":9000"}, http: {addr: ":9000"}}}`, "must not be the same address"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse([]byte(tc.yml))
+			assert.ErrorContains(t, err, tc.want)
+		})
+	}
+}

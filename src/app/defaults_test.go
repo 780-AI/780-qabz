@@ -18,6 +18,9 @@ database:
   redis: {host: "127.0.0.1", port: 1}
 metrics:
   prometheus: {addr: "127.0.0.1:0"}
+server:
+  grpc: {addr: "127.0.0.1:0"}
+  http: {addr: "127.0.0.1:0"}
 `))
 	if !assert.NoError(t, err) {
 		t.FailNow()
