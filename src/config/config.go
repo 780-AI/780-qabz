@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -121,9 +121,14 @@ func (c Config) validate() error {
 
 // PostgresDSN builds the connection string. It contains the password: never log it.
 func (c Config) PostgresDSN() string {
-	return fmt.Sprintf("postgres://%s:%s@%s/%s",
-		urlEscape(c.PostgresUser), urlEscape(c.PostgresPassword.Reveal()),
-		net.JoinHostPort(c.PostgresHost, strconv.Itoa(c.PostgresPort)), urlEscape(c.PostgresDB))
+	u := url.URL{
+		Scheme:  "postgres",
+		User:    url.UserPassword(c.PostgresUser, c.PostgresPassword.Reveal()),
+		Host:    net.JoinHostPort(c.PostgresHost, strconv.Itoa(c.PostgresPort)),
+		Path:    "/" + c.PostgresDB,
+		RawPath: "/" + url.PathEscape(c.PostgresDB), // keeps a "/" in the name escaped as %2F
+	}
+	return u.String()
 }
 
 // RedisAddr returns host:port.
@@ -134,19 +139,4 @@ func (c Config) RedisAddr() string {
 // PostgresTarget returns host:port/db for logs. It has no user and no password.
 func (c Config) PostgresTarget() string {
 	return net.JoinHostPort(c.PostgresHost, strconv.Itoa(c.PostgresPort)) + "/" + c.PostgresDB
-}
-
-func urlEscape(s string) string {
-	var b strings.Builder
-	for i := 0; i < len(s); i++ {
-		ch := s[i]
-		switch {
-		case ch >= 'a' && ch <= 'z', ch >= 'A' && ch <= 'Z', ch >= '0' && ch <= '9',
-			ch == '-', ch == '_', ch == '.', ch == '~':
-			b.WriteByte(ch)
-		default:
-			fmt.Fprintf(&b, "%%%02X", ch)
-		}
-	}
-	return b.String()
 }

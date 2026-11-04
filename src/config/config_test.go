@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -127,6 +128,38 @@ func TestSecretNeverPrints(t *testing.T) {
 }
 
 func TestPostgresDSNEscapes(t *testing.T) {
-	c, _ := Parse([]byte(`database: {postgres: {password: "p@ss/w:rd"}}`))
-	assert.Equal(t, "postgres://qabz:p%40ss%2Fw%3Ard@localhost:5432/qabz", c.PostgresDSN())
+	cases := []struct{ name, yml, want string }{
+		{"password", `database: {postgres: {password: "p@ss/w:rd"}}`,
+			"postgres://qabz:p%40ss%2Fw%3Ard@localhost:5432/qabz"},
+		{"user", `database: {postgres: {user: "a:b@c", password: x}}`,
+			"postgres://a%3Ab%40c:x@localhost:5432/qabz"},
+		{"db", `database: {postgres: {db: "d/b?x#y", password: x}}`,
+			"postgres://qabz:x@localhost:5432/d%2Fb%3Fx%23y"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := Parse([]byte(tc.yml))
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Equal(t, tc.want, c.PostgresDSN())
+		})
+	}
+}
+
+// TestPostgresDSNPgxParses checks that pgx, the real consumer, decodes every escaped part back.
+func TestPostgresDSNPgxParses(t *testing.T) {
+	c, err := Parse([]byte(`database: {postgres: {user: "u:s@r", password: "p@ss/w:rd %?#", db: "d/b?x"}}`))
+	if !assert.NoError(t, err) {
+		return
+	}
+	pc, err := pgconn.ParseConfig(c.PostgresDSN())
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "u:s@r", pc.User)
+	assert.Equal(t, "p@ss/w:rd %?#", pc.Password)
+	assert.Equal(t, "d/b?x", pc.Database)
+	assert.Equal(t, "localhost", pc.Host)
+	assert.Equal(t, uint16(5432), pc.Port)
 }

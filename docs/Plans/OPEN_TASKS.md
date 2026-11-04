@@ -1,7 +1,8 @@
-<!-- VERSION: 1.13 -->
+<!-- VERSION: 1.14 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.14 — 2026-11-04 — PostgresDSN net/url QA scenario added.
 v1.13 — 2026-11-04 — Nil-guard QA scenario added.
 v1.12 — 2026-11-02 — Task 005: docker-compose and yml_to_env scenarios now use config.yml, config_generated.env and the Python generator; Config-from-YAML run scenario added.
 v1.11 — 2026-11-02 — Migration scenario: no down command.
@@ -80,6 +81,11 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: all exit 0. Then make one check fail on purpose (for example a `go test -overlay` copy of `config/config.go` whose `Parse` returns a nil error) and run `go test ./config/`.
   Pass: the output shows `FAIL` with "An error is expected but got nil" and has no `panic: runtime error` line.
   Done 2026-11-04 by the implementer: all pass (awaiting operator confirmation).
+- ⏸ `PostgresDSN` with `net/url` (2026-11-04). In `src/` run `go test -race -count=1 -run DSN -v ./config/`.
+  Pass: `TestPostgresDSNEscapes` (3 cases) and `TestPostgresDSNPgxParses` pass.
+  Then (feature ON) set a `database.postgres.password` with `@`, `/` and `:` in `config.yml`, run `make compose`, then in `src/` `go run . --config=../config.yml`.
+  Pass: the log shows `postgres ok` and `app started`.
+  Unit checks done 2026-11-04 by the implementer; the compose run is not done (awaiting operator).
 
 ## Maintenance / housekeeping
 

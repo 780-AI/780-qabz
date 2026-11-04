@@ -1,7 +1,8 @@
-<!-- VERSION: 1.50 -->
+<!-- VERSION: 1.51 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.51 — 2026-11-04 — Added PostgresDSN-net-url entry.
 v1.50 — 2026-11-04 — Added standard-library-first entry.
 v1.49 — 2026-11-04 — Added one-active-task entry.
 v1.48 — 2026-11-04 — Added nil-safety-convention entry.
@@ -56,6 +57,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — PostgresDSN uses net/url
+- **Type:** Minor (refactor to the standard library, conventions § 5; the decoded DSN is the same)
+- **Files:** `src/config/config.go`, `src/config/config_test.go`, `docs/Plans/OPEN_TASKS.md` (v1.14), `docs/documents_manifest.md` (v0.52), `CHANGELOG.md` (this entry).
+- **Impact:** Small. `PostgresDSN` builds a `url.URL` (`url.UserPassword`, and `url.PathEscape` for the database name); the hand-written `urlEscape` is removed. The values that pgx decodes do not change. The DSN text can change: `url.UserPassword` does not escape the legal characters `$ & + , ; =` in the user and password (before, they became `%24`, `%26` and so on). A `/` in the database name stays escaped as `%2F`.
+- **QA scenarios:** (1) In `src/` `go build ./... && go vet ./... && go test -race -count=1 ./...`: all pass; `config` coverage 96.5% (done, 2026-11-04). (2) `TestPostgresDSNEscapes` (password, user, db cases) and `TestPostgresDSNPgxParses` (pgx decodes user, password and db back) pass (done, 2026-11-04). (3) Deliberate failure: a `-overlay` copy of `config.go` without `RawPath` fails the `db` case (done, 2026-11-04). (4) The App connects to the compose Postgres with `--config` (pending, needs the Docker daemon).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — Conventions § 5: standard library first
 - **Type:** Minor (docs only; a new binding code rule in the project conventions doc)
