@@ -64,6 +64,16 @@ func newRig() *rig {
 		cache: &fakeConn{name: "cache", c: c}, metrics: &fakeMetrics{c: c}}
 }
 
+// build runs Build and stops the test if it fails, so no test calls a method on a nil *App.
+func build(t *testing.T, b *Builder) *App {
+	t.Helper()
+	a, err := b.Build()
+	if !assert.NoError(t, err) || !assert.NotNil(t, a) {
+		t.FailNow()
+	}
+	return a
+}
+
 func (r *rig) builder() *Builder {
 	cfg := config.Config{PostgresHost: "h", PostgresPort: 1, PostgresDB: "d", RedisHost: "r", RedisPort: 2, MetricsAddr: ":0"}
 	return NewBuilder().WithConfig(cfg).WithLogger(r.log).WithDatabase(r.db).WithCache(r.cache).WithMetrics(r.metrics)
@@ -76,8 +86,7 @@ func TestBuildRequiresDependencies(t *testing.T) {
 	assert.ErrorContains(t, err, "cache is required")
 	assert.ErrorContains(t, err, "metrics is required")
 
-	a, err := newRig().builder().Build()
-	assert.NoError(t, err)
+	a := build(t, newRig().builder())
 	assert.NotNil(t, a.Database())
 	assert.NotNil(t, a.Cache())
 	assert.NotNil(t, a.Logger())
@@ -85,8 +94,7 @@ func TestBuildRequiresDependencies(t *testing.T) {
 
 func TestStartAndStopOrder(t *testing.T) {
 	r := newRig()
-	a, err := r.builder().WithTracer(&fakeTracer{c: r.c}).Build()
-	assert.NoError(t, err)
+	a := build(t, r.builder().WithTracer(&fakeTracer{c: r.c}))
 
 	assert.NoError(t, a.Start(context.Background()))
 	assert.Equal(t, []string{"db.ping", "cache.ping", "metrics.start"}, r.c.order)
@@ -103,7 +111,7 @@ func TestStartAndStopOrder(t *testing.T) {
 }
 
 func TestStartTwiceFails(t *testing.T) {
-	a, _ := newRig().builder().Build()
+	a := build(t, newRig().builder())
 	assert.NoError(t, a.Start(context.Background()))
 	assert.ErrorContains(t, a.Start(context.Background()), "already started")
 }
@@ -111,7 +119,7 @@ func TestStartTwiceFails(t *testing.T) {
 func TestStartFailureReleasesWithoutStoppingMetrics(t *testing.T) {
 	r := newRig()
 	r.cache.pingErr = errors.New("down")
-	a, _ := r.builder().Build()
+	a := build(t, r.builder())
 
 	err := a.Start(context.Background())
 	assert.ErrorContains(t, err, "redis")
@@ -123,7 +131,7 @@ func TestStartFailureReleasesWithoutStoppingMetrics(t *testing.T) {
 func TestStartMetricsFailure(t *testing.T) {
 	r := newRig()
 	r.metrics.startErr = errors.New("busy")
-	a, _ := r.builder().Build()
+	a := build(t, r.builder())
 	assert.ErrorContains(t, a.Start(context.Background()), "metrics")
 	assert.NotContains(t, r.c.order, "metrics.stop")
 }
@@ -131,14 +139,14 @@ func TestStartMetricsFailure(t *testing.T) {
 func TestStopReturnsErrors(t *testing.T) {
 	r := newRig()
 	r.metrics.stopErr = errors.New("stuck")
-	a, _ := r.builder().Build()
+	a := build(t, r.builder())
 	assert.NoError(t, a.Start(context.Background()))
 	assert.ErrorContains(t, a.Stop(context.Background()), "stuck")
 }
 
 func TestRunStopsOnContextDone(t *testing.T) {
 	r := newRig()
-	a, _ := r.builder().Build()
+	a := build(t, r.builder())
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- a.Run(ctx) }()
@@ -151,11 +159,13 @@ func TestRunStopsOnContextDone(t *testing.T) {
 func TestBuiltAppIsIsolatedFromBuilder(t *testing.T) {
 	r := newRig()
 	b := r.builder()
-	a, _ := b.Build()
+	a := build(t, b)
 	other := &fakeConn{name: "other", c: r.c}
 	b.WithDatabase(other)
 	assert.NoError(t, a.Start(context.Background()))
-	assert.Equal(t, "db.ping", r.c.order[0])
+	if assert.NotEmpty(t, r.c.order) {
+		assert.Equal(t, "db.ping", r.c.order[0])
+	}
 }
 
 type fakeMigrator struct {
@@ -173,16 +183,17 @@ type fakeReloader struct {
 func (f *fakeReloader) Start(context.Context) error { f.c.add("reloader.start"); return f.startErr }
 func (f *fakeReloader) Stop(context.Context) error  { f.c.add("reloader.stop"); return nil }
 
-func (r *rig) full(migrateOnStart bool) (*App, *fakeMigrator, *fakeReloader) {
+func (r *rig) full(t *testing.T, migrateOnStart bool) (*App, *fakeMigrator, *fakeReloader) {
+	t.Helper()
 	m, rl := &fakeMigrator{c: r.c}, &fakeReloader{c: r.c}
 	cfg := config.Config{MigrateOnStart: migrateOnStart, MigrateTimeout: time.Second, HotReloadInterval: time.Second}
-	a, _ := r.builder().WithConfig(cfg).WithMigrator(m).WithConfigReloader(rl).Build()
+	a := build(t, r.builder().WithConfig(cfg).WithMigrator(m).WithConfigReloader(rl))
 	return a, m, rl
 }
 
 func TestMigrateThenReloaderThenMetrics(t *testing.T) {
 	r := newRig()
-	a, _, _ := r.full(true)
+	a, _, _ := r.full(t, true)
 	assert.NoError(t, a.Start(context.Background()))
 	assert.Equal(t, []string{"db.ping", "cache.ping", "migrate.up", "reloader.start", "metrics.start"}, r.c.order)
 
@@ -193,7 +204,7 @@ func TestMigrateThenReloaderThenMetrics(t *testing.T) {
 
 func TestMigrateOffSkipsMigration(t *testing.T) {
 	r := newRig()
-	a, _, _ := r.full(false)
+	a, _, _ := r.full(t, false)
 	assert.NoError(t, a.Start(context.Background()))
 	assert.NotContains(t, r.c.order, "migrate.up")
 	assert.Contains(t, r.c.order, "reloader.start")
@@ -201,7 +212,7 @@ func TestMigrateOffSkipsMigration(t *testing.T) {
 
 func TestMigrationFailureStopsStart(t *testing.T) {
 	r := newRig()
-	a, m, _ := r.full(true)
+	a, m, _ := r.full(t, true)
 	m.err = errors.New("dirty")
 	assert.ErrorContains(t, a.Start(context.Background()), "dirty")
 	assert.Equal(t, []string{"db.ping", "cache.ping", "migrate.up", "cache.close", "db.close", "logger.sync"}, r.c.order)
@@ -210,7 +221,7 @@ func TestMigrationFailureStopsStart(t *testing.T) {
 
 func TestReloaderStartFailure(t *testing.T) {
 	r := newRig()
-	a, _, rl := r.full(true)
+	a, _, rl := r.full(t, true)
 	rl.startErr = errors.New("boom")
 	assert.ErrorContains(t, a.Start(context.Background()), "config reloader")
 	assert.NotContains(t, r.c.order, "metrics.start")
@@ -219,7 +230,7 @@ func TestReloaderStartFailure(t *testing.T) {
 
 func TestMetricsFailureStopsReloader(t *testing.T) {
 	r := newRig()
-	a, _, _ := r.full(true)
+	a, _, _ := r.full(t, true)
 	r.metrics.startErr = errors.New("busy")
 	assert.Error(t, a.Start(context.Background()))
 	assert.Contains(t, r.c.order, "reloader.stop")
@@ -235,7 +246,7 @@ func TestBuildRequiresConfig(t *testing.T) {
 func TestConfigReturnsCurrentHolderValue(t *testing.T) {
 	r := newRig()
 	h := config.NewHolder(config.Config{ServiceName: "a"})
-	a, _ := r.builder().WithConfigHolder(h).Build()
+	a := build(t, r.builder().WithConfigHolder(h))
 	assert.Equal(t, "a", a.Config().ServiceName)
 	h.Set(config.Config{ServiceName: "b"})
 	assert.Equal(t, "b", a.Config().ServiceName)

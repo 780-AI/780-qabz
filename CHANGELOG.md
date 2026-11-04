@@ -1,7 +1,20 @@
-<!-- VERSION: 1.32 -->
-<!-- Last Updated: 2026-11-02 -->
+<!-- VERSION: 1.45 -->
+<!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.45 — 2026-11-02 — Added 005-yml-to-env-generator entry.
+v1.44 — 2026-11-02 — Added 005-task-verification entry.
+v1.43 — 2026-11-02 — Added 005-task-output-name entry.
+v1.42 — 2026-11-02 — Added 004-yaml-config entry.
+v1.41 — 2026-11-02 — Added 004-task-tests-pass entry.
+v1.40 — 2026-11-02 — Added 004-task-rewrite entry.
+v1.39 — 2026-11-02 — Added 004-task-type-rules entry.
+v1.38 — 2026-11-02 — Added 004-task-slice-rule entry.
+v1.37 — 2026-11-02 — Added 005-task-python entry.
+v1.36 — 2026-11-02 — Added 004-task-hot-default entry.
+v1.35 — 2026-11-02 — Added 004-task-metrics-key entry.
+v1.34 — 2026-11-02 — Added 004-task-migration-keys entry.
+v1.33 — 2026-11-02 — Added 004-task-key-placement entry.
 v1.32 — 2026-11-02 — Added 005-task-update entry.
 v1.31 — 2026-11-02 — Added 005-task entry.
 v1.30 — 2026-11-02 — Added 004-task-key-mapping entry.
@@ -38,6 +51,97 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-02] — Task 005_yml_to_env_generator: Python generator and `make compose`
+- **Type:** Major (new script, Makefile targets, compose env source, removed files)
+- **Files:** `scripts/yml_to_env/` (`yml_to_env.py` v0.1, `yml_to_env_test.py` v0.1, `requirements.txt`; the Bash `yml_to_env.sh` and `yml_to_env_test.sh` are removed), `Makefile`, `docker-compose.yml`, `.gitignore`, `.env.example` (removed), `docs/folder_structure.md` (v0.20), `docs/Plans/OPEN_TASKS.md` (v1.12), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.46), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. Compose variables now come from `config_generated.env`, generated from `config.yml` (git-ignored). `make compose` runs `make env` (venv with pinned PyYAML 6.0.2, then the generator), then `docker compose --env-file config_generated.env up`; if step 1 fails, step 2 does not run. The generator: default output `config_generated.env` in the current directory; `--output` takes a file or a directory; names are upper case with the leading `database` part dropped (`database.postgres.password` is `POSTGRES_PASSWORD`; `--strip`, `--lower-case`); nested keys join with `_`, list items get an index; a 3-line header says auto-generated, do not edit, mainly used by docker-compose; the file is written whole (temp file, then rename, mode 0600) or not at all. Floats keep their YAML text. `.env.example` is gone. Python is now a project language: `CLAUDE.md` § 1 and the conventions doc are not updated yet (a Critical File edit, needs operator approval).
+- **QA scenarios:** (1) `make test-scripts`: 18 tests pass; a deliberate bug failed 8 of them (done, 2026-11-02). (2) `make env` on a custom multi-level YAML wrote the expected names and values to a tmp path, mode 0600; `docker compose --env-file <it> config` resolved the user, password, db and both ports (done, 2026-11-02). (3) `make compose` with a missing YAML stops at step 1 and does not run docker (done, 2026-11-02). (4) `make compose` with a valid `config.yml` brings `postgres` and `redis` up healthy (pending, needs the Docker daemon).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 005_yml_to_env_generator verification
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/005_yml_to_env_generator.md` (v0.5), `docs/documents_manifest.md` (v0.45), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 005 gets a final "Verification" section: run the script in a tmp folder on a custom multi-level YAML and check the output file path, key names and values.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 005_yml_to_env_generator output name
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/005_yml_to_env_generator.md` (v0.4), `docs/documents_manifest.md` (v0.44), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. `config_generated.env` is now the default output name; the script also accepts a custom output path/name. The Definition of Done and the test list carry this.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task 004_use_yml_config: Config from a YAML file
+- **Type:** Major (config source; `cmd` entry points)
+- **Files:** `src/config/` (`config.go`, new `decode.go`, new `boot.go` and their tests), `src/cmd/` (`run.go`, `start-app/start.go`, `migrate/migrate.go` and tests), `src/app/defaults_test.go`, `src/app/README.md` (v0.3), `src/go.mod` / `go.sum` (`go.yaml.in/yaml/v3` is a direct requirement), `docs/folder_structure.md` (v0.19), task file moved to `done_tasks/`, `docs/documents_manifest.md` (v0.43), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, behavior changes. `Config` no longer reads ENV. The App and `migrate` require `--config=path/to/config.yml`; a missing flag, a missing or unreadable file, invalid YAML or a broken rule (required `database.postgres.password`, port range, positive durations) panics. Keys: `service_name`, `hot_reload_interval`, `logs.{level,otlp_endpoint}`, `metrics.prometheus.addr`, `database.postgres.*`, `database.redis.*`, `database.migration.{on_start,timeout}`; a missing key keeps its default. The mapper assigns a YAML array to a slice/array, an object to a struct or `map[string]T`, a scalar to an int/uint/bool/string/`time.Duration`; any other pairing is an error. `bool` is supported besides the task table because `database.migration.on_start` is a bool. Not done (out of the rewritten task): `config.example.yml`, removal of `.env.example`, the `docker-compose.yml` env source (task 005).
+- **QA scenarios:** (1) `go test ./...` passes (done). (2) `qabz` with no flag, with a missing file and with `database.postgres.port: "x"` panics with a path-only message (done, 2026-11-02). (3) `qabz --config=<valid file>` starts against a real Postgres and Redis (pending, needs the compose stack and a YAML file; docker-compose still reads `.env` until task 005).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 004_use_yml_config tests pass
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.14), `docs/documents_manifest.md` (v0.42), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The Definition of Done of task 004 gets the line "All tests for configs must pass."
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task rewrite: 004_use_yml_config
+- **Type:** Minor (docs only; a task file rewrite)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.13), `docs/documents_manifest.md` (v0.41), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 004 is rewritten short: the `--config` rule, one YAML example, the YAML-to-Go type table, three steps and a short Definition of Done. The key placement, hot-reload default, example-file and `.env.example` text of v0.12 is removed.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 004_use_yml_config YAML-to-Go type rules
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.12), `docs/documents_manifest.md` (v0.40), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The slice-only rule of v0.11 becomes three rules: an array goes to a slice or array, an object goes to a struct or `map[string]T`, a scalar goes to its matching scalar type. Any other pairing is a parsing error. The Definition of Done and the test list carry the rules.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 004_use_yml_config slice type rule
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.11), `docs/documents_manifest.md` (v0.39), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 004 now requires that a slice field such as `[]string` accepts only a YAML array; a YAML object or scalar (or a wrong element type) is a parsing error. The Definition of Done and the test list carry the rule.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 005_yml_to_env_generator in Python
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/005_yml_to_env_generator.md` (v0.3), `docs/documents_manifest.md` (v0.38), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 005 now rewrites the generator in Python (more readable, better handling of data types) and removes the Bash converter and its tests. The design step also decides the YAML parser and whether `CLAUDE.md` § 1 lists Python.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 004_use_yml_config hot-reload default
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.10), `docs/documents_manifest.md` (v0.37), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 004 now defines the default of a hot-reloadable field as its entry in the config (found by the dotted `path`); a missing entry fails the start. All config names use dot notation. No design step is left open in task 004.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 004_use_yml_config metrics key
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.9), `docs/documents_manifest.md` (v0.36), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. `METRICS_ADDR` gets the YAML path `metrics.prometheus.addr` (top-level section `metrics`, subsection `prometheus`). No key of task 004 is open for design any more, except the declaration of hot-reload defaults.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 004_use_yml_config migration keys
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.8), `docs/documents_manifest.md` (v0.35), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The migration keys move from `logs` to `database.migration.on_start` and `database.migration.timeout`; `logs` keeps `otlp_endpoint` and `level`.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-02] — Task update: 004_use_yml_config key placement
+- **Type:** Minor (docs only; a task file edit)
+- **Files:** `docs/Plans/pending_tasks/004_use_yml_config.md` (v0.7), `docs/documents_manifest.md` (v0.34), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 004 now places `service_name` and `hot_reload_interval` at the top level of the YAML file, and puts `otlp_endpoint`, `level`, `migrate_on_start` and `migrate_timeout` in the section `logs`. `metrics_addr` is still an open design item.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-02] — Task update: 005_yml_to_env_generator
 - **Type:** Minor (docs only; a task file edit)

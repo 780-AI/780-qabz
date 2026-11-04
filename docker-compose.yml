@@ -1,6 +1,9 @@
-# Local development stack. Secrets come from .env (git-ignored); copy .env.example to .env first.
-# `docker compose up -d` starts postgres and redis. The `qabz` service has the profile `app`:
-#   docker compose --profile app up -d --build
+# Local development stack. The variables come from config_generated.env, which is generated from the
+# YAML config (config.yml, git-ignored). Start the stack with `make compose`; never write that file by hand.
+# `make compose` starts postgres and redis. Run docker compose by hand only with the env file:
+#   docker compose --env-file config_generated.env up -d
+# The `qabz` service has the profile `app`:
+#   docker compose --env-file config_generated.env --profile app up -d --build
 # It needs a Dockerfile, which arrives with the service code (plan Step 5 and later).
 
 services:
@@ -9,7 +12,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-qabz}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set database.postgres.password in config.yml}
       POSTGRES_DB: ${POSTGRES_DB:-qabz}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"

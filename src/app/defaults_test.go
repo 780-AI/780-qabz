@@ -10,37 +10,49 @@ import (
 	"qabz/config"
 )
 
-func testConfig() config.Config {
-	c, _ := config.LoadFrom(func(k string) (string, bool) {
-		m := map[string]string{"POSTGRES_PASSWORD": "s3cret", "POSTGRES_HOST": "127.0.0.1", "POSTGRES_PORT": "1",
-			"REDIS_HOST": "127.0.0.1", "REDIS_PORT": "1", "METRICS_ADDR": "127.0.0.1:0"}
-		v, ok := m[k]
-		return v, ok
-	})
+func testConfig(t *testing.T) config.Config {
+	t.Helper()
+	c, err := config.Parse([]byte(`
+database:
+  postgres: {host: "127.0.0.1", port: 1, password: "s3cret"}
+  redis: {host: "127.0.0.1", port: 1}
+metrics:
+  prometheus: {addr: "127.0.0.1:0"}
+`))
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
 	return c
 }
 
+// defaultApp builds the App from the real dependencies. It stops the test if a step fails.
+func defaultApp(t *testing.T) *App {
+	t.Helper()
+	b, err := NewDefaultBuilder(context.Background(), testConfig(t))
+	if !assert.NoError(t, err) || !assert.NotNil(t, b) {
+		t.FailNow()
+	}
+	return build(t, b)
+}
+
 func TestDefaultBuilderBuilds(t *testing.T) {
-	b, err := NewDefaultBuilder(context.Background(), testConfig())
-	assert.NoError(t, err)
-	a, err := b.Build()
-	assert.NoError(t, err)
+	a := defaultApp(t)
 	defer a.Database().Close()
 	defer a.Cache().Close()
 }
 
 func TestDefaultStartFailsWithoutServers(t *testing.T) {
-	b, _ := NewDefaultBuilder(context.Background(), testConfig())
-	a, _ := b.Build()
+	a := defaultApp(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	err := a.Start(ctx)
-	assert.Error(t, err)
-	assert.NotContains(t, err.Error(), "s3cret")
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "s3cret")
+	}
 }
 
 func TestDefaultBuilderRejectsBadLogLevel(t *testing.T) {
-	cfg := testConfig()
+	cfg := testConfig(t)
 	cfg.LogLevel = "loud"
 	_, err := NewDefaultBuilder(context.Background(), cfg)
 	assert.Error(t, err)

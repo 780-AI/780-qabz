@@ -1,4 +1,4 @@
-// Package config maps environment variables (ENV) to the typed Config.
+// Package config maps a YAML file to the typed Config.
 package config
 
 import (
@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // Secret is a string that never prints its value.
@@ -23,59 +26,97 @@ func (Secret) GoString() string { return `"***"` }
 // Reveal returns the real value. Use it only to build a connection.
 func (s Secret) Reveal() string { return string(s) }
 
-// Lookup reads one environment variable. os.LookupEnv is the production value.
-type Lookup func(key string) (string, bool)
-
-// Config holds every setting of the service.
+// Config holds every setting of the service. A field with the tag `path:"a.b.c"` gets the value at
+// that dotted path of the YAML tree (see decode.go). A path that is missing keeps the default.
 type Config struct {
-	ServiceName string
-	LogLevel    string
+	ServiceName string `path:"service_name"`
+	LogLevel    string `path:"logs.level"`
 
-	PostgresHost     string
-	PostgresPort     int
-	PostgresUser     string
-	PostgresPassword Secret
-	PostgresDB       string
+	PostgresHost     string `path:"database.postgres.host"`
+	PostgresPort     int    `path:"database.postgres.port"`
+	PostgresUser     string `path:"database.postgres.user"`
+	PostgresPassword Secret `path:"database.postgres.password"`
+	PostgresDB       string `path:"database.postgres.db"`
 
-	RedisHost     string
-	RedisPort     int
-	RedisPassword Secret
+	RedisHost     string `path:"database.redis.host"`
+	RedisPort     int    `path:"database.redis.port"`
+	RedisPassword Secret `path:"database.redis.password"`
 
-	MetricsAddr  string
-	OTLPEndpoint string // empty: tracing is off
+	MetricsAddr  string `path:"metrics.prometheus.addr"`
+	OTLPEndpoint string `path:"logs.otlp_endpoint"` // empty: tracing is off
 
 	// HotReloadInterval is how often the hot_reload:"true" fields are read again from Postgres.
-	HotReloadInterval time.Duration
+	HotReloadInterval time.Duration `path:"hot_reload_interval"`
 	// MigrateOnStart runs the SQL migrations at app start.
-	MigrateOnStart bool
+	MigrateOnStart bool `path:"database.migration.on_start"`
 	// MigrateTimeout limits the wait for the migration lock plus the migration run.
-	MigrateTimeout time.Duration
+	MigrateTimeout time.Duration `path:"database.migration.timeout"`
 }
 
-// Load reads the Config from the process environment.
-func Load() (Config, error) { return LoadFrom(os.LookupEnv) }
-
-// LoadFrom reads the Config with lookup. It returns all errors together.
-func LoadFrom(lookup Lookup) (Config, error) {
-	r := reader{lookup: lookup}
-	c := Config{
-		ServiceName:       r.str("SERVICE_NAME", "qabz"),
-		LogLevel:          r.str("LOG_LEVEL", "info"),
-		PostgresHost:      r.str("POSTGRES_HOST", "localhost"),
-		PostgresPort:      r.port("POSTGRES_PORT", 5432),
-		PostgresUser:      r.str("POSTGRES_USER", "qabz"),
-		PostgresPassword:  Secret(r.required("POSTGRES_PASSWORD")),
-		PostgresDB:        r.str("POSTGRES_DB", "qabz"),
-		RedisHost:         r.str("REDIS_HOST", "localhost"),
-		RedisPort:         r.port("REDIS_PORT", 6379),
-		RedisPassword:     Secret(r.str("REDIS_PASSWORD", "")),
-		MetricsAddr:       r.str("METRICS_ADDR", ":9090"),
-		OTLPEndpoint:      r.str("OTLP_ENDPOINT", ""),
-		HotReloadInterval: r.duration("HOT_RELOAD_INTERVAL", 30*time.Second),
-		MigrateOnStart:    r.boolean("MIGRATE_ON_START", true),
-		MigrateTimeout:    r.duration("MIGRATE_TIMEOUT", 60*time.Second),
+func defaults() Config {
+	return Config{
+		ServiceName:       "qabz",
+		LogLevel:          "info",
+		PostgresHost:      "localhost",
+		PostgresPort:      5432,
+		PostgresUser:      "qabz",
+		PostgresDB:        "qabz",
+		RedisHost:         "localhost",
+		RedisPort:         6379,
+		MetricsAddr:       ":9090",
+		HotReloadInterval: 30 * time.Second,
+		MigrateOnStart:    true,
+		MigrateTimeout:    60 * time.Second,
 	}
-	return c, r.err()
+}
+
+// LoadFile reads the YAML file at path into a Config. A missing or unreadable file is an error.
+func LoadFile(path string) (Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Config{}, fmt.Errorf("config file: %w", err)
+	}
+	return Parse(data)
+}
+
+// Parse reads a YAML document into a Config. Paths that are missing keep their default; the
+// rules (required password, port range, positive durations) are checked after the mapping.
+// It returns all rule errors together.
+func Parse(data []byte) (Config, error) {
+	var root any
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return Config{}, fmt.Errorf("config yaml: %w", err)
+	}
+	if root == nil { // an empty file
+		root = map[string]any{}
+	}
+	m, ok := root.(map[string]any)
+	if !ok {
+		return Config{}, errors.New("config yaml: the document must be an object")
+	}
+	c := defaults()
+	if err := decodeStruct(m, reflect.ValueOf(&c).Elem(), ""); err != nil {
+		return Config{}, err
+	}
+	return c, c.validate()
+}
+
+func (c Config) validate() error {
+	var errs []error
+	if c.PostgresPassword == "" {
+		errs = append(errs, errors.New("database.postgres.password is required"))
+	}
+	for path, n := range map[string]int{"database.postgres.port": c.PostgresPort, "database.redis.port": c.RedisPort} {
+		if n < 1 || n > 65535 {
+			errs = append(errs, fmt.Errorf("%s must be a port number (1-65535)", path))
+		}
+	}
+	for path, d := range map[string]time.Duration{"hot_reload_interval": c.HotReloadInterval, "database.migration.timeout": c.MigrateTimeout} {
+		if d <= 0 {
+			errs = append(errs, fmt.Errorf("%s must be a positive duration (for example 30s)", path))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // PostgresDSN builds the connection string. It contains the password: never log it.
@@ -108,65 +149,4 @@ func urlEscape(s string) string {
 		}
 	}
 	return b.String()
-}
-
-type reader struct {
-	lookup Lookup
-	errs   []error
-}
-
-func (r *reader) str(key, def string) string {
-	if v, ok := r.lookup(key); ok && v != "" {
-		return v
-	}
-	return def
-}
-
-func (r *reader) required(key string) string {
-	v, ok := r.lookup(key)
-	if !ok || v == "" {
-		r.errs = append(r.errs, fmt.Errorf("%s is required", key))
-	}
-	return v
-}
-
-func (r *reader) port(key string, def int) int {
-	v, ok := r.lookup(key)
-	if !ok || v == "" {
-		return def
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 1 || n > 65535 {
-		r.errs = append(r.errs, fmt.Errorf("%s must be a port number (1-65535)", key))
-		return def
-	}
-	return n
-}
-
-func (r *reader) err() error { return errors.Join(r.errs...) }
-
-func (r *reader) duration(key string, def time.Duration) time.Duration {
-	v, ok := r.lookup(key)
-	if !ok || v == "" {
-		return def
-	}
-	d, err := time.ParseDuration(v)
-	if err != nil || d <= 0 {
-		r.errs = append(r.errs, fmt.Errorf("%s must be a positive duration (for example 30s)", key))
-		return def
-	}
-	return d
-}
-
-func (r *reader) boolean(key string, def bool) bool {
-	v, ok := r.lookup(key)
-	if !ok || v == "" {
-		return def
-	}
-	b, err := strconv.ParseBool(v)
-	if err != nil {
-		r.errs = append(r.errs, fmt.Errorf("%s must be true or false", key))
-		return def
-	}
-	return b
 }

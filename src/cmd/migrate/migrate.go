@@ -20,19 +20,17 @@ import (
 func Run(args []string) int { return run(args, os.Stdout, os.Stderr) }
 
 func run(args []string, out, errOut io.Writer) int {
-	if len(args) == 0 {
-		fmt.Fprintln(errOut, "usage: migrate up | force VERSION | version")
+	if _, rest, _ := config.SplitArgs(args); len(rest) == 0 {
+		fmt.Fprintln(errOut, "usage: migrate --config=path/to/config.yml up | force VERSION | version")
 		return 2
 	}
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintln(errOut, "config:", err)
-		return 2
-	}
+	// A missing or unusable config file panics.
+	cfg, args := config.Boot(args)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, cfg.MigrateTimeout)
 	defer cancel()
+	var err error
 	m := postgres.NewMigrator(cfg.PostgresDSN(), migrations.FS)
 
 	switch args[0] {

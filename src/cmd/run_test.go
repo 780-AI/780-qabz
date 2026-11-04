@@ -14,8 +14,9 @@ func TestMigrateWithoutAction(t *testing.T) {
 	assert.Equal(t, 2, Run([]string{"migrate"}))
 }
 
+// start-app without a usable --config panics: that proves each form reached start-app.
 func TestStartAppDispatch(t *testing.T) {
-	t.Setenv("POSTGRES_PASSWORD", "") // config error: exit 2 proves start-app ran
-	assert.Equal(t, 2, Run(nil))
-	assert.Equal(t, 2, Run([]string{"start-app"}))
+	assert.Panics(t, func() { Run(nil) })
+	assert.Panics(t, func() { Run([]string{"start-app"}) })
+	assert.Panics(t, func() { Run([]string{"--config=/no/such/file.yml"}) })
 }

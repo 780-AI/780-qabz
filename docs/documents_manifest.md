@@ -1,4 +1,4 @@
-<!-- VERSION: 0.33 -->
+<!-- VERSION: 0.46 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.6 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.32 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.45 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.33 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.18 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.46 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.20 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -43,19 +43,32 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.11 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.12 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.10 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.5 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
-| 31 | YAML to env converter | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.sh` |
-| 32 | YAML to env converter tests | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env_test.sh` |
+| 31 | YAML to env generator | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
+| 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.2 | Docs | `src/app/README.md` |
+| 34 | App module README | v0.3 | Docs | `src/app/README.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-02
-- **Change**: Task file `005_yml_to_env_generator.md` updated to v0.2 (file name, `make compose`; not manifest-tracked). Bumped #3 CHANGELOG v1.32, #5 manifest v0.33.
-- **Previous change**: 2026-11-02 — New task file `005_yml_to_env_generator.md`; task 004 v0.6 (not manifest-tracked). Bumped #3 CHANGELOG v1.31, #5 manifest v0.32.
+- **Change**: Task 005 `yml_to_env_generator` done: Python generator, `make compose`. #31 and #32 are now the Python files (v0.1; the Bash files are removed). Bumped #3 CHANGELOG v1.45, #5 manifest v0.46, #6 folder_structure v0.20, #28 OPEN_TASKS v1.12. Task file moved to `done_tasks/` (not manifest-tracked).
+- **Previous change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.5 (Verification section; not manifest-tracked). Bumped #3 CHANGELOG v1.44, #5 manifest v0.45.
+- **Earlier change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.4 (default output name, custom output; not manifest-tracked). Bumped #3 CHANGELOG v1.43, #5 manifest v0.44.
+- **Earlier change**: 2026-11-02 — Task 004 `use_yml_config` done: Config from YAML. Bumped #3 CHANGELOG v1.42, #5 manifest v0.43, #6 folder_structure v0.19, #34 app README v0.3. Task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.14 (Definition of Done: all config tests pass; not manifest-tracked). Bumped #3 CHANGELOG v1.41, #5 manifest v0.42.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` rewritten short, v0.13 (not manifest-tracked). Bumped #3 CHANGELOG v1.40, #5 manifest v0.41.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.12 (YAML-to-Go type rules; not manifest-tracked). Bumped #3 CHANGELOG v1.39, #5 manifest v0.40.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.11 (slice fields accept only a YAML array; not manifest-tracked). Bumped #3 CHANGELOG v1.38, #5 manifest v0.39.
+- **Earlier change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.3 (generator rewritten in Python; not manifest-tracked). Bumped #3 CHANGELOG v1.37, #5 manifest v0.38.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.10 (hot-reload default is the config entry; not manifest-tracked). Bumped #3 CHANGELOG v1.36, #5 manifest v0.37.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.9 (`metrics.prometheus.addr`; not manifest-tracked). Bumped #3 CHANGELOG v1.35, #5 manifest v0.36.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.8 (migration keys to `database.migration`; not manifest-tracked). Bumped #3 CHANGELOG v1.34, #5 manifest v0.35.
+- **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.7 (key placement: top-level and `logs`; not manifest-tracked). Bumped #3 CHANGELOG v1.33, #5 manifest v0.34.
+- **Earlier change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.2 (file name, `make compose`; not manifest-tracked). Bumped #3 CHANGELOG v1.32, #5 manifest v0.33.
+- **Earlier change**: 2026-11-02 — New task file `005_yml_to_env_generator.md`; task 004 v0.6 (not manifest-tracked). Bumped #3 CHANGELOG v1.31, #5 manifest v0.32.
 - **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.5 (key mapping table; not manifest-tracked). Bumped #3 CHANGELOG v1.30, #5 manifest v0.31.
 - **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.4 (panic on missing config; not manifest-tracked). Bumped #3 CHANGELOG v1.29, #5 manifest v0.30.
 - **Earlier change**: 2026-11-02 — Task file `004_use_yml_config.md` updated to v0.3 with the operator answers (not manifest-tracked). Bumped #3 CHANGELOG v1.28, #5 manifest v0.29.

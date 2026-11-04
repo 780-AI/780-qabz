@@ -1,8 +1,10 @@
-<!-- VERSION: 0.18 -->
+<!-- VERSION: 0.20 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
 v0.18 — 2026-11-02 — No down migrations: migrate command is up, force V, version; 000001 has only the up file.
+v0.20 — 2026-11-02 — Task 005: scripts/yml_to_env/ is Python (yml_to_env.py, test, requirements.txt); .env.example removed; Makefile gets venv, env, compose, test-scripts; .gitignore gets config.yml, config_generated.env, .venv/.
+v0.19 — 2026-11-02 — config/ now maps YAML (config.go, decode.go, boot.go + tests); Config no longer reads ENV.
 v0.17 — 2026-11-02 — Added config/hot.go, migrations/ (embedded SQL), system/postgres migrator + config repository, cmd/run.go and cmd/migrate/; main.go dispatches by argument.
 v0.16 — 2026-11-02 — Added src/app/ (README.md, app, builder, defaults, tests); code in config/, common/logging/zap, common/monitoring/{prometheus,jaeger}, system/{postgres,redis}, cmd/start-app; main.go is one line.
 v0.15 — 2026-11-02 — Added pending_tasks/task_counter.json.
@@ -33,8 +35,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 ├── CHANGELOG.md                       # cross-cutting project history
 ├── .gitignore
 ├── docker-compose.yml                 # local dev stack: postgres, redis, qabz (profile `app`)
-├── .env.example                       # compose variables; copy to .env (git-ignored)
-├── Makefile                           # `make proto`: generates Go code from pb/proto/qabz
+├── Makefile                           # `make proto`, `make compose` (YAML -> config_generated.env -> docker compose up), `make test-scripts`
 ├── src/                               # all Go code and the Go module
 │   ├── go.mod                         # Go module `qabz` (go 1.27.3)
 │   ├── go.sum                         # module checksums
@@ -46,9 +47,9 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   │   └── app_test.go  defaults_test.go
 │   ├── cmd/                           # entry points (no main.go here)
 │   │   ├── run.go                     # Run(args): start-app (default) or migrate
-│   │   ├── start-app/                 # start.go: Run() loads config, builds and runs the App
+│   │   ├── start-app/                 # start.go: Run(args) loads --config, builds and runs the App
 │   │   └── migrate/                   # migrate.go: up, force V, version
-│   ├── config/                        # settings: Config from ENV (config.go); hot-reload: Holder, Reloader (hot.go)
+│   ├── config/                        # settings: Config from YAML (config.go), YAML mapper (decode.go), --config boot (boot.go); hot-reload: Holder, Reloader (hot.go)
 │   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs.up.sql (no down files)
 │   ├── system/                        # what the service connects to
 │   │   └── postgres/  redis/          # pgx pool, migrator, config repository; go-redis client (kafka/, nats/ still empty)
@@ -108,9 +109,10 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── doc_coverage_allowlist.toml    # justified doc-coverage exceptions
 │   ├── validation_ownership.toml      # source → tests + docs ownership map
 │   ├── claude_project_data.sh         # project-data locality tool (Rule 14)
-│   └── yml_to_env/                    # Bash tool: YAML config to .env variables
-│       ├── yml_to_env.sh              # the converter (bash 3.2+)
-│       └── yml_to_env_test.sh         # its tests
+│   └── yml_to_env/                    # Python tool: YAML config to the env file for docker-compose
+│       ├── yml_to_env.py              # the generator (Python 3.9+, PyYAML)
+│       ├── yml_to_env_test.py         # its tests (unittest)
+│       └── requirements.txt           # pinned PyYAML
 ├── .github/
 │   └── workflows/
 │       └── governance.yml             # governance CI

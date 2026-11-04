@@ -1,7 +1,8 @@
-<!-- VERSION: 1.11 -->
+<!-- VERSION: 1.12 -->
 <!-- Last Updated: 2026-11-02 -->
 <!--
 CHANGE LOG
+v1.12 — 2026-11-02 — Task 005: docker-compose and yml_to_env scenarios now use config.yml, config_generated.env and the Python generator; Config-from-YAML run scenario added.
 v1.11 — 2026-11-02 — Migration scenario: no down command.
 v1.10 — 2026-11-02 — Config hot-reload and migrations QA scenario added.
 v1.9 — 2026-11-02 — App bootstrap QA scenario added.
@@ -51,11 +52,12 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: `go version` prints `go1.27.3` (the toolchain downloads by itself); after `make proto`, `go build ./...` and `go vet ./...` exit 0.
 - ⏸ Go modules rule. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./...`, then `git status --short`.
   Pass: all commands exit 0 and `src/vendor/` is not listed.
-- ⏸ Step 4 docker-compose. Copy `.env.example` to `.env`, set `POSTGRES_PASSWORD`, run `docker compose up -d --wait`, then `docker compose ps`.
-  Pass: `postgres` and `redis` are `healthy`; `docker compose exec redis redis-cli ping` prints `PONG`; `docker compose config` without `POSTGRES_PASSWORD` fails. Run `docker compose down -v` after.
-- ⏸ `scripts/yml_to_env`. Run `bash scripts/yml_to_env/yml_to_env_test.sh`, then
-  `printf 'db:\n  Host: localhost\n  pass: p w\n' | bash scripts/yml_to_env/yml_to_env.sh -`, then the same with `-u` (and with `--upper-case`).
-  Pass: the tests print `102 passed, 0 failed` and exit 0; the output is `db_host=localhost` and `db_pass='p w'`; with `-u` it is `DB_HOST=localhost` and `DB_PASS='p w'`.
+- ⏸ Step 4 docker-compose (task 005). Create `config.yml` with `database.postgres.password` set, run `make compose` (in a second terminal run `docker compose ps`), then `docker compose down -v`.
+  Pass: `config_generated.env` is created with the auto-generated header; `postgres` and `redis` are `healthy`; `docker compose exec redis redis-cli ping` prints `PONG`; with no `database.postgres.password` in `config.yml`, `docker compose --env-file config_generated.env config` fails.
+- ⏸ `scripts/yml_to_env` (task 005). Run `make test-scripts`, then `make env CONFIG=<a multi-level yml> ENV_OUT=<tmp>/out.env`.
+  Pass: the tests print `OK`; `<tmp>/out.env` exists with mode 0600, a 3-line header and the expected names and values (for example `database.postgres.password` is `POSTGRES_PASSWORD`).
+- ⏸ Config from YAML (task 004, feature-ON). Run `make compose` with a valid `config.yml`, then in `src/` run `go run . --config=../config.yml`.
+  Pass: the App starts, pings Postgres and Redis, and serves the metrics address; without `--config` it panics.
 - ⏸ Project base skeleton. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./... && go run .`, then `git status --short`.
   Pass: all commands exit 0; the last one prints `hello world`; `src/vendor/` is not listed; `src/go.mod` lists `pgx/v5`, `go-redis/v9`, `prometheus/client_golang`, `zap` and `go.opentelemetry.io/otel`.
 - ⏸ App bootstrap. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./... && go test ./...`.

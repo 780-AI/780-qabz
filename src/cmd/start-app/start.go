@@ -13,15 +13,12 @@ import (
 )
 
 // Run starts the service and blocks until SIGINT or SIGTERM. It returns the process exit code.
-func Run() int {
+// args must carry --config=path/to/config.yml; without a usable config file Run panics.
+func Run(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "config:", err)
-		return 2
-	}
+	cfg, _ := config.Boot(args)
 	b, err := app.NewDefaultBuilder(ctx, cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "app:", err)

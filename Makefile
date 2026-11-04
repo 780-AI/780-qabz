@@ -4,6 +4,34 @@ PB_AUX    := pb/aux
 PB_OUT    := src/api/pb
 SWAG_OUT  := src/api/swagger
 
+# The YAML config (git-ignored; see task 004), the generated env file and the Python venv.
+CONFIG    ?= config.yml
+ENV_OUT   ?= config_generated.env
+VENV      := .venv
+VENV_PY   := $(VENV)/bin/python
+GEN_DIR   := scripts/yml_to_env
+
+.PHONY: venv env compose test-scripts
+
+## venv: create the Python venv with the pinned PyYAML (needed by the env generator).
+venv: $(VENV)/.installed
+$(VENV)/.installed: $(GEN_DIR)/requirements.txt
+	python3 -m venv $(VENV)
+	$(VENV)/bin/pip install --quiet -r $(GEN_DIR)/requirements.txt
+	touch $@
+
+## env: generate $(ENV_OUT) from $(CONFIG). Never edit the generated file by hand.
+env: venv
+	$(VENV_PY) $(GEN_DIR)/yml_to_env.py --output $(ENV_OUT) $(CONFIG)
+
+## compose: (1) generate $(ENV_OUT) from $(CONFIG), (2) docker compose up. Step 2 runs only if step 1 passes.
+compose: env
+	docker compose --env-file $(ENV_OUT) up
+
+## test-scripts: run the tests of the env generator.
+test-scripts: venv
+	$(VENV_PY) -m unittest discover -s $(GEN_DIR) -p '*_test.py'
+
 .PHONY: proto
 ## proto: regenerate Go, gRPC, gateway and swagger code from pb/proto/$(PB_DIR). Run after every fresh pull.
 proto:
