@@ -1,4 +1,4 @@
-<!-- VERSION: 0.52 -->
+<!-- VERSION: 0.53 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.51 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.52 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.52 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.53 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.20 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-04
-- **Change**: `PostgresDSN` uses `net/url` (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.51, #5 manifest v0.52, #28 OPEN_TASKS v1.14.
-- **Previous change**: 2026-11-04 — Conventions § 5 standard library first. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.7, #3 CHANGELOG v1.50, #5 manifest v0.51.
+- **Change**: New task file `006_greeting_ping.md` v0.1 (not manifest-tracked); task counter at 007. Bumped #3 CHANGELOG v1.52, #5 manifest v0.53.
+- **Previous change**: 2026-11-04 — `PostgresDSN` uses `net/url` (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.51, #5 manifest v0.52, #28 OPEN_TASKS v1.14.
+- **Earlier change**: 2026-11-04 — Conventions § 5 standard library first. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.7, #3 CHANGELOG v1.50, #5 manifest v0.51.
 - **Earlier change**: 2026-11-04 — CLAUDE.md § 1 one-active-task rule. Bumped #1 CLAUDE.md v1.7, #3 CHANGELOG v1.49, #5 manifest v0.50.
 - **Earlier change**: 2026-11-04 — Conventions § 4 nil safety added. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.6, #3 CHANGELOG v1.48, #5 manifest v0.49.
 - **Earlier change**: 2026-11-04 — Nil guards in the Go tests and the config code (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.47, #5 manifest v0.48, #28 OPEN_TASKS v1.13.

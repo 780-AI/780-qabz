@@ -1,7 +1,8 @@
-<!-- VERSION: 1.51 -->
+<!-- VERSION: 1.52 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.52 — 2026-11-04 — Added 006-task entry.
 v1.51 — 2026-11-04 — Added PostgresDSN-net-url entry.
 v1.50 — 2026-11-04 — Added standard-library-first entry.
 v1.49 — 2026-11-04 — Added one-active-task entry.
@@ -57,6 +58,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — New task: 006_greeting_ping
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/006_greeting_ping.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 007), `docs/documents_manifest.md` (v0.53), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Task 006 adds a `Greeting` method (`GreetingRequest`, `GreetingResponse`) to the `qabz` proto to ping the service; a call to `.../greeting` returns "Hello" with HTTP 200. Design points recorded: the proto is in the `pb` submodule (separate repository), which service gets the method, the response field, the HTTP path, and the missing gRPC / gateway server in the App.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — PostgresDSN uses net/url
 - **Type:** Minor (refactor to the standard library, conventions § 5; the decoded DSN is the same)
