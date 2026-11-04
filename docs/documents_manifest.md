@@ -1,4 +1,4 @@
-<!-- VERSION: 0.49 -->
+<!-- VERSION: 0.50 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -16,11 +16,11 @@
 
 | # | Title | Version | Category | Path |
 |---|---|---|---|---|
-| 1 | Operating Contract | v1.6 | Governance | `CLAUDE.md` |
+| 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.48 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.49 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.49 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.50 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.20 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-04
-- **Change**: Conventions § 4 nil safety added. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.6, #3 CHANGELOG v1.48, #5 manifest v0.49.
-- **Previous change**: 2026-11-04 — Nil guards in the Go tests and the config code (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.47, #5 manifest v0.48, #28 OPEN_TASKS v1.13.
+- **Change**: CLAUDE.md § 1 one-active-task rule. Bumped #1 CLAUDE.md v1.7, #3 CHANGELOG v1.49, #5 manifest v0.50.
+- **Previous change**: 2026-11-04 — Conventions § 4 nil safety added. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.6, #3 CHANGELOG v1.48, #5 manifest v0.49.
+- **Earlier change**: 2026-11-04 — Nil guards in the Go tests and the config code (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.47, #5 manifest v0.48, #28 OPEN_TASKS v1.13.
 - **Earlier change**: 2026-11-04 — Implementation Plan Step 4 follows task 005 (Python generator, `config.yml`). Bumped #29 Implementation Plan v0.11, #3 CHANGELOG v1.46, #5 manifest v0.47.
 - **Earlier change**: 2026-11-02 — Task 005 `yml_to_env_generator` done: Python generator, `make compose`. #31 and #32 are now the Python files (v0.1; the Bash files are removed). Bumped #3 CHANGELOG v1.45, #5 manifest v0.46, #6 folder_structure v0.20, #28 OPEN_TASKS v1.12. Task file moved to `done_tasks/` (not manifest-tracked).
 - **Earlier change**: 2026-11-02 — Task file `005_yml_to_env_generator.md` updated to v0.5 (Verification section; not manifest-tracked). Bumped #3 CHANGELOG v1.44, #5 manifest v0.45.

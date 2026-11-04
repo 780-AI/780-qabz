@@ -1,7 +1,8 @@
-<!-- VERSION: 1.48 -->
+<!-- VERSION: 1.49 -->
 <!-- Last Updated: 2026-11-04 -->
 <!--
 CHANGE LOG
+v1.49 — 2026-11-04 — Added one-active-task entry.
 v1.48 — 2026-11-04 — Added nil-safety-convention entry.
 v1.47 — 2026-11-04 — Added nil-guards entry.
 v1.46 — 2026-11-04 — Added Implementation-Plan-Step-4 entry.
@@ -54,6 +55,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-04] — CLAUDE.md § 1: one active task only
+- **Type:** Major (Critical File edit; docs only)
+- **Files:** `CLAUDE.md` (v1.7), `docs/documents_manifest.md` (v0.50), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. New § 1 rule: at most one task file is in `docs/Plans/in-progress_tasks/` at a time. Before a task moves from `pending_tasks/` to `in-progress_tasks/`, the folder must be empty; otherwise finish the active task or ask the operator.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — Conventions § 4: nil safety
 - **Type:** Minor (docs only; a new binding code rule in the project conventions doc)

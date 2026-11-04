@@ -1,8 +1,9 @@
-<!-- VERSION: 1.6 -->
-<!-- Last Updated: 2026-11-02 -->
+<!-- VERSION: 1.7 -->
+<!-- Last Updated: 2026-11-04 -->
 <!-- Source: docs/standards/ (this repo). Bootstrapped from Standard Set v2.8 (vault commit 8c152cf) on 2026-10-28. -->
 <!--
 CHANGE LOG
+v1.7 — 2026-11-04 — § 1: one active task only (at most one file in docs/Plans/in-progress_tasks/).
 v1.6 — 2026-11-02 — § 1: task names start with the ID (`<ID>_name.md`); replaces the rule that put the ID at the end.
 v1.5 — 2026-11-02 — § 1: task IDs from pending_tasks/task_counter.json.
 v1.4 — 2026-11-02 — § 1: task files rule (define in docs/Plans/*_tasks/, move after each task operation).
@@ -32,6 +33,7 @@ If a rule below conflicts with a request, **refuse or propose a compliant altern
 **Project conventions:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` is **binding** for all code in this repository. Load it before writing or reviewing code. It is project-owned: a suite sync does not change it.
 **Tasks:** every task is defined as a file in `docs/Plans/{pending|in-progress|done}_tasks/` (format: `pending_tasks/task_template.md`).
 After each task operation, update the task status and move the file to the proper folder in the same commit.
+**One active task only:** an active task is a task file in `docs/Plans/in-progress_tasks/`. At most ONE task file may be in that folder at any time. Before you move a task from `pending_tasks/` to `in-progress_tasks/`, confirm the folder is empty. If it is not, finish the active task (move it to `done_tasks/`) or ask the operator — do not start a second one.
 Each new task name starts with the ID from `pending_tasks/task_counter.json`, which is then incremented.
 <!-- PROJECT-OWNED:END -->
 
