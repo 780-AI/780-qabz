@@ -1,7 +1,8 @@
-<!-- VERSION: 1.75 -->
+<!-- VERSION: 1.76 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.76 — 2026-11-07 — Added session-wrap-up (task 014 session) entry.
 v1.75 — 2026-11-07 — Added 014-request-metrics-middleware entry.
 v1.74 — 2026-11-07 — Added durations-in-milliseconds-convention entry.
 v1.73 — 2026-11-07 — Added session-wrap-up entry.
@@ -81,6 +82,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Session wrap-up: lesson candidates (task 014 session)
+- **Type:** Minor (docs only)
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.25), `docs/documents_manifest.md` (v0.77), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Two lesson candidates queued for an operator decision: move the Implementation_Plan Step 5 policies into the conventions doc, and a recurrence of L084 (a gate read after the guarded action).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 014_request_metrics_middleware: request metrics and the Prometheus switch
 - **Type:** Major (new interceptor, new metrics, new config key; Critical File `system.html`)

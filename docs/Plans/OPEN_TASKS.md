@@ -1,7 +1,8 @@
-<!-- VERSION: 1.24 -->
+<!-- VERSION: 1.25 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.25 — 2026-11-07 — Session wrap-up: 2 lesson candidates added (Step 5 policies to conventions; gate read before the guarded action).
 v1.24 — 2026-11-07 — Task 014 request metrics: QA scenario added; 013 follow-up updated.
 v1.23 — 2026-11-07 — Session wrap-up: Lesson candidates section added (2 candidates).
 v1.22 — 2026-11-07 — Task 013 services endpoint: QA scenario and follow-ups added.
@@ -154,3 +155,5 @@ Found in the 2026-11-07 session wrap-up. Each one waits for an operator decision
 
 - **Logging of dependency failures in a request path.** Task 013 first logged nothing for a failed database read and used only a metric, from a too strict reading of the "metrics, not logs" policy (Implementation_Plan Step 5). The operator saw a 500 with no log line. Candidate rule: a failed call to a dependency (database, cache, provider) in a request path writes one error line with the cause, and the client gets no detail; a client error or a call that the client canceled writes no line. Recommendation: codify.
 - **Differences from bill.** Every intended difference from the old `bill` service is a numbered item in `docs/this_vs_bill.md` and has a `@todo` comment at the code that makes it (task 013, operator). Candidate rule for the conventions doc, so later tasks follow it. Recommendation: codify.
+- **Step 5 policies are not enforced.** The Prometheus switch was "mandatory" in Implementation_Plan Step 5, but no task built it; task 014 found it missing and added it. The other Step 5 policies (testable app, logging policy) are also only in the plan, so the `code-reviewer` agent does not check them. Candidate: move the Step 5 policies (Prometheus switch, testable app, logging) into `PROJECT_SPECIFIC_CONVENTIONS.md` (the plan's own open point), and check the code against each one. Recommendation: codify.
+- **Read a gate before the guarded action.** In the task 014 session, a content check of the staged files and `git commit` ran in one command, so the commit ran before the check output was read (the content was correct). Suite lesson L084 already says that each gate is its own step; this is a recurrence. Candidate: an `E0NN` entry in `docs/STANDARDS_LOG.md` (recurrence evidence for L084). Recommendation: queue (log it if it happens again).
