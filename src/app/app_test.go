@@ -309,3 +309,43 @@ func TestMetricsFailureStopsServers(t *testing.T) {
 	assert.Contains(t, r.c.order, "grpc.stop")
 	assert.NotContains(t, r.c.order, "metrics.stop")
 }
+
+// switchMetrics is a metrics endpoint with the Prometheus switch (as *prometheus.Server).
+type switchMetrics struct {
+	fakeMetrics
+	enabled bool
+}
+
+func (f *switchMetrics) Enabled() bool { return f.enabled }
+
+const (
+	logStarted  = "metrics started"
+	logDisabled = "metrics disabled (metrics.prometheus.enabled: false)"
+)
+
+// TestStartLogsMetricsSwitch: Start logs "metrics started" when metrics are on (or the endpoint has
+// no switch) and "metrics disabled" when they are off.
+func TestStartLogsMetricsSwitch(t *testing.T) {
+	cases := []struct {
+		name    string
+		m       func(c *calls) Metrics
+		want    string
+		notWant string
+	}{
+		{name: "no switch", m: func(c *calls) Metrics { return &fakeMetrics{c: c} }, want: logStarted, notWant: logDisabled},
+		{name: "on", m: func(c *calls) Metrics { return &switchMetrics{fakeMetrics: fakeMetrics{c: c}, enabled: true} }, want: logStarted, notWant: logDisabled},
+		{name: "off", m: func(c *calls) Metrics { return &switchMetrics{fakeMetrics: fakeMetrics{c: c}} }, want: logDisabled, notWant: logStarted},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newRig()
+			a := build(t, r.builder().WithMetrics(tc.m(r.c)))
+			if !assert.NoError(t, a.Start(context.Background())) {
+				return
+			}
+			assert.Contains(t, r.log.logs, tc.want)
+			assert.NotContains(t, r.log.logs, tc.notWant)
+			assert.NoError(t, a.Stop(context.Background()))
+		})
+	}
+}

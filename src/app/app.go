@@ -149,7 +149,11 @@ func (a *App) Start(ctx context.Context) error {
 		a.logger.Error("metrics start failed", "addr", cfg.MetricsAddr, "error", err)
 		return a.abort(fmt.Errorf("metrics: %w", err), run)
 	}
-	a.logger.Info("metrics started", "addr", cfg.MetricsAddr)
+	if m, ok := a.metrics.(interface{ Enabled() bool }); ok && !m.Enabled() {
+		a.logger.Info("metrics disabled (metrics.prometheus.enabled: false)")
+	} else {
+		a.logger.Info("metrics started", "addr", cfg.MetricsAddr)
+	}
 	a.started = true
 	a.logger.Info("app started")
 	return nil

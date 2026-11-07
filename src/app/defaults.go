@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	promclient "github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc"
 
 	pb "qabz/api/pb/qabz"
 	"qabz/common/auth"
@@ -33,7 +34,8 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	b := NewBuilder().WithLogger(logger)
 
 	// The auth check comes first: a missing secret stops the start before any connection.
-	metrics := prometheus.New(cfg.MetricsAddr)
+	// metrics.prometheus.enabled: false gives a disabled Server; then no metric is created or registered.
+	metrics := prometheus.New(cfg.MetricsAddr, cfg.MetricsEnabled)
 	authCheck, err := newAuth(cfg, metrics, logger)
 	if err == nil && authCheck == nil {
 		err = errors.New("auth: newAuth returned nil")
@@ -66,7 +68,14 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, authCheck.ServerOptions(), grpcserver.RegisterService(svc))
+	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
+	opts, err := newRequestMetrics(metrics)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	opts = append(opts, authCheck.ServerOptions()...)
+	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
 	}
@@ -98,7 +107,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 // newAuth builds the JWT check of every gRPC call (and so of every gateway route). With
 // debug.auth.disable it logs one warning and checks nothing; otherwise it needs
 // auth.secrets.hmac. Each rejected call adds 1 to
-// qabz_auth_rejected_total{reason}; a rejected call writes no log line.
+// qabz_auth_rejected_total{reason} (only when metrics are on); a rejected call writes no log line.
 func newAuth(cfg config.Config, metrics *prometheus.Server, logger Logger) (*grpcserver.Auth, error) {
 	if cfg.DebugAuthDisable {
 		logger.Warn("auth check disabled (debug.auth.disable): development only")
@@ -108,44 +117,64 @@ func newAuth(cfg config.Config, metrics *prometheus.Server, logger Logger) (*grp
 	if err != nil {
 		return nil, fmt.Errorf("%w (set auth.secrets.hmac, or debug.auth.disable in development)", err)
 	}
-	rejected := promclient.NewCounterVec(promclient.CounterOpts{
-		Name: "qabz_auth_rejected_total",
-		Help: "Calls rejected by the JWT auth check, by reason.",
-	}, []string{"reason"})
-	if metrics != nil && metrics.Registry() != nil {
-		if err := metrics.Registry().Register(rejected); err != nil {
+	var onReject func(reason string) // nil: metrics are off, nothing is recorded
+	if reg := metrics.Registry(); reg != nil {
+		rejected := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_auth_rejected_total",
+			Help: "Calls rejected by the JWT auth check, by reason.",
+		}, []string{"reason"})
+		if err := reg.Register(rejected); err != nil {
 			return nil, fmt.Errorf("auth: register metric: %w", err)
 		}
+		onReject = func(reason string) { rejected.WithLabelValues(reason).Inc() }
 	}
-	return grpcserver.NewAuth(grpcserver.AuthOptions{
-		Verifier: verifier,
-		OnReject: func(reason string) { rejected.WithLabelValues(reason).Inc() },
-	})
+	return grpcserver.NewAuth(grpcserver.AuthOptions{Verifier: verifier, OnReject: onReject})
 }
 
 // newService builds the gRPC Service: GET /v1/services reads the services table through an
 // in-memory cache (config.CacheServicesTTL). Each call adds 1 to
-// qabz_services_cache_total{result="hit"|"miss"|"error"}; a failed read also writes one error log line.
+// qabz_services_cache_total{result="hit"|"miss"|"error"} (only when metrics are on); a failed read
+// also writes one error log line.
 func newService(cfg config.Config, db *postgres.Client, metrics *prometheus.Server, logger Logger) (*grpcserver.Service, error) {
 	serviceID, err := grpcserver.ServiceIDFromConfig(cfg.ServiceID)
 	if err != nil {
 		return nil, err
 	}
-	results := promclient.NewCounterVec(promclient.CounterOpts{
-		Name: "qabz_services_cache_total",
-		Help: "GET /v1/services calls by cache result (hit, miss, error).",
-	}, []string{"result"})
-	if metrics != nil && metrics.Registry() != nil {
-		if err := metrics.Registry().Register(results); err != nil {
+	var onResult func(result string) // nil: metrics are off, nothing is recorded
+	if reg := metrics.Registry(); reg != nil {
+		results := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_services_cache_total",
+			Help: "GET /v1/services calls by cache result (hit, miss, error).",
+		}, []string{"result"})
+		if err := reg.Register(results); err != nil {
 			return nil, fmt.Errorf("services: register metric: %w", err)
 		}
+		onResult = func(result string) { results.WithLabelValues(result).Inc() }
 	}
 	catalog, err := billtype.NewServiceCatalog(postgres.NewServiceRepository(db), billtype.CatalogOptions{
 		TTL:      config.CacheServicesTTL,
-		OnResult: func(result string) { results.WithLabelValues(result).Inc() },
+		OnResult: onResult,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return grpcserver.NewService(grpcserver.ServiceDeps{Services: catalog, ServiceID: serviceID, Logger: logger}), nil
+}
+
+// newRequestMetrics returns the gRPC server options that measure every call (and so every gateway
+// route): qabz_request_duration_ms{path,code}, whose _count series counts the requests. With metrics
+// off it returns no option, so nothing is registered or recorded.
+func newRequestMetrics(metrics *prometheus.Server) ([]grpc.ServerOption, error) {
+	m, err := prometheus.NewRequestMetrics(metrics)
+	if err != nil || m == nil {
+		return nil, err
+	}
+	requests, err := grpcserver.NewRequests(m.Observe)
+	if err != nil {
+		return nil, err
+	}
+	if requests == nil {
+		return nil, errors.New("requests: NewRequests returned nil")
+	}
+	return requests.ServerOptions(), nil
 }

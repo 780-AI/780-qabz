@@ -1,7 +1,8 @@
-<!-- VERSION: 1.23 -->
+<!-- VERSION: 1.24 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.24 — 2026-11-07 — Task 014 request metrics: QA scenario added; 013 follow-up updated.
 v1.23 — 2026-11-07 — Session wrap-up: Lesson candidates section added (2 candidates).
 v1.22 — 2026-11-07 — Task 013 services endpoint: QA scenario and follow-ups added.
 v1.21 — 2026-11-07 — Task 012 auth status 403: 009/010 scenarios now expect 403, 012 scenario added.
@@ -134,7 +135,13 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Then (feature ON) create bill's `services` table in the dev database if it does not exist, insert test rows (some with `inquiry = false`, two languages), set `service.id` in `config.yml`, run the App and call `GET /v1/services` with and without `Accept-Language: en-US`.
   Pass: HTTP 200, `serviceId` = `service.id`, the rows of the language in `order` order exactly as inserted (`inquiry: false` stays false); a second call inside 60s does not see a row change; `qabz_services_cache_total` counts `hit` and `miss`. Also pass: without the `services` table the call gives HTTP 500 `internal error` and the App log has one error line `services: list failed` with the cause. Then delete the test rows (and the table, if you created it).
   Done 2026-11-07 by the implementer on the compose dev database: all pass (awaiting operator confirmation).
-- ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware (request duration, recovery, tracing) for all endpoints needs its own task.
+- ⏸ Task 014 request metrics and Prometheus switch (2026-11-07). In `src/` run `go test -race -count=1 ./common/monitoring/prometheus/ ./entry/... ./config/ ./app/`.
+  Pass: all pass (switch default / on / off, histogram in ms with sub-ms values, count and labels, rejected call counted, gateway 404 not counted, no metric registered with the switch off).
+  Then (feature ON) run `make compose up ARGS="-d --wait"` and the App, call `GET /v1/greeting` 3 times and `GET /v1/services` once, then `curl localhost:9090/metrics`.
+  Pass: `qabz_request_duration_ms_count` is 3 for `path="/haf80.api.bill.Service/Greeting"` and 1 for `path="/haf80.api.bill.Service/Get"`; the sums are in milliseconds; no series has a raw URL as `path`; `/metrics` has no `qabz_requests_total`.
+  Also pass: with the auth check on, a call with no token adds 1 to `qabz_request_duration_ms_count{code="PermissionDenied"}`; with `metrics.prometheus.enabled: false` the log shows `metrics disabled (metrics.prometheus.enabled: false)`, `curl localhost:9090/metrics` fails, and `GET /v1/greeting` still answers.
+  Done 2026-11-07 by the implementer: all pass (awaiting operator confirmation).
+- ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware: request metrics done in task 014; panic recovery and tracing for all endpoints still need their own tasks.
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 
 ## Maintenance / housekeeping

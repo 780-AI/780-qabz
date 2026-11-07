@@ -2,14 +2,22 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
+	pb "qabz/api/pb/qabz"
 	"qabz/common/auth/authtest"
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
+	grpcserver "qabz/entry/grpc"
 	"qabz/system/postgres"
 )
 
@@ -107,7 +115,7 @@ func TestNewServiceRules(t *testing.T) {
 		t.FailNow()
 	}
 	defer db.Close()
-	metrics := prometheus.New("127.0.0.1:0")
+	metrics := prometheus.New("127.0.0.1:0", true)
 
 	svc, err := newService(cfg, db, metrics, nil)
 	assert.NoError(t, err)
@@ -117,6 +125,164 @@ func TestNewServiceRules(t *testing.T) {
 	assert.ErrorContains(t, err, "services: register metric")
 
 	cfg.ServiceID = -1
-	_, err = newService(cfg, db, prometheus.New("127.0.0.1:0"), nil)
+	_, err = newService(cfg, db, prometheus.New("127.0.0.1:0", true), nil)
 	assert.ErrorContains(t, err, "service.id")
+}
+
+// registered reports whether reg already has a collector with the metric name: registering a
+// probe with the same name then fails (the probe has other labels and help, so the error is a
+// descriptor conflict).
+func registered(t *testing.T, reg *promclient.Registry, name string) bool {
+	t.Helper()
+	probe := promclient.NewCounter(promclient.CounterOpts{Name: name, Help: "probe"})
+	if err := reg.Register(probe); err != nil {
+		return true
+	}
+	reg.Unregister(probe)
+	return false
+}
+
+// metricsServer returns the metrics endpoint of b. It stops the test if it is not a *prometheus.Server.
+func metricsServer(t *testing.T, b *Builder) *prometheus.Server {
+	t.Helper()
+	m, ok := b.metrics.(*prometheus.Server)
+	if !assert.True(t, ok) || !assert.NotNil(t, m) {
+		t.FailNow()
+	}
+	return m
+}
+
+var qabzMetrics = []string{
+	prometheus.RequestDurationName, "qabz_auth_rejected_total", "qabz_services_cache_total",
+}
+
+// TestDefaultBuilderMetricsSwitch: with metrics on, the composition root registers every qabz
+// metric; with metrics.prometheus.enabled false it registers none and the endpoint is disabled.
+func TestDefaultBuilderMetricsSwitch(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("enabled=%v", enabled), func(t *testing.T) {
+			cfg := testConfig(t)
+			cfg.MetricsEnabled = enabled
+			cfg.DebugAuthDisable = false // the auth metric exists only with the check on
+			cfg.JWTHMACSecret = authtest.Secret
+			b, err := NewDefaultBuilder(context.Background(), cfg)
+			if !assert.NoError(t, err) || !assert.NotNil(t, b) {
+				return
+			}
+			a := build(t, b)
+			defer a.Database().Close()
+			defer a.Cache().Close()
+			m := metricsServer(t, b)
+			assert.Equal(t, enabled, m.Enabled())
+			if !enabled {
+				assert.Nil(t, m.Registry(), "nothing can be registered")
+				return
+			}
+			if !assert.NotNil(t, m.Registry()) {
+				return
+			}
+			assert.False(t, registered(t, m.Registry(), "qabz_no_such_metric"), "positive control: a free name")
+			for _, name := range qabzMetrics {
+				assert.True(t, registered(t, m.Registry(), name), name)
+			}
+		})
+	}
+}
+
+// TestRequestMetricsWiring: with metrics on newRequestMetrics gives the interceptor options and
+// registers the metrics once; with metrics off it gives no option.
+func TestRequestMetricsWiring(t *testing.T) {
+	on := prometheus.New("127.0.0.1:0", true)
+	opts, err := newRequestMetrics(on)
+	assert.NoError(t, err)
+	assert.Len(t, opts, 2, "one unary and one stream interceptor")
+	_, err = newRequestMetrics(on)
+	assert.ErrorContains(t, err, "requests: register metric")
+
+	opts, err = newRequestMetrics(prometheus.New("127.0.0.1:0", false))
+	assert.NoError(t, err)
+	assert.Empty(t, opts)
+}
+
+// TestMetricsOffRegistersNothing: with metrics off, newAuth and newService create no metric, so a
+// second call cannot conflict (with metrics on the second newService fails, see TestNewServiceRules).
+func TestMetricsOffRegistersNothing(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.DebugAuthDisable = false
+	cfg.JWTHMACSecret = authtest.Secret
+	db, err := postgres.New(context.Background(), cfg.PostgresDSN()) // lazy: no server needed
+	if !assert.NoError(t, err) || !assert.NotNil(t, db) {
+		t.FailNow()
+	}
+	defer db.Close()
+	off := prometheus.New("127.0.0.1:0", false)
+	for range 2 {
+		svc, err := newService(cfg, db, off, nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, svc)
+		check, err := newAuth(cfg, off, nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, check)
+	}
+
+	on := prometheus.New("127.0.0.1:0", true)
+	_, err = newAuth(cfg, on, nil)
+	assert.NoError(t, err)
+	_, err = newAuth(cfg, on, nil)
+	assert.ErrorContains(t, err, "auth: register metric")
+}
+
+// TestDefaultBuilderCountsRejectedCalls: in the composition root the request metrics come before
+// the auth check, so a call without a token is counted (histogram sample count) with code PermissionDenied.
+func TestDefaultBuilderCountsRejectedCalls(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.DebugAuthDisable = false
+	cfg.JWTHMACSecret = authtest.Secret
+	b, err := NewDefaultBuilder(context.Background(), cfg)
+	if !assert.NoError(t, err) || !assert.NotNil(t, b) {
+		return
+	}
+	a := build(t, b)
+	defer a.Database().Close()
+	defer a.Cache().Close()
+	gs, ok := b.grpc.(*grpcserver.Server)
+	if !assert.True(t, ok) || !assert.NotNil(t, gs) || !assert.NoError(t, gs.Start(context.Background())) {
+		return
+	}
+	defer func() { assert.NoError(t, gs.Stop(context.Background())) }()
+	conn, err := grpc.NewClient(gs.DialAddr(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if !assert.NoError(t, err) || !assert.NotNil(t, conn) {
+		return
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = pb.NewServiceClient(conn).Greeting(ctx, &pb.GreetingRequest{})
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+
+	reg := metricsServer(t, b).Registry()
+	if !assert.NotNil(t, reg) {
+		return
+	}
+	families, err := reg.Gather()
+	if !assert.NoError(t, err) {
+		return
+	}
+	found := false
+	for _, f := range families {
+		if f == nil || f.GetName() != prometheus.RequestDurationName {
+			continue
+		}
+		for _, m := range f.GetMetric() {
+			labels := map[string]string{}
+			for _, l := range m.GetLabel() {
+				labels[l.GetName()] = l.GetValue()
+			}
+			if labels["path"] == pb.Service_Greeting_FullMethodName && labels["code"] == "PermissionDenied" {
+				found = true
+				assert.Equal(t, uint64(1), m.GetHistogram().GetSampleCount())
+			}
+		}
+	}
+	assert.True(t, found, "the rejected call is counted")
 }

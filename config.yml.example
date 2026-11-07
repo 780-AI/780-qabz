@@ -23,6 +23,7 @@ server:
 metrics:
   prometheus:
     addr: ":9090"
+    enabled: true            # false: no metric is registered or recorded, no metrics endpoint
 
 database:
   postgres:

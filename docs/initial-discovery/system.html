@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 1.3 -->
+<!-- VERSION: 1.4 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v1.4 — 2026-11-07 — Task 014: request histogram qabz_request_duration_ms (path = gRPC method, code; its _count is the request counter); Prometheus switch metrics.prometheus.enabled.
 v1.3 — 2026-11-07 — Durations in milliseconds (conventions § 9): metric times use the suffix _ms; the planned *_seconds metrics renamed to *_ms.
 v1.2 — 2026-11-02 — No down migrations: only NNNNNN_name.up.sql files; migrate command is up, force V, version.
 v1.1 — 2026-11-02 — Migrations: qabz runs its own migrations (src/migrations, golang-migrate) at start and with the migrate command; hot-reload table app_hot_configs.
@@ -381,10 +382,13 @@ Since we are using AI coding, there is no need to slow down performance by using
 
 Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names start with `qabz_`. Durations are in milliseconds, and their names end with `_ms` (`PROJECT_SPECIFIC_CONVENTIONS.md` § 9). Any of them can be **alertable**.
 
+**Prometheus switch.** `metrics.prometheus.enabled` (default `true`) turns all metrics on or off. When it is `false`, no metric is registered or recorded and the metrics endpoint does not listen.
+
 ### Requests and orders
 
 | Metric | Type | What it tells you |
 |---|---|---|
+| `qabz_request_duration_ms` | histogram | Duration of every incoming request (gRPC and HTTP gateway) in milliseconds, by `path` (the gRPC method, for example `/haf80.api.bill.Service/Get`) and `code` (the gRPC code); buckets 5 ms to 10 000 ms. Its `_count` series is the request counter. A call that the auth check rejects is counted. An unknown HTTP route is not counted |
 | `qabz_inquiries_total` | counter | Inquiries per bill type, provider and outcome |
 | `qabz_orders_total` | counter | Every order status change (the state machine) |
 | `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |

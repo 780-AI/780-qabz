@@ -1,7 +1,8 @@
-<!-- VERSION: 1.74 -->
+<!-- VERSION: 1.75 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.75 — 2026-11-07 — Added 014-request-metrics-middleware entry.
 v1.74 — 2026-11-07 — Added durations-in-milliseconds-convention entry.
 v1.73 — 2026-11-07 — Added session-wrap-up entry.
 v1.72 — 2026-11-07 — Added 015-task entry.
@@ -80,6 +81,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 014_request_metrics_middleware: request metrics and the Prometheus switch
+- **Type:** Major (new interceptor, new metrics, new config key; Critical File `system.html`)
+- **Files:** `src/common/monitoring/prometheus/` (`prometheus.go`, `prometheus_test.go`, `requests.go` and `requests_test.go` new), `src/entry/grpc/` (`requests.go`, `requests_test.go` new), `src/entry/http/requests_test.go` (new), `src/config/` (`config.go`, `config_test.go`), `src/app/` (`app.go`, `app_test.go`, `defaults.go`, `defaults_test.go`, `README.md` v0.11), `src/go.mod` (`prometheus/client_model` now direct, same version), `config.yml.example`, `docs/initial-discovery/system.html` (v1.4, Critical File), `docs/folder_structure.md` (v0.28), `docs/Plans/OPEN_TASKS.md` (v1.24), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.76), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. Every gRPC call, and so every gateway route, records its duration in the histogram `qabz_request_duration_ms{path,code}` (milliseconds, buckets 5 to 10000, conventions § 9); its `_count` series is the request counter, so there is no separate `qabz_requests_total`. `path` is the gRPC method, never the raw URL; `code` is the gRPC code name. The interceptor runs before the auth check, so a rejected call (403) is counted; an unknown HTTP route (404 in the gateway) is not. New config key `metrics.prometheus.enabled` (default `true`): with `false`, no `qabz` metric is created or registered (requests, `qabz_auth_rejected_total`, `qabz_services_cache_total`), nothing is recorded, the metrics endpoint does not listen, and the start log says `metrics disabled`. `prometheus.New` now takes `enabled`. A local `config.yml` must add `metrics.prometheus.enabled` (the sync test fails otherwise). No API change, no migration.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, "Task 014 request metrics and Prometheus switch" (⏸, implementer run passed).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Conventions § 9: durations in milliseconds
 - **Type:** Minor (a new project convention; a Critical File doc edit with no code change)

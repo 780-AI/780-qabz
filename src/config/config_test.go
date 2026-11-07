@@ -20,6 +20,7 @@ func TestParseDefaults(t *testing.T) {
 	assert.Equal(t, 5432, c.PostgresPort)
 	assert.Equal(t, "localhost:6379", c.RedisAddr())
 	assert.Equal(t, ":9090", c.MetricsAddr)
+	assert.True(t, c.MetricsEnabled)
 	assert.Empty(t, c.OTLPEndpoint)
 	assert.Equal(t, 30*time.Second, c.HotReloadInterval)
 	assert.True(t, c.MigrateOnStart)
@@ -135,6 +136,31 @@ func TestSecretNeverPrints(t *testing.T) {
 }
 
 // TestParseAuthKeys: auth.secrets.hmac is read from the YAML; a missing section leaves it empty.
+// TestParseMetricsSwitch: the Prometheus switch is on by default and with an explicit true; it is
+// off only with an explicit false (Implementation_Plan Step 5).
+func TestParseMetricsSwitch(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{name: "default", yaml: `database: {postgres: {password: x}}`, want: true},
+		{name: "default with other metrics keys", yaml: `{database: {postgres: {password: x}}, metrics: {prometheus: {addr: ":1"}}}`, want: true},
+		{name: "explicit on", yaml: `{database: {postgres: {password: x}}, metrics: {prometheus: {enabled: true}}}`, want: true},
+		{name: "explicit off", yaml: `{database: {postgres: {password: x}}, metrics: {prometheus: {enabled: false}}}`, want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := Parse([]byte(tc.yaml))
+			if assert.NoError(t, err) {
+				assert.Equal(t, tc.want, c.MetricsEnabled)
+			}
+		})
+	}
+	_, err := Parse([]byte(`{database: {postgres: {password: x}}, metrics: {prometheus: {enabled: "no"}}}`))
+	assert.Error(t, err, "a non-bool value is an error, not off")
+}
+
 func TestParseAuthKeys(t *testing.T) {
 	c, err := Parse([]byte(`{database: {postgres: {password: x}}, auth: {secrets: {hmac: hm4c}}}`))
 	if assert.NoError(t, err) {

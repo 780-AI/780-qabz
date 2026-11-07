@@ -10,7 +10,7 @@ import (
 )
 
 func TestServeMetrics(t *testing.T) {
-	s := New("127.0.0.1:0")
+	s := New("127.0.0.1:0", true)
 	if !assert.NoError(t, s.Start(context.Background())) {
 		return
 	}
@@ -27,10 +27,10 @@ func TestServeMetrics(t *testing.T) {
 }
 
 func TestStartFailsOnBusyPort(t *testing.T) {
-	a := New("127.0.0.1:0")
+	a := New("127.0.0.1:0", true)
 	if !assert.NoError(t, a.Start(context.Background())) {
 		return
 	}
 	defer a.Stop(context.Background())
-	assert.Error(t, New(a.Addr()).Start(context.Background()))
+	assert.Error(t, New(a.Addr(), true).Start(context.Background()))
 }

@@ -61,8 +61,12 @@ type Config struct {
 	// debug section, and a missing key is false (the check is on).
 	DebugAuthDisable bool `path:"debug.auth.disable"`
 
-	MetricsAddr  string `path:"metrics.prometheus.addr"`
-	OTLPEndpoint string `path:"logs.otlp_endpoint"` // empty: tracing is off
+	MetricsAddr string `path:"metrics.prometheus.addr"`
+	// MetricsEnabled is the Prometheus switch (Implementation_Plan Step 5). It is on by default and
+	// off only with an explicit false: then no metric is registered or recorded and the metrics
+	// endpoint does not listen.
+	MetricsEnabled bool   `path:"metrics.prometheus.enabled"`
+	OTLPEndpoint   string `path:"logs.otlp_endpoint"` // empty: tracing is off
 
 	// HotReloadInterval is how often the hot_reload:"true" fields are read again from Postgres.
 	HotReloadInterval time.Duration `path:"hot_reload_interval"`
@@ -85,6 +89,7 @@ func defaults() Config {
 		GRPCAddr:          ":8082",
 		HTTPAddr:          ":8080",
 		MetricsAddr:       ":9090",
+		MetricsEnabled:    true,
 		HotReloadInterval: 30 * time.Second,
 		MigrateOnStart:    true,
 		MigrateTimeout:    60 * time.Second,
