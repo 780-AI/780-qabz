@@ -1,7 +1,8 @@
-<!-- VERSION: 0.22 -->
+<!-- VERSION: 0.23 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.23 — 2026-11-07 — `qabz.postman_collection.json` added to the root (conventions § 7).
 v0.22 — 2026-11-07 — Task 007: Makefile line names `make compose up|down|ps|logs`.
 v0.21 — 2026-11-04 — Task 006: entry/grpc/ (gRPC server, Service with Greeting) and entry/http/ (grpc-gateway HTTP server) have code.
 v0.18 — 2026-11-02 — No down migrations: migrate command is up, force V, version; 000001 has only the up file.
@@ -37,6 +38,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 ├── CHANGELOG.md                       # cross-cutting project history
 ├── .gitignore
 ├── docker-compose.yml                 # local dev stack: postgres, redis, qabz (profile `app`)
+├── qabz.postman_collection.json      # Postman collection of the HTTP API; updated with every API change (conventions § 7)
 ├── Makefile                           # `make proto`, `make compose up|down|ps|logs` (YAML -> config_generated.env -> docker compose <action>), `make test-scripts`
 ├── src/                               # all Go code and the Go module
 │   ├── go.mod                         # Go module `qabz` (go 1.27.3)

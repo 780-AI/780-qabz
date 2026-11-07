@@ -1,0 +1,47 @@
+{
+  "info": {
+    "name": "Qabz",
+    "description": "HTTP API of the Qabz service (grpc-gateway). Kept up to date with every API change: docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md section 7.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Service",
+      "item": [
+        {
+          "name": "Greeting",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/greeting",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "greeting"]
+            },
+            "description": "haf80.api.bill.Service/Greeting. Pings the service. Expected: HTTP 200 and {\"message\":\"Hello\"}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"message is Hello\", function () { pm.expect(pm.response.json().message).to.eql(\"Hello\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}

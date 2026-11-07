@@ -1,7 +1,8 @@
-<!-- VERSION: 0.8 -->
-<!-- Last Updated: 2026-11-04 -->
+<!-- VERSION: 0.9 -->
+<!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.9 — 2026-11-07 — Section 7: the Postman collection `qabz.postman_collection.json` in the repo root is updated in the same commit as every HTTP API change.
 v0.8 — 2026-11-04 — Section 6: `pb` submodule ownership. Only `pb/proto/qabz/` is writable; every other path in `pb/` is read-only for this repo.
 v0.7 — 2026-11-04 — Section 5: standard library first. Do not write a function that the Go standard library already has.
 v0.6 — 2026-11-04 — Section 4: nil safety. Do not use a value as non-nil without an `if` check or clear evidence in the code; tests stop after a failed guard check.
@@ -161,3 +162,31 @@ assert.Equal(t, "MockValue", res[0].Name)
 The first command lists each file changed since the `pb` commit that this repo records (committed or not). The second lists new untracked files. Each printed path is outside `proto/qabz/` and is a defect.
 
 **Review.** The `code-reviewer` agent runs the check on every review. A printed path is a defect.
+
+---
+
+## 7. Postman collection
+
+**The Postman collection `qabz.postman_collection.json` lives in the repository root. It MUST stay up to date with the HTTP API.** Every change to the API updates the collection in the same commit. The collection uses the Postman Collection v2.1 format.
+
+**An API change is any change that a client of the HTTP API (the grpc-gateway) can see:**
+- A new endpoint, or a removed endpoint.
+- A changed HTTP method or path (the `google.api.http` rule in `pb/proto/qabz/`).
+- A changed request or response: a field added, removed or renamed, a changed type, a changed required field, a changed example body.
+- Changed headers, query parameters, authentication, or status codes.
+- A changed default listen address (`server.http.addr`), which changes the `baseUrl` variable.
+
+**What the collection contains:**
+- One request for each implemented endpoint, grouped in folders by gRPC service (for example `Service`). An endpoint that only returns Unimplemented (HTTP 501) is added when it is implemented.
+- The URL uses the variable `{{baseUrl}}`. Do not write a host or a port in a request.
+- A request with a body has a valid example body.
+- Each request has a short description: the gRPC method name and the expected result.
+- No secret: no real password, token or key. Use a variable (for example `{{token}}`) and leave its value empty.
+
+**Check.** The file is valid JSON:
+
+```bash
+python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
+```
+
+**Review.** The `code-reviewer` agent checks each change to `pb/proto/qabz/`, `src/entry/http/` and `src/entry/grpc/`. If the change is an API change and the collection is not updated in the same change, that is a defect. The verdict is NOT READY.

@@ -1,4 +1,4 @@
-<!-- VERSION: 0.59 -->
+<!-- VERSION: 0.60 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.58 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.59 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.59 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.22 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.60 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.23 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -45,7 +45,7 @@
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
 | 28 | Open Tasks Register | v1.17 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
-| 30 | Project Specific Conventions | v0.8 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
+| 30 | Project Specific Conventions | v0.9 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-07
-- **Change**: Task 008 `logs_to_stdout` done: App log lines go to stdout; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.58, #5 manifest v0.59, #28 OPEN_TASKS v1.17.
-- **Previous change**: 2026-11-07 — New task file `008_logs_to_stdout.md` v0.1 (not manifest-tracked); task counter at 009. Bumped #3 CHANGELOG v1.57, #5 manifest v0.58.
+- **Change**: Conventions § 7 Postman collection; new `qabz.postman_collection.json` (JSON, no VERSION header, so no row). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.9, #3 CHANGELOG v1.59, #5 manifest v0.60, #6 folder_structure v0.23.
+- **Previous change**: 2026-11-07 — Task 008 `logs_to_stdout` done: App log lines go to stdout; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.58, #5 manifest v0.59, #28 OPEN_TASKS v1.17.
+- **Earlier change**: 2026-11-07 — New task file `008_logs_to_stdout.md` v0.1 (not manifest-tracked); task counter at 009. Bumped #3 CHANGELOG v1.57, #5 manifest v0.58.
 - **Earlier change**: 2026-11-07 — Task 007 `make_compose_actions` done: `make compose up|down|ps|logs`; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.56, #5 manifest v0.57, #6 folder_structure v0.22, #28 OPEN_TASKS v1.16, #29 Implementation Plan v0.12, #31 yml_to_env v0.2.
 - **Earlier change**: 2026-11-07 — New task file `007_make_compose_actions.md` v0.1 (not manifest-tracked); task counter at 008. Bumped #3 CHANGELOG v1.55, #5 manifest v0.56.
 - **Earlier change**: 2026-11-04 — Task 006 `greeting_ping` done: gRPC server, HTTP gateway, `Greeting`; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.54, #5 manifest v0.55, #6 folder_structure v0.21, #28 OPEN_TASKS v1.15, #34 app README v0.4.

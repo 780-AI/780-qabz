@@ -1,7 +1,8 @@
-<!-- VERSION: 1.58 -->
+<!-- VERSION: 1.59 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.59 — 2026-11-07 — Added postman-collection-convention entry.
 v1.58 — 2026-11-07 — Added 008-logs-to-stdout entry.
 v1.57 — 2026-11-07 — Added 008-task entry.
 v1.56 — 2026-11-07 — Added 007-make-compose-actions entry.
@@ -64,6 +65,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Conventions § 7: Postman collection
+- **Type:** Minor (a new project convention; a new tool file with no runtime effect)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.9), `qabz.postman_collection.json` (new), `docs/folder_structure.md` (v0.23), `docs/documents_manifest.md` (v0.60), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. New rule: the Postman collection `qabz.postman_collection.json` (Postman Collection v2.1) lives in the repo root, and every HTTP API change (endpoint, method, path, request or response field, header, status code, default HTTP address) updates it in the same commit. It has one request per implemented endpoint, uses `{{baseUrl}}` (default `http://localhost:8080`), and holds no secret. The `code-reviewer` agent rejects an API change without a collection update. The collection starts with `Service / Greeting` (`GET /v1/greeting`) and two Postman tests (status 200, `message` is `Hello`).
+- **QA scenarios:** None needed for the rule (Rule 11 exempts docs). Checked on 2026-11-07: `python3 -m json.tool qabz.postman_collection.json` passes; `curl http://localhost:8080/v1/greeting` on the running App gives `{"message":"Hello"}` 200, the result the collection request expects. Importing the collection into Postman and running it is for the operator.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 008_logs_to_stdout: App log lines go to stdout
 - **Type:** Major (runtime behavior: the output stream of the App logs)
