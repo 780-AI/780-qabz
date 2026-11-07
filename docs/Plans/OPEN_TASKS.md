@@ -1,7 +1,8 @@
-<!-- VERSION: 1.16 -->
+<!-- VERSION: 1.17 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.17 — 2026-11-07 — Task 008 logs-to-stdout QA scenario added.
 v1.16 — 2026-11-07 — Task 007: `make compose up|down|ps|logs`; scenarios use `make compose up`; QA scenario added.
 v1.15 — 2026-11-04 — Task 006 Greeting QA scenario added.
 v1.14 — 2026-11-04 — PostgresDSN net/url QA scenario added.
@@ -97,6 +98,11 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: `postgres` and `redis` are `Healthy`; `ps` lists both; `logs` prints their logs; `down` removes the containers and keeps the volumes.
   Also pass: `make compose`, `make compose foo` and `make up` each print the usage and exit 2; `make compose ps CONFIG=nope.yml` stops at the generator and does not run docker.
   Done 2026-11-07 by the implementer: all pass (awaiting operator confirmation).
+- ⏸ Task 008 logs to stdout (2026-11-07). In `src/` run `go test -race -count=1 -v -run 'TestNew' ./common/logging/zap/`.
+  Pass: `TestNewWritesToStdout` and `TestNewLevelFilters` pass.
+  Then (feature ON) run `make compose up ARGS="-d --wait"`, then in `src/` `go run . --config=../config.yml >/tmp/out.log 2>/tmp/err.log`, wait for `app started` in `/tmp/out.log`, and stop it with Ctrl-C.
+  Pass: `/tmp/out.log` has the JSON lines `postgres ok` to `app stopping`; `/tmp/err.log` is empty. In the VSCode Debug Console the log lines are no longer orange-red.
+  Done 2026-11-07 by the implementer: all pass (awaiting operator confirmation; the VSCode check is for the operator).
 
 ## Maintenance / housekeeping
 

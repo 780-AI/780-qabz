@@ -1,7 +1,8 @@
-<!-- VERSION: 1.57 -->
+<!-- VERSION: 1.58 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.58 — 2026-11-07 — Added 008-logs-to-stdout entry.
 v1.57 — 2026-11-07 — Added 008-task entry.
 v1.56 — 2026-11-07 — Added 007-make-compose-actions entry.
 v1.55 — 2026-11-07 — Added 007-task entry.
@@ -63,6 +64,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 008_logs_to_stdout: App log lines go to stdout
+- **Type:** Major (runtime behavior: the output stream of the App logs)
+- **Files:** `src/common/logging/zap/zap.go`, `src/common/logging/zap/zap_test.go`, `docs/Plans/OPEN_TASKS.md` (v1.17), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.59), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. Every App log line (all levels, same JSON) now goes to stdout in place of stderr, as in the `traffick` service. zap's own internal errors stay on stderr. Process errors that are not log lines (`app: ...` from `start-app`, the `migrate` errors and usage) stay on stderr; `migrate` does not use the logger, so `migrate version` keeps a clean stdout. A tool that reads the App logs from stderr only must read stdout now.
+- **QA scenarios:** (1) `go build`, `go vet`, `go test -race -count=1 ./...` pass; the new `TestNewWritesToStdout` fails on a deliberate stderr build (done, 2026-11-07). (2) Feature ON: the App on free ports wrote 8 log lines to stdout and 0 bytes to stderr; `GET /v1/greeting` 200 (done, 2026-11-07). (3) The operator checks the VSCode Debug Console colors (pending).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 008_logs_to_stdout
 - **Type:** Minor (docs only; a new task file)

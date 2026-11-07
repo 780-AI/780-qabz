@@ -12,12 +12,16 @@ import (
 type Logger struct{ s *uzap.SugaredLogger }
 
 // New builds a JSON logger at the given level (debug, info, warn, error).
+// Log lines of every level go to stdout (task 008; the zap default is stderr). zap's own
+// internal errors (for example a failed write) stay on stderr.
 func New(level, service string) (*Logger, error) {
 	var lvl zapcore.Level
 	if err := lvl.UnmarshalText([]byte(level)); err != nil {
 		return nil, fmt.Errorf("log level %q: %w", level, err)
 	}
 	cfg := uzap.NewProductionConfig()
+	cfg.OutputPaths = []string{"stdout"}
+	cfg.ErrorOutputPaths = []string{"stderr"}
 	cfg.Level = uzap.NewAtomicLevelAt(lvl)
 	cfg.DisableStacktrace = true
 	l, err := cfg.Build(uzap.AddCallerSkip(1))
