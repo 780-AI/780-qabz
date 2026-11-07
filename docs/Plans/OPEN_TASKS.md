@@ -1,7 +1,8 @@
-<!-- VERSION: 1.15 -->
-<!-- Last Updated: 2026-11-04 -->
+<!-- VERSION: 1.16 -->
+<!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.16 — 2026-11-07 — Task 007: `make compose up|down|ps|logs`; scenarios use `make compose up`; QA scenario added.
 v1.15 — 2026-11-04 — Task 006 Greeting QA scenario added.
 v1.14 — 2026-11-04 — PostgresDSN net/url QA scenario added.
 v1.13 — 2026-11-04 — Nil-guard QA scenario added.
@@ -55,11 +56,11 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: `go version` prints `go1.27.3` (the toolchain downloads by itself); after `make proto`, `go build ./...` and `go vet ./...` exit 0.
 - ⏸ Go modules rule. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./...`, then `git status --short`.
   Pass: all commands exit 0 and `src/vendor/` is not listed.
-- ⏸ Step 4 docker-compose (task 005). Create `config.yml` with `database.postgres.password` set, run `make compose` (in a second terminal run `docker compose ps`), then `docker compose down -v`.
+- ⏸ Step 4 docker-compose (task 005). Create `config.yml` with `database.postgres.password` set, run `make compose up` (in a second terminal run `make compose ps`), then `make compose down ARGS=-v`.
   Pass: `config_generated.env` is created with the auto-generated header; `postgres` and `redis` are `healthy`; `docker compose exec redis redis-cli ping` prints `PONG`; with no `database.postgres.password` in `config.yml`, `docker compose --env-file config_generated.env config` fails.
 - ⏸ `scripts/yml_to_env` (task 005). Run `make test-scripts`, then `make env CONFIG=<a multi-level yml> ENV_OUT=<tmp>/out.env`.
   Pass: the tests print `OK`; `<tmp>/out.env` exists with mode 0600, a 3-line header and the expected names and values (for example `database.postgres.password` is `POSTGRES_PASSWORD`).
-- ⏸ Config from YAML (task 004, feature-ON). Run `make compose` with a valid `config.yml`, then in `src/` run `go run . --config=../config.yml`.
+- ⏸ Config from YAML (task 004, feature-ON). Run `make compose up` with a valid `config.yml`, then in `src/` run `go run . --config=../config.yml`.
   Pass: the App starts, pings Postgres and Redis, and serves the metrics address; without `--config` it panics.
 - ⏸ Project base skeleton. In `src/` run `go mod tidy && go mod vendor && go build ./... && go vet ./... && go run .`, then `git status --short`.
   Pass: all commands exit 0; the last one prints `hello world`; `src/vendor/` is not listed; `src/go.mod` lists `pgx/v5`, `go-redis/v9`, `prometheus/client_golang`, `zap` and `go.opentelemetry.io/otel`.
@@ -84,14 +85,18 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Done 2026-11-04 by the implementer: all pass (awaiting operator confirmation).
 - ⏸ `PostgresDSN` with `net/url` (2026-11-04). In `src/` run `go test -race -count=1 -run DSN -v ./config/`.
   Pass: `TestPostgresDSNEscapes` (3 cases) and `TestPostgresDSNPgxParses` pass.
-  Then (feature ON) set a `database.postgres.password` with `@`, `/` and `:` in `config.yml`, run `make compose`, then in `src/` `go run . --config=../config.yml`.
+  Then (feature ON) set a `database.postgres.password` with `@`, `/` and `:` in `config.yml`, run `make compose up`, then in `src/` `go run . --config=../config.yml`.
   Pass: the log shows `postgres ok` and `app started`.
   Unit checks done 2026-11-04 by the implementer; the compose run is not done (awaiting operator).
 - ⏸ Task 006 Greeting (2026-11-04). In `src/` run `go build ./... && go vet ./... && go test -race -count=1 ./...`.
-  Pass: all exit 0. Then (feature ON) put `server.grpc.addr` and `server.http.addr` in `config.yml`, run `make compose`, then in `src/` `go run . --config=../config.yml`.
+  Pass: all exit 0. Then (feature ON) put `server.grpc.addr` and `server.http.addr` in `config.yml`, run `make compose up`, then in `src/` `go run . --config=../config.yml`.
   Send `GET http://localhost:8080/v1/greeting` from Postman.
   Pass: HTTP status 200 and the body `{"message":"Hello"}`; the log shows `grpc started` and `http started`.
   Done 2026-11-04 by the implementer with curl: all pass (awaiting the operator Postman call).
+- ⏸ Task 007 `make compose` actions (2026-11-07). With a valid `config.yml` run `make compose up ARGS="-d --wait"`, `make compose ps`, `make compose logs`, `make compose down`.
+  Pass: `postgres` and `redis` are `Healthy`; `ps` lists both; `logs` prints their logs; `down` removes the containers and keeps the volumes.
+  Also pass: `make compose`, `make compose foo` and `make up` each print the usage and exit 2; `make compose ps CONFIG=nope.yml` stops at the generator and does not run docker.
+  Done 2026-11-07 by the implementer: all pass (awaiting operator confirmation).
 
 ## Maintenance / housekeeping
 

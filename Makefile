@@ -11,7 +11,13 @@ VENV      := .venv
 VENV_PY   := $(VENV)/bin/python
 GEN_DIR   := scripts/yml_to_env
 
-.PHONY: venv env compose test-scripts
+# `make compose <action>`: the docker compose actions it accepts. ARGS passes extra flags,
+# for example: make compose up ARGS="-d --wait"; make compose logs ARGS=-f; make compose down ARGS=-v
+COMPOSE_ACTIONS := up down ps logs
+COMPOSE_ACTION  := $(word 2,$(MAKECMDGOALS))
+ARGS            ?=
+
+.PHONY: venv env compose test-scripts $(COMPOSE_ACTIONS)
 
 ## venv: create the Python venv with the pinned PyYAML (needed by the env generator).
 venv: $(VENV)/.installed
@@ -24,9 +30,19 @@ $(VENV)/.installed: $(GEN_DIR)/requirements.txt
 env: venv
 	$(VENV_PY) $(GEN_DIR)/yml_to_env.py --output $(ENV_OUT) $(CONFIG)
 
-## compose: (1) generate $(ENV_OUT) from $(CONFIG), (2) docker compose up. Step 2 runs only if step 1 passes.
-compose: env
-	docker compose --env-file $(ENV_OUT) up
+## compose: make compose up|down|ps|logs. (1) generate $(ENV_OUT) from $(CONFIG), (2) docker compose <action> $(ARGS).
+## Step 2 runs only if step 1 passes. A plain `make compose` (no action) prints the usage and fails.
+compose:
+	@test -n "$(filter $(COMPOSE_ACTION),$(COMPOSE_ACTIONS))" -a $(words $(MAKECMDGOALS)) -eq 2 || \
+		{ echo "usage: make compose up|down|ps|logs [ARGS=\"...\"]"; exit 2; }
+	@$(MAKE) --no-print-directory env
+	docker compose --env-file $(ENV_OUT) $(COMPOSE_ACTION) $(ARGS)
+
+# The action words are goals too; they do nothing by themselves (`make compose` runs them).
+# Alone (for example `make up`) they print the usage and fail.
+$(COMPOSE_ACTIONS):
+	@test "$(firstword $(MAKECMDGOALS))" = compose || \
+		{ echo "usage: make compose $@ [ARGS=\"...\"]"; exit 2; }
 
 ## test-scripts: run the tests of the env generator.
 test-scripts: venv

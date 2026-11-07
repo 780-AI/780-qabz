@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==============================================================
-# VERSION: 0.1
+# VERSION: 0.2
 # yml_to_env — generate a .env file (for docker-compose) from the YAML config.
 #
 # Usage:
@@ -30,6 +30,7 @@
 # Exit codes: 0 ok, 1 input/conversion error (no output written), 2 usage error.
 #
 # CHANGE LOG
+# v0.2 — 2026-11-07 — Header line points to `make env` (task 007 replaced `make compose`).
 # v0.1 — 2026-11-02 — Python rewrite of yml_to_env.sh (task 005); --output takes a file or a directory.
 # ==============================================================
 import argparse
@@ -44,7 +45,7 @@ DEFAULT_OUTPUT = "config_generated.env"
 DEFAULT_STRIP = "database"
 HEADER = (
     "# AUTO-GENERATED from the YAML config file {source} by scripts/yml_to_env/yml_to_env.py.\n"
-    "# DO NOT EDIT: change the YAML and generate this file again (make compose).\n"
+    "# DO NOT EDIT: change the YAML and generate this file again (make env).\n"
     "# This file is mainly used by docker-compose.\n"
 )
 

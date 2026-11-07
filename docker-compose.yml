@@ -1,6 +1,6 @@
 # Local development stack. The variables come from config_generated.env, which is generated from the
-# YAML config (config.yml, git-ignored). Start the stack with `make compose`; never write that file by hand.
-# `make compose` starts postgres and redis. Run docker compose by hand only with the env file:
+# YAML config (config.yml, git-ignored). Start the stack with `make compose up`; never write that file by hand.
+# `make compose up|down|ps|logs` (ARGS="..." passes flags); `up` starts postgres and redis. Run docker compose by hand only with the env file:
 #   docker compose --env-file config_generated.env up -d
 # The `qabz` service has the profile `app`:
 #   docker compose --env-file config_generated.env --profile app up -d --build

@@ -1,4 +1,4 @@
-<!-- VERSION: 0.56 -->
+<!-- VERSION: 0.57 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.55 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.56 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.56 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.21 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.57 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.22 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -43,10 +43,10 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.15 | Governance | `docs/Plans/OPEN_TASKS.md` |
-| 29 | Implementation Plan | v0.11 | Plan | `docs/Plans/Implementation_Plan.md` |
+| 28 | Open Tasks Register | v1.16 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.8 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
-| 31 | YAML to env generator | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
+| 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
 | 34 | App module README | v0.4 | Docs | `src/app/README.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-07
-- **Change**: New task file `007_make_compose_actions.md` v0.1 (not manifest-tracked); task counter at 008. Bumped #3 CHANGELOG v1.55, #5 manifest v0.56.
-- **Previous change**: 2026-11-04 — Task 006 `greeting_ping` done: gRPC server, HTTP gateway, `Greeting`; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.54, #5 manifest v0.55, #6 folder_structure v0.21, #28 OPEN_TASKS v1.15, #34 app README v0.4.
+- **Change**: Task 007 `make_compose_actions` done: `make compose up|down|ps|logs`; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.56, #5 manifest v0.57, #6 folder_structure v0.22, #28 OPEN_TASKS v1.16, #29 Implementation Plan v0.12, #31 yml_to_env v0.2.
+- **Previous change**: 2026-11-07 — New task file `007_make_compose_actions.md` v0.1 (not manifest-tracked); task counter at 008. Bumped #3 CHANGELOG v1.55, #5 manifest v0.56.
+- **Earlier change**: 2026-11-04 — Task 006 `greeting_ping` done: gRPC server, HTTP gateway, `Greeting`; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.54, #5 manifest v0.55, #6 folder_structure v0.21, #28 OPEN_TASKS v1.15, #34 app README v0.4.
 - **Earlier change**: 2026-11-04 — Conventions § 6 `pb` submodule ownership (only `pb/proto/qabz/` is writable). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.8, #3 CHANGELOG v1.53, #5 manifest v0.54.
 - **Earlier change**: 2026-11-04 — New task file `006_greeting_ping.md` v0.1 (not manifest-tracked); task counter at 007. Bumped #3 CHANGELOG v1.52, #5 manifest v0.53.
 - **Earlier change**: 2026-11-04 — `PostgresDSN` uses `net/url` (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.51, #5 manifest v0.52, #28 OPEN_TASKS v1.14.

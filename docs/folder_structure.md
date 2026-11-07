@@ -1,7 +1,8 @@
-<!-- VERSION: 0.21 -->
-<!-- Last Updated: 2026-11-04 -->
+<!-- VERSION: 0.22 -->
+<!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.22 — 2026-11-07 — Task 007: Makefile line names `make compose up|down|ps|logs`.
 v0.21 — 2026-11-04 — Task 006: entry/grpc/ (gRPC server, Service with Greeting) and entry/http/ (grpc-gateway HTTP server) have code.
 v0.18 — 2026-11-02 — No down migrations: migrate command is up, force V, version; 000001 has only the up file.
 v0.20 — 2026-11-02 — Task 005: scripts/yml_to_env/ is Python (yml_to_env.py, test, requirements.txt); .env.example removed; Makefile gets venv, env, compose, test-scripts; .gitignore gets config.yml, config_generated.env, .venv/.
@@ -36,7 +37,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 ├── CHANGELOG.md                       # cross-cutting project history
 ├── .gitignore
 ├── docker-compose.yml                 # local dev stack: postgres, redis, qabz (profile `app`)
-├── Makefile                           # `make proto`, `make compose` (YAML -> config_generated.env -> docker compose up), `make test-scripts`
+├── Makefile                           # `make proto`, `make compose up|down|ps|logs` (YAML -> config_generated.env -> docker compose <action>), `make test-scripts`
 ├── src/                               # all Go code and the Go module
 │   ├── go.mod                         # Go module `qabz` (go 1.27.3)
 │   ├── go.sum                         # module checksums

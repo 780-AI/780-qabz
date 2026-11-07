@@ -1,7 +1,8 @@
-<!-- VERSION: 0.11 -->
-<!-- Last Updated: 2026-11-04 -->
+<!-- VERSION: 0.12 -->
+<!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.12 — 2026-11-07 — Step 4: `make compose` replaced by `make compose up|down|ps|logs` (task 007).
 v0.11 — 2026-11-04 — Step 4: the Bash yml_to_env tool is replaced by the Python generator (task 005); `.env` / `.env.example` replaced by `config.yml` and the generated `config_generated.env`; `make env` / `make compose` recorded.
 v0.10 — 2026-11-02 — Go code, go.mod and generated api/ moved into src/ (Steps 3 and 5 paths).
 v0.9 — 2026-11-01 — yml_to_env: `-u` / `--upper-case` added; names are lower case by default.
@@ -75,17 +76,17 @@ Add a `docker-compose.yml` with three Docker services. The app itself is one of 
 
 Decided and done (2026-11-01):
 - Images: `postgres:18-alpine` and `redis:8-alpine` (major-version tags; the latest majors on Docker Hub on 2026-11-01).
-- Credentials: values in the YAML config `config.yml` (git-ignored; `.env.example` is removed). `make compose` generates `config_generated.env` from `config.yml` and gives it to `docker compose --env-file`. The compose file stops with an error if `database.postgres.password` is not set in `config.yml`. User, database and ports have defaults (`qabz`, `qabz`, 5432, 6379).
+- Credentials: values in the YAML config `config.yml` (git-ignored; `.env.example` is removed). `make compose up` generates `config_generated.env` from `config.yml` and gives it to `docker compose --env-file`. The compose file stops with an error if `database.postgres.password` is not set in `config.yml`. User, database and ports have defaults (`qabz`, `qabz`, 5432, 6379).
 - Ports: published on `127.0.0.1` only. Host ports are set with `database.postgres.port` and `database.redis.port` in `config.yml` (`POSTGRES_PORT` and `REDIS_PORT` in the generated file).
 - Volumes: named volumes `postgres_data` and `redis_data`. The Postgres volume is mounted at `/var/lib/postgresql`, as Postgres 18 requires.
 - Health checks: `pg_isready` and `redis-cli ping`, every 5 seconds.
 - Start order: `qabz` waits for `postgres` and `redis` to be healthy (`depends_on` with `service_healthy`).
-- The `qabz` service has the profile `app` and builds from `Dockerfile` in the repository root. The Dockerfile does not exist yet, so `make compose` (or `docker compose --env-file config_generated.env up -d`) starts only `postgres` and `redis`. `docker compose --env-file config_generated.env --profile app up -d --build` starts the app after the Dockerfile exists.
+- The `qabz` service has the profile `app` and builds from `Dockerfile` in the repository root. The Dockerfile does not exist yet, so `make compose up` (or `docker compose --env-file config_generated.env up -d`) starts only `postgres` and `redis`. `docker compose --env-file config_generated.env --profile app up -d --build` starts the app after the Dockerfile exists.
 
 Tool `scripts/yml_to_env/` (added 2026-11-01, operator request; rewritten in Python by task 005 on 2026-11-02): generates a `.env`-format file from the YAML config, so Compose can read it.
 - Language: Python 3.9+ with PyYAML 6.0.2 (pinned in `scripts/yml_to_env/requirements.txt`), in `scripts/yml_to_env/yml_to_env.py`. The Bash version (`yml_to_env.sh` and its tests) is removed: Python is more readable and handles the data types better.
 - Usage: `python scripts/yml_to_env/yml_to_env.py [-o PATH] [--strip PREFIX] [--lower-case] config.yml`. The default output is `config_generated.env` in the current directory; `-o` takes a file or a directory (a directory gets `config_generated.env`). The file is written whole or not at all, with mode 0600, so a bad input leaves an existing output file untouched.
-- Make targets: `make venv` creates `.venv` with the pinned PyYAML; `make env` (`CONFIG=config.yml`, `ENV_OUT=config_generated.env`) runs the generator; `make compose` runs `make env`, then `docker compose --env-file config_generated.env up`. If the generation fails, docker does not run.
+- Make targets: `make venv` creates `.venv` with the pinned PyYAML; `make env` (`CONFIG=config.yml`, `ENV_OUT=config_generated.env`) runs the generator; `make compose up|down|ps|logs` (task 007, 2026-11-07) runs `make env`, then `docker compose --env-file config_generated.env <action> $(ARGS)`; `ARGS` passes extra flags (for example `make compose up ARGS="-d --wait"`). If the generation fails, docker does not run. A plain `make compose`, an unknown action, or an action word alone (`make up`) prints the usage and exits 2.
 - Names: upper case by default (`--lower-case` turns this off); nested keys join with `_`; the first path part `database` is dropped (`database.postgres.password` gives `POSTGRES_PASSWORD`; `--strip ""` turns this off). A list item gets its index (`HOSTS_0`, `SRV_0_HOST`). An empty list or map gives no line. Two keys with the same name, or a key that is not `[A-Za-z0-9_]`, stop the tool with an error.
 - Values: a bool is `true` / `false`, a null is an empty value, a float keeps its YAML text (`1.10` stays `1.10`). A value with a space or a special character is single-quoted; a value with `'` or a line break is double-quoted.
 - Header: the file starts with 3 comment lines: auto-generated, do not edit, mainly used by docker-compose.

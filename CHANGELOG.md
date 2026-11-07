@@ -1,7 +1,8 @@
-<!-- VERSION: 1.55 -->
+<!-- VERSION: 1.56 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.56 — 2026-11-07 — Added 007-make-compose-actions entry.
 v1.55 — 2026-11-07 — Added 007-task entry.
 v1.54 — 2026-11-04 — Added 006-greeting-ping entry.
 v1.53 — 2026-11-04 — Added pb-ownership-convention entry.
@@ -61,6 +62,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 007_make_compose_actions: `make compose up|down|ps|logs`
+- **Type:** Minor (developer tooling; no App code, no config key)
+- **Files:** `Makefile`, `docker-compose.yml` (comment), `scripts/yml_to_env/yml_to_env.py` (v0.2, header text), `docs/Plans/Implementation_Plan.md` (v0.12), `docs/Plans/OPEN_TASKS.md` (v1.16), `docs/folder_structure.md` (v0.22), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.57), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, for developers only. `make compose` alone is removed: it prints the usage and exits 2. `make compose up|down|ps|logs` generate `config_generated.env` from `config.yml`, then run `docker compose --env-file config_generated.env <action> $(ARGS)`; if the generation fails, docker does not run. `ARGS` passes flags (`make compose up ARGS="-d --wait"`, `make compose down ARGS=-v`). An unknown action, more than one action, or an action word alone (`make up`) prints the usage and exits 2. The generated file header now says `make env` in place of `make compose`. No App runtime impact.
+- **QA scenarios:** (1) `make compose up ARGS="-d --wait"`: `postgres` and `redis` `Healthy`; `make compose ps` lists both; `make compose logs ARGS=--tail=3` prints both logs; `make compose down` removes the containers and keeps the volumes (done, 2026-11-07). (2) `make compose`, `make compose foo`, `make compose up down`, `make up`: usage, exit 2; `make compose ps CONFIG=nope.yml` stops at the generator (done, 2026-11-07). (3) `make test-scripts`: 18 tests pass (done, 2026-11-07). Operator confirmation pending in `OPEN_TASKS.md`.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 007_make_compose_actions
 - **Type:** Minor (docs only; a new task file)
