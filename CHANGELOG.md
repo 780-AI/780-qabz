@@ -1,7 +1,8 @@
-<!-- VERSION: 1.59 -->
+<!-- VERSION: 1.60 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.60 — 2026-11-07 — Added 009-task entry.
 v1.59 — 2026-11-07 — Added postman-collection-convention entry.
 v1.58 — 2026-11-07 — Added 008-logs-to-stdout entry.
 v1.57 — 2026-11-07 — Added 008-task entry.
@@ -65,6 +66,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 009_auth_middleware
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/009_auth_middleware.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 010), `docs/documents_manifest.md` (v0.61), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds a JWT auth middleware for every endpoint (401 on an empty, expired or wrong token) and a development-only config key `debug.auth.disable`. It records the design points, including the default: in the code the `bool` zero value (auth on when the key is missing); the development `config.yml` sets `disable: true`. It also defines the test matrix: four config entries times the JWT inputs (missing, malformed, expired, wrong key or algorithm, bad claims, valid), on gRPC and through the HTTP gateway.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Conventions § 7: Postman collection
 - **Type:** Minor (a new project convention; a new tool file with no runtime effect)
