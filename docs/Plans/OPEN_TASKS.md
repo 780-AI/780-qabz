@@ -1,7 +1,8 @@
-<!-- VERSION: 1.20 -->
+<!-- VERSION: 1.21 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.21 — 2026-11-07 — Task 012 auth status 403: 009/010 scenarios now expect 403, 012 scenario added.
 v1.20 — 2026-11-07 — Task 011 no audience check: 009/010 scenarios and follow-ups updated, 011 scenario added.
 v1.19 — 2026-11-07 — Task 010 HMAC secret: 009 scenario and follow-ups updated, 010 scenario added.
 v1.18 — 2026-11-07 — Task 009 auth middleware QA scenario and open points added.
@@ -109,18 +110,23 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 - ⏸ Task 009 auth middleware (2026-11-07). In `src/` run `go test -race -count=1 ./common/auth/... ./entry/... ./app/`.
   Pass: all pass (the JWT input table on the verifier, 4 config entries × the table on gRPC, the table through the gateway, the start rules).
   Then (feature ON) remove `debug.auth.disable` from `config.yml` (or set it to `false`), set `auth.secrets.hmac` (task 010 replaced `auth.jwt.public_key_path`; task 011 removed `auth.jwt.audience`), run the App and call `GET /v1/greeting` with no token.
-  Pass: HTTP 401 `{"code":16,"message":"unauthenticated",...}`. With a valid token from the auth service: HTTP 200 `{"message":"Hello"}`. With `debug.auth.disable: true` and no token: HTTP 200 and one `auth check disabled` warning at start.
+  Pass: HTTP 403 `{"code":7,"message":"unauthenticated",...}` (task 012; was 401). With a valid token from the auth service: HTTP 200 `{"message":"Hello"}`. With `debug.auth.disable: true` and no token: HTTP 200 and one `auth check disabled` warning at start.
   Done 2026-11-07 by the implementer with a scratch key pair: all pass (awaiting operator confirmation with a real token).
 - ⏸ Task 010 HMAC secret (2026-11-07). In `src/` run `go test -race -count=1 ./common/auth/... ./entry/... ./app/ ./config/`.
   Pass: all pass (the table has `HS256`, `HS384`, `HS512` valid; another secret, `none`, `RS256`, `ES512`, `PS256`, lower-case `hs256` and an HS512 header over an HS256 signature rejected).
   Then (feature ON) put the auth service secret in `auth.secrets.hmac` in `config.yml`, remove `debug.auth.disable`, run the App and call `GET /v1/greeting` with no token, then with a token from the auth service.
-  Pass: no token gives HTTP 401; the real token gives HTTP 200 `{"message":"Hello"}`; the secret is not in the log.
+  Pass: no token gives HTTP 403 (task 012); the real token gives HTTP 200 `{"message":"Hello"}`; the secret is not in the log.
   Done 2026-11-07 by the implementer with a test secret: all pass (awaiting operator confirmation with a real token).
 - ⏸ Task 011 no audience check (2026-11-07). In `src/` run `go test -race -count=1 ./common/auth/... ./entry/... ./app/ ./config/`.
   Pass: all pass (any `aud` string, also empty, is valid and reaches `Claims.Audience`; a missing `aud`, an array or a number is rejected).
   Then (feature ON) run the App with only `auth.secrets.hmac` in the `auth` section and call `GET /v1/greeting` with a token from the auth service.
   Pass: HTTP 200 `{"message":"Hello"}`.
   Done 2026-11-07 by the implementer with a test secret and tokens with different `aud` values: all pass (awaiting operator confirmation with a real token).
+- ⏸ Task 012 auth status 403 (2026-11-07). In `src/` run `go test -race -count=1 ./entry/...`.
+  Pass: every rejected input gives gRPC `PermissionDenied` and, through the gateway, HTTP 403.
+  Then (feature ON) run the App with the check on and call `GET /v1/greeting` with no token, then with a token from the auth service.
+  Pass: no token gives HTTP 403 `{"code":7,"message":"unauthenticated",...}`; the real token gives HTTP 200.
+  Done 2026-11-07 by the implementer with a test secret: all pass (awaiting operator confirmation with a real token).
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 
 ## Maintenance / housekeeping

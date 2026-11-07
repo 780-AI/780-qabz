@@ -118,7 +118,7 @@ func TestAuthConfigAndTokenTable(t *testing.T) {
 						}
 						return
 					}
-					assert.Equal(t, codes.Unauthenticated, status.Code(err))
+					assert.Equal(t, codes.PermissionDenied, status.Code(err))
 					assert.Equal(t, "unauthenticated", status.Convert(err).Message(), "the reason is not sent to the client")
 					if assert.Len(t, *reasons, before+1) {
 						assert.Equal(t, tc.Reason, (*reasons)[before])
@@ -138,7 +138,7 @@ func TestAuthRejectsTwoAuthorizationValues(t *testing.T) {
 	good := "Bearer " + authtest.Sign(t, authtest.Secret, authtest.Header("HS256"), authtest.ValidClaims())
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", good, "authorization", good)
 	_, err = client.Greeting(ctx, &pb.GreetingRequest{})
-	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 	assert.Equal(t, []string{"malformed"}, *reasons)
 }
 
@@ -158,26 +158,26 @@ func (f fakeVerifier) VerifyAuthorization(string) (auth.Claims, error) { return 
 func TestAuthCheckEdgeCases(t *testing.T) {
 	var nilAuth *Auth
 	_, err := nilAuth.check(context.Background())
-	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 
 	// A Verifier error that is not an *auth.Error is reported as "error".
 	var got []string
 	a := &Auth{opts: AuthOptions{Verifier: fakeVerifier{err: context.Canceled}, OnReject: func(r string) { got = append(got, r) }}}
 	_, err = a.check(context.Background())
-	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 	assert.Equal(t, []string{"error"}, got)
 
 	// An Auth built without NewAuth and with no Verifier rejects every call.
 	got = nil
 	b := &Auth{opts: AuthOptions{OnReject: func(r string) { got = append(got, r) }}}
 	_, err = b.check(context.Background())
-	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 	assert.Equal(t, []string{"no_verifier"}, got)
 
 	// Without OnReject a rejection still works.
 	c := &Auth{opts: AuthOptions{Verifier: fakeVerifier{err: context.Canceled}}}
 	_, err = c.check(context.Background())
-	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 }
 
 // fakeStream is a ServerStream with a fixed context.
@@ -210,9 +210,9 @@ func TestAuthStreamInterceptor(t *testing.T) {
 	}
 
 	err = intercept(nil, fakeStream{ctx: context.Background()}, &grpc.StreamServerInfo{}, handler)
-	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 	err = intercept(nil, nil, &grpc.StreamServerInfo{}, handler)
-	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 }
 
 func TestNewWithOptionsRejectsNilOption(t *testing.T) {

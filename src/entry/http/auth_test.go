@@ -35,7 +35,7 @@ func authStack(t *testing.T) *Gateway {
 }
 
 // TestAuthOverHTTP runs every JWT input of the shared table through the gateway: a rejected call
-// must be HTTP 401 (not 500), a valid one HTTP 200.
+// must be HTTP 403 (not 401, not 500), a valid one HTTP 200.
 func TestAuthOverHTTP(t *testing.T) {
 	gw := authStack(t)
 	for _, tc := range authtest.Cases(t) {
@@ -61,7 +61,7 @@ func TestAuthOverHTTP(t *testing.T) {
 				assert.Contains(t, string(body), `"message":"Hello"`)
 				return
 			}
-			assert.Equal(t, http.StatusUnauthorized, res.StatusCode, string(body))
+			assert.Equal(t, http.StatusForbidden, res.StatusCode, string(body))
 			assert.NotContains(t, string(body), tc.Reason+`"`, "the reason is not sent to the client")
 		})
 	}

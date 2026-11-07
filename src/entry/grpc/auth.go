@@ -33,8 +33,9 @@ type Auth struct {
 	opts AuthOptions
 }
 
-// errUnauthenticated is the one answer for every rejected call: the reason is not sent to the client.
-var errUnauthenticated = status.Error(codes.Unauthenticated, "unauthenticated")
+// errRejected is the one answer for every rejected call: the reason is not sent to the client.
+// PermissionDenied maps to HTTP 403 in the gateway (task 012).
+var errRejected = status.Error(codes.PermissionDenied, "unauthenticated")
 
 // NewAuth returns the auth check. Without a Verifier it fails unless the check is disabled, so a
 // missing key can never mean "no check".
@@ -60,7 +61,7 @@ func (a *Auth) Unary() grpc.UnaryServerInterceptor {
 func (a *Auth) Stream() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if ss == nil {
-			return errUnauthenticated
+			return errRejected
 		}
 		ctx, err := a.check(ss.Context())
 		if err != nil {
@@ -75,10 +76,10 @@ func (a *Auth) ServerOptions() []grpc.ServerOption {
 	return []grpc.ServerOption{grpc.ChainUnaryInterceptor(a.Unary()), grpc.ChainStreamInterceptor(a.Stream())}
 }
 
-// check returns ctx with the claims, or the Unauthenticated error.
+// check returns ctx with the claims, or errRejected.
 func (a *Auth) check(ctx context.Context) (context.Context, error) {
 	if a == nil {
-		return ctx, errUnauthenticated
+		return ctx, errRejected
 	}
 	if a.opts.Disabled {
 		return ctx, nil
@@ -110,7 +111,7 @@ func (a *Auth) rejected(reason string) error {
 	if a.opts.OnReject != nil {
 		a.opts.OnReject(reason)
 	}
-	return errUnauthenticated
+	return errRejected
 }
 
 // authStream carries the context with the claims to a stream handler.

@@ -40,7 +40,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "greeting"]
             },
-            "description": "haf80.api.bill.Service/Greeting. Pings the service. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true. Expected: HTTP 200 and {\"message\":\"Hello\"}; without a valid token HTTP 401."
+            "description": "haf80.api.bill.Service/Greeting. Pings the service. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true. Expected: HTTP 200 and {\"message\":\"Hello\"}; without a valid token HTTP 403."
           },
           "event": [
             {

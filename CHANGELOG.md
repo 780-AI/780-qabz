@@ -1,7 +1,8 @@
-<!-- VERSION: 1.67 -->
+<!-- VERSION: 1.68 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.68 — 2026-11-07 — Added 012-auth-status-403 entry.
 v1.67 — 2026-11-07 — Added 012-task entry.
 v1.66 — 2026-11-07 — Added 011-jwt-no-audience-check entry.
 v1.65 — 2026-11-07 — Added 011-task entry.
@@ -73,6 +74,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 012_auth_status_403: a rejected auth check gives HTTP 403
+- **Type:** Major (API behavior: status code)
+- **Files:** `src/entry/grpc/auth.go`, `src/entry/grpc/auth_test.go`, `src/entry/http/auth_test.go`, `src/app/README.md` (v0.9), `qabz.postman_collection.json`, `docs/Plans/OPEN_TASKS.md` (v1.21), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.69), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. A call that fails the JWT check now gets gRPC `PermissionDenied` (code 7) and, through the gateway, HTTP 403, in place of `Unauthenticated` (code 16) / HTTP 401. The message stays "unauthenticated"; the check, the metric and `debug.auth.disable` are unchanged. A client that looks for 401 to refresh its token must look for 403.
+- **QA scenarios:** (1) `go build`, `go vet`, `go test -race -count=1 ./...` pass (done, 2026-11-07). (2) Deliberate failure (the old code) fails `entry/grpc` and `entry/http` (done, 2026-11-07). (3) Feature ON: no token, bad token, another secret 403; valid token 200 (done, 2026-11-07). (4) The operator calls greeting with a real token and with no token (pending).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 012_auth_status_403
 - **Type:** Minor (docs only; a new task file)
