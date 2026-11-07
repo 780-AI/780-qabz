@@ -1,4 +1,4 @@
-<!-- VERSION: 0.62 -->
+<!-- VERSION: 0.63 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.61 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.62 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.62 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.63 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.24 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-07
-- **Change**: Task 009 `auth_middleware` done: JWT auth check on every endpoint; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.61, #5 manifest v0.62, #6 folder_structure v0.24, #28 OPEN_TASKS v1.18, #34 app README v0.5.
-- **Previous change**: 2026-11-07 — New task file `009_auth_middleware.md` v0.1 (not manifest-tracked); task counter at 010. Bumped #3 CHANGELOG v1.60, #5 manifest v0.61.
+- **Change**: New task file `010_jwt_hmac_secret.md` v0.1 (not manifest-tracked); task counter at 011. Bumped #3 CHANGELOG v1.62, #5 manifest v0.63.
+- **Previous change**: 2026-11-07 — Task 009 `auth_middleware` done: JWT auth check on every endpoint; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.61, #5 manifest v0.62, #6 folder_structure v0.24, #28 OPEN_TASKS v1.18, #34 app README v0.5.
+- **Earlier change**: 2026-11-07 — New task file `009_auth_middleware.md` v0.1 (not manifest-tracked); task counter at 010. Bumped #3 CHANGELOG v1.60, #5 manifest v0.61.
 - **Earlier change**: 2026-11-07 — Conventions § 7 Postman collection; new `qabz.postman_collection.json` (JSON, no VERSION header, so no row). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.9, #3 CHANGELOG v1.59, #5 manifest v0.60, #6 folder_structure v0.23.
 - **Earlier change**: 2026-11-07 — Task 008 `logs_to_stdout` done: App log lines go to stdout; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.58, #5 manifest v0.59, #28 OPEN_TASKS v1.17.
 - **Earlier change**: 2026-11-07 — New task file `008_logs_to_stdout.md` v0.1 (not manifest-tracked); task counter at 009. Bumped #3 CHANGELOG v1.57, #5 manifest v0.58.

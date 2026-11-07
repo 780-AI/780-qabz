@@ -1,7 +1,8 @@
-<!-- VERSION: 1.61 -->
+<!-- VERSION: 1.62 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.62 — 2026-11-07 — Added 010-task entry.
 v1.61 — 2026-11-07 — Added 009-auth-middleware entry.
 v1.60 — 2026-11-07 — Added 009-task entry.
 v1.59 — 2026-11-07 — Added postman-collection-convention entry.
@@ -67,6 +68,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 010_jwt_hmac_secret
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/010_jwt_hmac_secret.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 011), `docs/documents_manifest.md` (v0.63), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task changes the JWT check of task 009 from ES512 with a public key file to HMAC only (`HS256`, `HS384`, `HS512`) with one secret, `auth.jwt.hmac_secret`, as the auth service and `bill` use. Every other algorithm is rejected; the other checks stay. It records that this reverses the task 009 decision "Qabz never signs a token".
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 009_auth_middleware: JWT auth check on every endpoint
 - **Type:** Major (new package `common/auth`; new interceptor; new config keys; every endpoint now needs a token)
