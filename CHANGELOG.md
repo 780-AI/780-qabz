@@ -1,7 +1,8 @@
-<!-- VERSION: 1.60 -->
+<!-- VERSION: 1.61 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.61 — 2026-11-07 — Added 009-auth-middleware entry.
 v1.60 — 2026-11-07 — Added 009-task entry.
 v1.59 — 2026-11-07 — Added postman-collection-convention entry.
 v1.58 — 2026-11-07 — Added 008-logs-to-stdout entry.
@@ -66,6 +67,14 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 009_auth_middleware: JWT auth check on every endpoint
+- **Type:** Major (new package `common/auth`; new interceptor; new config keys; every endpoint now needs a token)
+- **Files:** `src/common/auth/` (new: `jwt.go`, `context.go`, `jwt_test.go`, `authtest/authtest.go`, `authtest/authtest_test.go`), `src/entry/grpc/` (`auth.go` new, `auth_test.go` new, `server.go`), `src/entry/http/auth_test.go` (new), `src/config/config.go`, `src/app/` (`defaults.go`, `defaults_test.go`, `README.md` v0.5), `src/go.mod`, `src/go.sum` (`github.com/valyala/fastjson` v1.6.10; the `sub` UUID check uses the standard-library `uuid` package, so `github.com/google/uuid` stays indirect), `qabz.postman_collection.json`, `docs/folder_structure.md` (v0.24), `docs/Plans/OPEN_TASKS.md` (v1.18), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.62), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. Every gRPC call and every gateway route now needs `Authorization: Bearer <JWT>`; otherwise gRPC `Unauthenticated` / HTTP 401 with the message "unauthenticated". The token must be ES512, signed by the key in `auth.jwt.public_key_path` (PEM, read at start), with `exp` in the future, `nbf` not in the future, `aud` containing `auth.jwt.audience`, `sub` a UUID, `mobile`, and `non_otp` not `guest`. Qabz never signs a token. With the check on, the start fails (exit 1) when the key file or the audience is missing. `debug.auth.disable: true` turns the check off and logs one warning; a missing `debug` section keeps the check on. New metric `qabz_auth_rejected_total{reason}`; no log line per rejection. The metrics endpoint is not checked. A local config without the new keys must add `debug.auth.disable: true` (development) or the two `auth.jwt` keys. The Postman collection has a `{{token}}` variable and bearer auth.
+- **QA scenarios:** (1) `go build`, `go vet`, `go test -race -count=1 ./...` pass (done, 2026-11-07). (2) Deliberate failures (any `alg`, no `exp` check, guests allowed, `disable` ignored both ways, no `aud` check) each fail the tests (done, 2026-11-07). (3) Feature ON with a scratch key: no token 401, valid token 200, bad token 401, metric counts, `disable: true` 200 with the warning, no key → exit 1 (done, 2026-11-07). (4) The operator calls greeting with a real token (pending).
+- **Open:** ES512 and the `aud` value need confirmation from the auth team; `system.html` plans etcd keys with reload (follow-up, Critical File).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 009_auth_middleware
 - **Type:** Minor (docs only; a new task file)

@@ -48,6 +48,15 @@ type Config struct {
 	// HTTPAddr is the listen address of the grpc-gateway HTTP server (host:port; port 0 picks a free port).
 	HTTPAddr string `path:"server.http.addr"`
 
+	// JWTPublicKeyPath is the PEM file of the auth service's ES512 public key. Qabz only verifies
+	// tokens with it. Required while the auth check is on.
+	JWTPublicKeyPath string `path:"auth.jwt.public_key_path"`
+	// JWTAudience is the value that the token's aud claim must contain. Required while the auth check is on.
+	JWTAudience string `path:"auth.jwt.audience"`
+	// DebugAuthDisable turns the auth check off. Development only: the production config has no
+	// debug section, and a missing key is false (the check is on).
+	DebugAuthDisable bool `path:"debug.auth.disable"`
+
 	MetricsAddr  string `path:"metrics.prometheus.addr"`
 	OTLPEndpoint string `path:"logs.otlp_endpoint"` // empty: tracing is off
 

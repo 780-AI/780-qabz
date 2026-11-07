@@ -2,11 +2,14 @@ package app
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	"qabz/common/auth/authtest"
 	"qabz/config"
 )
 
@@ -21,6 +24,8 @@ metrics:
 server:
   grpc: {addr: "127.0.0.1:0"}
   http: {addr: "127.0.0.1:0"}
+debug:
+  auth: {disable: true}
 `))
 	if !assert.NoError(t, err) {
 		t.FailNow()
@@ -59,4 +64,45 @@ func TestDefaultBuilderRejectsBadLogLevel(t *testing.T) {
 	cfg.LogLevel = "loud"
 	_, err := NewDefaultBuilder(context.Background(), cfg)
 	assert.Error(t, err)
+}
+
+// TestDefaultBuilderAuthRules: with the check on, the start needs a readable P-521 key file and an
+// audience; with debug.auth.disable it needs neither.
+func TestDefaultBuilderAuthRules(t *testing.T) {
+	key := authtest.NewKey(t)
+	keyPath := filepath.Join(t.TempDir(), "jwt.pub.pem")
+	if !assert.NoError(t, os.WriteFile(keyPath, key.PublicPEM, 0o600)) {
+		return
+	}
+	cases := []struct {
+		name     string
+		disable  bool
+		path     string
+		audience string
+		ok       bool
+	}{
+		{name: "disabled, no key", disable: true, ok: true},
+		{name: "on, key and audience", path: keyPath, audience: authtest.Audience, ok: true},
+		{name: "on, no key", audience: authtest.Audience},
+		{name: "on, no audience", path: keyPath},
+		{name: "on, missing key file", path: filepath.Join(t.TempDir(), "missing.pem"), audience: authtest.Audience},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig(t)
+			cfg.DebugAuthDisable = tc.disable
+			cfg.JWTPublicKeyPath = tc.path
+			cfg.JWTAudience = tc.audience
+			b, err := NewDefaultBuilder(context.Background(), cfg)
+			if !tc.ok {
+				assert.Error(t, err)
+				return
+			}
+			if assert.NoError(t, err) && assert.NotNil(t, b) {
+				a := build(t, b)
+				a.Database().Close()
+				a.Cache().Close()
+			}
+		})
+	}
 }

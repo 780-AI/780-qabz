@@ -3,8 +3,12 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
+
+	promclient "github.com/prometheus/client_golang/prometheus"
 
 	pb "qabz/api/pb/qabz"
+	"qabz/common/auth"
 	"qabz/common/logging/zap"
 	"qabz/common/monitoring/jaeger"
 	"qabz/common/monitoring/prometheus"
@@ -27,6 +31,16 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	}
 	b := NewBuilder().WithLogger(logger)
 
+	// The auth check comes first: a bad key or audience stops the start before any connection.
+	metrics := prometheus.New(cfg.MetricsAddr)
+	authCheck, err := newAuth(cfg, metrics, logger)
+	if err == nil && authCheck == nil {
+		err = errors.New("auth: newAuth returned nil")
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	db, err := postgres.New(ctx, cfg.PostgresDSN())
 	if err != nil || db == nil {
 		// pgx errors can quote the DSN: report the target only.
@@ -44,9 +58,9 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		b.WithConfigReloader(reloader)
 	}
 	b.WithCache(redis.New(cfg.RedisAddr(), cfg.RedisPassword.Reveal()))
-	b.WithMetrics(prometheus.New(cfg.MetricsAddr))
+	b.WithMetrics(metrics)
 
-	gs, err := grpcserver.New(cfg.GRPCAddr, grpcserver.RegisterService(grpcserver.NewService()))
+	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, authCheck.ServerOptions(), grpcserver.RegisterService(grpcserver.NewService()))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
 	}
@@ -73,4 +87,32 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		b.WithTracer(tr)
 	}
 	return b, nil
+}
+
+// newAuth builds the JWT check of every gRPC call (and so of every gateway route). With
+// debug.auth.disable it logs one warning and checks nothing; otherwise it needs
+// auth.jwt.public_key_path and auth.jwt.audience. Each rejected call adds 1 to
+// qabz_auth_rejected_total{reason}; a rejected call writes no log line.
+func newAuth(cfg config.Config, metrics *prometheus.Server, logger Logger) (*grpcserver.Auth, error) {
+	if cfg.DebugAuthDisable {
+		logger.Warn("auth check disabled (debug.auth.disable): development only")
+		return grpcserver.NewAuth(grpcserver.AuthOptions{Disabled: true})
+	}
+	verifier, err := auth.LoadVerifier(cfg.JWTPublicKeyPath, cfg.JWTAudience)
+	if err != nil {
+		return nil, fmt.Errorf("%w (set auth.jwt.public_key_path and auth.jwt.audience, or debug.auth.disable in development)", err)
+	}
+	rejected := promclient.NewCounterVec(promclient.CounterOpts{
+		Name: "qabz_auth_rejected_total",
+		Help: "Calls rejected by the JWT auth check, by reason.",
+	}, []string{"reason"})
+	if metrics != nil && metrics.Registry() != nil {
+		if err := metrics.Registry().Register(rejected); err != nil {
+			return nil, fmt.Errorf("auth: register metric: %w", err)
+		}
+	}
+	return grpcserver.NewAuth(grpcserver.AuthOptions{
+		Verifier: verifier,
+		OnReject: func(reason string) { rejected.WithLabelValues(reason).Inc() },
+	})
 }

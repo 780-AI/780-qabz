@@ -27,6 +27,11 @@ type Server struct {
 
 // New creates the server and registers the services. A server needs at least one Register.
 func New(addr string, register ...Register) (*Server, error) {
+	return NewWithOptions(addr, nil, register...)
+}
+
+// NewWithOptions is New with gRPC server options (for example the interceptors of Auth).
+func NewWithOptions(addr string, opts []grpc.ServerOption, register ...Register) (*Server, error) {
 	if addr == "" {
 		return nil, errors.New("grpc server: address is required")
 	}
@@ -38,7 +43,12 @@ func New(addr string, register ...Register) (*Server, error) {
 			return nil, fmt.Errorf("grpc server: register function %d is nil", i)
 		}
 	}
-	srv := grpc.NewServer()
+	for i, o := range opts {
+		if o == nil {
+			return nil, fmt.Errorf("grpc server: server option %d is nil", i)
+		}
+	}
+	srv := grpc.NewServer(opts...)
 	if srv == nil {
 		return nil, errors.New("grpc server: grpc.NewServer returned nil")
 	}

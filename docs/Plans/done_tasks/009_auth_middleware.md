@@ -1,7 +1,7 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 1.0 -->
 # 009_auth_middleware — JWT authentication for every endpoint
 
-Status: pending
+Status: done
 
 ## Description
 
@@ -72,3 +72,27 @@ Rules for the tests:
 ## Verification
 
 Run the App with auth on (remove `debug.auth.disable` from `config.yml`, or set it to `false`) and call `GET /v1/greeting` with no token. Pass: HTTP 401. Then call it with a valid test token. Pass: HTTP 200 and `{"message":"Hello"}`. Then set `debug.auth.disable: true`, call it with no token. Pass: HTTP 200.
+
+## Decisions (operator, 2026-11-07)
+
+- Qabz only verifies tokens; it never signs one.
+- Required claims: `exp`, `sub` (a UUID) and `mobile`, `aud` compared with `auth.jwt.audience`; guests (`non_otp == "guest"`) are refused.
+- The metrics endpoint stays outside the auth check.
+- Algorithm and key source: the operator skipped the question. Claude chose ES512 (the algorithm of `bill`'s `pkg/auth`) and a PEM file path (`auth.jwt.public_key_path`). **Confirm both with the auth team.**
+
+## Result (2026-11-07)
+
+- `common/auth/jwt.go`: `Verifier` (ES512 only, P-521 public key, standard `crypto` plus `fastjson` for the hot-path JSON, no JWT library). The signature is checked before the claims are read. `exp` required; `nbf` checked when present; `crit` refused. Rejection reasons are metric labels only.
+- `common/auth/context.go`: `WithClaims` / `ClaimsFrom` for the handlers.
+- `entry/grpc/auth.go`: `Auth` with unary and stream interceptors; one answer for every rejection (`Unauthenticated`, "unauthenticated"). `NewWithOptions` installs it. Without a verifier it refuses to build unless disabled.
+- `config`: `auth.jwt.public_key_path`, `auth.jwt.audience`, `debug.auth.disable` (a plain `bool`: missing means the check is on).
+- `app/defaults.go`: builds the check first; with the check on, a missing or bad key file or audience stops the start; with `debug.auth.disable` one warning is logged. Counter `qabz_auth_rejected_total{reason}`.
+- Tests next to the code: `common/auth/jwt_test.go` (33 JWT inputs), `entry/grpc/auth_test.go` (4 config entries × 33 inputs, claims in the context, two Authorization values, stream), `entry/http/auth_test.go` (33 inputs through the gateway: 401 / 200), `app/defaults_test.go` (start rules). The shared input table is in `common/auth/authtest` (test keys and tokens, tests only), with its own tests in `authtest_test.go`.
+- Deliberate failures: accepting any `alg`, not requiring `exp`, allowing guests, ignoring `disable` (both ways) and skipping the `aud` check each made tests fail.
+- Feature ON run: no token → HTTP 401; a scratch valid token → HTTP 200 `{"message":"Hello"}`; a bad token → 401; the metric showed `missing` 1 and `malformed` 1; no log line per rejection. With `debug.auth.disable: true` → 200 and the warning. Auth on without a key → exit 1 with a clear message.
+- The local `config.yml` (git-ignored) got `debug.auth.disable: true`.
+
+## Open items at close
+
+- `docs/initial-discovery/system.html` (Critical File) plans the JWT public keys in etcd with live reload. This task reads a PEM file once at start. Moving to etcd with reload is a follow-up and needs the Critical File workflow.
+- The algorithm (ES512) and the audience value are not confirmed by the auth team yet.
