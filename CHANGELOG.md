@@ -1,7 +1,8 @@
-<!-- VERSION: 1.68 -->
+<!-- VERSION: 1.69 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.69 — 2026-11-07 — Added 013-task entry.
 v1.68 — 2026-11-07 — Added 012-auth-status-403 entry.
 v1.67 — 2026-11-07 — Added 012-task entry.
 v1.66 — 2026-11-07 — Added 011-jwt-no-audience-check entry.
@@ -74,6 +75,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 013_services_endpoint
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/013_services_endpoint.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 014), `docs/documents_manifest.md` (v0.70), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds `GET /v1/services`: the `services` table of the `bill` database through a repository interface, cached in memory for `CacheServicesTTL` (default 60s).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 012_auth_status_403: a rejected auth check gives HTTP 403
 - **Type:** Major (API behavior: status code)
