@@ -1,7 +1,8 @@
-<!-- VERSION: 0.9 -->
+<!-- VERSION: 0.10 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.10 — 2026-11-07 — Section 8: every config key is in both `config.yml` (local, git-ignored) and `config.yml.example` (tracked, default or zero values); the two stay in sync.
 v0.9 — 2026-11-07 — Section 7: the Postman collection `qabz.postman_collection.json` in the repo root is updated in the same commit as every HTTP API change.
 v0.8 — 2026-11-04 — Section 6: `pb` submodule ownership. Only `pb/proto/qabz/` is writable; every other path in `pb/` is read-only for this repo.
 v0.7 — 2026-11-04 — Section 5: standard library first. Do not write a function that the Go standard library already has.
@@ -190,3 +191,20 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 ```
 
 **Review.** The `code-reviewer` agent checks each change to `pb/proto/qabz/`, `src/entry/http/` and `src/entry/grpc/`. If the change is an API change and the collection is not updated in the same change, that is a defect. The verdict is NOT READY.
+
+## 8. Config files
+
+**Every config key MUST be in two files in the repository root, and the two files MUST have the same keys:**
+- `config.yml`: the real config of the local run. It is git-ignored and is never committed. It holds the real values, secrets too.
+- `config.yml.example`: the template. It is committed. Each key has its default value (the value in `defaults()` in `src/config/config.go`), or the zero value (`""`, `0`, `false`) when the key has no default. It has no real secret, host, token or key.
+
+**A config change updates both files in the same change:** a new key, a removed or renamed key, or a changed default. A new key is a `path` tag on a `Config` field in `src/config/config.go`. A secret key uses the `Secret` type, so its value never prints.
+
+**Layout.** Auth secrets are under `auth.secrets` (for example `auth.secrets.hmac`). Other keys follow the area they configure (`database.*`, `server.*`, `auth.jwt.*`, `debug.*`). Do not put a config value in a separate file.
+
+**Check.** The tests in `src/config/example_test.go` fail when:
+- `config.yml.example` and the `Config` path tags do not have the same keys.
+- A value in `config.yml.example` is not the default or zero value.
+- The local `config.yml` and `config.yml.example` do not have the same keys. This test is skipped where `config.yml` does not exist, for example in CI.
+
+**Review.** The `code-reviewer` agent checks each change to `src/config/`. A config change without the matching change to `config.yml.example` is a defect. The verdict is NOT READY.

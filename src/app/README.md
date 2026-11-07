@@ -1,4 +1,4 @@
-<!-- VERSION: 0.6 -->
+<!-- VERSION: 0.7 -->
 # app
 
 `app` is the bootstrap of the Qabz service. The type `App` owns every long-lived dependency: the logger, the Postgres database, the Redis cache, the metrics endpoint and the optional tracer. Entry points (for example `cmd/start-app`) build an `App` and run it. They hold no wiring of their own.
@@ -15,6 +15,7 @@ Before the metrics endpoint starts, `Start` runs the SQL migrations (`database.m
 
 ```go
 cfg, _ := config.Boot(os.Args[1:])  // --config=path/to/config.yml is required; a bad file panics
+                                    // start from config.yml.example: cp config.yml.example config.yml
 
 b, err := app.NewDefaultBuilder(ctx, cfg)   // real zap, Postgres, Redis, Prometheus
 if err != nil { return err }

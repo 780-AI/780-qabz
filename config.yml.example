@@ -1,0 +1,48 @@
+# Qabz config template (conventions § 8). Copy it to config.yml (git-ignored) and fill in the values:
+#   cp config.yml.example config.yml
+# This file has every config key, with its default value, or a zero value when the key has no
+# default. Never put a real secret, host or token here. A new config key goes into this file and
+# into config.yml in the same change.
+
+service_name: "qabz"
+hot_reload_interval: "30s"
+
+logs:
+  level: "info"
+  otlp_endpoint: ""          # empty: tracing is off
+
+server:
+  grpc:
+    addr: ":8082"
+  http:
+    addr: ":8080"
+
+metrics:
+  prometheus:
+    addr: ":9090"
+
+database:
+  postgres:
+    host: "localhost"
+    port: 5432
+    user: "qabz"
+    password: ""             # required
+    db: "qabz"
+  redis:
+    host: "localhost"
+    port: 6379
+    password: ""
+  migration:
+    on_start: true
+    timeout: "60s"
+
+auth:
+  secrets:
+    hmac: ""                 # the auth service JWT secret; required while the auth check is on
+  jwt:
+    audience: ""             # the aud value of the tokens; required while the auth check is on
+
+# Development only: the production config has no debug section.
+debug:
+  auth:
+    disable: false

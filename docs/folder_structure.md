@@ -1,7 +1,8 @@
-<!-- VERSION: 0.25 -->
+<!-- VERSION: 0.26 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.26 — 2026-11-07 — `config.yml.example` (tracked config template) and `config.yml` (git-ignored) added to the root (conventions § 8).
 v0.25 — 2026-11-07 — Task 010: common/auth/ comment says HMAC secret (was ES512 public key).
 v0.24 — 2026-11-07 — Task 009: common/auth/ (JWT verifier, authtest/ test helpers) and entry/grpc/auth.go (auth interceptor).
 v0.23 — 2026-11-07 — `qabz.postman_collection.json` added to the root (conventions § 7).
@@ -39,6 +40,8 @@ Authoritative layout reference (CLAUDE.md § 13).
 ├── README.md                          # project entry point
 ├── CHANGELOG.md                       # cross-cutting project history
 ├── .gitignore
+├── config.yml                         # local config (git-ignored): real values and secrets; same keys as config.yml.example
+├── config.yml.example                 # config template: every key with its default or zero value (conventions § 8)
 ├── docker-compose.yml                 # local dev stack: postgres, redis, qabz (profile `app`)
 ├── qabz.postman_collection.json      # Postman collection of the HTTP API; updated with every API change (conventions § 7)
 ├── Makefile                           # `make proto`, `make compose up|down|ps|logs` (YAML -> config_generated.env -> docker compose <action>), `make test-scripts`
@@ -55,7 +58,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   │   ├── run.go                     # Run(args): start-app (default) or migrate
 │   │   ├── start-app/                 # start.go: Run(args) loads --config, builds and runs the App
 │   │   └── migrate/                   # migrate.go: up, force V, version
-│   ├── config/                        # settings: Config from YAML (config.go), YAML mapper (decode.go), --config boot (boot.go); hot-reload: Holder, Reloader (hot.go)
+│   ├── config/                        # settings: Config from YAML (config.go; example_test.go keeps config.yml.example in sync), YAML mapper (decode.go), --config boot (boot.go); hot-reload: Holder, Reloader (hot.go)
 │   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs.up.sql (no down files)
 │   ├── system/                        # what the service connects to
 │   │   └── postgres/  redis/          # pgx pool, migrator, config repository; go-redis client (kafka/, nats/ still empty)

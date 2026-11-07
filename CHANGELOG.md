@@ -1,7 +1,8 @@
-<!-- VERSION: 1.63 -->
+<!-- VERSION: 1.64 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.64 — 2026-11-07 — Added config-example-convention entry.
 v1.63 — 2026-11-07 — Added 010-jwt-hmac-secret entry.
 v1.62 — 2026-11-07 — Added 010-task entry.
 v1.61 — 2026-11-07 — Added 009-auth-middleware entry.
@@ -69,6 +70,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Conventions § 8: config.yml and config.yml.example
+- **Type:** Minor (a new project convention; a new tracked template file; new tests; no runtime change)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.10), `config.yml.example` (new), `src/config/example_test.go` (new), `src/app/README.md` (v0.7), `docs/folder_structure.md` (v0.26), `docs/documents_manifest.md` (v0.65), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Every config key is now in both `config.yml` (local, git-ignored, real values) and `config.yml.example` (committed, default or zero values, no secret); a config change updates both in the same change. Auth secrets sit under `auth.secrets`. New tests fail when the example and the `Config` path tags differ, when an example value is not the default or zero value, or when the local `config.yml` has other keys than the example (skipped without a local `config.yml`). The local `config.yml` (not committed) got the missing keys.
+- **QA scenarios:** (1) In `src/` run `go test -count=1 -v -run 'Example|LocalConfig|LeafPaths' ./config/`. Pass: the 4 tests pass (done, 2026-11-07). (2) Positive controls: a key removed from the example, a non-default value, a password in the example, and a key removed from `config.yml` each fail a test (done, 2026-11-07).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 010_jwt_hmac_secret: JWT check with an HMAC secret
 - **Type:** Major (auth behavior and a config key change)
