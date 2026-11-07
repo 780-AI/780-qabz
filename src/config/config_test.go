@@ -135,7 +135,6 @@ func TestSecretNeverPrints(t *testing.T) {
 	}
 }
 
-// TestParseAuthKeys: auth.secrets.hmac is read from the YAML; a missing section leaves it empty.
 // TestParseMetricsSwitch: the Prometheus switch is on by default and with an explicit true; it is
 // off only with an explicit false (Implementation_Plan Step 5).
 func TestParseMetricsSwitch(t *testing.T) {
@@ -161,6 +160,7 @@ func TestParseMetricsSwitch(t *testing.T) {
 	assert.Error(t, err, "a non-bool value is an error, not off")
 }
 
+// TestParseAuthKeys: auth.secrets.hmac is read from the YAML; a missing section leaves it empty.
 func TestParseAuthKeys(t *testing.T) {
 	c, err := Parse([]byte(`{database: {postgres: {password: x}}, auth: {secrets: {hmac: hm4c}}}`))
 	if assert.NoError(t, err) {

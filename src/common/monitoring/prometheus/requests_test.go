@@ -72,7 +72,8 @@ func family(t *testing.T, s *Server, name string) *dto.MetricFamily {
 			return f
 		}
 	}
-	t.Fatalf("metric family %s not found", name)
+	assert.Failf(t, "metric family not found", "%s", name)
+	t.FailNow()
 	return nil
 }
 

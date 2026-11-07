@@ -1,7 +1,8 @@
-<!-- VERSION: 1.76 -->
+<!-- VERSION: 1.77 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.77 — 2026-11-07 — Added 014-review-test-fixes entry.
 v1.76 — 2026-11-07 — Added session-wrap-up (task 014 session) entry.
 v1.75 — 2026-11-07 — Added 014-request-metrics-middleware entry.
 v1.74 — 2026-11-07 — Added durations-in-milliseconds-convention entry.
@@ -82,6 +83,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 014 review fixes: two test files
+- **Type:** Minor (tests only; no runtime code)
+- **Files:** `src/common/monitoring/prometheus/requests_test.go`, `src/config/config_test.go`, `docs/documents_manifest.md` (v0.78), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The `code-reviewer` agent found these items in commit 3138bf1 (already pushed, so the fix is a new commit, Rule 3). (1) The test helper `family` checked "the metric is registered" with a manual `t.Fatalf`; it now uses `assert.Failf` and then `t.FailNow()` (conventions § 3). (2) The doc comment of `TestParseAuthKeys` was above `TestParseMetricsSwitch`; it is back above its own test.
+- **QA scenarios:** (1) In `src/` `go vet ./...`, `go build ./...`, `go test -race -count=1 ./common/monitoring/prometheus/ ./config/`: all pass (done, 2026-11-07). (2) Deliberate failure: a `go test -overlay` copy of the test that asks `family` for a missing name gives `FAIL` with "metric family not found" and no panic (done, 2026-11-07).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Session wrap-up: lesson candidates (task 014 session)
 - **Type:** Minor (docs only)
