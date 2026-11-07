@@ -1,7 +1,8 @@
-<!-- VERSION: 1.22 -->
+<!-- VERSION: 1.23 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.23 — 2026-11-07 — Session wrap-up: Lesson candidates section added (2 candidates).
 v1.22 — 2026-11-07 — Task 013 services endpoint: QA scenario and follow-ups added.
 v1.21 — 2026-11-07 — Task 012 auth status 403: 009/010 scenarios now expect 403, 012 scenario added.
 v1.20 — 2026-11-07 — Task 011 no audience check: 009/010 scenarios and follow-ups updated, 011 scenario added.
@@ -139,3 +140,10 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 ## Maintenance / housekeeping
 
 - Fill `SESSION_OPENER.md` § 2 environment mapping (stage / production hosts) — before plan Step 3.
+
+## Lesson candidates
+
+Found in the 2026-11-07 session wrap-up. Each one waits for an operator decision: codify (a section in `PROJECT_SPECIFIC_CONVENTIONS.md`) or discard.
+
+- **Logging of dependency failures in a request path.** Task 013 first logged nothing for a failed database read and used only a metric, from a too strict reading of the "metrics, not logs" policy (Implementation_Plan Step 5). The operator saw a 500 with no log line. Candidate rule: a failed call to a dependency (database, cache, provider) in a request path writes one error line with the cause, and the client gets no detail; a client error or a call that the client canceled writes no line. Recommendation: codify.
+- **Differences from bill.** Every intended difference from the old `bill` service is a numbered item in `docs/this_vs_bill.md` and has a `@todo` comment at the code that makes it (task 013, operator). Candidate rule for the conventions doc, so later tasks follow it. Recommendation: codify.

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.72 -->
+<!-- VERSION: 1.73 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.73 — 2026-11-07 — Added session-wrap-up entry.
 v1.72 — 2026-11-07 — Added 015-task entry.
 v1.71 — 2026-11-07 — Added 014-task entry.
 v1.70 — 2026-11-07 — Added 013-services-endpoint entry.
@@ -78,6 +79,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Session wrap-up: lesson candidates
+- **Type:** Minor (docs only)
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.23), `docs/documents_manifest.md` (v0.74), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Two lesson candidates queued for an operator decision: error logs for dependency failures in a request path, and the `docs/this_vs_bill.md` + `@todo` rule.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 015_dev_bill_database
 - **Type:** Minor (docs only; a new task file)
