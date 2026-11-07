@@ -1,7 +1,8 @@
-<!-- VERSION: 1.71 -->
+<!-- VERSION: 1.72 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.72 — 2026-11-07 — Added 015-task entry.
 v1.71 — 2026-11-07 — Added 014-task entry.
 v1.70 — 2026-11-07 — Added 013-services-endpoint entry.
 v1.69 — 2026-11-07 — Added 013-task entry.
@@ -77,6 +78,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 015_dev_bill_database
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/015_dev_bill_database.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 016), `docs/documents_manifest.md` (v0.73), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds dev-only commands that create the full `bill` database schema, seed `services` (5 rows) and `providers` (45 rows), and unseed them, plus a config key `mode` (`dev`, `stage`, `prod`) that blocks the commands outside `dev`.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 014_request_metrics_middleware
 - **Type:** Minor (docs only; a new task file)
