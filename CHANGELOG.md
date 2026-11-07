@@ -1,7 +1,8 @@
-<!-- VERSION: 1.73 -->
+<!-- VERSION: 1.74 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.74 — 2026-11-07 — Added durations-in-milliseconds-convention entry.
 v1.73 — 2026-11-07 — Added session-wrap-up entry.
 v1.72 — 2026-11-07 — Added 015-task entry.
 v1.71 — 2026-11-07 — Added 014-task entry.
@@ -79,6 +80,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Conventions § 9: durations in milliseconds
+- **Type:** Minor (a new project convention; a Critical File doc edit with no code change)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.12), `docs/initial-discovery/system.html` (v1.3, Critical File), `docs/documents_manifest.md` (v0.75), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact (no metric records a duration yet). New rule: every recorded duration (metric, log field) is in milliseconds, recorded as a float (`float64(d) / float64(time.Millisecond)`, not the integer `d.Milliseconds()`), and duration metric names end with `_ms`. Config durations and the default `go_*` / `process_*` metrics are not covered. This deviates from the Prometheus base-unit naming (`_seconds`) by operator decision. `system.html`: the rule "times are in seconds" is replaced, and the planned metrics are renamed (`qabz_order_complete_duration_ms`, `qabz_provider_call_duration_ms`, `qabz_cron_duration_ms`, `qabz_oldest_pending_order_age_ms`, `qabz_dependency_check_duration_ms`, `qabz_db_query_duration_ms`). The `code-reviewer` agent (local, git-ignored) enforces the rule.
+- **QA scenarios:** None needed (Rule 11 exempts docs; task 014 applies the rule to the first duration metric).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Session wrap-up: lesson candidates
 - **Type:** Minor (docs only)

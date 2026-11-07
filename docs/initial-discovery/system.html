@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 1.2 -->
-<!-- Last Updated: 2026-11-02 -->
+<!-- VERSION: 1.3 -->
+<!-- Last Updated: 2026-11-07 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v1.3 — 2026-11-07 — Durations in milliseconds (conventions § 9): metric times use the suffix _ms; the planned *_seconds metrics renamed to *_ms.
 v1.2 — 2026-11-02 — No down migrations: only NNNNNN_name.up.sql files; migrate command is up, force V, version.
 v1.1 — 2026-11-02 — Migrations: qabz runs its own migrations (src/migrations, golang-migrate) at start and with the migrate command; hot-reload table app_hot_configs.
 v1.0 — 2026-10-28 — VERSION header added; moved from docs/ to docs/initial-discovery/.
@@ -378,7 +379,7 @@ Since we are using AI coding, there is no need to slow down performance by using
 
 **Gap.** The current system severely lacks custom metrics. This part needs to be covered in the new system.
 
-Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names start with `qabz_`, and times are in seconds. Any of them can be **alertable**.
+Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names start with `qabz_`. Durations are in milliseconds, and their names end with `_ms` (`PROJECT_SPECIFIC_CONVENTIONS.md` § 9). Any of them can be **alertable**.
 
 ### Requests and orders
 
@@ -387,13 +388,13 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | `qabz_inquiries_total` | counter | Inquiries per bill type, provider and outcome |
 | `qabz_orders_total` | counter | Every order status change (the state machine) |
 | `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |
-| `qabz_order_complete_duration_seconds` | histogram | How long `OrderComplete` takes |
+| `qabz_order_complete_duration_ms` | histogram | How long `OrderComplete` takes |
 
 ### Providers
 
 | Metric | Type | What it tells you |
 |---|---|---|
-| `qabz_provider_call_duration_seconds` | histogram | Latency of each provider call |
+| `qabz_provider_call_duration_ms` | histogram | Latency of each provider call |
 | `qabz_provider_calls_total` | counter | Calls and errors per provider |
 | `qabz_provider_timeouts_total` | counter | Timeouts, which trigger a switch |
 
@@ -412,10 +413,10 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | Metric | Type | What it tells you |
 |---|---|---|
 | `qabz_cron_runs_total` | counter | Cron runs, by result |
-| `qabz_cron_duration_seconds` | histogram | How long a cron run takes |
+| `qabz_cron_duration_ms` | histogram | How long a cron run takes |
 | `qabz_cron_orders_processed_total` | counter | What each run did with the orders it picked |
 | `qabz_pending_orders` | gauge | Orders waiting right now |
-| `qabz_oldest_pending_order_age_seconds` | gauge | Age of the oldest pending order, against the 10-hour deadline |
+| `qabz_oldest_pending_order_age_ms` | gauge | Age of the oldest pending order, against the 10-hour deadline |
 | `qabz_karashab_unconfirmed_orders` | gauge | Landline orders not yet confirmed |
 
 ### Infrastructure
@@ -423,8 +424,8 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | Metric | Type | What it tells you |
 |---|---|---|
 | `qabz_dependency_up` | gauge | 1 if Postgres, Redis, Kafka, NATS or etcd answers |
-| `qabz_dependency_check_duration_seconds` | gauge | Response time of that check |
-| `qabz_db_query_duration_seconds` | histogram | Duration of the main queries |
+| `qabz_dependency_check_duration_ms` | gauge | Response time of that check |
+| `qabz_db_query_duration_ms` | histogram | Duration of the main queries |
 
 ### Logs
 

@@ -1,4 +1,4 @@
-<!-- VERSION: 0.74 -->
+<!-- VERSION: 0.75 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.73 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.74 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.74 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.75 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.27 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -36,7 +36,7 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v1.2 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v1.3 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
@@ -45,7 +45,7 @@
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
 | 28 | Open Tasks Register | v1.23 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
-| 30 | Project Specific Conventions | v0.11 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
+| 30 | Project Specific Conventions | v0.12 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-07
-- **Change**: Session wrap-up: OPEN_TASKS gets a Lesson candidates section. Bumped #3 CHANGELOG v1.73, #5 manifest v0.74, #28 OPEN_TASKS v1.23.
-- **Previous change**: 2026-11-07 — New task file `015_dev_bill_database.md` v0.1 (not manifest-tracked); task counter at 016. Bumped #3 CHANGELOG v1.72, #5 manifest v0.73.
+- **Change**: Conventions § 9 durations in milliseconds; `system.html` rule and planned metric names changed to `_ms`. Bumped #3 CHANGELOG v1.74, #5 manifest v0.75, #21 system.html v1.3, #30 PROJECT_SPECIFIC_CONVENTIONS v0.12.
+- **Previous change**: 2026-11-07 — Session wrap-up: OPEN_TASKS gets a Lesson candidates section. Bumped #3 CHANGELOG v1.73, #5 manifest v0.74, #28 OPEN_TASKS v1.23.
+- **Earlier change**: 2026-11-07 — New task file `015_dev_bill_database.md` v0.1 (not manifest-tracked); task counter at 016. Bumped #3 CHANGELOG v1.72, #5 manifest v0.73.
 - **Earlier change**: 2026-11-07 — New task file `014_request_metrics_middleware.md` v0.1 (not manifest-tracked); task counter at 015. Bumped #3 CHANGELOG v1.71, #5 manifest v0.72.
 - **Earlier change**: 2026-11-07 — Task 013 `services_endpoint` done: `GET /v1/services` from the bill `services` table, in-memory cache, config key `service.id`; new `docs/this_vs_bill.md` (#35 v0.1); Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.70, #5 manifest v0.71, #6 folder_structure v0.27, #28 OPEN_TASKS v1.22, #34 app README v0.10.
 - **Earlier change**: 2026-11-07 — New task file `013_services_endpoint.md` v0.1 (not manifest-tracked); task counter at 014. Bumped #3 CHANGELOG v1.69, #5 manifest v0.70.

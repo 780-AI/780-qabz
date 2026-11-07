@@ -1,7 +1,8 @@
-<!-- VERSION: 0.11 -->
+<!-- VERSION: 0.12 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.12 — 2026-11-07 — Section 9: every recorded duration (metric, log field) is in milliseconds; metric names end with `_ms`.
 v0.11 — 2026-11-07 — Section 8: layout examples no longer name `auth.jwt.*` (task 011 removed its only key).
 v0.10 — 2026-11-07 — Section 8: every config key is in both `config.yml` (local, git-ignored) and `config.yml.example` (tracked, default or zero values); the two stay in sync.
 v0.9 — 2026-11-07 — Section 7: the Postman collection `qabz.postman_collection.json` in the repo root is updated in the same commit as every HTTP API change.
@@ -209,3 +210,19 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 - The local `config.yml` and `config.yml.example` do not have the same keys. This test is skipped where `config.yml` does not exist, for example in CI.
 
 **Review.** The `code-reviewer` agent checks each change to `src/config/`. A config change without the matching change to `config.yml.example` is a defect. The verdict is NOT READY.
+
+## 9. Durations in milliseconds
+
+**Every duration that the code records MUST be in milliseconds.** This covers metrics (histograms and gauges of a time, for example a latency or an age) and measured durations in log fields.
+
+- A metric name ends with `_ms` (for example `qabz_request_duration_ms`), not `_seconds`.
+- Record the value as a float: `float64(d) / float64(time.Millisecond)`. Do not use `d.Milliseconds()`: it returns an integer and drops the part under 1 ms (a 250 µs call becomes 0).
+- Histogram buckets are in milliseconds (for example `5, 10, 25, ..., 10000`).
+
+**Not covered:**
+- Config values: Go duration strings such as `"30s"` and `time.Duration` fields in `Config`.
+- The default metrics of the Prometheus client (`go_*`, `process_*`). They keep their own units.
+
+**Why.** Operator decision, 2026-11-07 (task 014). It deviates from the Prometheus base-unit naming (`_seconds`): dashboards and alert rules for `qabz` read milliseconds.
+
+**Review.** The `code-reviewer` agent checks each new or changed metric and log field that holds a duration. A duration not in milliseconds, or a duration metric whose name does not end with `_ms`, is a defect. The verdict is NOT READY.
