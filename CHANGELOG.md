@@ -1,7 +1,8 @@
-<!-- VERSION: 1.64 -->
+<!-- VERSION: 1.65 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.65 — 2026-11-07 — Added 011-task entry.
 v1.64 — 2026-11-07 — Added config-example-convention entry.
 v1.63 — 2026-11-07 — Added 010-jwt-hmac-secret entry.
 v1.62 — 2026-11-07 — Added 010-task entry.
@@ -70,6 +71,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 011_jwt_no_audience_check
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/011_jwt_no_audience_check.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 012), `docs/documents_manifest.md` (v0.66), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task removes `auth.jwt.audience` and the `aud` comparison, as `bill` does: `aud` must still be a string, any value is accepted, and it goes into the claims. It records the accepted risk (a token issued for another service also works on Qabz).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Conventions § 8: config.yml and config.yml.example
 - **Type:** Minor (a new project convention; a new tracked template file; new tests; no runtime change)
