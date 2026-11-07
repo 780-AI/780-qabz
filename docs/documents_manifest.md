@@ -1,4 +1,4 @@
-<!-- VERSION: 0.55 -->
+<!-- VERSION: 0.56 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.54 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.55 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.55 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.56 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.21 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -53,9 +53,10 @@
 
 ## Last Updated
 
-- **Date**: 2026-11-04
-- **Change**: Task 006 `greeting_ping` done: gRPC server, HTTP gateway, `Greeting`; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.54, #5 manifest v0.55, #6 folder_structure v0.21, #28 OPEN_TASKS v1.15, #34 app README v0.4.
-- **Previous change**: 2026-11-04 — Conventions § 6 `pb` submodule ownership (only `pb/proto/qabz/` is writable). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.8, #3 CHANGELOG v1.53, #5 manifest v0.54.
+- **Date**: 2026-11-07
+- **Change**: New task file `007_make_compose_actions.md` v0.1 (not manifest-tracked); task counter at 008. Bumped #3 CHANGELOG v1.55, #5 manifest v0.56.
+- **Previous change**: 2026-11-04 — Task 006 `greeting_ping` done: gRPC server, HTTP gateway, `Greeting`; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.54, #5 manifest v0.55, #6 folder_structure v0.21, #28 OPEN_TASKS v1.15, #34 app README v0.4.
+- **Earlier change**: 2026-11-04 — Conventions § 6 `pb` submodule ownership (only `pb/proto/qabz/` is writable). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.8, #3 CHANGELOG v1.53, #5 manifest v0.54.
 - **Earlier change**: 2026-11-04 — New task file `006_greeting_ping.md` v0.1 (not manifest-tracked); task counter at 007. Bumped #3 CHANGELOG v1.52, #5 manifest v0.53.
 - **Earlier change**: 2026-11-04 — `PostgresDSN` uses `net/url` (Go files have no VERSION header, so they have no rows). Bumped #3 CHANGELOG v1.51, #5 manifest v0.52, #28 OPEN_TASKS v1.14.
 - **Earlier change**: 2026-11-04 — Conventions § 5 standard library first. Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.7, #3 CHANGELOG v1.50, #5 manifest v0.51.

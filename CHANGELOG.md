@@ -1,7 +1,8 @@
-<!-- VERSION: 1.54 -->
-<!-- Last Updated: 2026-11-04 -->
+<!-- VERSION: 1.55 -->
+<!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.55 — 2026-11-07 — Added 007-task entry.
 v1.54 — 2026-11-04 — Added 006-greeting-ping entry.
 v1.53 — 2026-11-04 — Added pb-ownership-convention entry.
 v1.52 — 2026-11-04 — Added 006-task entry.
@@ -60,6 +61,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 007_make_compose_actions
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/007_make_compose_actions.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 008), `docs/documents_manifest.md` (v0.56), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task replaces `make compose` with `make compose up|down|ps|logs`.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-04] — Task 006_greeting_ping: gRPC server, HTTP gateway and Greeting
 - **Type:** Major (new packages `entry/grpc` and `entry/http`; new config keys; new public endpoint; `pb` submodule pointer)
