@@ -91,16 +91,16 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 
 // newAuth builds the JWT check of every gRPC call (and so of every gateway route). With
 // debug.auth.disable it logs one warning and checks nothing; otherwise it needs
-// auth.jwt.public_key_path and auth.jwt.audience. Each rejected call adds 1 to
+// auth.secrets.hmac and auth.jwt.audience. Each rejected call adds 1 to
 // qabz_auth_rejected_total{reason}; a rejected call writes no log line.
 func newAuth(cfg config.Config, metrics *prometheus.Server, logger Logger) (*grpcserver.Auth, error) {
 	if cfg.DebugAuthDisable {
 		logger.Warn("auth check disabled (debug.auth.disable): development only")
 		return grpcserver.NewAuth(grpcserver.AuthOptions{Disabled: true})
 	}
-	verifier, err := auth.LoadVerifier(cfg.JWTPublicKeyPath, cfg.JWTAudience)
+	verifier, err := auth.NewVerifier([]byte(cfg.JWTHMACSecret.Reveal()), cfg.JWTAudience, nil)
 	if err != nil {
-		return nil, fmt.Errorf("%w (set auth.jwt.public_key_path and auth.jwt.audience, or debug.auth.disable in development)", err)
+		return nil, fmt.Errorf("%w (set auth.secrets.hmac and auth.jwt.audience, or debug.auth.disable in development)", err)
 	}
 	rejected := promclient.NewCounterVec(promclient.CounterOpts{
 		Name: "qabz_auth_rejected_total",

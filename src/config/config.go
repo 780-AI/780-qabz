@@ -48,9 +48,10 @@ type Config struct {
 	// HTTPAddr is the listen address of the grpc-gateway HTTP server (host:port; port 0 picks a free port).
 	HTTPAddr string `path:"server.http.addr"`
 
-	// JWTPublicKeyPath is the PEM file of the auth service's ES512 public key. Qabz only verifies
-	// tokens with it. Required while the auth check is on.
-	JWTPublicKeyPath string `path:"auth.jwt.public_key_path"`
+	// JWTHMACSecret is the secret that the auth service signs the user JWT with (HS256, HS384 or
+	// HS512). The raw string is the key. It sits in the main config with the other auth secrets
+	// (auth.secrets). Qabz only verifies tokens with it. Required while the auth check is on.
+	JWTHMACSecret Secret `path:"auth.secrets.hmac"`
 	// JWTAudience is the value that the token's aud claim must contain. Required while the auth check is on.
 	JWTAudience string `path:"auth.jwt.audience"`
 	// DebugAuthDisable turns the auth check off. Development only: the production config has no

@@ -10,23 +10,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	pb "qabz/api/pb/qabz"
-	"qabz/common/auth"
 	"qabz/common/auth/authtest"
 	grpcserver "qabz/entry/grpc"
 )
 
 // authStack starts a gRPC server with the auth check on and a gateway in front of it.
-func authStack(t *testing.T, key authtest.Key) *Gateway {
+func authStack(t *testing.T) *Gateway {
 	t.Helper()
-	pub, err := auth.ParsePublicKey(key.PublicPEM)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	v, err := auth.NewVerifier(pub, authtest.Audience, func() time.Time { return authtest.Now })
-	if !assert.NoError(t, err) || !assert.NotNil(t, v) {
-		t.FailNow()
-	}
-	a, err := grpcserver.NewAuth(grpcserver.AuthOptions{Verifier: v})
+	a, err := grpcserver.NewAuth(grpcserver.AuthOptions{Verifier: authtest.Verifier(t)})
 	if !assert.NoError(t, err) || !assert.NotNil(t, a) {
 		t.FailNow()
 	}
@@ -46,9 +37,8 @@ func authStack(t *testing.T, key authtest.Key) *Gateway {
 // TestAuthOverHTTP runs every JWT input of the shared table through the gateway: a rejected call
 // must be HTTP 401 (not 500), a valid one HTTP 200.
 func TestAuthOverHTTP(t *testing.T) {
-	key := authtest.NewKey(t)
-	gw := authStack(t, key)
-	for _, tc := range authtest.Cases(t, key) {
+	gw := authStack(t)
+	for _, tc := range authtest.Cases(t) {
 		t.Run(tc.Name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.62 -->
+<!-- VERSION: 1.63 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.63 — 2026-11-07 — Added 010-jwt-hmac-secret entry.
 v1.62 — 2026-11-07 — Added 010-task entry.
 v1.61 — 2026-11-07 — Added 009-auth-middleware entry.
 v1.60 — 2026-11-07 — Added 009-task entry.
@@ -68,6 +69,14 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 010_jwt_hmac_secret: JWT check with an HMAC secret
+- **Type:** Major (auth behavior and a config key change)
+- **Files:** `src/common/auth/` (`jwt.go`, `jwt_test.go`, `authtest/authtest.go`, `authtest/authtest_test.go`), `src/config/` (`config.go`, `config_test.go`), `src/app/` (`defaults.go`, `defaults_test.go`, `README.md` v0.6), `src/entry/grpc/auth_test.go`, `src/entry/http/auth_test.go`, `docs/folder_structure.md` (v0.25), `docs/Plans/OPEN_TASKS.md` (v1.19), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.64), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. The JWT must be signed with HMAC (`HS256`, `HS384` or `HS512`) and the secret in the new key `auth.secrets.hmac`; ES512 tokens and every other `alg` get HTTP 401. `auth.jwt.public_key_path` is removed: with the check on, a config without `auth.jwt.hmac_secret` (or `auth.jwt.audience`) does not start (exit 1). The other checks, the metric and `debug.auth.disable` are unchanged. The task 009 decision "Qabz never signs a token" no longer holds: the shared secret could sign one; Qabz still only verifies.
+- **QA scenarios:** (1) `go build`, `go vet`, `go test -race -count=1 ./...` pass (done, 2026-11-07). (2) Deliberate failures (no HMAC compare, any alg accepted) fail the tests (done, 2026-11-07). (3) Feature ON with a test secret: no token 401, HS256/HS384/HS512 200, another secret / RS256 / expired / guest 401, metric counts, no secret in the log, no secret → exit 1 (done, 2026-11-07). (4) The operator calls greeting with a real token from the auth service (pending).
+- **Open:** the HMAC variant and the `aud` value need confirmation from the auth team; the current secret has 20 bytes, under the 32 bytes RFC 7518 § 3.2 asks for HS256.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 010_jwt_hmac_secret
 - **Type:** Minor (docs only; a new task file)

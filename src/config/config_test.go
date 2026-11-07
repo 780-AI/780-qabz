@@ -119,11 +119,28 @@ func TestLoadFile(t *testing.T) {
 }
 
 func TestSecretNeverPrints(t *testing.T) {
-	c, err := Parse([]byte(`database: {postgres: {password: s3cret}, redis: {password: r3dis}}`))
-	assert.NoError(t, err)
+	c, err := Parse([]byte(`{database: {postgres: {password: s3cret}, redis: {password: r3dis}}, auth: {secrets: {hmac: hm4c}}}`))
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
 	for _, out := range []string{fmt.Sprintf("%v", c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), c.PostgresTarget()} {
 		assert.NotContains(t, out, "s3cret")
 		assert.NotContains(t, out, "r3dis")
+		assert.NotContains(t, out, "hm4c")
+	}
+}
+
+// TestParseAuthKeys: the auth.jwt keys are read from the YAML; a missing section leaves them empty.
+func TestParseAuthKeys(t *testing.T) {
+	c, err := Parse([]byte(`{database: {postgres: {password: x}}, auth: {secrets: {hmac: hm4c}, jwt: {audience: qabz}}}`))
+	if assert.NoError(t, err) {
+		assert.Equal(t, "hm4c", c.JWTHMACSecret.Reveal())
+		assert.Equal(t, "qabz", c.JWTAudience)
+	}
+	c, err = Parse([]byte(`database: {postgres: {password: x}}`))
+	if assert.NoError(t, err) {
+		assert.Equal(t, "", c.JWTHMACSecret.Reveal())
+		assert.Equal(t, "", c.JWTAudience)
 	}
 }
 

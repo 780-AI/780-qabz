@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -66,36 +64,32 @@ func TestDefaultBuilderRejectsBadLogLevel(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestDefaultBuilderAuthRules: with the check on, the start needs a readable P-521 key file and an
-// audience; with debug.auth.disable it needs neither.
+// TestDefaultBuilderAuthRules: with the check on, the start needs the HMAC secret and an audience;
+// with debug.auth.disable it needs neither. The secret is never in the start error.
 func TestDefaultBuilderAuthRules(t *testing.T) {
-	key := authtest.NewKey(t)
-	keyPath := filepath.Join(t.TempDir(), "jwt.pub.pem")
-	if !assert.NoError(t, os.WriteFile(keyPath, key.PublicPEM, 0o600)) {
-		return
-	}
 	cases := []struct {
 		name     string
 		disable  bool
-		path     string
+		secret   config.Secret
 		audience string
 		ok       bool
 	}{
-		{name: "disabled, no key", disable: true, ok: true},
-		{name: "on, key and audience", path: keyPath, audience: authtest.Audience, ok: true},
-		{name: "on, no key", audience: authtest.Audience},
-		{name: "on, no audience", path: keyPath},
-		{name: "on, missing key file", path: filepath.Join(t.TempDir(), "missing.pem"), audience: authtest.Audience},
+		{name: "disabled, no secret", disable: true, ok: true},
+		{name: "on, secret and audience", secret: authtest.Secret, audience: authtest.Audience, ok: true},
+		{name: "on, no secret", audience: authtest.Audience},
+		{name: "on, no audience", secret: authtest.Secret},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := testConfig(t)
 			cfg.DebugAuthDisable = tc.disable
-			cfg.JWTPublicKeyPath = tc.path
+			cfg.JWTHMACSecret = tc.secret
 			cfg.JWTAudience = tc.audience
 			b, err := NewDefaultBuilder(context.Background(), cfg)
 			if !tc.ok {
-				assert.Error(t, err)
+				if assert.Error(t, err) {
+					assert.NotContains(t, err.Error(), authtest.Secret)
+				}
 				return
 			}
 			if assert.NoError(t, err) && assert.NotNil(t, b) {

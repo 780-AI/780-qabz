@@ -1,7 +1,8 @@
-<!-- VERSION: 0.24 -->
+<!-- VERSION: 0.25 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.25 — 2026-11-07 — Task 010: common/auth/ comment says HMAC secret (was ES512 public key).
 v0.24 — 2026-11-07 — Task 009: common/auth/ (JWT verifier, authtest/ test helpers) and entry/grpc/auth.go (auth interceptor).
 v0.23 — 2026-11-07 — `qabz.postman_collection.json` added to the root (conventions § 7).
 v0.22 — 2026-11-07 — Task 007: Makefile line names `make compose up|down|ps|logs`.
@@ -61,7 +62,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── common/                        # shared by every package
 │   │   ├── logging/                   # zap/ (logger, done), logstash/ (log shipping, empty)
 │   │   ├── monitoring/                # jaeger/ (tracing), prometheus/ (metrics endpoint)
-│   │   ├── auth/                      # JWT verifier (ES512, public key only); authtest/ = test keys, tokens and the shared JWT input table (tests only)
+│   │   ├── auth/                      # JWT verifier (HMAC HS256/384/512, shared secret); authtest/ = test secret, tokens and the shared JWT input table (tests only)
 │   │   └── errors/  validation/  crypto/  helpers/
 │   ├── core/                          # order, inquiry, savedbill, fee, reconcile, billtype
 │   ├── provider/                      # parsianproxy, jiring, irancellproxy, qabzino, tavanir, karashop

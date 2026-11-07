@@ -1,21 +1,17 @@
-// Package auth verifies the user JWT that the auth service issues. Qabz only verifies tokens, with
-// the issuer's public key; it never signs one.
+// Package auth verifies the user JWT that the auth service issues. The token is signed with HMAC
+// and a secret that the auth service and Qabz share. Qabz only verifies tokens; it never signs one.
 //
 // The check is stateless: signature, algorithm, time claims and the required claims. It runs for
 // every request, so it is a hot path: the JSON parts are read with fastjson (conventions § 1).
 package auth
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/sha512"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"errors"
-	"fmt"
-	"math/big"
-	"os"
+	"hash"
 	"strings"
 	"time"
 	"uuid"
@@ -23,12 +19,14 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-// Algorithm is the only JWT algorithm Qabz accepts (ECDSA P-521 with SHA-512). A token with any
-// other "alg" is rejected, so a token cannot choose a weaker check.
-const Algorithm = "ES512"
-
-// es512KeySize is the size of each of r and s in an ES512 signature (RFC 7518 § 3.4).
-const es512KeySize = 66
+// algorithms are the only JWT algorithms Qabz accepts: HMAC with SHA-2 (RFC 7518 § 3.2), all with
+// the one shared secret. The names are compared exactly. A token with any other "alg" ("none", RSA,
+// ECDSA, RSA-PSS) is rejected; Qabz holds no asymmetric key, so no key can be used as another kind.
+var algorithms = map[string]func() hash.Hash{
+	"HS256": sha256.New,
+	"HS384": sha512.New384,
+	"HS512": sha512.New,
+}
 
 // Reason tells why a token was rejected. It is a metric label, never sent to the client.
 type Reason string
@@ -38,7 +36,7 @@ const (
 	ReasonMissing     Reason = "missing"       // no Authorization value
 	ReasonScheme      Reason = "scheme"        // not "Bearer <token>"
 	ReasonMalformed   Reason = "malformed"     // not three base64url parts of valid JSON
-	ReasonAlgorithm   Reason = "algorithm"     // alg is not Algorithm, or crit is present
+	ReasonAlgorithm   Reason = "algorithm"     // alg is not HS256, HS384 or HS512, or crit is present
 	ReasonSignature   Reason = "signature"     // the signature does not match the key
 	ReasonExpired     Reason = "expired"       // exp is missing or not in the future
 	ReasonNotYetValid Reason = "not_yet_valid" // nbf is in the future
@@ -75,21 +73,19 @@ type Claims struct {
 	NonOTP string // non_otp, the login type (never "guest" here)
 }
 
-// Verifier checks tokens with one public key and one expected audience.
+// Verifier checks tokens with one HMAC secret and one expected audience.
 type Verifier struct {
-	key      *ecdsa.PublicKey
+	secret   []byte
 	audience string
 	now      func() time.Time
 	parsers  fastjson.ParserPool
 }
 
-// NewVerifier returns a Verifier for key and audience. now is the clock; nil means time.Now.
-func NewVerifier(key *ecdsa.PublicKey, audience string, now func() time.Time) (*Verifier, error) {
-	if key == nil {
-		return nil, errors.New("auth: public key is required")
-	}
-	if key.Curve != elliptic.P521() {
-		return nil, fmt.Errorf("auth: %s needs a P-521 public key", Algorithm)
+// NewVerifier returns a Verifier for secret and audience. It keeps its own copy of secret. now is
+// the clock; nil means time.Now.
+func NewVerifier(secret []byte, audience string, now func() time.Time) (*Verifier, error) {
+	if len(secret) == 0 {
+		return nil, errors.New("auth: HMAC secret is required")
 	}
 	if audience == "" {
 		return nil, errors.New("auth: audience is required")
@@ -97,43 +93,7 @@ func NewVerifier(key *ecdsa.PublicKey, audience string, now func() time.Time) (*
 	if now == nil {
 		now = time.Now
 	}
-	return &Verifier{key: key, audience: audience, now: now}, nil
-}
-
-// LoadVerifier reads a PEM public key file and returns a Verifier that uses the real clock.
-func LoadVerifier(path, audience string) (*Verifier, error) {
-	if path == "" {
-		return nil, errors.New("auth: public key path is required")
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("auth: public key file: %w", err)
-	}
-	key, err := ParsePublicKey(data)
-	if err != nil {
-		return nil, err
-	}
-	return NewVerifier(key, audience, nil)
-}
-
-// ParsePublicKey reads a PEM "PUBLIC KEY" (PKIX) block that holds an ECDSA P-521 key.
-func ParsePublicKey(data []byte) (*ecdsa.PublicKey, error) {
-	block, _ := pem.Decode(data)
-	if block == nil || block.Type != "PUBLIC KEY" {
-		return nil, errors.New("auth: no PEM \"PUBLIC KEY\" block")
-	}
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("auth: public key: %w", err)
-	}
-	key, ok := pub.(*ecdsa.PublicKey)
-	if !ok || key == nil {
-		return nil, errors.New("auth: the public key is not an ECDSA key")
-	}
-	if key.Curve != elliptic.P521() {
-		return nil, fmt.Errorf("auth: %s needs a P-521 public key", Algorithm)
-	}
-	return key, nil
+	return &Verifier{secret: append([]byte(nil), secret...), audience: audience, now: now}, nil
 }
 
 // BearerToken returns the token of an Authorization value "Bearer <token>". The scheme is not
@@ -164,7 +124,7 @@ func (v *Verifier) VerifyAuthorization(authorization string) (Claims, error) {
 // Verify checks a compact JWS token and returns its claims. The signature is checked before the
 // claims are read.
 func (v *Verifier) Verify(token string) (Claims, error) {
-	if v == nil || v.key == nil {
+	if v == nil || len(v.secret) == 0 || v.now == nil {
 		return Claims{}, errors.New("auth: verifier not created with NewVerifier")
 	}
 	headerB64, rest, ok := strings.Cut(token, ".")
@@ -180,18 +140,20 @@ func (v *Verifier) Verify(token string) (Claims, error) {
 	if err != nil {
 		return Claims{}, reject(ReasonMalformed)
 	}
-	if err := v.checkHeader(header); err != nil {
+	newHash, err := v.checkHeader(header)
+	if err != nil {
 		return Claims{}, err
 	}
 
 	sig, err := base64.RawURLEncoding.DecodeString(sigB64)
-	if err != nil || len(sig) != 2*es512KeySize {
+	if err != nil {
 		return Claims{}, reject(ReasonSignature)
 	}
-	digest := sha512.Sum512([]byte(token[:len(headerB64)+1+len(payloadB64)]))
-	r := new(big.Int).SetBytes(sig[:es512KeySize])
-	s := new(big.Int).SetBytes(sig[es512KeySize:])
-	if !ecdsa.Verify(v.key, digest[:], r, s) {
+	// A hash.Hash Write never returns an error. hmac.Equal is constant time, and a signature of the
+	// wrong length fails it.
+	mac := hmac.New(newHash, v.secret)
+	mac.Write([]byte(token[:len(headerB64)+1+len(payloadB64)]))
+	if !hmac.Equal(sig, mac.Sum(nil)) {
 		return Claims{}, reject(ReasonSignature)
 	}
 
@@ -202,22 +164,27 @@ func (v *Verifier) Verify(token string) (Claims, error) {
 	return v.readClaims(payload)
 }
 
-// checkHeader accepts only {"alg":"ES512"} (plus typ and kid) and no "crit" extension.
-func (v *Verifier) checkHeader(header []byte) error {
+// checkHeader accepts only an "alg" of HS256, HS384 or HS512 (plus typ and kid) and no "crit"
+// extension. It returns the hash of the algorithm.
+func (v *Verifier) checkHeader(header []byte) (func() hash.Hash, error) {
 	p := v.parsers.Get()
 	defer v.parsers.Put(p)
 	h, err := p.ParseBytes(header)
 	if err != nil || h == nil || h.Type() != fastjson.TypeObject {
-		return reject(ReasonMalformed)
+		return nil, reject(ReasonMalformed)
 	}
 	if h.Exists("crit") {
-		return reject(ReasonAlgorithm)
+		return nil, reject(ReasonAlgorithm)
 	}
 	alg := h.Get("alg")
-	if alg == nil || alg.Type() != fastjson.TypeString || string(alg.GetStringBytes()) != Algorithm {
-		return reject(ReasonAlgorithm)
+	if alg == nil || alg.Type() != fastjson.TypeString {
+		return nil, reject(ReasonAlgorithm)
 	}
-	return nil
+	newHash, ok := algorithms[string(alg.GetStringBytes())]
+	if !ok || newHash == nil {
+		return nil, reject(ReasonAlgorithm)
+	}
+	return newHash, nil
 }
 
 // readClaims checks the time claims, the audience and the required claims. Every string is

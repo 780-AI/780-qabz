@@ -1,7 +1,8 @@
-<!-- VERSION: 1.18 -->
+<!-- VERSION: 1.19 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.19 — 2026-11-07 — Task 010 HMAC secret: 009 scenario and follow-ups updated, 010 scenario added.
 v1.18 — 2026-11-07 — Task 009 auth middleware QA scenario and open points added.
 v1.17 — 2026-11-07 — Task 008 logs-to-stdout QA scenario added.
 v1.16 — 2026-11-07 — Task 007: `make compose up|down|ps|logs`; scenarios use `make compose up`; QA scenario added.
@@ -106,10 +107,15 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Done 2026-11-07 by the implementer: all pass (awaiting operator confirmation; the VSCode check is for the operator).
 - ⏸ Task 009 auth middleware (2026-11-07). In `src/` run `go test -race -count=1 ./common/auth/... ./entry/... ./app/`.
   Pass: all pass (the JWT input table on the verifier, 4 config entries × the table on gRPC, the table through the gateway, the start rules).
-  Then (feature ON) remove `debug.auth.disable` from `config.yml` (or set it to `false`), set `auth.jwt.public_key_path` and `auth.jwt.audience`, run the App and call `GET /v1/greeting` with no token.
+  Then (feature ON) remove `debug.auth.disable` from `config.yml` (or set it to `false`), set `auth.secrets.hmac` and `auth.jwt.audience` (task 010 replaced `auth.jwt.public_key_path`), run the App and call `GET /v1/greeting` with no token.
   Pass: HTTP 401 `{"code":16,"message":"unauthenticated",...}`. With a valid token from the auth service: HTTP 200 `{"message":"Hello"}`. With `debug.auth.disable: true` and no token: HTTP 200 and one `auth check disabled` warning at start.
   Done 2026-11-07 by the implementer with a scratch key pair: all pass (awaiting operator confirmation with a real token).
-- ⏸ Task 009 follow-ups: confirm ES512 and the `aud` value with the auth team; move the JWT public keys to etcd with live reload as `system.html` plans (Critical File workflow).
+- ⏸ Task 010 HMAC secret (2026-11-07). In `src/` run `go test -race -count=1 ./common/auth/... ./entry/... ./app/ ./config/`.
+  Pass: all pass (the table has `HS256`, `HS384`, `HS512` valid; another secret, `none`, `RS256`, `ES512`, `PS256`, lower-case `hs256` and an HS512 header over an HS256 signature rejected).
+  Then (feature ON) put the auth service secret in `auth.secrets.hmac` and the audience in `auth.jwt.audience` in `config.yml`, remove `debug.auth.disable`, run the App and call `GET /v1/greeting` with no token, then with a token from the auth service.
+  Pass: no token gives HTTP 401; the real token gives HTTP 200 `{"message":"Hello"}`; the secret is not in the log.
+  Done 2026-11-07 by the implementer with a test secret: all pass (awaiting operator confirmation with a real token).
+- ⏸ Task 009/010 follow-ups: confirm the HMAC variant and the `aud` value with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 
 ## Maintenance / housekeeping
 

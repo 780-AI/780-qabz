@@ -1,16 +1,13 @@
 package authtest
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/sha512"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json/v2"
-	"encoding/pem"
 	"fmt"
-	"math/big"
+	"hash"
 	"strings"
 	"testing"
 
@@ -27,45 +24,20 @@ func (f *fatalTB) Helper() {}
 
 func (f *fatalTB) Fatalf(format string, args ...any) { f.fatal = fmt.Sprintf(format, args...) }
 
-func TestNewKeyIsP521WithMatchingPEM(t *testing.T) {
-	key := NewKey(t)
-	if !assert.NotNil(t, key.Private) {
-		t.FailNow()
-	}
-	assert.Equal(t, elliptic.P521(), key.Private.Curve)
-	block, _ := pem.Decode(key.PublicPEM)
-	if !assert.NotNil(t, block) {
-		t.FailNow()
-	}
-	assert.Equal(t, "PUBLIC KEY", block.Type)
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	ec, ok := pub.(*ecdsa.PublicKey)
-	if !assert.True(t, ok) || !assert.NotNil(t, ec) {
-		t.FailNow()
-	}
-	assert.True(t, ec.Equal(&key.Private.PublicKey))
-}
-
-func TestSignMakesAVerifiableToken(t *testing.T) {
+func TestSignMakesAnHMACToken(t *testing.T) {
 	cases := []struct {
-		name    string
-		curve   elliptic.Curve
 		alg     string
-		sigSize int
+		newHash func() hash.Hash
+		size    int
 	}{
-		{name: "P-521 is ES512", curve: elliptic.P521(), alg: "ES512", sigSize: 132},
-		{name: "P-256 is ES256", curve: elliptic.P256(), alg: "ES256", sigSize: 64},
+		{alg: "HS256", newHash: sha256.New, size: 32},
+		{alg: "HS384", newHash: sha512.New384, size: 48},
+		{alg: "HS512", newHash: sha512.New, size: 64},
+		{alg: "RS256", newHash: sha256.New, size: 32}, // a non-HMAC alg is signed with SHA-256
 	}
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			key := newKey(t, tc.curve)
-			if !assert.NotNil(t, key.Private) {
-				t.FailNow()
-			}
-			token := Sign(t, key.Private, map[string]any{"alg": tc.alg}, ValidClaims())
+		t.Run(tc.alg, func(t *testing.T) {
+			token := Sign(t, Secret, Header(tc.alg), ValidClaims())
 			parts := strings.Split(token, ".")
 			if !assert.Len(t, parts, 3) {
 				t.FailNow()
@@ -80,6 +52,7 @@ func TestSignMakesAVerifiableToken(t *testing.T) {
 				t.FailNow()
 			}
 			assert.Equal(t, tc.alg, h["alg"])
+			assert.Equal(t, "JWT", h["typ"])
 
 			payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 			if !assert.NoError(t, err) {
@@ -93,41 +66,20 @@ func TestSignMakesAVerifiableToken(t *testing.T) {
 			assert.Equal(t, Audience, c["aud"])
 
 			sig, err := base64.RawURLEncoding.DecodeString(parts[2])
-			if !assert.NoError(t, err) || !assert.Len(t, sig, tc.sigSize) {
+			if !assert.NoError(t, err) || !assert.Len(t, sig, tc.size) {
 				t.FailNow()
 			}
-			input := []byte(parts[0] + "." + parts[1])
-			var digest []byte
-			if tc.sigSize == 132 {
-				d := sha512.Sum512(input)
-				digest = d[:]
-			} else {
-				d := sha256.Sum256(input)
-				digest = d[:]
-			}
-			half := tc.sigSize / 2
-			r := new(big.Int).SetBytes(sig[:half])
-			s := new(big.Int).SetBytes(sig[half:])
-			assert.True(t, ecdsa.Verify(&key.Private.PublicKey, digest, r, s))
+			mac := hmac.New(tc.newHash, []byte(Secret))
+			mac.Write([]byte(parts[0] + "." + parts[1]))
+			assert.True(t, hmac.Equal(mac.Sum(nil), sig))
 		})
 	}
 }
 
-func TestSignStopsWithoutKey(t *testing.T) {
-	cases := []struct {
-		name string
-		key  *ecdsa.PrivateKey
-	}{
-		{name: "nil key", key: nil},
-		{name: "key without curve", key: &ecdsa.PrivateKey{}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			f := &fatalTB{TB: t}
-			assert.Equal(t, "", Sign(f, tc.key, ES512Header(), ValidClaims()))
-			assert.Contains(t, f.fatal, "no key")
-		})
-	}
+func TestSignStopsWithoutSecret(t *testing.T) {
+	f := &fatalTB{TB: t}
+	assert.Equal(t, "", Sign(f, "", Header("HS256"), ValidClaims()))
+	assert.Contains(t, f.fatal, "no secret")
 }
 
 func TestEncodeStopsOnBadValue(t *testing.T) {
@@ -137,7 +89,7 @@ func TestEncodeStopsOnBadValue(t *testing.T) {
 }
 
 func TestCasesTable(t *testing.T) {
-	cases := Cases(t, NewKey(t))
+	cases := Cases(t)
 	if !assert.NotEmpty(t, cases) {
 		t.FailNow()
 	}
@@ -159,7 +111,7 @@ func TestCasesTable(t *testing.T) {
 			assert.Empty(t, c.Authorization, c.Name)
 		}
 	}
-	assert.Positive(t, valid)
+	assert.Equal(t, 6, valid)
 	assert.Equal(t, 1, noHeader)
 }
 
@@ -177,5 +129,17 @@ func TestCut3(t *testing.T) {
 	for _, tc := range cases {
 		a, b, c := cut3(tc.in)
 		assert.Equal(t, []string{tc.a, tc.b, tc.c}, []string{a, b, c}, tc.in)
+	}
+}
+
+// TestVerifierMatchesTable: the verifier of Verifier accepts exactly the valid inputs of the table.
+func TestVerifierMatchesTable(t *testing.T) {
+	v := Verifier(t)
+	if !assert.NotNil(t, v) {
+		t.FailNow()
+	}
+	for _, c := range Cases(t) {
+		_, err := v.VerifyAuthorization(c.Authorization)
+		assert.Equal(t, c.Valid, err == nil, c.Name)
 	}
 }

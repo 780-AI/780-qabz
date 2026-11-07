@@ -58,21 +58,13 @@ func (s *claimsService) seen() *auth.Claims {
 
 // startAuthServer starts a gRPC server with the auth check built from cfg, as NewDefaultBuilder
 // does, and returns a client and the reasons the check reported.
-func startAuthServer(t *testing.T, cfg config.Config, key authtest.Key, svc pb.ServiceServer) (pb.ServiceClient, *[]string) {
+func startAuthServer(t *testing.T, cfg config.Config, svc pb.ServiceServer) (pb.ServiceClient, *[]string) {
 	t.Helper()
 	var mu sync.Mutex
 	reasons := []string{}
 	opts := AuthOptions{Disabled: cfg.DebugAuthDisable, OnReject: func(r string) { mu.Lock(); reasons = append(reasons, r); mu.Unlock() }}
 	if !cfg.DebugAuthDisable {
-		pub, err := auth.ParsePublicKey(key.PublicPEM)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
-		v, err := auth.NewVerifier(pub, authtest.Audience, func() time.Time { return authtest.Now })
-		if !assert.NoError(t, err) || !assert.NotNil(t, v) {
-			t.FailNow()
-		}
-		opts.Verifier = v
+		opts.Verifier = authtest.Verifier(t)
 	}
 	a, err := NewAuth(opts)
 	if !assert.NoError(t, err) || !assert.NotNil(t, a) {
@@ -93,8 +85,7 @@ func startAuthServer(t *testing.T, cfg config.Config, key authtest.Key, svc pb.S
 
 // TestAuthConfigAndTokenTable runs every config entry with every JWT input of the shared table.
 func TestAuthConfigAndTokenTable(t *testing.T) {
-	key := authtest.NewKey(t)
-	cases := authtest.Cases(t, key)
+	cases := authtest.Cases(t)
 	for _, entry := range configEntries {
 		t.Run(entry.name, func(t *testing.T) {
 			cfg, err := config.Parse([]byte(entry.yml))
@@ -103,7 +94,7 @@ func TestAuthConfigAndTokenTable(t *testing.T) {
 			}
 			assert.Equal(t, entry.disabled, cfg.DebugAuthDisable)
 			svc := &claimsService{}
-			client, reasons := startAuthServer(t, cfg, key, svc)
+			client, reasons := startAuthServer(t, cfg, svc)
 
 			for _, tc := range cases {
 				t.Run(tc.Name, func(t *testing.T) {
@@ -139,13 +130,12 @@ func TestAuthConfigAndTokenTable(t *testing.T) {
 }
 
 func TestAuthRejectsTwoAuthorizationValues(t *testing.T) {
-	key := authtest.NewKey(t)
 	cfg, err := config.Parse([]byte(configEntries[0].yml))
 	if !assert.NoError(t, err) {
 		return
 	}
-	client, reasons := startAuthServer(t, cfg, key, &claimsService{})
-	good := "Bearer " + authtest.Sign(t, key.Private, authtest.ES512Header(), authtest.ValidClaims())
+	client, reasons := startAuthServer(t, cfg, &claimsService{})
+	good := "Bearer " + authtest.Sign(t, authtest.Secret, authtest.Header("HS256"), authtest.ValidClaims())
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", good, "authorization", good)
 	_, err = client.Greeting(ctx, &pb.GreetingRequest{})
 	assert.Equal(t, codes.Unauthenticated, status.Code(err))
@@ -199,16 +189,7 @@ type fakeStream struct {
 func (f fakeStream) Context() context.Context { return f.ctx }
 
 func TestAuthStreamInterceptor(t *testing.T) {
-	key := authtest.NewKey(t)
-	pub, err := auth.ParsePublicKey(key.PublicPEM)
-	if !assert.NoError(t, err) {
-		return
-	}
-	v, err := auth.NewVerifier(pub, authtest.Audience, func() time.Time { return authtest.Now })
-	if !assert.NoError(t, err) {
-		return
-	}
-	a, err := NewAuth(AuthOptions{Verifier: v})
+	a, err := NewAuth(AuthOptions{Verifier: authtest.Verifier(t)})
 	if !assert.NoError(t, err) || !assert.NotNil(t, a) {
 		return
 	}
@@ -221,7 +202,7 @@ func TestAuthStreamInterceptor(t *testing.T) {
 		}
 		return nil
 	}
-	good := "Bearer " + authtest.Sign(t, key.Private, authtest.ES512Header(), authtest.ValidClaims())
+	good := "Bearer " + authtest.Sign(t, authtest.Secret, authtest.Header("HS256"), authtest.ValidClaims())
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", good))
 	assert.NoError(t, intercept(nil, fakeStream{ctx: ctx}, &grpc.StreamServerInfo{}, handler))
 	if assert.NotNil(t, seen) {
