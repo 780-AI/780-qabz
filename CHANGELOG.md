@@ -1,7 +1,8 @@
-<!-- VERSION: 1.56 -->
+<!-- VERSION: 1.57 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.57 — 2026-11-07 — Added 008-task entry.
 v1.56 — 2026-11-07 — Added 007-make-compose-actions entry.
 v1.55 — 2026-11-07 — Added 007-task entry.
 v1.54 — 2026-11-04 — Added 006-greeting-ping entry.
@@ -62,6 +63,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 008_logs_to_stdout
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/008_logs_to_stdout.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 009), `docs/documents_manifest.md` (v0.58), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task sends the App log lines to stdout, as the `traffick` service does.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 007_make_compose_actions: `make compose up|down|ps|logs`
 - **Type:** Minor (developer tooling; no App code, no config key)
