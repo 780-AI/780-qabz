@@ -1,7 +1,8 @@
-<!-- VERSION: 1.70 -->
+<!-- VERSION: 1.71 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.71 — 2026-11-07 — Added 014-task entry.
 v1.70 — 2026-11-07 — Added 013-services-endpoint entry.
 v1.69 — 2026-11-07 — Added 013-task entry.
 v1.68 — 2026-11-07 — Added 012-auth-status-403 entry.
@@ -76,6 +77,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 014_request_metrics_middleware
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/014_request_metrics_middleware.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 015), `docs/documents_manifest.md` (v0.72), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds the request duration middleware of Implementation_Plan Step 6 (it does not exist yet) with a Prometheus counter of each incoming request, labeled with the request path.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 013_services_endpoint: GET /v1/services
 - **Type:** Major (a new endpoint, a new config key, new packages)
