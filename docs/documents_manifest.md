@@ -1,4 +1,4 @@
-<!-- VERSION: 0.67 -->
+<!-- VERSION: 0.68 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.66 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.67 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.67 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.68 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.26 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,8 +54,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-07
-- **Change**: Task 011 `jwt_no_audience_check` done: `aud` is not compared (any string), `auth.jwt.audience` removed; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.66, #5 manifest v0.67, #28 OPEN_TASKS v1.20, #30 PROJECT_SPECIFIC_CONVENTIONS v0.11, #34 app README v0.8.
-- **Previous change**: 2026-11-07 — New task file `011_jwt_no_audience_check.md` v0.1 (not manifest-tracked); task counter at 012. Bumped #3 CHANGELOG v1.65, #5 manifest v0.66.
+- **Change**: New task file `012_auth_status_403.md` v0.1 (not manifest-tracked); task counter at 013. Bumped #3 CHANGELOG v1.67, #5 manifest v0.68.
+- **Previous change**: 2026-11-07 — Task 011 `jwt_no_audience_check` done: `aud` is not compared (any string), `auth.jwt.audience` removed; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.66, #5 manifest v0.67, #28 OPEN_TASKS v1.20, #30 PROJECT_SPECIFIC_CONVENTIONS v0.11, #34 app README v0.8.
+- **Earlier change**: 2026-11-07 — New task file `011_jwt_no_audience_check.md` v0.1 (not manifest-tracked); task counter at 012. Bumped #3 CHANGELOG v1.65, #5 manifest v0.66.
 - **Earlier change**: 2026-11-07 — Conventions § 8 config files; new `config.yml.example` (YAML, no VERSION header, so no row) and `src/config/example_test.go` (Go, no row). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.10, #3 CHANGELOG v1.64, #5 manifest v0.65, #6 folder_structure v0.26, #34 app README v0.7.
 - **Earlier change**: 2026-11-07 — Task 010 `jwt_hmac_secret` done: JWT check with an HMAC secret (`auth.secrets.hmac`) in place of the ES512 public key; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.63, #5 manifest v0.64, #6 folder_structure v0.25, #28 OPEN_TASKS v1.19, #34 app README v0.6.
 - **Earlier change**: 2026-11-07 — New task file `010_jwt_hmac_secret.md` v0.1 (not manifest-tracked); task counter at 011. Bumped #3 CHANGELOG v1.62, #5 manifest v0.63.

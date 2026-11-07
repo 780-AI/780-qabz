@@ -1,7 +1,8 @@
-<!-- VERSION: 1.66 -->
+<!-- VERSION: 1.67 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.67 — 2026-11-07 — Added 012-task entry.
 v1.66 — 2026-11-07 — Added 011-jwt-no-audience-check entry.
 v1.65 — 2026-11-07 — Added 011-task entry.
 v1.64 — 2026-11-07 — Added config-example-convention entry.
@@ -72,6 +73,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — New task: 012_auth_status_403
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/012_auth_status_403.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 013), `docs/documents_manifest.md` (v0.68), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task changes the answer of a rejected auth check from gRPC `Unauthenticated` / HTTP 401 to gRPC `PermissionDenied` / HTTP 403; the message, the check and the metric stay.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 011_jwt_no_audience_check: aud is not compared
 - **Type:** Major (auth behavior and a config key removed)
