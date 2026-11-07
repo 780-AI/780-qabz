@@ -1,4 +1,4 @@
-<!-- VERSION: 0.66 -->
+<!-- VERSION: 0.67 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.65 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.66 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.66 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.67 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.26 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,19 +43,20 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.19 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.20 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
-| 30 | Project Specific Conventions | v0.10 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
+| 30 | Project Specific Conventions | v0.11 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.7 | Docs | `src/app/README.md` |
+| 34 | App module README | v0.8 | Docs | `src/app/README.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-07
-- **Change**: New task file `011_jwt_no_audience_check.md` v0.1 (not manifest-tracked); task counter at 012. Bumped #3 CHANGELOG v1.65, #5 manifest v0.66.
-- **Previous change**: 2026-11-07 — Conventions § 8 config files; new `config.yml.example` (YAML, no VERSION header, so no row) and `src/config/example_test.go` (Go, no row). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.10, #3 CHANGELOG v1.64, #5 manifest v0.65, #6 folder_structure v0.26, #34 app README v0.7.
+- **Change**: Task 011 `jwt_no_audience_check` done: `aud` is not compared (any string), `auth.jwt.audience` removed; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.66, #5 manifest v0.67, #28 OPEN_TASKS v1.20, #30 PROJECT_SPECIFIC_CONVENTIONS v0.11, #34 app README v0.8.
+- **Previous change**: 2026-11-07 — New task file `011_jwt_no_audience_check.md` v0.1 (not manifest-tracked); task counter at 012. Bumped #3 CHANGELOG v1.65, #5 manifest v0.66.
+- **Earlier change**: 2026-11-07 — Conventions § 8 config files; new `config.yml.example` (YAML, no VERSION header, so no row) and `src/config/example_test.go` (Go, no row). Bumped #30 PROJECT_SPECIFIC_CONVENTIONS v0.10, #3 CHANGELOG v1.64, #5 manifest v0.65, #6 folder_structure v0.26, #34 app README v0.7.
 - **Earlier change**: 2026-11-07 — Task 010 `jwt_hmac_secret` done: JWT check with an HMAC secret (`auth.secrets.hmac`) in place of the ES512 public key; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.63, #5 manifest v0.64, #6 folder_structure v0.25, #28 OPEN_TASKS v1.19, #34 app README v0.6.
 - **Earlier change**: 2026-11-07 — New task file `010_jwt_hmac_secret.md` v0.1 (not manifest-tracked); task counter at 011. Bumped #3 CHANGELOG v1.62, #5 manifest v0.63.
 - **Earlier change**: 2026-11-07 — Task 009 `auth_middleware` done: JWT auth check on every endpoint; task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so they have no rows. Bumped #3 CHANGELOG v1.61, #5 manifest v0.62, #6 folder_structure v0.24, #28 OPEN_TASKS v1.18, #34 app README v0.5.

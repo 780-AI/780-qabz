@@ -1,7 +1,8 @@
-<!-- VERSION: 0.10 -->
+<!-- VERSION: 0.11 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v0.11 — 2026-11-07 — Section 8: layout examples no longer name `auth.jwt.*` (task 011 removed its only key).
 v0.10 — 2026-11-07 — Section 8: every config key is in both `config.yml` (local, git-ignored) and `config.yml.example` (tracked, default or zero values); the two stay in sync.
 v0.9 — 2026-11-07 — Section 7: the Postman collection `qabz.postman_collection.json` in the repo root is updated in the same commit as every HTTP API change.
 v0.8 — 2026-11-04 — Section 6: `pb` submodule ownership. Only `pb/proto/qabz/` is writable; every other path in `pb/` is read-only for this repo.
@@ -200,7 +201,7 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 
 **A config change updates both files in the same change:** a new key, a removed or renamed key, or a changed default. A new key is a `path` tag on a `Config` field in `src/config/config.go`. A secret key uses the `Secret` type, so its value never prints.
 
-**Layout.** Auth secrets are under `auth.secrets` (for example `auth.secrets.hmac`). Other keys follow the area they configure (`database.*`, `server.*`, `auth.jwt.*`, `debug.*`). Do not put a config value in a separate file.
+**Layout.** Auth secrets are under `auth.secrets` (for example `auth.secrets.hmac`). Other keys follow the area they configure (`database.*`, `server.*`, `metrics.*`, `debug.*`). Do not put a config value in a separate file.
 
 **Check.** The tests in `src/config/example_test.go` fail when:
 - `config.yml.example` and the `Config` path tags do not have the same keys.

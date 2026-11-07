@@ -1,7 +1,8 @@
-<!-- VERSION: 1.65 -->
+<!-- VERSION: 1.66 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.66 — 2026-11-07 — Added 011-jwt-no-audience-check entry.
 v1.65 — 2026-11-07 — Added 011-task entry.
 v1.64 — 2026-11-07 — Added config-example-convention entry.
 v1.63 — 2026-11-07 — Added 010-jwt-hmac-secret entry.
@@ -71,6 +72,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 011_jwt_no_audience_check: aud is not compared
+- **Type:** Major (auth behavior and a config key removed)
+- **Files:** `src/common/auth/` (`jwt.go`, `jwt_test.go`, `authtest/authtest.go`, `authtest/authtest_test.go`), `src/config/` (`config.go`, `config_test.go`), `src/app/` (`defaults.go`, `defaults_test.go`, `README.md` v0.8), `config.yml.example`, `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.11), `docs/Plans/OPEN_TASKS.md` (v1.20), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.67), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. `aud` is no longer compared with a value, as in `bill`: any `aud` string (also empty) is accepted and goes into `Claims.Audience`; a missing `aud`, an array or a number still gets HTTP 401. `auth.jwt.audience` is removed: with the check on, only `auth.secrets.hmac` is needed. Risk accepted by the operator: a token that the auth service issued for another service also works on Qabz. A local `config.yml` must drop `auth.jwt.audience` (the sync test fails otherwise).
+- **QA scenarios:** (1) `go build`, `go vet`, `go test -race -count=1 ./...` pass (done, 2026-11-07). (2) Deliberate failure (no `aud` check) fails 3 table cases (done, 2026-11-07). (3) Feature ON with a test secret: `aud` "qabz", "bill", "" 200; no `aud`, array, number 401; metric `audience` 3 (done, 2026-11-07). (4) The operator calls greeting with a real token from the auth service (pending).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 011_jwt_no_audience_check
 - **Type:** Minor (docs only; a new task file)

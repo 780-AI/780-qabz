@@ -1,7 +1,7 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 1.0 -->
 # 011_jwt_no_audience_check — accept any aud string, as bill does
 
-Status: pending
+Status: done
 
 ## Description
 
@@ -25,3 +25,12 @@ Risk (accepted by the operator): any valid token of the auth service works on Qa
 ## Verification
 
 Remove `auth.jwt.audience` from `config.yml`, keep `auth.secrets.hmac`, run the App with the check on and call `GET /v1/greeting` with a token from the auth service. Pass: HTTP 200 `{"message":"Hello"}`.
+
+## Result (2026-11-07)
+
+- `common/auth/jwt.go`: `NewVerifier(secret, now)` has no audience. `readClaims` needs `aud` to be a JSON string (any value, also empty) and copies it to the new `Claims.Audience`; a missing or non-string `aud` is `audience`. `hasAudience` is gone.
+- `config`: `auth.jwt.audience` (`JWTAudience`) is removed. `app/defaults.go` needs only `auth.secrets.hmac` with the check on.
+- `config.yml.example` and the local `config.yml` lost `auth.jwt.audience`; the sync tests (conventions § 8) pass.
+- Tests: the shared table has 43 inputs (7 valid). New: any `aud`, empty `aud` (valid); `aud` array, `aud` number (rejected). `TestAudienceInClaims` checks the value in the claims. `go build`, `go vet`, `go test -race -count=1 ./...` pass; `common/auth` 95.5%.
+- Deliberate failure (an overlay without the `aud` check): `no aud`, `aud array` and `aud is a number` fail.
+- Feature ON (App binary, compose Postgres and Redis, test secret, config with only `auth.secrets.hmac`): `aud` "qabz", "bill" and "" gave 200; no `aud`, an array and a number gave 401; the metric showed `audience` 3; the secret was in no log.

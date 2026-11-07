@@ -52,8 +52,6 @@ type Config struct {
 	// HS512). The raw string is the key. It sits in the main config with the other auth secrets
 	// (auth.secrets). Qabz only verifies tokens with it. Required while the auth check is on.
 	JWTHMACSecret Secret `path:"auth.secrets.hmac"`
-	// JWTAudience is the value that the token's aud claim must contain. Required while the auth check is on.
-	JWTAudience string `path:"auth.jwt.audience"`
 	// DebugAuthDisable turns the auth check off. Development only: the production config has no
 	// debug section, and a missing key is false (the check is on).
 	DebugAuthDisable bool `path:"debug.auth.disable"`

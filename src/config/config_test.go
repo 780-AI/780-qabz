@@ -130,17 +130,15 @@ func TestSecretNeverPrints(t *testing.T) {
 	}
 }
 
-// TestParseAuthKeys: the auth.jwt keys are read from the YAML; a missing section leaves them empty.
+// TestParseAuthKeys: auth.secrets.hmac is read from the YAML; a missing section leaves it empty.
 func TestParseAuthKeys(t *testing.T) {
-	c, err := Parse([]byte(`{database: {postgres: {password: x}}, auth: {secrets: {hmac: hm4c}, jwt: {audience: qabz}}}`))
+	c, err := Parse([]byte(`{database: {postgres: {password: x}}, auth: {secrets: {hmac: hm4c}}}`))
 	if assert.NoError(t, err) {
 		assert.Equal(t, "hm4c", c.JWTHMACSecret.Reveal())
-		assert.Equal(t, "qabz", c.JWTAudience)
 	}
 	c, err = Parse([]byte(`database: {postgres: {password: x}}`))
 	if assert.NoError(t, err) {
 		assert.Equal(t, "", c.JWTHMACSecret.Reveal())
-		assert.Equal(t, "", c.JWTAudience)
 	}
 }
 

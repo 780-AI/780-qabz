@@ -64,27 +64,24 @@ func TestDefaultBuilderRejectsBadLogLevel(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestDefaultBuilderAuthRules: with the check on, the start needs the HMAC secret and an audience;
-// with debug.auth.disable it needs neither. The secret is never in the start error.
+// TestDefaultBuilderAuthRules: with the check on, the start needs the HMAC secret; with
+// debug.auth.disable it does not. The secret is never in the start error.
 func TestDefaultBuilderAuthRules(t *testing.T) {
 	cases := []struct {
-		name     string
-		disable  bool
-		secret   config.Secret
-		audience string
-		ok       bool
+		name    string
+		disable bool
+		secret  config.Secret
+		ok      bool
 	}{
 		{name: "disabled, no secret", disable: true, ok: true},
-		{name: "on, secret and audience", secret: authtest.Secret, audience: authtest.Audience, ok: true},
-		{name: "on, no secret", audience: authtest.Audience},
-		{name: "on, no audience", secret: authtest.Secret},
+		{name: "on, secret", secret: authtest.Secret, ok: true},
+		{name: "on, no secret"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := testConfig(t)
 			cfg.DebugAuthDisable = tc.disable
 			cfg.JWTHMACSecret = tc.secret
-			cfg.JWTAudience = tc.audience
 			b, err := NewDefaultBuilder(context.Background(), cfg)
 			if !tc.ok {
 				if assert.Error(t, err) {

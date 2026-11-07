@@ -41,7 +41,7 @@ const (
 	ReasonExpired     Reason = "expired"       // exp is missing or not in the future
 	ReasonNotYetValid Reason = "not_yet_valid" // nbf is in the future
 	ReasonClaims      Reason = "claims"        // sub, mobile or non_otp missing or bad
-	ReasonAudience    Reason = "audience"      // aud does not contain the expected audience
+	ReasonAudience    Reason = "audience"      // aud is missing or not a string
 	ReasonGuest       Reason = "guest"         // a guest (non_otp == "guest") token
 )
 
@@ -68,32 +68,29 @@ func ReasonOf(err error) Reason {
 
 // Claims are the token values that the handlers can use.
 type Claims struct {
-	UserID string // sub, a UUID
-	Mobile string // mobile
-	NonOTP string // non_otp, the login type (never "guest" here)
+	UserID   string // sub, a UUID
+	Mobile   string // mobile
+	NonOTP   string // non_otp, the login type (never "guest" here)
+	Audience string // aud, any string (not compared with a value, as in bill)
 }
 
-// Verifier checks tokens with one HMAC secret and one expected audience.
+// Verifier checks tokens with one HMAC secret.
 type Verifier struct {
-	secret   []byte
-	audience string
-	now      func() time.Time
-	parsers  fastjson.ParserPool
+	secret  []byte
+	now     func() time.Time
+	parsers fastjson.ParserPool
 }
 
-// NewVerifier returns a Verifier for secret and audience. It keeps its own copy of secret. now is
-// the clock; nil means time.Now.
-func NewVerifier(secret []byte, audience string, now func() time.Time) (*Verifier, error) {
+// NewVerifier returns a Verifier for secret. It keeps its own copy of secret. now is the clock; nil
+// means time.Now.
+func NewVerifier(secret []byte, now func() time.Time) (*Verifier, error) {
 	if len(secret) == 0 {
 		return nil, errors.New("auth: HMAC secret is required")
-	}
-	if audience == "" {
-		return nil, errors.New("auth: audience is required")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Verifier{secret: append([]byte(nil), secret...), audience: audience, now: now}, nil
+	return &Verifier{secret: append([]byte(nil), secret...), now: now}, nil
 }
 
 // BearerToken returns the token of an Authorization value "Bearer <token>". The scheme is not
@@ -187,7 +184,7 @@ func (v *Verifier) checkHeader(header []byte) (func() hash.Hash, error) {
 	return newHash, nil
 }
 
-// readClaims checks the time claims, the audience and the required claims. Every string is
+// readClaims checks the time claims and the required claims. Every string is
 // copied out before the parser goes back to the pool.
 func (v *Verifier) readClaims(payload []byte) (Claims, error) {
 	p := v.parsers.Get()
@@ -216,9 +213,12 @@ func (v *Verifier) readClaims(payload []byte) (Claims, error) {
 		}
 	}
 
-	if !hasAudience(c.Get("aud"), v.audience) {
+	// aud must be a JSON string; its value is not compared with anything (as in bill).
+	aud := c.Get("aud")
+	if aud == nil || aud.Type() != fastjson.TypeString {
 		return Claims{}, reject(ReasonAudience)
 	}
+	audience := string(aud.GetStringBytes()) // string() copies the bytes out of the parser
 
 	sub, ok := stringClaim(c, "sub")
 	if !ok || len(sub) != 36 {
@@ -238,7 +238,7 @@ func (v *Verifier) readClaims(payload []byte) (Claims, error) {
 	if nonOTP == "guest" {
 		return Claims{}, reject(ReasonGuest)
 	}
-	return Claims{UserID: sub, Mobile: mobile, NonOTP: nonOTP}, nil
+	return Claims{UserID: sub, Mobile: mobile, NonOTP: nonOTP, Audience: audience}, nil
 }
 
 // stringClaim returns a copy of the non-empty string claim name.
@@ -249,26 +249,4 @@ func stringClaim(c *fastjson.Value, name string) (string, bool) {
 	}
 	s := string(v.GetStringBytes()) // string() copies the bytes out of the parser
 	return s, s != ""
-}
-
-// hasAudience reports whether aud (a string or an array of strings, RFC 7519 § 4.1.3) contains want.
-func hasAudience(aud *fastjson.Value, want string) bool {
-	if aud == nil {
-		return false
-	}
-	switch aud.Type() {
-	case fastjson.TypeString:
-		return string(aud.GetStringBytes()) == want
-	case fastjson.TypeArray:
-		items, err := aud.Array()
-		if err != nil {
-			return false
-		}
-		for _, item := range items {
-			if item != nil && item.Type() == fastjson.TypeString && string(item.GetStringBytes()) == want {
-				return true
-			}
-		}
-	}
-	return false
 }

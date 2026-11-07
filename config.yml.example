@@ -39,8 +39,6 @@ database:
 auth:
   secrets:
     hmac: ""                 # the auth service JWT secret; required while the auth check is on
-  jwt:
-    audience: ""             # the aud value of the tokens; required while the auth check is on
 
 # Development only: the production config has no debug section.
 debug:

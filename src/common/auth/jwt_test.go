@@ -44,14 +44,12 @@ func TestBearerToken(t *testing.T) {
 }
 
 func TestNewVerifierRejectsBadInput(t *testing.T) {
-	_, err := auth.NewVerifier(nil, authtest.Audience, nil)
+	_, err := auth.NewVerifier(nil, nil)
 	assert.Error(t, err)
-	_, err = auth.NewVerifier([]byte{}, authtest.Audience, nil)
-	assert.Error(t, err)
-	_, err = auth.NewVerifier([]byte(authtest.Secret), "", nil)
+	_, err = auth.NewVerifier([]byte{}, nil)
 	assert.Error(t, err)
 
-	v, err := auth.NewVerifier([]byte(authtest.Secret), authtest.Audience, nil) // nil clock: the real clock
+	v, err := auth.NewVerifier([]byte(authtest.Secret), nil) // nil clock: the real clock
 	assert.NoError(t, err)
 	assert.NotNil(t, v)
 }
@@ -60,7 +58,7 @@ func TestNewVerifierRejectsBadInput(t *testing.T) {
 // secret the verifier uses.
 func TestNewVerifierCopiesSecret(t *testing.T) {
 	secret := []byte(authtest.Secret)
-	v, err := auth.NewVerifier(secret, authtest.Audience, func() time.Time { return authtest.Now })
+	v, err := auth.NewVerifier(secret, func() time.Time { return authtest.Now })
 	if !assert.NoError(t, err) || !assert.NotNil(t, v) {
 		t.FailNow()
 	}
@@ -70,6 +68,19 @@ func TestNewVerifierCopiesSecret(t *testing.T) {
 	token := authtest.Sign(t, authtest.Secret, authtest.Header("HS256"), authtest.ValidClaims())
 	_, err = v.Verify(token)
 	assert.NoError(t, err)
+}
+
+// TestAudienceInClaims: any aud string is accepted and reaches the claims unchanged.
+func TestAudienceInClaims(t *testing.T) {
+	v := authtest.Verifier(t)
+	for _, aud := range []string{authtest.Audience, "another-service", ""} {
+		claims := authtest.ValidClaims()
+		claims["aud"] = aud
+		got, err := v.Verify(authtest.Sign(t, authtest.Secret, authtest.Header("HS256"), claims))
+		if assert.NoError(t, err, aud) {
+			assert.Equal(t, aud, got.Audience)
+		}
+	}
 }
 
 func TestVerifyOnZeroVerifier(t *testing.T) {

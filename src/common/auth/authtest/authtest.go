@@ -16,7 +16,7 @@ import (
 	"qabz/common/auth"
 )
 
-// Audience is the aud value the test verifiers expect.
+// Audience is the aud value of the valid test token. The verifier does not compare it.
 const Audience = "qabz"
 
 // Now is the fixed clock of the tests, so the exp and nbf cases do not depend on the time of the run.
@@ -43,10 +43,10 @@ func ValidClaims() map[string]any {
 	}
 }
 
-// Verifier returns a verifier with Secret, Audience and the clock Now. It stops the test if that fails.
+// Verifier returns a verifier with Secret and the clock Now. It stops the test if that fails.
 func Verifier(t testing.TB) *auth.Verifier {
 	t.Helper()
-	v, err := auth.NewVerifier([]byte(Secret), Audience, func() time.Time { return Now })
+	v, err := auth.NewVerifier([]byte(Secret), func() time.Time { return Now })
 	if err != nil || v == nil {
 		t.Fatalf("authtest: new verifier: %v", err)
 		return nil
@@ -106,7 +106,7 @@ type Case struct {
 	Reason string
 }
 
-// Cases returns every JWT input of the tests, for a verifier with Secret and Audience. Add a new
+// Cases returns every JWT input of the tests, for a verifier with Secret. Add a new
 // input here: every test that uses the table picks it up.
 func Cases(t testing.TB) []Case {
 	t.Helper()
@@ -181,14 +181,16 @@ func Cases(t testing.TB) []Case {
 		{Name: "no sub", Authorization: b(sign(with(func(c map[string]any) { delete(c, "sub") }))), Reason: "claims"},
 		{Name: "no mobile", Authorization: b(sign(with(func(c map[string]any) { delete(c, "mobile") }))), Reason: "claims"},
 		{Name: "no non_otp", Authorization: b(sign(with(func(c map[string]any) { delete(c, "non_otp") }))), Reason: "claims"},
-		{Name: "wrong aud", Authorization: b(sign(with(func(c map[string]any) { c["aud"] = "other" }))), Reason: "audience"},
 		{Name: "no aud", Authorization: b(sign(with(func(c map[string]any) { delete(c, "aud") }))), Reason: "audience"},
+		{Name: "aud array", Authorization: b(sign(with(func(c map[string]any) { c["aud"] = []string{"other", Audience} }))), Reason: "audience"},
+		{Name: "aud is a number", Authorization: b(sign(with(func(c map[string]any) { c["aud"] = 1 }))), Reason: "audience"},
 		{Name: "guest", Authorization: b(sign(with(func(c map[string]any) { c["non_otp"] = "guest" }))), Reason: "guest"},
 		{Name: "valid HS256", Authorization: b(good), Valid: true},
 		{Name: "valid HS384", Authorization: b(Sign(t, Secret, Header("HS384"), ValidClaims())), Valid: true},
 		{Name: "valid HS512", Authorization: b(Sign(t, Secret, Header("HS512"), ValidClaims())), Valid: true},
 		{Name: "valid lower-case scheme", Authorization: "bearer " + good, Valid: true},
-		{Name: "valid aud array", Authorization: b(sign(with(func(c map[string]any) { c["aud"] = []string{"other", Audience} }))), Valid: true},
+		{Name: "valid any aud", Authorization: b(sign(with(func(c map[string]any) { c["aud"] = "another-service" }))), Valid: true},
+		{Name: "valid empty aud", Authorization: b(sign(with(func(c map[string]any) { c["aud"] = "" }))), Valid: true},
 		{Name: "valid nbf in the past", Authorization: b(sign(with(func(c map[string]any) { c["nbf"] = Now.Unix() - 60 }))), Valid: true},
 	}
 }

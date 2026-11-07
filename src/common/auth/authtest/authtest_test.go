@@ -111,7 +111,7 @@ func TestCasesTable(t *testing.T) {
 			assert.Empty(t, c.Authorization, c.Name)
 		}
 	}
-	assert.Equal(t, 6, valid)
+	assert.Equal(t, 7, valid)
 	assert.Equal(t, 1, noHeader)
 }
 
