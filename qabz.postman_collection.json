@@ -55,6 +55,39 @@
             }
           ],
           "response": []
+        },
+        {
+          "name": "Services",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept-Language",
+                "value": "fa-IR",
+                "type": "text",
+                "description": "Language of the list (raw value, as bill). Without the header: fa-IR."
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/services",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "services"]
+            },
+            "description": "haf80.api.bill.Service/Get. Returns the service list (bill types) of the Accept-Language language from the services table, by order, cached in memory for 60s. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true. Expected: HTTP 200 and {\"serviceId\":<service.id>,\"services\":[{\"name\",\"isActive\",\"tag\",\"type\",\"inquiry\",\"icon\"}]}; inquiry is the stored value (bill always sends true). Without a valid token HTTP 403; a database error HTTP 500."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has serviceId and a services list\", function () { const b = pm.response.json(); pm.expect(b).to.have.property(\"serviceId\"); pm.expect(b.services).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
         }
       ]
     }

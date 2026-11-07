@@ -1,7 +1,8 @@
-<!-- VERSION: 1.69 -->
+<!-- VERSION: 1.70 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.70 — 2026-11-07 — Added 013-services-endpoint entry.
 v1.69 — 2026-11-07 — Added 013-task entry.
 v1.68 — 2026-11-07 — Added 012-auth-status-403 entry.
 v1.67 — 2026-11-07 — Added 012-task entry.
@@ -75,6 +76,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-07] — Task 013_services_endpoint: GET /v1/services
+- **Type:** Major (a new endpoint, a new config key, new packages)
+- **Files:** `src/config/` (`constants.go` new, `config.go`, `config_test.go`), `src/core/billtype/` (`services.go`, `services_test.go` new; `.gitkeep` removed), `src/system/postgres/` (`service_repository.go`, `service_repository_live_test.go`, `postgrestest/postgrestest.go`, `postgrestest/postgrestest_test.go` new), `src/entry/grpc/` (`service.go`, `service_test.go` new, `server_test.go`, `auth_test.go`), `src/entry/http/` (`services_test.go`, `services_live_test.go` new, `gateway_test.go`, `auth_test.go`), `src/app/` (`defaults.go`, `defaults_test.go`, `README.md` v0.10), `config.yml.example`, `qabz.postman_collection.json`, `docs/this_vs_bill.md` (new, v0.1), `docs/folder_structure.md` (v0.27), `docs/Plans/OPEN_TASKS.md` (v1.22), task file moved to `done_tasks/` (v1.0), `docs/documents_manifest.md` (v0.71), `CHANGELOG.md` (this entry).
+- **Impact:** Yes. `GET /v1/services` (gRPC `Service.Get`) was HTTP 501; now it returns the service list of the `services` table (bill database) for the `Accept-Language` language, by `order`, cached in memory per language for `CacheServicesTTL` (60s). New config key `service.id` (default 0) is sent as `serviceId`. New metric `qabz_services_cache_total{result}`; a failed read writes one error log line with the cause (the client gets no detail). Difference from `bill`: `inquiry` is the stored value, not always `true` (`docs/this_vs_bill.md` items 1-4: `inquiry`, error code, empty header, cache). `NewService` now takes `ServiceDeps`. No migration.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, "Task 013 `GET /v1/services`" (⏸, implementer run passed).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — New task: 013_services_endpoint
 - **Type:** Minor (docs only; a new task file)

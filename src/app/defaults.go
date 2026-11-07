@@ -13,6 +13,7 @@ import (
 	"qabz/common/monitoring/jaeger"
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
+	"qabz/core/billtype"
 	grpcserver "qabz/entry/grpc"
 	httpserver "qabz/entry/http"
 	"qabz/migrations"
@@ -60,7 +61,12 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	b.WithCache(redis.New(cfg.RedisAddr(), cfg.RedisPassword.Reveal()))
 	b.WithMetrics(metrics)
 
-	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, authCheck.ServerOptions(), grpcserver.RegisterService(grpcserver.NewService()))
+	svc, err := newService(cfg, db, metrics, logger)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, authCheck.ServerOptions(), grpcserver.RegisterService(svc))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
 	}
@@ -115,4 +121,31 @@ func newAuth(cfg config.Config, metrics *prometheus.Server, logger Logger) (*grp
 		Verifier: verifier,
 		OnReject: func(reason string) { rejected.WithLabelValues(reason).Inc() },
 	})
+}
+
+// newService builds the gRPC Service: GET /v1/services reads the services table through an
+// in-memory cache (config.CacheServicesTTL). Each call adds 1 to
+// qabz_services_cache_total{result="hit"|"miss"|"error"}; a failed read also writes one error log line.
+func newService(cfg config.Config, db *postgres.Client, metrics *prometheus.Server, logger Logger) (*grpcserver.Service, error) {
+	serviceID, err := grpcserver.ServiceIDFromConfig(cfg.ServiceID)
+	if err != nil {
+		return nil, err
+	}
+	results := promclient.NewCounterVec(promclient.CounterOpts{
+		Name: "qabz_services_cache_total",
+		Help: "GET /v1/services calls by cache result (hit, miss, error).",
+	}, []string{"result"})
+	if metrics != nil && metrics.Registry() != nil {
+		if err := metrics.Registry().Register(results); err != nil {
+			return nil, fmt.Errorf("services: register metric: %w", err)
+		}
+	}
+	catalog, err := billtype.NewServiceCatalog(postgres.NewServiceRepository(db), billtype.CatalogOptions{
+		TTL:      config.CacheServicesTTL,
+		OnResult: func(result string) { results.WithLabelValues(result).Inc() },
+	})
+	if err != nil {
+		return nil, err
+	}
+	return grpcserver.NewService(grpcserver.ServiceDeps{Services: catalog, ServiceID: serviceID, Logger: logger}), nil
 }

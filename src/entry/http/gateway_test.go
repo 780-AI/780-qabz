@@ -22,7 +22,7 @@ import (
 // It stops the test if a step fails.
 func stack(t *testing.T) *Gateway {
 	t.Helper()
-	gs, err := grpcserver.New("127.0.0.1:0", grpcserver.RegisterService(grpcserver.NewService()))
+	gs, err := grpcserver.New("127.0.0.1:0", grpcserver.RegisterService(grpcserver.NewService(grpcserver.ServiceDeps{})))
 	if !assert.NoError(t, err) || !assert.NotNil(t, gs) {
 		t.FailNow()
 	}
@@ -80,7 +80,8 @@ func TestUnknownRouteIsNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, code)
 }
 
-func TestUnwrittenMethodIsNotImplemented(t *testing.T) {
+// A Service without a lister (ServiceDeps{}) answers Get with Unimplemented, which is HTTP 501.
+func TestServicesWithoutListerIsNotImplemented(t *testing.T) {
 	code, _ := get(t, stack(t), "/v1/services")
 	assert.Equal(t, http.StatusNotImplemented, code)
 }

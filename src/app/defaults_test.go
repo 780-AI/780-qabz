@@ -8,7 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"qabz/common/auth/authtest"
+	"qabz/common/monitoring/prometheus"
 	"qabz/config"
+	"qabz/system/postgres"
 )
 
 func testConfig(t *testing.T) config.Config {
@@ -96,4 +98,25 @@ func TestDefaultBuilderAuthRules(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewServiceRules(t *testing.T) {
+	cfg := testConfig(t)
+	db, err := postgres.New(context.Background(), cfg.PostgresDSN()) // lazy: no server needed
+	if !assert.NoError(t, err) || !assert.NotNil(t, db) {
+		t.FailNow()
+	}
+	defer db.Close()
+	metrics := prometheus.New("127.0.0.1:0")
+
+	svc, err := newService(cfg, db, metrics, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, svc)
+
+	_, err = newService(cfg, db, metrics, nil) // the metric is already registered
+	assert.ErrorContains(t, err, "services: register metric")
+
+	cfg.ServiceID = -1
+	_, err = newService(cfg, db, prometheus.New("127.0.0.1:0"), nil)
+	assert.ErrorContains(t, err, "service.id")
 }

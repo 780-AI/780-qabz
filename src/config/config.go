@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"os"
@@ -31,7 +32,11 @@ func (s Secret) Reveal() string { return string(s) }
 // that dotted path of the YAML tree (see decode.go). A path that is missing keeps the default.
 type Config struct {
 	ServiceName string `path:"service_name"`
-	LogLevel    string `path:"logs.level"`
+	// ServiceID is the ID of this service in the payment flow. GET /v1/services sends it as
+	// serviceId. The old bill service has the same key (service.id); qabz uses bill's ID.
+	// 0 to 2147483647 (int32 in the proto).
+	ServiceID int    `path:"service.id"`
+	LogLevel  string `path:"logs.level"`
 
 	PostgresHost     string `path:"database.postgres.host"`
 	PostgresPort     int    `path:"database.postgres.port"`
@@ -121,6 +126,9 @@ func (c Config) validate() error {
 	var errs []error
 	if c.PostgresPassword == "" {
 		errs = append(errs, errors.New("database.postgres.password is required"))
+	}
+	if c.ServiceID < 0 || c.ServiceID > math.MaxInt32 {
+		errs = append(errs, fmt.Errorf("service.id must be from 0 to %d", math.MaxInt32))
 	}
 	for path, n := range map[string]int{"database.postgres.port": c.PostgresPort, "database.redis.port": c.RedisPort} {
 		if n < 1 || n > 65535 {

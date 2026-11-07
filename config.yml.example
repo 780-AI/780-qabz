@@ -7,6 +7,9 @@
 service_name: "qabz"
 hot_reload_interval: "30s"
 
+service:
+  id: 0                      # ID in the payment flow (bill uses 105); sent as serviceId by GET /v1/services
+
 logs:
   level: "info"
   otlp_endpoint: ""          # empty: tracing is off

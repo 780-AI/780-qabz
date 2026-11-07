@@ -216,6 +216,6 @@ func TestAuthStreamInterceptor(t *testing.T) {
 }
 
 func TestNewWithOptionsRejectsNilOption(t *testing.T) {
-	_, err := NewWithOptions("127.0.0.1:0", []grpc.ServerOption{nil}, RegisterService(NewService()))
+	_, err := NewWithOptions("127.0.0.1:0", []grpc.ServerOption{nil}, RegisterService(NewService(ServiceDeps{})))
 	assert.Error(t, err)
 }

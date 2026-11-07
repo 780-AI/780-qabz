@@ -21,7 +21,7 @@ func authStack(t *testing.T) *Gateway {
 	if !assert.NoError(t, err) || !assert.NotNil(t, a) {
 		t.FailNow()
 	}
-	gs, err := grpcserver.NewWithOptions("127.0.0.1:0", a.ServerOptions(), grpcserver.RegisterService(grpcserver.NewService()))
+	gs, err := grpcserver.NewWithOptions("127.0.0.1:0", a.ServerOptions(), grpcserver.RegisterService(grpcserver.NewService(grpcserver.ServiceDeps{})))
 	if !assert.NoError(t, err) || !assert.NotNil(t, gs) || !assert.NoError(t, gs.Start(context.Background())) {
 		t.FailNow()
 	}

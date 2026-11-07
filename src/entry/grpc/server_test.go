@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "qabz/api/pb/qabz"
 )
@@ -19,7 +18,7 @@ import (
 // startServer starts a Server with the Service on a free port. It stops the test if a step fails.
 func startServer(t *testing.T) *Server {
 	t.Helper()
-	s, err := New("127.0.0.1:0", RegisterService(NewService()))
+	s, err := New("127.0.0.1:0", RegisterService(NewService(ServiceDeps{})))
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		t.FailNow()
 	}
@@ -42,11 +41,11 @@ func client(t *testing.T, s *Server) pb.ServiceClient {
 }
 
 func TestNewErrors(t *testing.T) {
-	_, err := New("", RegisterService(NewService()))
+	_, err := New("", RegisterService(NewService(ServiceDeps{})))
 	assert.ErrorContains(t, err, "address is required")
 	_, err = New("127.0.0.1:0")
 	assert.ErrorContains(t, err, "at least one service")
-	_, err = New("127.0.0.1:0", RegisterService(NewService()), nil)
+	_, err = New("127.0.0.1:0", RegisterService(NewService(ServiceDeps{})), nil)
 	assert.ErrorContains(t, err, "register function 1 is nil")
 }
 
@@ -65,14 +64,14 @@ func TestUnwrittenMethodIsUnimplemented(t *testing.T) {
 	s := startServer(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := client(t, s).Get(ctx, &emptypb.Empty{})
+	_, err := client(t, s).NewOrder(ctx, &pb.RawOrderRequest{})
 	if assert.Error(t, err) {
 		assert.Equal(t, codes.Unimplemented, status.Code(err))
 	}
 }
 
 func TestGreetingDirect(t *testing.T) {
-	svc := NewService()
+	svc := NewService(ServiceDeps{})
 	res, err := svc.Greeting(context.Background(), nil)
 	if assert.NoError(t, err) && assert.NotNil(t, res) {
 		assert.Equal(t, GreetingText, res.GetMessage())
@@ -93,7 +92,7 @@ func TestGreetingDirect(t *testing.T) {
 }
 
 func TestStartStopLifecycle(t *testing.T) {
-	s, err := New("127.0.0.1:0", RegisterService(NewService()))
+	s, err := New("127.0.0.1:0", RegisterService(NewService(ServiceDeps{})))
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		return
 	}
@@ -101,7 +100,7 @@ func TestStartStopLifecycle(t *testing.T) {
 	assert.NoError(t, s.Stop(context.Background()), "Stop before Start is a no-op")
 	assert.ErrorContains(t, s.Start(context.Background()), "already stopped")
 
-	s, err = New("127.0.0.1:0", RegisterService(NewService()))
+	s, err = New("127.0.0.1:0", RegisterService(NewService(ServiceDeps{})))
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		return
 	}
@@ -128,7 +127,7 @@ func TestStartFailsWhenPortIsTaken(t *testing.T) {
 		return
 	}
 	defer ln.Close()
-	s, err := New(ln.Addr().String(), RegisterService(NewService()))
+	s, err := New(ln.Addr().String(), RegisterService(NewService(ServiceDeps{})))
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		return
 	}
@@ -150,7 +149,7 @@ func TestDialAddr(t *testing.T) {
 }
 
 func TestDialAddrOfDefaultListenIsIPv4Loopback(t *testing.T) {
-	s, err := New(":0", RegisterService(NewService()))
+	s, err := New(":0", RegisterService(NewService(ServiceDeps{})))
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		return
 	}

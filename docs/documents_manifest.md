@@ -1,11 +1,11 @@
-<!-- VERSION: 0.70 -->
+<!-- VERSION: 0.71 -->
 # Document & Code Manifest
 
 ## Module Quick Index
 
 | Module / Section | Entry range |
 |---|---|
-| Governance + project docs (contract, standards, session docs, READMEs) | 1-17 |
+| Governance + project docs (contract, standards, session docs, READMEs) | 1-17, 35 |
 | Scripts | 18-20, 31-32 |
 | Initial-discovery design docs (HTML) | 21-27 |
 | Plans (register, implementation plan, task template) | 28-29, 33 |
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.69 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.70 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.70 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.26 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.71 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.27 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -43,19 +43,21 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.21 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.22 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.11 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.9 | Docs | `src/app/README.md` |
+| 34 | App module README | v0.10 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.1 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-07
-- **Change**: New task file `013_services_endpoint.md` v0.1 (not manifest-tracked); task counter at 014. Bumped #3 CHANGELOG v1.69, #5 manifest v0.70.
-- **Previous change**: 2026-11-07 — Task 012 `auth_status_403` done: a rejected auth check gives gRPC `PermissionDenied` / HTTP 403; Postman updated (JSON, no row); task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.68, #5 manifest v0.69, #28 OPEN_TASKS v1.21, #34 app README v0.9.
+- **Change**: Task 013 `services_endpoint` done: `GET /v1/services` from the bill `services` table, in-memory cache, config key `service.id`; new `docs/this_vs_bill.md` (#35 v0.1); Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.70, #5 manifest v0.71, #6 folder_structure v0.27, #28 OPEN_TASKS v1.22, #34 app README v0.10.
+- **Previous change**: 2026-11-07 — New task file `013_services_endpoint.md` v0.1 (not manifest-tracked); task counter at 014. Bumped #3 CHANGELOG v1.69, #5 manifest v0.70.
+- **Earlier change**: 2026-11-07 — Task 012 `auth_status_403` done: a rejected auth check gives gRPC `PermissionDenied` / HTTP 403; Postman updated (JSON, no row); task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.68, #5 manifest v0.69, #28 OPEN_TASKS v1.21, #34 app README v0.9.
 - **Earlier change**: 2026-11-07 — New task file `012_auth_status_403.md` v0.1 (not manifest-tracked); task counter at 013. Bumped #3 CHANGELOG v1.67, #5 manifest v0.68.
 - **Earlier change**: 2026-11-07 — Task 011 `jwt_no_audience_check` done: `aud` is not compared (any string), `auth.jwt.audience` removed; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.66, #5 manifest v0.67, #28 OPEN_TASKS v1.20, #30 PROJECT_SPECIFIC_CONVENTIONS v0.11, #34 app README v0.8.
 - **Earlier change**: 2026-11-07 — New task file `011_jwt_no_audience_check.md` v0.1 (not manifest-tracked); task counter at 012. Bumped #3 CHANGELOG v1.65, #5 manifest v0.66.

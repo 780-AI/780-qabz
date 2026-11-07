@@ -1,7 +1,8 @@
-<!-- VERSION: 1.21 -->
+<!-- VERSION: 1.22 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.22 — 2026-11-07 — Task 013 services endpoint: QA scenario and follow-ups added.
 v1.21 — 2026-11-07 — Task 012 auth status 403: 009/010 scenarios now expect 403, 012 scenario added.
 v1.20 — 2026-11-07 — Task 011 no audience check: 009/010 scenarios and follow-ups updated, 011 scenario added.
 v1.19 — 2026-11-07 — Task 010 HMAC secret: 009 scenario and follow-ups updated, 010 scenario added.
@@ -127,6 +128,12 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Then (feature ON) run the App with the check on and call `GET /v1/greeting` with no token, then with a token from the auth service.
   Pass: no token gives HTTP 403 `{"code":7,"message":"unauthenticated",...}`; the real token gives HTTP 200.
   Done 2026-11-07 by the implementer with a test secret: all pass (awaiting operator confirmation with a real token).
+- ⏸ Task 013 `GET /v1/services` (2026-11-07). In `src/` run `go test -race -count=1 ./core/billtype/ ./entry/... ./config/ ./app/`, then with `QABZ_TEST_POSTGRES_DSN` set `go test -race -count=1 -run Live ./system/postgres/ ./entry/http/`.
+  Pass: all pass (`TestLiveServicesEndToEnd` returns the mock rows exactly as inserted; the live tests use a throw-away schema and drop it).
+  Then (feature ON) create bill's `services` table in the dev database if it does not exist, insert test rows (some with `inquiry = false`, two languages), set `service.id` in `config.yml`, run the App and call `GET /v1/services` with and without `Accept-Language: en-US`.
+  Pass: HTTP 200, `serviceId` = `service.id`, the rows of the language in `order` order exactly as inserted (`inquiry: false` stays false); a second call inside 60s does not see a row change; `qabz_services_cache_total` counts `hit` and `miss`. Also pass: without the `services` table the call gives HTTP 500 `internal error` and the App log has one error line `services: list failed` with the cause. Then delete the test rows (and the table, if you created it).
+  Done 2026-11-07 by the implementer on the compose dev database: all pass (awaiting operator confirmation).
+- ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware (request duration, recovery, tracing) for all endpoints needs its own task.
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 
 ## Maintenance / housekeeping

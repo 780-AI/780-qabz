@@ -15,6 +15,7 @@ func TestParseDefaults(t *testing.T) {
 	c, err := Parse([]byte(`database: {postgres: {password: "pw"}}`))
 	assert.NoError(t, err)
 	assert.Equal(t, "qabz", c.ServiceName)
+	assert.Equal(t, 0, c.ServiceID)
 	assert.Equal(t, "info", c.LogLevel)
 	assert.Equal(t, 5432, c.PostgresPort)
 	assert.Equal(t, "localhost:6379", c.RedisAddr())
@@ -27,6 +28,8 @@ func TestParseDefaults(t *testing.T) {
 
 const fullYAML = `
 service_name: "svc"
+service:
+  id: 105
 hot_reload_interval: "5s"
 logs:
   level: "debug"
@@ -54,6 +57,7 @@ func TestParseAllKeys(t *testing.T) {
 	c, err := Parse([]byte(fullYAML))
 	assert.NoError(t, err)
 	assert.Equal(t, "svc", c.ServiceName)
+	assert.Equal(t, 105, c.ServiceID)
 	assert.Equal(t, "debug", c.LogLevel)
 	assert.Equal(t, "jaeger:4317", c.OTLPEndpoint)
 	assert.Equal(t, ":9191", c.MetricsAddr)
@@ -204,4 +208,14 @@ func TestServerAddrs(t *testing.T) {
 			assert.ErrorContains(t, err, tc.want)
 		})
 	}
+}
+
+func TestParseServiceIDRange(t *testing.T) {
+	for name, id := range map[string]string{"negative": "-1", "above int32": "2147483648"} {
+		_, err := Parse([]byte("service: {id: " + id + "}\ndatabase: {postgres: {password: pw}}"))
+		assert.ErrorContains(t, err, "service.id must be from 0 to 2147483647", name)
+	}
+	c, err := Parse([]byte("service: {id: 2147483647}\ndatabase: {postgres: {password: pw}}"))
+	assert.NoError(t, err)
+	assert.Equal(t, 2147483647, c.ServiceID)
 }
