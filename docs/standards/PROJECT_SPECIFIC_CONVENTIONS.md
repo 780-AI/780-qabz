@@ -1,7 +1,8 @@
-<!-- VERSION: 0.13 -->
+<!-- VERSION: 0.14 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.14 — 2026-11-08 — Section 11: coverage gate. Each changed Go package has 70.0% statement coverage or more, measured with the database tests included.
 v0.13 — 2026-11-08 — Section 10: every fatal or critical error that is not a common error MUST be logged (one error line with the cause); common errors are not logged.
 v0.12 — 2026-11-07 — Section 9: every recorded duration (metric, log field) is in milliseconds; metric names end with `_ms`.
 v0.11 — 2026-11-07 — Section 8: layout examples no longer name `auth.jwt.*` (task 011 removed its only key).
@@ -254,3 +255,21 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator decision, 2026-11-08 (task 016). An HTTP 500 with no log line cannot be investigated. Task 013 first returned 500 for a failed database read with no log line (lesson candidate of 2026-11-07); this rule makes the practice binding.
 
 **Review.** The `code-reviewer` agent finds each server-fault answer and each fatal start path. A path with no log line, or a common error that writes a log line, is a defect. The verdict is NOT READY.
+
+## 11. Coverage gate
+
+**The statement coverage of each changed Go package MUST be 70.0% or more, measured with the database tests included.** 69.9% fails. Do not round up.
+
+**Changed package.** A package that has a new or modified non-test `.go` file. A package with only changed test files is not gated.
+
+**How to measure:**
+- Set `QABZ_TEST_POSTGRES_DSN` to a real Postgres (the compose Postgres), so that the live (database) tests run. Never print the password.
+- Run `go test -race -count=1 -v -coverprofile=<file> <package>` in `src/`, then read the total with `go tool cover -func=<file>`. Keep the profile outside the repo.
+- Check in the `-v` output that the live tests ran and did not skip. A unit-only number (no DSN, live tests skipped) is not the gate value.
+- If no database is available, the gate is "not measured". A change cannot pass a gate that was not measured.
+
+**Not counted:** generated code (`api/pb/`, `api/swagger/`), the `pb/` submodule and test files. A package with no tests has 0% and fails.
+
+**Why.** Operator decision, 2026-11-08 (task 019). The repository code of `system/postgres` is mostly tested by the live tests on a throw-away schema; a unit-only measurement reported 67.7% for a package at 89.0% with its database tests, and failed a change that had raised the coverage.
+
+**Review.** The `code-reviewer` agent measures each changed package as above and reports package, coverage and PASS or FAIL. A FAIL, or a gate that was not measured, is a defect. The verdict is NOT READY.

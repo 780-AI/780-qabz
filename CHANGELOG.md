@@ -1,7 +1,8 @@
-<!-- VERSION: 1.91 -->
+<!-- VERSION: 1.92 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.92 — 2026-11-08 — Added coverage-gate-convention entry.
 v1.91 — 2026-11-08 — Added 019-mybill-delete-endpoint entry.
 v1.90 — 2026-11-08 — Added 020-task entry.
 v1.89 — 2026-11-08 — Added 019-task entry.
@@ -97,6 +98,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Conventions § 11: coverage gate with the database tests
+- **Type:** Minor (governance doc; no code change)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.14), `docs/documents_manifest.md` (v0.93), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. New binding rule: each changed Go package has 70.0% statement coverage or more, measured with the database tests included (`QABZ_TEST_POSTGRES_DSN` set, live tests run and do not skip); with no database the gate is "not measured" and the change cannot pass. Before, the 70% gate lived only in the local `code-reviewer` agent and did not say how to measure; a unit-only run failed task 019 (`system/postgres` 67.7% unit-only, 89.0% with its database tests). The local `code-reviewer` agent (git-ignored) checks the rule. No CI job runs Go tests today, so the review is the only place the gate is measured.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Task 019_mybill_delete_endpoint: DELETE /v1/mybill/{id}
 - **Type:** Major (new endpoint)
