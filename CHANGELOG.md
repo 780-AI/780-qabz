@@ -1,7 +1,8 @@
-<!-- VERSION: 1.92 -->
+<!-- VERSION: 1.93 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.93 — 2026-11-08 — Added 019b-task entry.
 v1.92 — 2026-11-08 — Added coverage-gate-convention entry.
 v1.91 — 2026-11-08 — Added 019-mybill-delete-endpoint entry.
 v1.90 — 2026-11-08 — Added 020-task entry.
@@ -98,6 +99,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — New task: 019b_mybill_delete_success_text
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/019b_mybill_delete_success_text.md` (v0.1; letter suffix of task 019, so the task counter does not change), `docs/documents_manifest.md` (v0.94), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task changes the success message of `DELETE /v1/mybill/{id}` from bill's "internal error" text to "عملیات با موفقیت انجام شد" (operator decision); failure answers stay as bill's; a new difference from bill (`this_vs_bill.md` item 12).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Conventions § 11: coverage gate with the database tests
 - **Type:** Minor (governance doc; no code change)
