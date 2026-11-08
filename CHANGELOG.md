@@ -1,7 +1,8 @@
-<!-- VERSION: 1.84 -->
+<!-- VERSION: 1.85 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.85 — 2026-11-08 — Added 018-task entry.
 v1.84 — 2026-11-08 — Added 015-dev-bill-database entry.
 v1.83 — 2026-11-08 — Added session-wrap-up (task 016 session) entry.
 v1.82 — 2026-11-08 — Added error-logging-convention entry.
@@ -90,6 +91,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — New task: 018_make_help
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/018_make_help.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 019), `docs/documents_manifest.md` (v0.86), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds a `make help` target that lists the Makefile targets.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Task 015_dev_bill_database: devdb seed / unseed and the mode key
 - **Type:** Major (new command, new packages, new required config key)
