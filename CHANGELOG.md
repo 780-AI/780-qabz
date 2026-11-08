@@ -1,7 +1,9 @@
-<!-- VERSION: 1.93 -->
+<!-- VERSION: 1.95 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.95 — 2026-11-08 — Added 019b-mybill-delete-success-text entry.
+v1.94 — 2026-11-08 — Added metrics-convention entry.
 v1.93 — 2026-11-08 — Added 019b-task entry.
 v1.92 — 2026-11-08 — Added coverage-gate-convention entry.
 v1.91 — 2026-11-08 — Added 019-mybill-delete-endpoint entry.
@@ -99,6 +101,20 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Task 019b: DELETE /v1/mybill/{id} sends a success text on success
+- **Type:** Minor (fix-forward of task 019, Rule 3; one answer text, operator decision)
+- **Files:** `src/entry/grpc/mybills.go` (`deleteSuccessText`, the success answer), `src/entry/grpc/mybills_test.go`, `src/entry/http/mybills_test.go`, `src/entry/http/mybills_live_test.go`, `qabz.postman_collection.json` (`Delete` description and test), `src/app/README.md` (v0.16), `docs/this_vs_bill.md` (v0.5, item 12), `docs/Plans/OPEN_TASKS.md` (v1.35), `docs/documents_manifest.md` (v0.96), `CHANGELOG.md` (this entry); task file moved to `done_tasks/` (not manifest-tracked). Go files have no VERSION header, so no rows.
+- **Impact:** Yes, behavior changes. A successful `DELETE /v1/mybill/{id}` answers HTTP 200 with `{"message":"عملیات با موفقیت انجام شد"}` ("the operation was done successfully") in place of bill's `invalid_parameter_error` text "خطای داخلی رخ داده است", which clients read as a failure (operator decision, 2026-11-08). This applies to each success case of task 019 (a bill of the user, an already disabled bill, an unknown id, a bill of another user). Not changed: HTTP 200, the soft delete, every failure answer (gRPC `Unknown`, HTTP 500, bill's text), the logs and `qabz_mybill_delete_total{type,result}`. A difference from bill: `docs/this_vs_bill.md` item 12, `@todo` at `deleteSuccessText`.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → Pending verification → "Task 019b `DELETE /v1/mybill/{id}` success text": the unit, gateway and live tests check the success text and bill's failure text; feature ON on the dev database: POST a bill, DELETE it, DELETE it again and DELETE an unknown id give HTTP 200 with the success text; `not-a-uuid` gives HTTP 500 `code 2` with bill's text; the row is `disable` after the first DELETE. The Task 019 scenario now expects the new success text.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
+
+## [2026-11-08] — Conventions § 12: metrics for every feature
+- **Type:** Minor (governance doc; no code change)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.15), `docs/documents_manifest.md` (v0.95), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. New binding rule: every added or changed feature is measurable. Each endpoint goes through the `qabz_request_duration_ms` interceptor; a feature whose outcomes the `code` label cannot tell apart has a feature metric that counts each outcome (a plain read with only success or a gRPC error needs none, and the author says so); dependency calls and jobs get a `_ms` histogram and a counter with the names planned in `system.html`. Metrics are registered only when `metrics.Registry()` is not nil, names start with `qabz_`, label values come from a small fixed set (no IDs, amounts or error text), each new metric gets a `system.html` row and tests (registered-names list, a value check per outcome). The current code already follows the rule. The new local `artifacts_agent` agent (git-ignored, with the `task-master` agent that replaces `supervisor`) checks it with § 7 and § 10.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — New task: 019b_mybill_delete_success_text
 - **Type:** Minor (docs only; a new task file)

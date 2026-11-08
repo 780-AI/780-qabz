@@ -274,7 +274,8 @@ func (f *fakeDisableRepo) ids() []string {
 }
 
 // TestMyBillDeleteOverHTTP: the gateway route DELETE /v1/mybill/{id}, the id from the path (escaped
-// forms unescaped), bill's answers and the HTTP codes. The real store checks the id.
+// forms unescaped), the answers (the success text of task 019b, bill's text on failure) and the
+// HTTP codes. The real store checks the id.
 func TestMyBillDeleteOverHTTP(t *testing.T) {
 	f := &fakeDisableRepo{found: true}
 	store, err := savedbill.NewStore(f)
@@ -288,7 +289,7 @@ func TestMyBillDeleteOverHTTP(t *testing.T) {
 		var res pb.BillActionResponse
 		// Test code, not a hot path; protojson reads the gateway's proto JSON (conventions § 1).
 		if assert.NoError(t, protojson.Unmarshal(body, &res), string(body)) {
-			assert.Equal(t, "خطای داخلی رخ داده است", res.GetMessage())
+			assert.Equal(t, "عملیات با موفقیت انجام شد", res.GetMessage())
 		}
 	}
 	f.mu.Lock()
@@ -300,8 +301,10 @@ func TestMyBillDeleteOverHTTP(t *testing.T) {
 	// Other forms reach the store as sent.
 	code, body = deleteMyBill(t, gw, url.PathEscape("{8F3A1C2E-4B5D-4E6F-9A7B-1C2D3E4F5A6B}"), true)
 	assert.Equal(t, http.StatusOK, code, string(body))
+	assert.Contains(t, string(body), "عملیات با موفقیت انجام شد")
 	code, body = deleteMyBill(t, gw, "8f3a1c2e4b5d4e6f9a7b1c2d3e4f5a6b", true)
 	assert.Equal(t, http.StatusOK, code, string(body))
+	assert.Contains(t, string(body), "عملیات با موفقیت انجام شد")
 	assert.Equal(t, []string{"8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", "{8F3A1C2E-4B5D-4E6F-9A7B-1C2D3E4F5A6B}",
 		"8f3a1c2e4b5d4e6f9a7b1c2d3e4f5a6b"}, f.ids())
 

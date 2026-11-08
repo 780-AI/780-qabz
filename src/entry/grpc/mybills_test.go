@@ -486,9 +486,9 @@ func assertBillUnknown(t *testing.T, err error, msg string) {
 	}
 }
 
-// TestDeleteSuccess: the user of the JWT and the id as sent reach the store; the answer is bill's
-// message (the invalid_parameter_error text), with or without a matching bill; the call is
-// counted with the bill type (unknown for no bill or a NULL type) and the result.
+// TestDeleteSuccess: the user of the JWT and the id as sent reach the store; the answer is the
+// success text (task 019b; bill sends its invalid_parameter_error text), with or without a
+// matching bill; the call is counted with the bill type (unknown for no bill or a NULL type) and the result.
 func TestDeleteSuccess(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -509,7 +509,7 @@ func TestDeleteSuccess(t *testing.T) {
 		if !assert.NoError(t, err) || !assert.NotNil(t, res) {
 			continue
 		}
-		assert.Equal(t, "خطای داخلی رخ داده است", res.GetMessage(), "bill sends this text on success")
+		assert.Equal(t, "عملیات با موفقیت انجام شد", res.GetMessage(), "the success text (task 019b)")
 		assert.Equal(t, [][2]string{{billsUser, "{8F3A1C2E-4B5D-4E6F-9A7B-1C2D3E4F5A6B}"}}, f.calls)
 		assert.Equal(t, []string{c.counted}, r.got, c.name)
 		assert.Empty(t, log.lines)
@@ -517,7 +517,7 @@ func TestDeleteSuccess(t *testing.T) {
 	// Without OnDelete the answer is the same.
 	res, err := NewMyBills(MyBillsDeps{Deleter: &fakeDeleter{}}).Delete(userCtx(), &pb.DeleteBillRequest{Id: "x"})
 	if assert.NoError(t, err) && assert.NotNil(t, res) {
-		assert.Equal(t, "خطای داخلی رخ داده است", res.GetMessage())
+		assert.Equal(t, "عملیات با موفقیت انجام شد", res.GetMessage())
 	}
 }
 
@@ -647,7 +647,7 @@ func TestDeleteOverGRPCWithAuth(t *testing.T) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "Bearer "+token)
 	res, err := c.Delete(ctx, &pb.DeleteBillRequest{Id: "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b"})
 	if assert.NoError(t, err) && assert.NotNil(t, res) {
-		assert.Equal(t, "خطای داخلی رخ داده است", res.GetMessage())
+		assert.Equal(t, "عملیات با موفقیت انجام شد", res.GetMessage())
 	}
 	f.mu.Lock()
 	assert.Equal(t, [][2]string{{authtest.UserID, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b"}}, f.calls)

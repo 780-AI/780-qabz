@@ -236,8 +236,8 @@ func listedIDs(t *testing.T, gw *Gateway) []string {
 // each DELETE goes through the gateway, the JWT check, the handler, the store and the repository.
 // After each call every row is checked by a direct SQL query (only the target row changed, only
 // its status, nothing removed) and GET /v1/mybill is checked (the bill is not listed; the other
-// bills are). The answers are bill's: HTTP 200 with bill's message, or HTTP 500 (gRPC Unknown)
-// with the same text. It needs QABZ_TEST_POSTGRES_DSN.
+// bills are). The answers: HTTP 200 with the success text (task 019b), or bill's HTTP 500 (gRPC
+// Unknown) with bill's text. It needs QABZ_TEST_POSTGRES_DSN.
 func TestLiveMyBillDeleteEndToEnd(t *testing.T) {
 	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
 	if dsn == "" {
@@ -347,8 +347,11 @@ func TestLiveMyBillDeleteEndToEnd(t *testing.T) {
 		}
 		countMu.Unlock()
 		assert.Equal(t, c.code, code, "%s: %s", c.name, body)
-		assert.Contains(t, string(body), "خطای داخلی رخ داده است", "%s: bill's text on success and on error", c.name)
-		if c.code != http.StatusOK {
+		if c.code == http.StatusOK {
+			assert.Contains(t, string(body), "عملیات با موفقیت انجام شد", "%s: the success text (task 019b)", c.name)
+			assert.NotContains(t, string(body), "خطای داخلی رخ داده است", "%s: no error text on success", c.name)
+		} else {
+			assert.Contains(t, string(body), "خطای داخلی رخ داده است", "%s: bill's text on error", c.name)
 			assert.Contains(t, strings.ReplaceAll(string(body), " ", ""), `"code":2`, "%s: gRPC Unknown", c.name)
 		}
 		if c.disables != "" {

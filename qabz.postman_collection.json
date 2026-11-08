@@ -189,7 +189,7 @@
                 }
               ]
             },
-            "description": "haf80.api.bill.MyBills/Delete. Deletes a saved bill (My Bills) of the user of the JWT, exactly as bill does: the row stays with status disable, so GetAll no longer lists it. The id is checked with uuid.Parse of github.com/google/uuid (upper case, {...}, 32 hex digits and urn:uuid: are accepted) and goes to the database as sent. An unknown id, a bill of another user and a bill that is already disabled change nothing and still succeed. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id). Expected: HTTP 200 and {\"message\":\"خطای داخلی رخ داده است\"} (bill sends this text on success). An id that does not parse, an empty id, a call with no user (debug.auth.disable with an empty mock_user_id) or a database error (also urn:uuid:..., which Postgres rejects): HTTP 500 {\"code\":2,\"message\":\"خطای داخلی رخ داده است\"} (gRPC Unknown, as bill). Without a valid token HTTP 403."
+            "description": "haf80.api.bill.MyBills/Delete. Deletes a saved bill (My Bills) of the user of the JWT, as bill does: the row stays with status disable, so GetAll no longer lists it. The id is checked with uuid.Parse of github.com/google/uuid (upper case, {...}, 32 hex digits and urn:uuid: are accepted) and goes to the database as sent. An unknown id, a bill of another user and a bill that is already disabled change nothing and still succeed. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id). Expected: HTTP 200 and {\"message\":\"عملیات با موفقیت انجام شد\"} (the operation was done successfully; bill sends its internal-error text on success, docs/this_vs_bill.md item 12). An id that does not parse, an empty id, a call with no user (debug.auth.disable with an empty mock_user_id) or a database error (also urn:uuid:..., which Postgres rejects): HTTP 500 {\"code\":2,\"message\":\"خطای داخلی رخ داده است\"} (gRPC Unknown, as bill). Without a valid token HTTP 403."
           },
           "event": [
             {
@@ -198,7 +198,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"has bill's message\", function () { pm.expect(pm.response.json().message).to.be.a(\"string\").and.not.empty; });"
+                  "pm.test(\"has the success message\", function () { pm.expect(pm.response.json().message).to.eql(\"عملیات با موفقیت انجام شد\"); });"
                 ]
               }
             }

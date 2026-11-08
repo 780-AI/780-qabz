@@ -31,9 +31,14 @@ const (
 const DeleteTypeUnknown = "unknown"
 
 // billInternalErrorText is the text of bill's invalid_parameter_error and database_error
-// (pkg/errorHandler/errors.go): "an internal error has occurred". bill sends it as the error of a
-// failed Delete and also as the message of a successful Delete.
+// (pkg/errorHandler/errors.go): "an internal error has occurred". It is the text of every failed
+// Delete, as in bill.
 const billInternalErrorText = "خطای داخلی رخ داده است"
+
+// deleteSuccessText is the message of a successful Delete: "the operation was done successfully"
+// (operator decision, task 019b).
+// @todo bill sends billInternalErrorText on success too. See docs/this_vs_bill.md, item 12.
+const deleteSuccessText = "عملیات با موفقیت انجام شد"
 
 // errBillUnknown is the answer of every failed Delete, as in bill: bill returns a plain Go error
 // with billInternalErrorText, which gRPC sends as Unknown (HTTP 500). Operator decision 1 (task
@@ -229,7 +234,7 @@ func (s *MyBills) GetAll(ctx context.Context, _ *emptypb.Empty) (*pb.BillsRespon
 // disable, so GetAll no longer lists it. The id must parse with uuid.Parse of
 // github.com/google/uuid and goes to the database as sent. An unknown id, a bill of another user
 // and a bill that is already disabled change nothing and still succeed. Success is HTTP 200 with
-// message = billInternalErrorText, the text that bill sends. Every failure is errBillUnknown
+// message = deleteSuccessText (bill sends billInternalErrorText). Every failure is errBillUnknown
 // (gRPC Unknown, HTTP 500); only a failed write writes a log line.
 func (s *MyBills) Delete(ctx context.Context, req *pb.DeleteBillRequest) (*pb.BillActionResponse, error) {
 	if ctx == nil {
@@ -277,7 +282,7 @@ func (s *MyBills) Delete(ctx context.Context, req *pb.DeleteBillRequest) (*pb.Bi
 		}
 		s.onDelete(label, result)
 	}
-	return &pb.BillActionResponse{Message: billInternalErrorText}, nil
+	return &pb.BillActionResponse{Message: deleteSuccessText}, nil
 }
 
 // billResponses maps saved bills to the GetAll answer with the rules of bill (see GetAll).

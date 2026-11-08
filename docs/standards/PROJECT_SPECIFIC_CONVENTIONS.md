@@ -1,7 +1,8 @@
-<!-- VERSION: 0.14 -->
+<!-- VERSION: 0.15 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.15 — 2026-11-08 — Section 12: metrics for every feature. A feature metric counts each outcome that the `code` label cannot tell apart; metrics registered only when on; fixed-set labels; `system.html` row and tests; the `artifacts_agent` checks it.
 v0.14 — 2026-11-08 — Section 11: coverage gate. Each changed Go package has 70.0% statement coverage or more, measured with the database tests included.
 v0.13 — 2026-11-08 — Section 10: every fatal or critical error that is not a common error MUST be logged (one error line with the cause); common errors are not logged.
 v0.12 — 2026-11-07 — Section 9: every recorded duration (metric, log field) is in milliseconds; metric names end with `_ms`.
@@ -273,3 +274,32 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator decision, 2026-11-08 (task 019). The repository code of `system/postgres` is mostly tested by the live tests on a throw-away schema; a unit-only measurement reported 67.7% for a package at 89.0% with its database tests, and failed a change that had raised the coverage.
 
 **Review.** The `code-reviewer` agent measures each changed package as above and reports package, coverage and PASS or FAIL. A FAIL, or a gate that was not measured, is a defect. The verdict is NOT READY.
+
+## 12. Metrics for every feature
+
+**Every added or changed feature MUST be measurable with Prometheus metrics.** A feature is a gRPC method or HTTP endpoint, a call to a dependency (the database, the cache, a provider, another service), a background job (a cron, a consumer, a worker), or a new start path.
+
+**Request metric.** Every gRPC method and HTTP endpoint is counted by `qabz_request_duration_ms` (the `Requests` interceptor in `src/entry/grpc/requests.go`). A new service is registered on the gRPC server that has this interceptor. Its `code` label already counts client errors and server faults.
+
+**Feature metric.** A feature whose outcomes the `code` label cannot tell apart has a feature metric that counts each outcome. Examples: `created` or `existing` (`qabz_mybill_insert_total`), `found` or `not_found` (`qabz_mybill_delete_total`), a cache `hit`, `miss` or `error` (`qabz_services_cache_total`).
+- A plain read whose only outcomes are success or a gRPC error (for example `GET /v1/mybill`) needs no feature metric. The author states this in the change.
+- Each outcome that the code can reach is counted once, on the path where it happens. A reachable outcome that counts nothing is a defect.
+
+**Dependency calls and jobs.** A call to a provider or another external service has a latency histogram (`_ms`, § 9) and a call and error counter. A background job has a run counter by result and a duration histogram. Use the names planned in `docs/initial-discovery/system.html` (for example `qabz_provider_call_duration_ms`, `qabz_provider_calls_total`, `qabz_cron_runs_total`, `qabz_cron_duration_ms`).
+
+**How to define a metric** (the pattern of `newMyBills` in `src/app/defaults.go`):
+- Create and register the metric only when `metrics.Registry()` is not nil. When metrics are off (`metrics.prometheus.enabled: false`), the callback is nil and the feature records nothing.
+- Return a registration error with the feature prefix (for example `mybill: register metric: %w`).
+- The name starts with `qabz_`. A counter ends with `_total`. A duration follows § 9 (`_ms`, a float in milliseconds).
+- The `Help` text names the endpoint or job and each label with its values.
+- Each label value comes from a small fixed set. Never use a user ID, a bill ID, a phone number, an amount, an error text or any other free input as a label value: the number of series has no limit.
+
+**Design doc.** Each new metric gets a row in the "Logs, Metrics and Alerts" tables of `docs/initial-discovery/system.html` in the same commit (a Critical File, `CLAUDE.md` § 4). A metric that `system.html` plans for the feature area is implemented with the feature, or the task Description says that it comes later.
+
+**Tests.**
+- The metric name is in the registered-metrics list of `src/app/defaults_test.go`. `TestMetricsOffRegistersNothing` then checks that nothing is registered when metrics are off.
+- A test checks the value of the metric for each outcome label value.
+
+**Why.** Operator decision, 2026-11-08. `system.html` names the lack of custom metrics as the main gap of the current system. The pattern exists in tasks 013, 014, 016 and 019 but was not binding, so a new feature could ship without a way to measure it.
+
+**Review.** The `artifacts_agent` agent checks each feature of the change against this section, with § 7 (Postman) and § 10 (logging). A missing feature metric, a free-input label, a metric not registered behind the switch, a missing `system.html` row or a missing test is a defect. The verdict is NOT READY.
