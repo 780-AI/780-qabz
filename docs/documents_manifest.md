@@ -1,4 +1,4 @@
-<!-- VERSION: 0.86 -->
+<!-- VERSION: 0.87 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.85 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.86 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.86 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.30 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.87 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.31 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.30 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.31 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.13 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-08
-- **Change**: New task file `018_make_help.md` v0.1 (not manifest-tracked); task counter at 019. Bumped #3 CHANGELOG v1.85, #5 manifest v0.86.
-- **Previous change**: 2026-11-08 — Task 015 `dev_bill_database` done: required config key `mode`, command `devdb seed | unseed`, `system/postgres/devdb/` (bill schema and seed SQL, embedded; SQL files have no VERSION header, so no rows); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.84, #5 manifest v0.85, #6 folder_structure v0.30, #28 OPEN_TASKS v1.30, #34 app README v0.13.
+- **Change**: Task 018 `make_help` done: `Makefile` target `help` (the Makefile has no VERSION header, so no row); task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.86, #5 manifest v0.87, #6 folder_structure v0.31, #28 OPEN_TASKS v1.31.
+- **Previous change**: 2026-11-08 — New task file `018_make_help.md` v0.1 (not manifest-tracked); task counter at 019. Bumped #3 CHANGELOG v1.85, #5 manifest v0.86.
+- **Earlier change**: 2026-11-08 — Task 015 `dev_bill_database` done: required config key `mode`, command `devdb seed | unseed`, `system/postgres/devdb/` (bill schema and seed SQL, embedded; SQL files have no VERSION header, so no rows); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.84, #5 manifest v0.85, #6 folder_structure v0.30, #28 OPEN_TASKS v1.30, #34 app README v0.13.
 - **Earlier change**: 2026-11-08 — Session wrap-up (task 016 session): task 016 follow-up and 3 lesson candidates in OPEN_TASKS. Bumped #3 CHANGELOG v1.83, #5 manifest v0.84, #28 OPEN_TASKS v1.29.
 - **Earlier change**: 2026-11-08 — Conventions § 10: every fatal or critical error that is not common MUST be logged; lesson candidate codified and removed. Bumped #3 CHANGELOG v1.82, #5 manifest v0.83, #28 OPEN_TASKS v1.28, #30 PROJECT_SPECIFIC_CONVENTIONS v0.13.
 - **Earlier change**: 2026-11-08 — Task 016 `mybill_insert_endpoint` done: `POST /v1/mybill` into bill's `bills` table, `common/helpers/`, `core/savedbill/`, saved bill repository, config key `debug.auth.mock_user_id`; Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.81, #5 manifest v0.82, #6 folder_structure v0.29, #28 OPEN_TASKS v1.27, #34 app README v0.12, #35 this_vs_bill v0.2.

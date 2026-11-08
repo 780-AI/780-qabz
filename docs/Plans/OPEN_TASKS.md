@@ -1,7 +1,8 @@
-<!-- VERSION: 1.30 -->
+<!-- VERSION: 1.31 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.31 — 2026-11-08 — Task 018 `make help`: QA scenario added.
 v1.30 — 2026-11-08 — Task 015 dev bill database: QA scenario added; task 016 follow-up updated (the dev database now has the bills table); postgrestest schema follow-up added.
 v1.29 — 2026-11-08 — Session wrap-up (task 016 session): task 016 follow-up (real bills data shapes for task 017); 3 lesson candidates added.
 v1.28 — 2026-11-08 — Lesson candidate "Logging of dependency failures" removed: codified as conventions § 10.
@@ -147,6 +148,9 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: `qabz_request_duration_ms_count` is 3 for `path="/haf80.api.bill.Service/Greeting"` and 1 for `path="/haf80.api.bill.Service/Get"`; the sums are in milliseconds; no series has a raw URL as `path`; `/metrics` has no `qabz_requests_total`.
   Also pass: with the auth check on, a call with no token adds 1 to `qabz_request_duration_ms_count{code="PermissionDenied"}`; with `metrics.prometheus.enabled: false` the log shows `metrics disabled (metrics.prometheus.enabled: false)`, `curl localhost:9090/metrics` fails, and `GET /v1/greeting` still answers.
   Done 2026-11-07 by the implementer: all pass (awaiting operator confirmation).
+- ⏸ Task 018 `make help` (2026-11-08). In the repo root run `make help`, then `make help CONFIG=other.yml`.
+  Pass: a usage line, then one line per target (`help`, `venv`, `env`, `compose` with a second line, `test-scripts`, `proto`) with its description; exit 0; with `CONFIG=other.yml` the `env` and `compose` lines name `other.yml`. `make` alone still creates the venv, as before.
+  Done 2026-11-08 by the implementer (macOS awk and BusyBox awk): all pass (awaiting operator confirmation).
 - ⏸ Task 015 dev bill database (2026-11-08). In `src/` run `go test -race -count=1 ./config/ ./cmd/... ./system/postgres/devdb/`, then with `QABZ_TEST_POSTGRES_DSN` set `go test -race -count=1 -run Live ./system/postgres/devdb/`.
   Pass: all pass (the mode table; the guard for every mode with no connection outside `dev`; seed, second seed, unseed and second unseed on an empty throw-away schema; a failed seed changes nothing).
   Then (feature ON, Rule 15) with `mode: "dev"` in `config.yml` run `go run . devdb --config=../config.yml seed`, start the App and call `GET /v1/services`; run `seed` again; set `mode: "prod"` (then `"stage"`) and run `seed` and `unseed`; set `mode: "dev"` and run `unseed`; then `seed` again to keep the dev data.

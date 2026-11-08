@@ -1,7 +1,8 @@
-<!-- VERSION: 0.30 -->
+<!-- VERSION: 0.31 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.31 — 2026-11-08 — Task 018: Makefile line names `make help`.
 v0.30 — 2026-11-08 — Task 015: cmd/devdb/ (dev-only seed / unseed of the bill tables) and system/postgres/devdb/ (bill schema and seed SQL); config/constants.go has the mode values; postgrestest/ gets EmptySchema.
 v0.29 — 2026-11-08 — Task 016: common/helpers/ (bill ID, phone), core/savedbill/ (My Bills store), system/postgres saved bill repository + bills table in postgrestest/, entry/grpc MyBills.Insert.
 v0.28 — 2026-11-07 — Task 014: common/monitoring/prometheus/requests.go (request metrics, Prometheus switch) and entry/grpc/requests.go (request metrics interceptor).
@@ -48,7 +49,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 ├── config.yml.example                 # config template: every key with its default or zero value (conventions § 8)
 ├── docker-compose.yml                 # local dev stack: postgres, redis, qabz (profile `app`)
 ├── qabz.postman_collection.json      # Postman collection of the HTTP API; updated with every API change (conventions § 7)
-├── Makefile                           # `make proto`, `make compose up|down|ps|logs` (YAML -> config_generated.env -> docker compose <action>), `make test-scripts`
+├── Makefile                           # `make help` (lists the targets), `make proto`, `make compose up|down|ps|logs` (YAML -> config_generated.env -> docker compose <action>), `make test-scripts`
 ├── src/                               # all Go code and the Go module
 │   ├── go.mod                         # Go module `qabz` (go 1.27.3)
 │   ├── go.sum                         # module checksums

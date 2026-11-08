@@ -17,7 +17,18 @@ COMPOSE_ACTIONS := up down ps logs
 COMPOSE_ACTION  := $(word 2,$(MAKECMDGOALS))
 ARGS            ?=
 
-.PHONY: venv env compose test-scripts $(COMPOSE_ACTIONS)
+.PHONY: help venv env compose test-scripts $(COMPOSE_ACTIONS)
+
+## help: list the make targets with their descriptions (read from the "## target:" comments in this file).
+help:
+	@echo 'usage: make <target> [VAR=value ...]   (variables: CONFIG, ENV_OUT, ARGS, PB_DIR)'
+	@awk -v config='$(CONFIG)' -v env_out='$(ENV_OUT)' -v pb_dir='$(PB_DIR)' ' \
+		/^## [A-Za-z0-9_-]+:/ { sub(/^## /, ""); t = substr($$0, 1, index($$0, ":") - 1); \
+			d = substr($$0, index($$0, ":") + 2); last = t; printf "  %-14s %s\n", t, sub_vars(d); next } \
+		/^## / && last != "" { sub(/^## /, ""); printf "  %-14s %s\n", "", sub_vars($$0); next } \
+		{ last = "" } \
+		function sub_vars(x) { gsub(/\$$\(CONFIG\)/, config, x); gsub(/\$$\(ENV_OUT\)/, env_out, x); \
+			gsub(/\$$\(PB_DIR\)/, pb_dir, x); return x }' $(firstword $(MAKEFILE_LIST))
 
 ## venv: create the Python venv with the pinned PyYAML (needed by the env generator).
 venv: $(VENV)/.installed

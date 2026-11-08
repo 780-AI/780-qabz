@@ -1,7 +1,8 @@
-<!-- VERSION: 1.85 -->
+<!-- VERSION: 1.86 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.86 — 2026-11-08 — Added 018-make-help entry.
 v1.85 — 2026-11-08 — Added 018-task entry.
 v1.84 — 2026-11-08 — Added 015-dev-bill-database entry.
 v1.83 — 2026-11-08 — Added session-wrap-up (task 016 session) entry.
@@ -91,6 +92,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Task 018_make_help: make help
+- **Type:** Minor (a new Makefile target that only prints; no change to the other targets)
+- **Files:** `Makefile`, `docs/folder_structure.md` (v0.31), `docs/Plans/OPEN_TASKS.md` (v1.31), task file moved to `done_tasks/`, `docs/documents_manifest.md` (v0.87), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, a new command: `make help` prints a usage line and each target with its description, read from the `## target:` comments of the Makefile (variables such as `$(CONFIG)` show their values). No other target changes; `make` alone still runs `venv`.
+- **QA scenarios:** `OPEN_TASKS.md` > Pending verification > Task 018 (⏸; done by the implementer, awaiting operator confirmation).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — New task: 018_make_help
 - **Type:** Minor (docs only; a new task file)
