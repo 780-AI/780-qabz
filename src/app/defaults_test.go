@@ -156,7 +156,7 @@ func metricsServer(t *testing.T, b *Builder) *prometheus.Server {
 
 var qabzMetrics = []string{
 	prometheus.RequestDurationName, "qabz_auth_rejected_total", "qabz_services_cache_total",
-	"qabz_mybill_insert_total",
+	"qabz_mybill_insert_total", "qabz_mybill_delete_total",
 }
 
 // TestDefaultBuilderMetricsSwitch: with metrics on, the composition root registers every qabz
@@ -290,8 +290,8 @@ func TestDefaultBuilderCountsRejectedCalls(t *testing.T) {
 	assert.True(t, found, "the rejected call is counted")
 }
 
-// TestNewMyBillsRules: with metrics on the insert counter is registered once (a second call
-// conflicts); with metrics off nothing is registered, so a second call works; a service.id out of
+// TestNewMyBillsRules: with metrics on the insert and delete counters are registered once (a second
+// call conflicts, also when only the delete counter is taken); with metrics off nothing is registered, so a second call works; a service.id out of
 // the int32 range is rejected.
 func TestNewMyBillsRules(t *testing.T) {
 	cfg := testConfig(t)
@@ -308,6 +308,16 @@ func TestNewMyBillsRules(t *testing.T) {
 	_, err = newMyBills(cfg, db, on, nil)
 	assert.ErrorContains(t, err, "mybill: register metric")
 
+	onlyDelete := prometheus.New("127.0.0.1:0", true)
+	if assert.NotNil(t, onlyDelete.Registry()) {
+		taken := promclient.NewCounter(promclient.CounterOpts{Name: "qabz_mybill_delete_total", Help: "taken"})
+		assert.NoError(t, onlyDelete.Registry().Register(taken))
+		svc, err = newMyBills(cfg, db, onlyDelete, nil)
+		assert.ErrorContains(t, err, "mybill: register metric")
+		assert.Nil(t, svc)
+		assert.True(t, registered(t, onlyDelete.Registry(), "qabz_mybill_insert_total"), "the insert counter came first")
+	}
+
 	off := prometheus.New("127.0.0.1:0", false)
 	for range 2 {
 		svc, err := newMyBills(cfg, db, off, nil)
@@ -323,8 +333,8 @@ func TestNewMyBillsRules(t *testing.T) {
 }
 
 // TestDefaultBuilderServesMyBills: the composition root registers the MyBills service. With
-// debug.auth.disable a call has no user, so Insert and GetAll answer PermissionDenied; an
-// unregistered service would answer Unimplemented.
+// debug.auth.disable a call has no user, so Insert and GetAll answer PermissionDenied and Delete
+// answers Unknown (as bill); an unregistered service would answer Unimplemented.
 func TestDefaultBuilderServesMyBills(t *testing.T) {
 	b, err := NewDefaultBuilder(context.Background(), testConfig(t))
 	if !assert.NoError(t, err) || !assert.NotNil(t, b) {
@@ -350,13 +360,17 @@ func TestDefaultBuilderServesMyBills(t *testing.T) {
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 	_, err = c.GetAll(ctx, &emptypb.Empty{})
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
-	_, err = c.Delete(ctx, &pb.DeleteBillRequest{Id: "x"}) // positive control: a method that is not written yet
+	res, err := c.Delete(ctx, &pb.DeleteBillRequest{Id: "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"})
+	assert.Nil(t, res)
+	assert.Equal(t, codes.Unknown, status.Code(err), "no user: bill's answer")
+	_, err = c.Update(ctx, &pb.UpdateBillRequest{Id: "x"}) // positive control: a method that is not written yet
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }
 
-// TestDefaultBuilderMockUser: with debug.auth.disable and debug.auth.mock_user_id, Insert and
-// GetAll get past the user check and reach the database. The test database does not listen (port 1), so the answer
-// is Internal, not PermissionDenied.
+// TestDefaultBuilderMockUser: with debug.auth.disable and debug.auth.mock_user_id, Insert, GetAll
+// and Delete get past the user check and reach the database. The test database does not listen
+// (port 1), so the answer is Internal (Insert, GetAll), not PermissionDenied, and Unknown (Delete,
+// as bill).
 func TestDefaultBuilderMockUser(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.DebugAuthMockUserID = "5a2c8173-cae5-4a6b-a109-af45f760824b"
@@ -383,4 +397,6 @@ func TestDefaultBuilderMockUser(t *testing.T) {
 	assert.Equal(t, codes.Internal, status.Code(err))
 	_, err = pb.NewMyBillsClient(conn).GetAll(ctx, &emptypb.Empty{})
 	assert.Equal(t, codes.Internal, status.Code(err))
+	_, err = pb.NewMyBillsClient(conn).Delete(ctx, &pb.DeleteBillRequest{Id: "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"})
+	assert.Equal(t, codes.Unknown, status.Code(err))
 }

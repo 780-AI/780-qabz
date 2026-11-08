@@ -44,6 +44,14 @@ const listSavedBillsSQL = `SELECT id::text, COALESCE(user_id::text, ''), COALESC
 FROM bills WHERE user_id = $1 AND status = 'enable'
 ORDER BY created_at DESC, id DESC`
 
+// disableSavedBillSQL deletes a bill as bill (go-pg Update, Column("status")) does: only status
+// changes, and only on the row with the id that belongs to the user. Both values are cast from
+// text, so Postgres, not the driver, reads them as the client sent them (bill puts them in the SQL
+// text): the forms that Postgres accepts (upper case, {...}, no hyphens) find the row, and
+// urn:uuid:... is an error. RETURNING type only reads the type of the matched row (for the delete
+// counter); the rows written are the same as with bill's statement.
+const disableSavedBillSQL = `UPDATE bills SET status = 'disable' WHERE id = $1::text::uuid AND user_id = $2::text::uuid RETURNING type`
+
 // The json_data keys of the bill entity.Data struct.
 var (
 	keyOperator = []byte("Operator")
@@ -185,6 +193,30 @@ func (r *SavedBillRepository) List(ctx context.Context, userID string) ([]savedb
 		return nil, err
 	}
 	return out, nil
+}
+
+// Disable sets status to disable on the bill with the id when it belongs to the user. It reports
+// whether a row matched (Postgres matches a row that was already disabled too) and its type ("" for
+// NULL). bill does not read the result, so no matching row is not an error.
+func (r *SavedBillRepository) Disable(ctx context.Context, userID, id string) (string, bool, error) {
+	if r == nil || r.db == nil {
+		return "", false, errors.New("saved bill repository: no database pool")
+	}
+	row := r.db.QueryRow(ctx, disableSavedBillSQL, id, userID)
+	if row == nil {
+		return "", false, errors.New("saved bill repository: no row from QueryRow")
+	}
+	var typ *string
+	switch err := row.Scan(&typ); {
+	case errors.Is(err, pgx.ErrNoRows):
+		return "", false, nil
+	case err != nil:
+		return "", false, err
+	case typ == nil:
+		return "", true, nil
+	default:
+		return *typ, true, nil
+	}
 }
 
 // billData reads json_data (raw, its JSON text; "" for NULL) as bill does. go-pg decodes it with

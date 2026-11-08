@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -84,13 +85,26 @@ func getMyBills(t *testing.T, gw *Gateway, withToken bool) (int, []byte) {
 // fails.
 func callMyBill(t *testing.T, gw *Gateway, method, body string, withToken bool) (int, []byte) {
 	t.Helper()
+	return callMyBillPath(t, gw, method, "/v1/mybill", body, withToken)
+}
+
+// deleteMyBill sends DELETE /v1/mybill/<rawID> like postMyBill. rawID goes into the URL as given
+// (escape it first when it needs escaping).
+func deleteMyBill(t *testing.T, gw *Gateway, rawID string, withToken bool) (int, []byte) {
+	t.Helper()
+	return callMyBillPath(t, gw, http.MethodDelete, "/v1/mybill/"+rawID, "", withToken)
+}
+
+// callMyBillPath is callMyBill with the URL path.
+func callMyBillPath(t *testing.T, gw *Gateway, method, path, body string, withToken bool) (int, []byte) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var reader io.Reader
 	if body != "" {
 		reader = strings.NewReader(body)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, "http://"+gw.Addr()+"/v1/mybill", reader)
+	req, err := http.NewRequestWithContext(ctx, method, "http://"+gw.Addr()+path, reader)
 	if !assert.NoError(t, err) || !assert.NotNil(t, req) {
 		t.FailNow()
 	}
@@ -230,4 +244,88 @@ func TestMyBillInsertOverHTTP(t *testing.T) {
 	code, body = postMyBill(t, gw, `{"billId":"123456","type":"water"}`, true)
 	assert.Equal(t, http.StatusBadRequest, code, string(body))
 	assert.Contains(t, string(body), "invalid parameter")
+}
+
+// fakeDisableRepo is a savedbill.Repository whose Disable records each call and answers with
+// found. The other methods are not used by Delete.
+type fakeDisableRepo struct {
+	savedbill.Repository
+
+	mu    sync.Mutex
+	calls [][2]string // user, id
+	found bool
+}
+
+func (f *fakeDisableRepo) Disable(_ context.Context, userID, id string) (string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, [2]string{userID, id})
+	return "water", f.found, nil
+}
+
+func (f *fakeDisableRepo) ids() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []string
+	for _, c := range f.calls {
+		out = append(out, c[1])
+	}
+	return out
+}
+
+// TestMyBillDeleteOverHTTP: the gateway route DELETE /v1/mybill/{id}, the id from the path (escaped
+// forms unescaped), bill's answers and the HTTP codes. The real store checks the id.
+func TestMyBillDeleteOverHTTP(t *testing.T) {
+	f := &fakeDisableRepo{found: true}
+	store, err := savedbill.NewStore(f)
+	if !assert.NoError(t, err) || !assert.NotNil(t, store) {
+		t.FailNow()
+	}
+	gw := myBillsStackDeps(t, grpcserver.MyBillsDeps{Deleter: store})
+
+	code, body := deleteMyBill(t, gw, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", true)
+	if assert.Equal(t, http.StatusOK, code, string(body)) {
+		var res pb.BillActionResponse
+		// Test code, not a hot path; protojson reads the gateway's proto JSON (conventions § 1).
+		if assert.NoError(t, protojson.Unmarshal(body, &res), string(body)) {
+			assert.Equal(t, "خطای داخلی رخ داده است", res.GetMessage())
+		}
+	}
+	f.mu.Lock()
+	if assert.Len(t, f.calls, 1) {
+		assert.Equal(t, [2]string{authtest.UserID, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b"}, f.calls[0])
+	}
+	f.mu.Unlock()
+
+	// Other forms reach the store as sent.
+	code, body = deleteMyBill(t, gw, url.PathEscape("{8F3A1C2E-4B5D-4E6F-9A7B-1C2D3E4F5A6B}"), true)
+	assert.Equal(t, http.StatusOK, code, string(body))
+	code, body = deleteMyBill(t, gw, "8f3a1c2e4b5d4e6f9a7b1c2d3e4f5a6b", true)
+	assert.Equal(t, http.StatusOK, code, string(body))
+	assert.Equal(t, []string{"8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", "{8F3A1C2E-4B5D-4E6F-9A7B-1C2D3E4F5A6B}",
+		"8f3a1c2e4b5d4e6f9a7b1c2d3e4f5a6b"}, f.ids())
+
+	// An id that does not parse: HTTP 500 with bill's text; the repository is not called.
+	calls := len(f.ids())
+	code, body = deleteMyBill(t, gw, "not-a-uuid", true)
+	assert.Equal(t, http.StatusInternalServerError, code, string(body))
+	assert.Contains(t, string(body), "خطای داخلی رخ داده است")
+	assert.Contains(t, strings.ReplaceAll(string(body), " ", ""), `"code":2`, "gRPC Unknown")
+	// An empty id (DELETE /v1/mybill/): the route matches with id "", the same answer.
+	code, body = deleteMyBill(t, gw, "", true)
+	assert.Equal(t, http.StatusInternalServerError, code, string(body))
+	assert.Contains(t, string(body), "خطای داخلی رخ داده است")
+	assert.Len(t, f.ids(), calls)
+	// urn:uuid: in the path is not read as a gRPC verb: the id reaches the store whole.
+	code, body = deleteMyBill(t, gw, "urn:uuid:8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", true)
+	assert.Equal(t, http.StatusOK, code, string(body))
+	if ids := f.ids(); assert.Len(t, ids, calls+1) {
+		assert.Equal(t, "urn:uuid:8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", ids[calls])
+	}
+	calls++
+
+	// No token: HTTP 403 (the JWT check, task 012).
+	code, body = deleteMyBill(t, gw, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", false)
+	assert.Equal(t, http.StatusForbidden, code, string(body))
+	assert.Len(t, f.ids(), calls)
 }

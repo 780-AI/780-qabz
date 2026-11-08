@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"qabz/common/helpers"
 )
 
@@ -22,6 +24,10 @@ const (
 
 // StatusEnable is bills.status of a saved bill that the user can see (bill entity.ENABLE).
 const StatusEnable = "enable"
+
+// StatusDisable is bills.status of a bill that the user deleted (bill entity.DISABLE). The row
+// stays in the table.
+const StatusDisable = "disable"
 
 // OperatorMCI is the operator of a mobile bill saved with no operator (bill entity.MCIOPERATOR).
 const OperatorMCI = "mci"
@@ -81,6 +87,11 @@ type Repository interface {
 	// List returns the enabled bills of the user, newest first (bill: GetAll in
 	// domain/repository/mybill). A user with no bills gives an empty list and no error.
 	List(ctx context.Context, userID string) ([]Bill, error)
+	// Disable sets status to StatusDisable on the bill with the id when the bill belongs to the user
+	// (bill: Delete in domain/repository/mybill). The id and the user go to the database as sent.
+	// It reports whether a bill of the user has the id (found; the bill may have been disabled
+	// already) and that bill's type ("" for a NULL type or no bill); no such bill is not an error.
+	Disable(ctx context.Context, userID, id string) (billType string, found bool, err error)
 }
 
 // Store applies the My Bills rules and saves through a Repository.
@@ -145,6 +156,28 @@ func (s *Store) List(ctx context.Context, userID string) ([]Bill, error) {
 		return nil, fmt.Errorf("%w: no user", ErrInvalid)
 	}
 	return s.repo.List(ctx, userID)
+}
+
+// Delete deletes the bill with the id when it belongs to userID: the row stays, with status
+// disable, so List no longer returns it (bill: Delete in controller/myBill and service/myBill).
+// The id is checked with uuid.Parse of github.com/google/uuid, the check and the version of bill,
+// and goes to the repository as sent, not in the parsed form. An id that is not a bill of the
+// user changes nothing and is not an error, as in bill; a bill that is already disabled stays
+// disabled. found reports whether a bill of the user has the id, and billType is its type ("" for
+// a NULL type or no bill). No user or an id that does not parse gives an error that wraps
+// ErrInvalid, and nothing is written. The standard library uuid package is deliberately not used:
+// its Parse differs from bill's github.com/google/uuid v1.6.0 (upper-case URN:UUID:, the braces).
+func (s *Store) Delete(ctx context.Context, userID, id string) (billType string, found bool, err error) {
+	if s == nil || s.repo == nil {
+		return "", false, errors.New("savedbill: store not created with NewStore")
+	}
+	if userID == "" {
+		return "", false, fmt.Errorf("%w: no user", ErrInvalid)
+	}
+	if _, err := uuid.Parse(id); err != nil {
+		return "", false, fmt.Errorf("%w: bad id: %w", ErrInvalid, err)
+	}
+	return s.repo.Disable(ctx, userID, id)
 }
 
 // inquiryID checks req by its type and returns the value of the data column (bill

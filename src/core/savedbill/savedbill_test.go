@@ -3,15 +3,19 @@ package savedbill
 import (
 	"context"
 	"errors"
+	"runtime/debug"
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 const testUser = "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"
 
 // fakeRepo records the bills that Insert gets and answers with id, created and err. List records
-// the user and answers with list and err.
+// the user and answers with list and err. Disable records the user and the id and answers with
+// billType, found and err.
 type fakeRepo struct {
 	got       []Bill
 	id        string
@@ -19,6 +23,14 @@ type fakeRepo struct {
 	err       error
 	list      []Bill
 	listUsers []string
+	disabled  [][2]string // user, id
+	found     bool
+	billType  string
+}
+
+func (f *fakeRepo) Disable(_ context.Context, userID, id string) (string, bool, error) {
+	f.disabled = append(f.disabled, [2]string{userID, id})
+	return f.billType, f.found, f.err
 }
 
 func (f *fakeRepo) Insert(_ context.Context, b Bill) (string, bool, error) {
@@ -188,4 +200,119 @@ func TestListOnZeroStore(t *testing.T) {
 	assert.Error(t, err)
 	_, err = (&Store{}).List(context.Background(), testUser)
 	assert.Error(t, err)
+}
+
+// TestDeleteIDForms: every id form that uuid.Parse (github.com/google/uuid v1.6.0, as bill) accepts
+// reaches the repository as sent, with the user; the result of the repository is returned.
+func TestDeleteIDForms(t *testing.T) {
+	for _, id := range []string{
+		"8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b",          // standard
+		"8F3A1C2E-4B5D-4E6F-9A7B-1C2D3E4F5A6B",          // upper case
+		"{8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b}",        // braces
+		"8f3a1c2e4b5d4e6f9a7b1c2d3e4f5a6b",              // no hyphens
+		"urn:uuid:8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", // urn (Postgres rejects it later)
+		"00000000-0000-0000-0000-000000000000",          // nil UUID: any version is accepted
+		"URN:UUID:8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b", // urn in upper case
+		" 8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b ",        // 38 characters: the first and the last are not checked
+		"(8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b]",        // the same
+	} {
+		for _, found := range []bool{true, false} {
+			repo := &fakeRepo{found: found, billType: "water"}
+			typ, got, err := newTestStore(t, repo).Delete(context.Background(), testUser, id)
+			assert.NoError(t, err, id)
+			assert.Equal(t, found, got, id)
+			assert.Equal(t, "water", typ, "the type of the repository is passed through: %s", id)
+			assert.Equal(t, [][2]string{{testUser, id}}, repo.disabled, "the id goes as sent: %s", id)
+		}
+	}
+}
+
+// TestDeleteInvalid: no user, an empty id or an id that does not parse gives ErrInvalid and the
+// repository is not called.
+func TestDeleteInvalid(t *testing.T) {
+	cases := []struct{ name, user, id string }{
+		{"no user", "", "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b"},
+		{"empty id", testUser, ""},
+		{"not a uuid", testUser, "abc"},
+		{"one digit short", testUser, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6"},
+		{"bad hex", testUser, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6g"},
+		{"hyphen moved", testUser, "8f3a1c2e4-b5d-4e6f-9a7b-1c2d3e4f5a6b"},
+		{"one space", testUser, " 8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b"},
+		{"braces with no hyphens", testUser, "{8f3a1c2e4b5d4e6f9a7b1c2d3e4f5a6b}"},
+		{"bad urn prefix", testUser, "urn:uuix:8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b"},
+	}
+	for _, c := range cases {
+		repo := &fakeRepo{found: true, billType: "water"}
+		typ, got, err := newTestStore(t, repo).Delete(context.Background(), c.user, c.id)
+		assert.ErrorIs(t, err, ErrInvalid, c.name)
+		assert.False(t, got, c.name)
+		assert.Empty(t, typ, c.name)
+		assert.Empty(t, repo.disabled, "%s: the repository is not called", c.name)
+	}
+}
+
+func TestDeleteRepositoryError(t *testing.T) {
+	boom := errors.New("boom")
+	_, got, err := newTestStore(t, &fakeRepo{err: boom, found: true}).Delete(context.Background(), testUser, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b")
+	assert.ErrorIs(t, err, boom)
+	assert.NotErrorIs(t, err, ErrInvalid)
+	assert.True(t, got, "the repository result is passed through")
+}
+
+func TestDeleteOnZeroStore(t *testing.T) {
+	var s *Store
+	_, _, err := s.Delete(context.Background(), testUser, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b")
+	assert.Error(t, err)
+	_, _, err = (&Store{}).Delete(context.Background(), testUser, "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b")
+	assert.Error(t, err)
+}
+
+// TestDeleteMatchesBillUUIDParse is the bill reference check of the id: for every input, Delete
+// accepts the id exactly when uuid.Parse of github.com/google/uuid accepts it, and the module is
+// v1.6.0, the version in bill's go.mod. The inputs are each length that uuid.Parse knows (36, 38,
+// 45, 32) and lengths around them, with every position changed to each probe character.
+func TestDeleteMatchesBillUUIDParse(t *testing.T) {
+	info, ok := debug.ReadBuildInfo()
+	if !assert.True(t, ok) || !assert.NotNil(t, info) {
+		return
+	}
+	version := ""
+	for _, m := range info.Deps {
+		if m != nil && m.Path == "github.com/google/uuid" {
+			version = m.Version
+		}
+	}
+	assert.Equal(t, "v1.6.0", version, "the uuid module of bill")
+
+	const std = "8f3a1c2e-4b5d-4e6f-9a7b-1c2d3e4f5a6b"
+	bases := []string{
+		std, strings.ToUpper(std), "{" + std + "}", "urn:uuid:" + std, "URN:UUID:" + std,
+		strings.ReplaceAll(std, "-", ""), std[:35], std + "0", "{" + std, std + "}",
+	}
+	probes := []byte{'0', 'f', 'F', 'g', '-', '{', '}', ':', ' ', 'x'}
+	inputs := []string{"", "urn:uuid:", "{}"}
+	for _, b := range bases {
+		inputs = append(inputs, b)
+		for i := range len(b) {
+			for _, p := range probes {
+				inputs = append(inputs, b[:i]+string(p)+b[i+1:])
+			}
+		}
+	}
+	accepted := 0
+	for _, id := range inputs {
+		_, refErr := uuid.Parse(id)
+		repo := &fakeRepo{}
+		_, _, err := newTestStore(t, repo).Delete(context.Background(), testUser, id)
+		if refErr == nil {
+			accepted++
+			assert.NoError(t, err, "uuid.Parse accepts %q", id)
+			assert.Len(t, repo.disabled, 1, id)
+		} else {
+			assert.ErrorIs(t, err, ErrInvalid, "uuid.Parse rejects %q", id)
+			assert.Empty(t, repo.disabled, id)
+		}
+	}
+	assert.Greater(t, accepted, 100, "both outcomes are exercised")
+	assert.Less(t, accepted, len(inputs)-100, "both outcomes are exercised")
 }

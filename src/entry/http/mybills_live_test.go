@@ -3,7 +3,10 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -188,4 +191,176 @@ func TestLiveMyBillListEndToEnd(t *testing.T) {
 	// No token: HTTP 403.
 	code, body = getMyBills(t, gw, false)
 	assert.Equal(t, http.StatusForbidden, code, string(body))
+}
+
+// liveBillRows reads every bills row by a direct query: id -> the whole row as JSON text. It stops
+// the test if the query fails.
+func liveBillRows(t *testing.T, ctx context.Context, db *postgres.Client) map[string]string {
+	t.Helper()
+	rows, err := db.Pool().Query(ctx, `SELECT id::text, row_to_json(b)::text FROM bills b`)
+	if !assert.NoError(t, err) || !assert.NotNil(t, rows) {
+		t.FailNow()
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, row string
+		if !assert.NoError(t, rows.Scan(&id, &row)) {
+			t.FailNow()
+		}
+		out[id] = row
+	}
+	if !assert.NoError(t, rows.Err()) {
+		t.FailNow()
+	}
+	return out
+}
+
+// listedIDs returns the ids of GET /v1/mybill for the test token's user. It stops the test if the
+// call fails.
+func listedIDs(t *testing.T, gw *Gateway) []string {
+	t.Helper()
+	code, body := getMyBills(t, gw, true)
+	if !assert.Equal(t, http.StatusOK, code, string(body)) {
+		t.FailNow()
+	}
+	var ids []string
+	for _, b := range decodeBills(t, body).GetData() {
+		ids = append(ids, b.GetId())
+	}
+	return ids
+}
+
+// TestLiveMyBillDeleteEndToEnd is the integration test of DELETE /v1/mybill/{id}: bills of two
+// users (enabled and disabled) are in one bills table (a throw-away schema of a real Postgres);
+// each DELETE goes through the gateway, the JWT check, the handler, the store and the repository.
+// After each call every row is checked by a direct SQL query (only the target row changed, only
+// its status, nothing removed) and GET /v1/mybill is checked (the bill is not listed; the other
+// bills are). The answers are bill's: HTTP 200 with bill's message, or HTTP 500 (gRPC Unknown)
+// with the same text. It needs QABZ_TEST_POSTGRES_DSN.
+func TestLiveMyBillDeleteEndToEnd(t *testing.T) {
+	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	db, err := postgres.New(ctx, postgrestest.BillsSchema(t, ctx, dsn))
+	if !assert.NoError(t, err) || !assert.NotNil(t, db) {
+		t.FailNow()
+	}
+	defer db.Close()
+	store, err := savedbill.NewStore(postgres.NewSavedBillRepository(db))
+	if !assert.NoError(t, err) || !assert.NotNil(t, store) {
+		t.FailNow()
+	}
+	var countMu sync.Mutex
+	var counted []string // the OnDelete calls as "<type> <result>"
+	gw := myBillsStackDeps(t, grpcserver.MyBillsDeps{Bills: store, Lister: store, Deleter: store,
+		OnDelete: func(billType, result string) {
+			countMu.Lock()
+			counted = append(counted, billType+" "+result)
+			countMu.Unlock()
+		}})
+
+	// Two bills of the token's user through POST, then rows by SQL: a disabled bill of the user, and
+	// an enabled and a disabled bill of another user.
+	var mine []string
+	for _, p := range []string{`{"type":"water","billId":"123455","name":"آب"}`, `{"type":"mobile","phone":"09121234567"}`} {
+		code, body := postMyBill(t, gw, p, true)
+		if !assert.Equal(t, http.StatusOK, code, string(body)) {
+			t.FailNow()
+		}
+		mine = append(mine, decodeBill(t, body).GetId())
+	}
+	target, sibling := mine[0], mine[1]
+	const (
+		otherUser     = "0b9d2c4e-8a3f-4e61-b7d2-5c1a9e0f3d22"
+		mineDisabled  = "00000000-0000-4000-8000-0000000000d1"
+		otherEnabled  = "00000000-0000-4000-8000-0000000000d2"
+		otherDisabled = "00000000-0000-4000-8000-0000000000d3"
+		formUpper     = "00000000-0000-4000-8000-0000000000e1"
+		formBraces    = "00000000-0000-4000-8000-0000000000e2"
+		formNoHyphen  = "00000000-0000-4000-8000-0000000000e3"
+	)
+	_, err = db.Pool().Exec(ctx, `INSERT INTO bills (id, user_id, name, type, bill_id, status, data, created_at) VALUES
+		($1, $4, 'old', 'gas', '999', 'disable', '999', '2026-01-01 10:00'),
+		($2, $5, 'other', 'water', '123455', 'enable', '123455', '2026-01-01 10:00'),
+		($3, $5, 'other old', 'water', '111', 'disable', '111', '2026-01-01 10:00')`,
+		mineDisabled, otherEnabled, otherDisabled, authtest.UserID, otherUser)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	_, err = db.Pool().Exec(ctx, `INSERT INTO bills (id, user_id, type, bill_id, status, data, created_at) VALUES
+		($1, $4, 'water', 'f1', 'enable', 'f1', '2026-01-02 10:00'),
+		($2, $4, 'water', 'f2', 'enable', 'f2', '2026-01-03 10:00'),
+		($3, $4, 'water', 'f3', 'enable', 'f3', '2026-01-04 10:00')`, formUpper, formBraces, formNoHyphen, authtest.UserID)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	want := liveBillRows(t, ctx, db)
+	if !assert.Len(t, want, 8) {
+		t.FailNow()
+	}
+	listed := listedIDs(t, gw)
+	assert.ElementsMatch(t, []string{target, sibling, formUpper, formBraces, formNoHyphen}, listed)
+	unlist := func(id string) {
+		want[id] = strings.Replace(want[id], `"status":"enable"`, `"status":"disable"`, 1)
+		for i, l := range listed {
+			if l == id {
+				listed = append(listed[:i], listed[i+1:]...)
+				break
+			}
+		}
+	}
+
+	cases := []struct {
+		name, rawID string
+		code        int
+		disables    string // the row that changes; "" for none
+		counted     string // the delete counter labels "<type> <result>"; "" for no count
+	}{
+		{"own bill", target, http.StatusOK, target, "water found"},
+		{"again: already disabled", target, http.StatusOK, "", "water found"},
+		{"an own disabled bill", mineDisabled, http.StatusOK, "", "gas found"},
+		{"a bill of another user", otherEnabled, http.StatusOK, "", "unknown not_found"},
+		{"a disabled bill of another user", otherDisabled, http.StatusOK, "", "unknown not_found"},
+		{"unknown id", "00000000-0000-4000-8000-0000000000ff", http.StatusOK, "", "unknown not_found"},
+		{"upper case", strings.ToUpper(formUpper), http.StatusOK, formUpper, "water found"},
+		{"braces", url.PathEscape("{" + formBraces + "}"), http.StatusOK, formBraces, "water found"},
+		{"no hyphens", strings.ReplaceAll(formNoHyphen, "-", ""), http.StatusOK, formNoHyphen, "water found"},
+		{"invalid id", "not-a-uuid", http.StatusInternalServerError, "", ""},
+		{"empty id", "", http.StatusInternalServerError, "", ""},
+		{"urn (Postgres rejects it)", "urn:uuid:" + sibling, http.StatusInternalServerError, "", ""},
+		{"38 characters, not braces (Postgres rejects it)", url.PathEscape(" " + sibling + " "), http.StatusInternalServerError, "", ""},
+	}
+	for _, c := range cases {
+		countMu.Lock()
+		counted = nil
+		countMu.Unlock()
+		code, body := deleteMyBill(t, gw, c.rawID, true)
+		countMu.Lock()
+		if c.counted == "" {
+			assert.Empty(t, counted, "%s: a failed call is not counted", c.name)
+		} else {
+			assert.Equal(t, []string{c.counted}, counted, "%s: the delete counter labels", c.name)
+		}
+		countMu.Unlock()
+		assert.Equal(t, c.code, code, "%s: %s", c.name, body)
+		assert.Contains(t, string(body), "خطای داخلی رخ داده است", "%s: bill's text on success and on error", c.name)
+		if c.code != http.StatusOK {
+			assert.Contains(t, strings.ReplaceAll(string(body), " ", ""), `"code":2`, "%s: gRPC Unknown", c.name)
+		}
+		if c.disables != "" {
+			unlist(c.disables)
+		}
+		assert.Equal(t, want, liveBillRows(t, ctx, db), "%s: only the target row's status changes", c.name)
+		assert.ElementsMatch(t, listed, listedIDs(t, gw), "%s: GET lists the other bills", c.name)
+	}
+	assert.Equal(t, []string{sibling}, listedIDs(t, gw))
+
+	// No token: HTTP 403, nothing changes.
+	code, body := deleteMyBill(t, gw, sibling, false)
+	assert.Equal(t, http.StatusForbidden, code, string(body))
+	assert.Equal(t, want, liveBillRows(t, ctx, db))
 }

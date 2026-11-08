@@ -1,7 +1,8 @@
-<!-- VERSION: 1.90 -->
+<!-- VERSION: 1.91 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.91 — 2026-11-08 — Added 019-mybill-delete-endpoint entry.
 v1.90 — 2026-11-08 — Added 020-task entry.
 v1.89 — 2026-11-08 — Added 019-task entry.
 v1.88 — 2026-11-08 — Added 017-mybill-list-endpoint entry.
@@ -96,6 +97,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Task 019_mybill_delete_endpoint: DELETE /v1/mybill/{id}
+- **Type:** Major (new endpoint)
+- **Files:** `src/core/savedbill/savedbill.go` (`Store.Delete`, `Repository.Disable`, `StatusDisable`) + test, `src/system/postgres/savedbill_repository.go` (`Disable`, `disableSavedBillSQL`) + unit and live tests, `src/entry/grpc/mybills.go` (`Delete`, `BillDeleter`, `OnDelete`) + test, `src/entry/http/mybills_test.go`, `mybills_live_test.go`, `src/app/defaults.go` (wiring, `qabz_mybill_delete_total`) + test, `src/go.mod` (`github.com/google/uuid` v1.6.0 direct, was indirect), `qabz.postman_collection.json`, `docs/this_vs_bill.md` (v0.4), `docs/folder_structure.md` (v0.33), `src/app/README.md` (v0.15), `docs/Plans/OPEN_TASKS.md` (v1.34), task file moved to `done_tasks/`, `docs/documents_manifest.md` (v0.92), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, behavior changes. New endpoint `DELETE /v1/mybill/{id}` (gRPC `MyBills.Delete`), exactly as bill (operator decisions, task 019): the id is checked with `uuid.Parse` of `github.com/google/uuid` v1.6.0 and sent to Postgres as sent; `UPDATE bills SET status = 'disable' WHERE id AND user_id` (no row removed, only `status` changes; `RETURNING type` only reads the type for the metric); an unknown id, another user's bill or an already disabled bill still succeed. Success: HTTP 200 `{"message":"خطای داخلی رخ داده است"}` (bill's text). An invalid or empty id, a call with no user and a database error (also `urn:uuid:` ids, which Postgres rejects): gRPC `Unknown` (HTTP 500) with the same text. Only the database error writes a log line (`mybill: delete failed`). New metric `qabz_mybill_delete_total{type,result}` (`type` = `bills.type` of the bill, `unknown` for `not_found` or a NULL type; `result` = `found` | `not_found`). Difference from bill: `docs/this_vs_bill.md` item 11 (no log line for a call with no user). `POST` / `GET /v1/mybill` and other endpoints unchanged.
+- **QA scenarios:** `OPEN_TASKS.md` > Pending verification > Task 019 (⏸; the feature-ON run is done by the implementer; awaiting operator confirmation).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — New task: 020_providers_sorted_list
 - **Type:** Minor (docs only; a new task file)

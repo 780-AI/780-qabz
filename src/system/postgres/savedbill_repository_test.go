@@ -13,9 +13,11 @@ import (
 	"qabz/core/savedbill"
 )
 
-// fakeRow answers Scan with one string value or an error.
+// fakeRow answers Scan with one string value (a NULL when null is set) or an error. The
+// destination is a *string, or a **string for a column that can be NULL.
 type fakeRow struct {
 	value string
+	null  bool
 	err   error
 }
 
@@ -24,17 +26,31 @@ func (r fakeRow) Scan(dest ...any) error {
 		return r.err
 	}
 	if len(dest) > 0 {
-		if p, ok := dest[0].(*string); ok && p != nil {
-			*p = r.value
+		switch p := dest[0].(type) {
+		case *string:
+			if p != nil {
+				*p = r.value
+			}
+		case **string:
+			if p != nil {
+				*p = nil
+				if !r.null {
+					v := r.value
+					*p = &v
+				}
+			}
 		}
 	}
 	return nil
 }
 
-// fakeDB answers the find queries in order (rows), every Exec with execErr and every Query with
-// list and listErr. It records the calls.
+// fakeDB answers the QueryRow calls in order (rows; nilRow: a nil row), every Exec with execErr and
+// every Query with list and listErr. It records the calls.
 type fakeDB struct {
 	rows     []fakeRow
+	nilRow   bool
+	rowSQL   string
+	rowArgs  []any
 	execErr  error
 	queries  int
 	execs    int
@@ -96,7 +112,12 @@ func (r *fakeRows) Scan(dest ...any) error {
 	return nil
 }
 
-func (f *fakeDB) QueryRow(context.Context, string, ...any) pgx.Row {
+func (f *fakeDB) QueryRow(_ context.Context, sql string, args ...any) pgx.Row {
+	f.rowSQL, f.rowArgs = sql, args
+	if f.nilRow {
+		f.queries++
+		return nil
+	}
 	if f.queries >= len(f.rows) {
 		f.queries++
 		return fakeRow{err: errors.New("unexpected query")}
@@ -288,6 +309,62 @@ func TestSavedBillListWithoutPool(t *testing.T) {
 		got, err := r.List(context.Background(), "u")
 		assert.Error(t, err)
 		assert.Nil(t, got)
+	}
+}
+
+// TestSavedBillDisable: one UPDATE ... RETURNING type with the id and the user as sent; a returned
+// row gives found and its type (a NULL type: ""); no row is not found and not an error.
+func TestSavedBillDisable(t *testing.T) {
+	cases := []struct {
+		name     string
+		row      fakeRow
+		wantType string
+		found    bool
+	}{
+		{"a bill with a type", fakeRow{value: "water"}, "water", true},
+		{"a bill with a NULL type", fakeRow{null: true}, "", true},
+		{"no bill", fakeRow{err: pgx.ErrNoRows}, "", false},
+	}
+	for _, c := range cases {
+		db := &fakeDB{rows: []fakeRow{c.row}}
+		typ, found, err := fakeRepo(db).Disable(context.Background(), "u", "{ID}")
+		assert.NoError(t, err, c.name)
+		assert.Equal(t, c.found, found, c.name)
+		assert.Equal(t, c.wantType, typ, c.name)
+		assert.Equal(t, 1, db.queries, c.name)
+		assert.Equal(t, disableSavedBillSQL, db.rowSQL, c.name)
+		assert.Equal(t, []any{"{ID}", "u"}, db.rowArgs, "id then user, as sent: %s", c.name)
+		assert.Equal(t, 0, db.execs+db.listCalls, c.name)
+	}
+}
+
+// TestSavedBillDisableSQL pins the statement: only status changes, to disable, on the row with the
+// id of the user; both values are cast from text, so Postgres (not pgx) reads them as sent;
+// RETURNING type only reads the type for the delete counter.
+func TestSavedBillDisableSQL(t *testing.T) {
+	assert.Equal(t, `UPDATE bills SET status = 'disable' WHERE id = $1::text::uuid AND user_id = $2::text::uuid RETURNING type`, disableSavedBillSQL)
+	assert.Contains(t, disableSavedBillSQL, "'"+savedbill.StatusDisable+"'")
+}
+
+func TestSavedBillDisableError(t *testing.T) {
+	boom := &pgconn.PgError{Code: "22P02", Message: "invalid input syntax for type uuid"}
+	typ, found, err := fakeRepo(&fakeDB{rows: []fakeRow{{err: boom}}}).Disable(context.Background(), "u", "urn:uuid:x")
+	assert.ErrorIs(t, err, boom)
+	assert.False(t, found)
+	assert.Empty(t, typ)
+
+	typ, found, err = fakeRepo(&fakeDB{nilRow: true}).Disable(context.Background(), "u", "id")
+	assert.Error(t, err, "a nil row")
+	assert.False(t, found)
+	assert.Empty(t, typ)
+}
+
+func TestSavedBillDisableWithoutPool(t *testing.T) {
+	for _, r := range []*SavedBillRepository{nil, NewSavedBillRepository(nil), NewSavedBillRepository(&Client{})} {
+		typ, found, err := r.Disable(context.Background(), "u", "id")
+		assert.Error(t, err)
+		assert.False(t, found)
+		assert.Empty(t, typ)
 	}
 }
 

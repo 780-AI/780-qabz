@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -283,5 +284,114 @@ func TestLiveSavedBillList(t *testing.T) {
 	if assert.NoError(t, err) {
 		_, err = repo.List(ctx, liveOther)
 		assert.ErrorContains(t, err, "00000000-0000-4000-8000-000000000007")
+	}
+}
+
+// liveBillRows reads every bills row by a direct query: id -> the whole row as JSON text. It stops
+// the test if the query fails.
+func liveBillRows(t *testing.T, ctx context.Context, db *postgres.Client) map[string]string {
+	t.Helper()
+	rows, err := db.Pool().Query(ctx, `SELECT id::text, row_to_json(b)::text FROM bills b`)
+	if !assert.NoError(t, err) || !assert.NotNil(t, rows) {
+		t.FailNow()
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, row string
+		if !assert.NoError(t, rows.Scan(&id, &row)) {
+			t.FailNow()
+		}
+		out[id] = row
+	}
+	if !assert.NoError(t, rows.Err()) {
+		t.FailNow()
+	}
+	return out
+}
+
+// TestLiveSavedBillDisable deletes bills on a real bills table and checks every row by a direct
+// SQL query after each call: only the target row changes, only its status, to disable; no row is
+// removed. Each id form that Postgres accepts finds the row; urn:uuid: is a database error, as in
+// bill.
+func TestLiveSavedBillDisable(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	db, repo := liveBills(t, ctx)
+
+	const (
+		target   = "00000000-0000-4000-8000-0000000000b1" // enabled bill of liveUser
+		sibling  = "00000000-0000-4000-8000-0000000000b2" // another enabled bill of liveUser
+		disabled = "00000000-0000-4000-8000-0000000000b3" // a disabled bill of liveUser
+		other    = "00000000-0000-4000-8000-0000000000b4" // an enabled bill of liveOther
+		upper    = "00000000-0000-4000-8000-0000000000c1"
+		braces   = "00000000-0000-4000-8000-0000000000c2"
+		noHyphen = "00000000-0000-4000-8000-0000000000c3"
+		nullType = "00000000-0000-4000-8000-0000000000c4" // an enabled bill of liveUser with a NULL type
+	)
+	_, err := db.Pool().Exec(ctx, `INSERT INTO bills (id, user_id, name, type, bill_id, status, last_order_date, data, json_data, created_at) VALUES
+	('`+target+`', '`+liveUser+`', 'آب', 'water', '123455', 'enable', '1403/01/01', '123455', '{"Operator": "", "Phone": "", "IsPinned": true}', '2026-01-01 10:00'),
+	('`+sibling+`', '`+liveUser+`', 'برق', 'electricity', '123455', 'enable', NULL, '123455', NULL, '2026-01-02 10:00'),
+	('`+disabled+`', '`+liveUser+`', 'old', 'gas', '999', 'disable', NULL, '999', NULL, '2026-01-03 10:00'),
+	('`+other+`', '`+liveOther+`', 'other', 'water', '123455', 'enable', NULL, '123455', NULL, '2026-01-04 10:00'),
+	('`+upper+`', '`+liveUser+`', 'u', 'water', 'u1', 'enable', NULL, 'u1', NULL, '2026-01-05 10:00'),
+	('`+braces+`', '`+liveUser+`', 'b', 'water', 'b1', 'enable', NULL, 'b1', NULL, '2026-01-06 10:00'),
+	('`+noHyphen+`', '`+liveUser+`', 'n', 'water', 'n1', 'enable', NULL, 'n1', NULL, '2026-01-07 10:00'),
+	('`+nullType+`', '`+liveUser+`', 'x', NULL, 'x1', 'enable', NULL, 'x1', NULL, '2026-01-08 10:00')`)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	want := liveBillRows(t, ctx, db)
+	if !assert.Len(t, want, 8) {
+		t.FailNow()
+	}
+	disable := func(id string) {
+		want[id] = strings.Replace(want[id], `"status":"enable"`, `"status":"disable"`, 1)
+	}
+
+	cases := []struct {
+		name, user, id string
+		found          bool   // Postgres counts a matched row, also one that was disabled already
+		typ            string // the returned bills.type ("" for NULL or no row)
+		disables       string // the row that changes; "" for none
+	}{
+		{"own bill", liveUser, target, true, "water", target},
+		{"again: already disabled", liveUser, target, true, "water", ""},
+		{"a disabled bill", liveUser, disabled, true, "gas", ""},
+		{"a bill of another user", liveUser, other, false, "", ""},
+		{"unknown id", liveUser, "00000000-0000-4000-8000-0000000000ff", false, "", ""},
+		{"upper case", liveUser, strings.ToUpper(upper), true, "water", upper},
+		{"braces", liveUser, "{" + braces + "}", true, "water", braces},
+		{"no hyphens", liveUser, strings.ReplaceAll(noHyphen, "-", ""), true, "water", noHyphen},
+		{"a NULL type", liveUser, nullType, true, "", nullType},
+	}
+	for _, c := range cases {
+		typ, found, err := repo.Disable(ctx, c.user, c.id)
+		assert.NoError(t, err, c.name)
+		assert.Equal(t, c.found, found, c.name)
+		assert.Equal(t, c.typ, typ, c.name)
+		if c.disables != "" {
+			disable(c.disables)
+		}
+		assert.Equal(t, want, liveBillRows(t, ctx, db), "%s: only the target row's status changes", c.name)
+	}
+
+	// Forms that uuid.Parse accepts but Postgres does not: a database error, and nothing changes.
+	for _, id := range []string{"urn:uuid:" + sibling, "URN:UUID:" + sibling, " " + sibling + " ", "(" + sibling + ")"} {
+		_, found, err := repo.Disable(ctx, liveUser, id)
+		if assert.Error(t, err, id) {
+			assert.Contains(t, err.Error(), "invalid input syntax for type uuid", id)
+		}
+		assert.False(t, found, id)
+	}
+	// A user that is not a UUID: a database error too (bill sends it to Postgres as well).
+	_, _, err = repo.Disable(ctx, "not-a-user", sibling)
+	assert.Error(t, err)
+	assert.Equal(t, want, liveBillRows(t, ctx, db), "the failed calls change nothing")
+
+	// List no longer returns the disabled bills; the sibling stays.
+	got, err := repo.List(ctx, liveUser)
+	if assert.NoError(t, err) && assert.Len(t, got, 1) {
+		assert.Equal(t, sibling, got[0].ID)
 	}
 }

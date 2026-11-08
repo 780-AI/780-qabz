@@ -168,9 +168,12 @@ func newService(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 	return grpcserver.NewService(grpcserver.ServiceDeps{Services: catalog, ServiceID: serviceID, Logger: logger}), nil
 }
 
-// newMyBills builds the gRPC MyBills service: POST /v1/mybill saves a bill in the bills table and
-// GET /v1/mybill lists the user's bills (serviceId is config service.id). Each saved bill adds 1
-// to qabz_mybill_insert_total{result="created"|"existing"} (only when metrics are on); a failed
+// newMyBills builds the gRPC MyBills service: POST /v1/mybill saves a bill in the bills table,
+// GET /v1/mybill lists the user's bills (serviceId is config service.id) and DELETE
+// /v1/mybill/{id} disables a bill of the user. Each saved bill adds 1 to
+// qabz_mybill_insert_total{result="created"|"existing"} and each successful delete adds 1 to
+// qabz_mybill_delete_total{type,result="found"|"not_found"} (type: bills.type of the bill, or
+// "unknown" for not_found and a NULL type) (only when metrics are on); a failed
 // write or read writes one error log line. Rejected and failed calls are in the code label of
 // qabz_request_duration_ms.
 func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Server, logger Logger) (*grpcserver.MyBills, error) {
@@ -178,7 +181,8 @@ func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 	if err != nil {
 		return nil, err
 	}
-	var onInsert func(result string) // nil: metrics are off, nothing is recorded
+	var onInsert func(result string)           // nil: metrics are off, nothing is recorded
+	var onDelete func(billType, result string) // nil: metrics are off, nothing is recorded
 	if reg := metrics.Registry(); reg != nil {
 		inserts := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_mybill_insert_total",
@@ -188,6 +192,14 @@ func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 			return nil, fmt.Errorf("mybill: register metric: %w", err)
 		}
 		onInsert = func(result string) { inserts.WithLabelValues(result).Inc() }
+		deletes := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_mybill_delete_total",
+			Help: "DELETE /v1/mybill/{id} successful calls by bill type (bills.type; unknown for not_found or a NULL type) and result (found: a bill of the user has the id; not_found).",
+		}, []string{"type", "result"})
+		if err := reg.Register(deletes); err != nil {
+			return nil, fmt.Errorf("mybill: register metric: %w", err)
+		}
+		onDelete = func(billType, result string) { deletes.WithLabelValues(billType, result).Inc() }
 	}
 	store, err := savedbill.NewStore(postgres.NewSavedBillRepository(db))
 	if err != nil {
@@ -196,9 +208,11 @@ func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 	return grpcserver.NewMyBills(grpcserver.MyBillsDeps{
 		Bills:     store,
 		Lister:    store,
+		Deleter:   store,
 		ServiceID: serviceID,
 		Logger:    logger,
 		OnInsert:  onInsert,
+		OnDelete:  onDelete,
 	}), nil
 }
 

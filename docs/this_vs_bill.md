@@ -1,7 +1,8 @@
-<!-- VERSION: 0.3 -->
+<!-- VERSION: 0.4 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.4 — 2026-11-08 — Task 019: item 11 for DELETE /v1/mybill/{id} (no log line for a call with no user). The answers of DELETE match bill, so they are not an item.
 v0.3 — 2026-11-08 — Task 017: item 6 also covers GET /v1/mybill; items 9-10 for GET /v1/mybill (tiebreak of the order, error answer).
 v0.2 — 2026-11-08 — Task 016: items 5-8 for POST /v1/mybill (invalid request answer, no user, no log line for a client error, unique-key retry).
 v0.1 — 2026-11-07 — Created (task 013). Items 1-4: GET /v1/services (inquiry as stored, error answer, empty Accept-Language, cache).
@@ -77,3 +78,9 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **Qabz:** gives gRPC `Internal` (code 13) with the message `internal error` and no detail, and one error log line `mybill: list failed` with the cause. Both give HTTP 500. A bad `json_data` value fails the whole list too, as in bill (operator decision, task 017).
     - **Reason:** the same as item 2.
     - **Code:** the `@todo` comment at the `errInternal` answer in `MyBills.GetAll` in `src/entry/grpc/mybills.go`.
+
+11. **`DELETE /v1/mybill/{id}`: no log line for a call with no user.**
+    - **bill:** the handler reads the user with a plain type assertion (`ctx.Value("user_id").(string)`), so a call with no user panics. The recovery handler prints the stack and writes one warn-level line `service has panicked!`, then answers bill's `invalid_parameter_error` (`Unknown`, HTTP 500). A call with an empty user goes to the database and fails there (`database_error`, one error line).
+    - **Qabz:** gives the same answer (`Unknown`, HTTP 500, the same Persian text) and writes no log line. This happens only with `debug.auth.disable: true` and an empty `debug.auth.mock_user_id`. The other answers of `DELETE` are bill's (operator decision, task 019): the success message, `Unknown` for an id that does not parse, an empty id and a database error. Like bill, Qabz writes no line for an invalid id and one error line for a database error (`mybill: delete failed`, with the cause).
+    - **Reason:** conventions § 10: a client error is a common error and writes no log line, although the code is `Unknown` (operator decision 4, task 019).
+    - **Code:** the `@todo` comment at the no-user answer in `MyBills.Delete` in `src/entry/grpc/mybills.go`.
