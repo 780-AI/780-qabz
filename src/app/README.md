@@ -1,4 +1,4 @@
-<!-- VERSION: 0.12 -->
+<!-- VERSION: 0.13 -->
 # app
 
 `app` is the bootstrap of the Qabz service. The type `App` owns every long-lived dependency: the logger, the Postgres database, the Redis cache, the metrics endpoint and the optional tracer. Entry points (for example `cmd/start-app`) build an `App` and run it. They hold no wiring of their own.
@@ -20,6 +20,10 @@ Every gRPC call, and so every gateway route, is measured first (`entry/grpc/requ
 Every gRPC call, and so every gateway route, goes through the JWT auth check (`entry/grpc/auth.go`, verifier in `common/auth`). A call without a valid `Authorization: Bearer <token>` gets gRPC `PermissionDenied` (HTTP 403) with the message "unauthenticated". The check accepts only HMAC tokens (`HS256`, `HS384`, `HS512`) signed with the secret that the auth service shares (`auth.secrets.hmac`, never printed) and needs `exp`, `sub` (a UUID), `mobile`, `non_otp` (not `guest`) and an `aud` string (any value: it is not compared, as in `bill`; it goes into the claims). Every other `alg` (`none`, RSA, ECDSA) is rejected. Qabz only verifies tokens. Each rejection adds 1 to `qabz_auth_rejected_total{reason}` and writes no log line. `debug.auth.disable: true` turns the check off for development and logs one warning at start; then `debug.auth.mock_user_id` (a lower-case UUID, default empty) is the user of every call, so handlers that need a user (My Bills) work without a token, and with it empty a call has no user; the production config has no `debug` section, and a missing key keeps the check on. With the check on, `NewDefaultBuilder` fails when the secret is missing. The metrics endpoint is outside the check. `Stop` stops the metrics endpoint, the gateway, then the gRPC server. A failed `Start` stops only the parts that started.
 
 Before the metrics endpoint starts, `Start` runs the SQL migrations (`database.migration.on_start`, default true; many containers can start together, because the migrator takes a Postgres advisory lock) and starts the optional config reloader. A `Config` field with the tag `hot_reload:"true"` is read again from the table `app_hot_configs` every `hot_reload_interval`. `App.Config()` returns a copy of the current settings, so do not keep it.
+
+The config key `mode` (`dev`, `stage` or `prod`) is required: without it, or with another value, `config.Boot` panics and neither the App nor a command starts. Now it changes only the development commands.
+
+**Development database (`devdb`).** `go run . devdb --config=../config.yml seed` (in `src/`) creates every table of the `bill` service database that does not exist yet, as bill's code makes them (`system/postgres/devdb/schema.sql`), inserts the seed rows of `services` (5) and `providers` (45) whose `id` does not exist, and moves the two id sequences past the largest id. `devdb ... unseed` deletes those seed rows by `id`; the tables stay. Both run in one transaction, a second run changes nothing, and they print the row counts. They run only with `mode: dev`: with `stage` or `prod` they exit 1 before they connect. The `bill` tables are not qabz migrations (qabz does not own them).
 
 ```go
 cfg, _ := config.Boot(os.Args[1:])  // --config=path/to/config.yml is required; a bad file panics

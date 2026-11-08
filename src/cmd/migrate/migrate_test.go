@@ -23,7 +23,7 @@ func exec(t *testing.T, args ...string) (int, string) {
 	return code, errOut.String()
 }
 
-const okConfig = `database: {postgres: {password: "x"}}`
+const okConfig = `{mode: dev, database: {postgres: {password: "x"}}}`
 
 func TestUsageErrors(t *testing.T) {
 	cfg := configArg(t, okConfig)
@@ -36,11 +36,12 @@ func TestUsageErrors(t *testing.T) {
 func TestConfigMissingPanics(t *testing.T) {
 	assert.Panics(t, func() { exec(t, "up") })
 	assert.Panics(t, func() { exec(t, "up", "--config=/no/such/file.yml") })
-	assert.Panics(t, func() { exec(t, "up", configArg(t, `database: {postgres: {port: 5432}}`)) }) // no password
+	assert.Panics(t, func() { exec(t, "up", configArg(t, `{mode: dev, database: {postgres: {port: 5432}}}`)) }) // no password
 }
 
 func TestUpFailsWithoutServer(t *testing.T) {
 	cfg := configArg(t, `
+mode: dev
 database:
   postgres: {host: "127.0.0.1", port: 1, password: "s3cret"}
   migration: {timeout: "5s"}

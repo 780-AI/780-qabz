@@ -59,9 +59,9 @@ func TestBootPanics(t *testing.T) {
 		"flag without path": {"--config"},
 		"file missing":      {"--config=" + filepath.Join(dir, "none.yml")},
 		"file is a folder":  {"--config=" + dir},
-		"invalid yaml":      {"--config=" + writeConfig(t, "database: {postgres: [")},
+		"invalid yaml":      {"--config=" + writeConfig(t, "mode: dev\ndatabase: {postgres: [")},
 		"empty file":        {"--config=" + writeConfig(t, "")},
-		"rule broken":       {"--config=" + writeConfig(t, "database: {postgres: {password: pw, port: 0}}")},
+		"rule broken":       {"--config=" + writeConfig(t, "mode: dev\ndatabase: {postgres: {password: pw, port: 0}}")},
 	}
 	if os.Geteuid() != 0 { // root can read any file
 		cases["file unreadable"] = []string{"--config=" + unreadable}

@@ -26,10 +26,10 @@ var configEntries = []struct {
 	yml      string
 	disabled bool
 }{
-	{name: "no debug section", yml: `database: {postgres: {password: x}}`},
-	{name: "debug without auth", yml: `{database: {postgres: {password: x}}, debug: {}}`},
-	{name: "disable false", yml: `{database: {postgres: {password: x}}, debug: {auth: {disable: false}}}`},
-	{name: "disable true", yml: `{database: {postgres: {password: x}}, debug: {auth: {disable: true}}}`, disabled: true},
+	{name: "no debug section", yml: `{mode: dev, database: {postgres: {password: x}}}`},
+	{name: "debug without auth", yml: `{mode: dev, database: {postgres: {password: x}}, debug: {}}`},
+	{name: "disable false", yml: `{mode: dev, database: {postgres: {password: x}}, debug: {auth: {disable: false}}}`},
+	{name: "disable true", yml: `{mode: dev, database: {postgres: {password: x}}, debug: {auth: {disable: true}}}`, disabled: true},
 }
 
 // claimsService answers Greeting and records the claims the handler saw.

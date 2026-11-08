@@ -1,7 +1,8 @@
-<!-- VERSION: 0.29 -->
+<!-- VERSION: 0.30 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.30 — 2026-11-08 — Task 015: cmd/devdb/ (dev-only seed / unseed of the bill tables) and system/postgres/devdb/ (bill schema and seed SQL); config/constants.go has the mode values; postgrestest/ gets EmptySchema.
 v0.29 — 2026-11-08 — Task 016: common/helpers/ (bill ID, phone), core/savedbill/ (My Bills store), system/postgres saved bill repository + bills table in postgrestest/, entry/grpc MyBills.Insert.
 v0.28 — 2026-11-07 — Task 014: common/monitoring/prometheus/requests.go (request metrics, Prometheus switch) and entry/grpc/requests.go (request metrics interceptor).
 v0.27 — 2026-11-07 — Task 013: config/constants.go, core/billtype/ (service catalog), system/postgres service repository + postgrestest/, entry/grpc Service.Get; docs/this_vs_bill.md.
@@ -58,13 +59,14 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   │   ├── app.go  builder.go  defaults.go
 │   │   └── app_test.go  defaults_test.go
 │   ├── cmd/                           # entry points (no main.go here)
-│   │   ├── run.go                     # Run(args): start-app (default) or migrate
+│   │   ├── run.go                     # Run(args): start-app (default), migrate or devdb
 │   │   ├── start-app/                 # start.go: Run(args) loads --config, builds and runs the App
-│   │   └── migrate/                   # migrate.go: up, force V, version
-│   ├── config/                        # settings: Config from YAML (config.go; example_test.go keeps config.yml.example in sync), consts (constants.go: CacheServicesTTL), YAML mapper (decode.go), --config boot (boot.go); hot-reload: Holder, Reloader (hot.go)
+│   │   ├── migrate/                   # migrate.go: up, force V, version
+│   │   └── devdb/                     # devdb.go: seed | unseed of the bill tables; development only (mode: dev)
+│   ├── config/                        # settings: Config from YAML (config.go; example_test.go keeps config.yml.example in sync), consts (constants.go: CacheServicesTTL, the mode values dev / stage / prod), YAML mapper (decode.go), --config boot (boot.go); hot-reload: Holder, Reloader (hot.go)
 │   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs.up.sql (no down files)
 │   ├── system/                        # what the service connects to
-│   │   └── postgres/  redis/          # pgx pool, migrator, config repository, services and saved bill repositories (bill tables); postgrestest/ = throw-away schema with the services or bills table (tests only); go-redis client (kafka/, nats/ still empty)
+│   │   └── postgres/  redis/          # pgx pool, migrator, config repository, services and saved bill repositories (bill tables); devdb/ = the bill tables as bill's code makes them + the services / providers seed (embedded SQL; development only); postgrestest/ = throw-away schema, empty or with the services or bills table (tests only); go-redis client (kafka/, nats/ still empty)
 │   ├── common/                        # shared by every package
 │   │   ├── logging/                   # zap/ (logger, done), logstash/ (log shipping, empty)
 │   │   ├── monitoring/                # jaeger/ (tracing), prometheus/ (metrics endpoint with the Prometheus switch; requests.go: request duration histogram in ms, its _count = request counter)

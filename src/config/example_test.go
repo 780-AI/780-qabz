@@ -73,7 +73,8 @@ func TestExampleHasEveryKey(t *testing.T) {
 }
 
 // TestExampleHasDefaultValues: every value in config.yml.example is the default of its key, or the
-// zero value when the key has no default. The required password is the only key set for the check.
+// zero value when the key has no default. The required password and mode are the only keys set for
+// the check.
 func TestExampleHasDefaultValues(t *testing.T) {
 	m := readYAML(t, examplePath)
 	db, ok := m["database"].(map[string]any)
@@ -85,7 +86,9 @@ func TestExampleHasDefaultValues(t *testing.T) {
 		t.FailNow()
 	}
 	assert.Equal(t, "", pg["password"], "the example has no password")
+	assert.Equal(t, "", m["mode"], "the example has no mode")
 	pg["password"] = "x"
+	m["mode"] = ModeProd
 	data, err := yaml.Marshal(m)
 	if !assert.NoError(t, err) {
 		t.FailNow()
@@ -96,6 +99,7 @@ func TestExampleHasDefaultValues(t *testing.T) {
 	}
 	want := defaults()
 	want.PostgresPassword = "x"
+	want.Mode = ModeProd
 	assert.Equal(t, want, got)
 }
 

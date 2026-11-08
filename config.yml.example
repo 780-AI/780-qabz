@@ -4,6 +4,7 @@
 # default. Never put a real secret, host or token here. A new config key goes into this file and
 # into config.yml in the same change.
 
+mode: ""                     # required: dev, stage or prod; the devdb commands run only with dev
 service_name: "qabz"
 hot_reload_interval: "30s"
 

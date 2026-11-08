@@ -25,6 +25,7 @@ import (
 func testConfig(t *testing.T) config.Config {
 	t.Helper()
 	c, err := config.Parse([]byte(`
+mode: dev
 database:
   postgres: {host: "127.0.0.1", port: 1, password: "s3cret"}
   redis: {host: "127.0.0.1", port: 1}

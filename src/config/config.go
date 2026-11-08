@@ -32,6 +32,10 @@ func (s Secret) Reveal() string { return string(s) }
 // Config holds every setting of the service. A field with the tag `path:"a.b.c"` gets the value at
 // that dotted path of the YAML tree (see decode.go). A path that is missing keeps the default.
 type Config struct {
+	// Mode is the run environment: ModeDev, ModeStage or ModeProd. The key is required: a missing
+	// key or any other value stops the start. The development commands (devdb) run only in ModeDev.
+	// It changes nothing else.
+	Mode        string `path:"mode"`
 	ServiceName string `path:"service_name"`
 	// ServiceID is the ID of this service in the payment flow. GET /v1/services sends it as
 	// serviceId. The old bill service has the same key (service.id); qabz uses bill's ID.
@@ -135,6 +139,13 @@ func Parse(data []byte) (Config, error) {
 
 func (c Config) validate() error {
 	var errs []error
+	switch c.Mode {
+	case ModeDev, ModeStage, ModeProd:
+	case "":
+		errs = append(errs, errors.New("mode is required (dev, stage or prod)"))
+	default:
+		errs = append(errs, fmt.Errorf("mode must be dev, stage or prod (got %q)", c.Mode))
+	}
 	if c.PostgresPassword == "" {
 		errs = append(errs, errors.New("database.postgres.password is required"))
 	}

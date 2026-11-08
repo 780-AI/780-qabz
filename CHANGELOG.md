@@ -1,7 +1,8 @@
-<!-- VERSION: 1.83 -->
+<!-- VERSION: 1.84 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.84 — 2026-11-08 — Added 015-dev-bill-database entry.
 v1.83 — 2026-11-08 — Added session-wrap-up (task 016 session) entry.
 v1.82 — 2026-11-08 — Added error-logging-convention entry.
 v1.81 — 2026-11-08 — Added 016-mybill-insert-endpoint entry.
@@ -89,6 +90,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Task 015_dev_bill_database: devdb seed / unseed and the mode key
+- **Type:** Major (new command, new packages, new required config key)
+- **Files:** `src/config/config.go`, `constants.go` + tests (`config_test.go`, `example_test.go`, `boot_test.go`), `config.yml.example`, `src/cmd/devdb/` (new) + test, `src/cmd/run.go` + test, `src/system/postgres/devdb/` (new: `devdb.go`, `schema.sql`, `seed_services.sql`, `seed_providers.sql`, `unseed_services.sql`, `unseed_providers.sql`, unit and live tests), `src/system/postgres/postgrestest/` (`EmptySchema`), the config YAML in `src/app/`, `src/cmd/migrate/`, `src/cmd/start-app/` and `src/entry/grpc/` tests, `docs/folder_structure.md` (v0.30), `src/app/README.md` (v0.13), `docs/Plans/OPEN_TASKS.md` (v1.30), task file moved to `done_tasks/`, `docs/documents_manifest.md` (v0.85), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, behavior changes. New required config key `mode` (`dev`, `stage`, `prod`): a config without it, or with another value, no longer loads, so every existing `config.yml` must add it (breaking for local configs; the local `config.yml` has `mode: "dev"`). `mode` changes nothing else in the App. New development command `devdb --config=... seed | unseed`: `seed` creates the 10 tables of the `bill` database as bill's code makes them (no `outboxes`: bill's code does not create it) and inserts the 5 `services` and 45 `providers` seed rows; `unseed` deletes those rows by `id`. One transaction each; a second run changes nothing. With `mode` `stage` or `prod` both exit 1 before they connect. Not a qabz migration; `src/migrations/` is unchanged.
+- **QA scenarios:** `OPEN_TASKS.md` > Pending verification > Task 015 (⏸; done by the implementer on the compose dev database, awaiting operator confirmation).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Session wrap-up: task 016 follow-up and lesson candidates (task 016 session)
 - **Type:** Minor (docs only)

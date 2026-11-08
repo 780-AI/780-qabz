@@ -60,7 +60,15 @@ func BillsSchema(t testing.TB, ctx context.Context, dsn string) string {
 	return newSchema(t, ctx, dsn, billsTableSQL)
 }
 
-// newSchema creates a throw-away schema, runs ddl in it and returns dsn with search_path set to it.
+// EmptySchema is ServicesSchema with no table: for code that creates its own tables (the devdb
+// command). For tests only.
+func EmptySchema(t testing.TB, ctx context.Context, dsn string) string {
+	t.Helper()
+	return newSchema(t, ctx, dsn, "")
+}
+
+// newSchema creates a throw-away schema, runs ddl in it (no ddl: an empty schema) and returns dsn
+// with search_path set to it.
 func newSchema(t testing.TB, ctx context.Context, dsn, ddl string) string {
 	t.Helper()
 	// rand.Text has only A-Z and 2-7; in lower case the name needs no quoting.
@@ -95,6 +103,9 @@ func newSchema(t testing.TB, ctx context.Context, dsn, ddl string) string {
 	u.RawQuery = q.Encode()
 	schemaDSN := u.String()
 
+	if ddl == "" {
+		return schemaDSN
+	}
 	c, err := postgres.New(ctx, schemaDSN)
 	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
 		t.FailNow()

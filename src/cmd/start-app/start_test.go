@@ -22,6 +22,7 @@ func TestRunWithoutConfigPanics(t *testing.T) {
 
 func TestRunStartFailure(t *testing.T) {
 	arg := configFile(t, `
+mode: dev
 database:
   postgres: {host: "127.0.0.1", port: 1, password: "x"}
 metrics:
@@ -32,6 +33,7 @@ metrics:
 
 func TestRunBadLogLevel(t *testing.T) {
 	arg := configFile(t, `
+mode: dev
 logs: {level: "loud"}
 database: {postgres: {password: "x"}}
 `)

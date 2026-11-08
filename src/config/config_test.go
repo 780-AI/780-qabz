@@ -12,7 +12,7 @@ import (
 )
 
 func TestParseDefaults(t *testing.T) {
-	c, err := Parse([]byte(`database: {postgres: {password: "pw"}}`))
+	c, err := Parse([]byte(`{mode: dev, database: {postgres: {password: "pw"}}}`))
 	assert.NoError(t, err)
 	assert.Equal(t, "qabz", c.ServiceName)
 	assert.Equal(t, 0, c.ServiceID)
@@ -28,6 +28,7 @@ func TestParseDefaults(t *testing.T) {
 }
 
 const fullYAML = `
+mode: stage
 service_name: "svc"
 service:
   id: 105
@@ -57,6 +58,7 @@ database:
 func TestParseAllKeys(t *testing.T) {
 	c, err := Parse([]byte(fullYAML))
 	assert.NoError(t, err)
+	assert.Equal(t, ModeStage, c.Mode)
 	assert.Equal(t, "svc", c.ServiceName)
 	assert.Equal(t, 105, c.ServiceID)
 	assert.Equal(t, "debug", c.LogLevel)
@@ -94,16 +96,16 @@ func TestParseEmptyFile(t *testing.T) {
 
 func TestParseWrongTypesAndBadYAML(t *testing.T) {
 	for name, doc := range map[string]string{
-		"string given a number":   "service_name: 5\ndatabase: {postgres: {password: pw}}",
-		"int given a string":      "database: {postgres: {password: pw, port: \"5432\"}}",
-		"bool given a string":     "database: {postgres: {password: pw}, migration: {on_start: \"yes\"}}",
-		"duration given a number": "hot_reload_interval: 30\ndatabase: {postgres: {password: pw}}",
-		"bad duration":            "hot_reload_interval: soon\ndatabase: {postgres: {password: pw}}",
-		"null":                    "service_name:\ndatabase: {postgres: {password: pw}}",
-		"object given an array":   "database: [1, 2]",
-		"scalar in the path":      "database: {postgres: 5}",
+		"string given a number":   "mode: dev\nservice_name: 5\ndatabase: {postgres: {password: pw}}",
+		"int given a string":      "mode: dev\ndatabase: {postgres: {password: pw, port: \"5432\"}}",
+		"bool given a string":     "mode: dev\ndatabase: {postgres: {password: pw}, migration: {on_start: \"yes\"}}",
+		"duration given a number": "mode: dev\nhot_reload_interval: 30\ndatabase: {postgres: {password: pw}}",
+		"bad duration":            "mode: dev\nhot_reload_interval: soon\ndatabase: {postgres: {password: pw}}",
+		"null":                    "mode: dev\nservice_name:\ndatabase: {postgres: {password: pw}}",
+		"object given an array":   "mode: dev\ndatabase: [1, 2]",
+		"scalar in the path":      "mode: dev\ndatabase: {postgres: 5}",
 		"root is an array":        "- a\n- b",
-		"invalid yaml":            "database: {postgres: [",
+		"invalid yaml":            "mode: dev\ndatabase: {postgres: [",
 	} {
 		_, err := Parse([]byte(doc))
 		if assert.Error(t, err, name) {
@@ -124,7 +126,7 @@ func TestLoadFile(t *testing.T) {
 }
 
 func TestSecretNeverPrints(t *testing.T) {
-	c, err := Parse([]byte(`{database: {postgres: {password: s3cret}, redis: {password: r3dis}}, auth: {secrets: {hmac: hm4c}}}`))
+	c, err := Parse([]byte(`{mode: dev, database: {postgres: {password: s3cret}, redis: {password: r3dis}}, auth: {secrets: {hmac: hm4c}}}`))
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -143,10 +145,10 @@ func TestParseMetricsSwitch(t *testing.T) {
 		yaml string
 		want bool
 	}{
-		{name: "default", yaml: `database: {postgres: {password: x}}`, want: true},
-		{name: "default with other metrics keys", yaml: `{database: {postgres: {password: x}}, metrics: {prometheus: {addr: ":1"}}}`, want: true},
-		{name: "explicit on", yaml: `{database: {postgres: {password: x}}, metrics: {prometheus: {enabled: true}}}`, want: true},
-		{name: "explicit off", yaml: `{database: {postgres: {password: x}}, metrics: {prometheus: {enabled: false}}}`, want: false},
+		{name: "default", yaml: `{mode: dev, database: {postgres: {password: x}}}`, want: true},
+		{name: "default with other metrics keys", yaml: `{mode: dev, database: {postgres: {password: x}}, metrics: {prometheus: {addr: ":1"}}}`, want: true},
+		{name: "explicit on", yaml: `{mode: dev, database: {postgres: {password: x}}, metrics: {prometheus: {enabled: true}}}`, want: true},
+		{name: "explicit off", yaml: `{mode: dev, database: {postgres: {password: x}}, metrics: {prometheus: {enabled: false}}}`, want: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -156,17 +158,17 @@ func TestParseMetricsSwitch(t *testing.T) {
 			}
 		})
 	}
-	_, err := Parse([]byte(`{database: {postgres: {password: x}}, metrics: {prometheus: {enabled: "no"}}}`))
+	_, err := Parse([]byte(`{mode: dev, database: {postgres: {password: x}}, metrics: {prometheus: {enabled: "no"}}}`))
 	assert.Error(t, err, "a non-bool value is an error, not off")
 }
 
 // TestParseAuthKeys: auth.secrets.hmac is read from the YAML; a missing section leaves it empty.
 func TestParseAuthKeys(t *testing.T) {
-	c, err := Parse([]byte(`{database: {postgres: {password: x}}, auth: {secrets: {hmac: hm4c}}}`))
+	c, err := Parse([]byte(`{mode: dev, database: {postgres: {password: x}}, auth: {secrets: {hmac: hm4c}}}`))
 	if assert.NoError(t, err) {
 		assert.Equal(t, "hm4c", c.JWTHMACSecret.Reveal())
 	}
-	c, err = Parse([]byte(`database: {postgres: {password: x}}`))
+	c, err = Parse([]byte(`{mode: dev, database: {postgres: {password: x}}}`))
 	if assert.NoError(t, err) {
 		assert.Equal(t, "", c.JWTHMACSecret.Reveal())
 	}
@@ -174,11 +176,11 @@ func TestParseAuthKeys(t *testing.T) {
 
 func TestPostgresDSNEscapes(t *testing.T) {
 	cases := []struct{ name, yml, want string }{
-		{"password", `database: {postgres: {password: "p@ss/w:rd"}}`,
+		{"password", `{mode: dev, database: {postgres: {password: "p@ss/w:rd"}}}`,
 			"postgres://qabz:p%40ss%2Fw%3Ard@localhost:5432/qabz"},
-		{"user", `database: {postgres: {user: "a:b@c", password: x}}`,
+		{"user", `{mode: dev, database: {postgres: {user: "a:b@c", password: x}}}`,
 			"postgres://a%3Ab%40c:x@localhost:5432/qabz"},
-		{"db", `database: {postgres: {db: "d/b?x#y", password: x}}`,
+		{"db", `{mode: dev, database: {postgres: {db: "d/b?x#y", password: x}}}`,
 			"postgres://qabz:x@localhost:5432/d%2Fb%3Fx%23y"},
 	}
 	for _, tc := range cases {
@@ -194,7 +196,7 @@ func TestPostgresDSNEscapes(t *testing.T) {
 
 // TestPostgresDSNPgxParses checks that pgx, the real consumer, decodes every escaped part back.
 func TestPostgresDSNPgxParses(t *testing.T) {
-	c, err := Parse([]byte(`database: {postgres: {user: "u:s@r", password: "p@ss/w:rd %?#", db: "d/b?x"}}`))
+	c, err := Parse([]byte(`{mode: dev, database: {postgres: {user: "u:s@r", password: "p@ss/w:rd %?#", db: "d/b?x"}}}`))
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -210,24 +212,24 @@ func TestPostgresDSNPgxParses(t *testing.T) {
 }
 
 func TestServerAddrs(t *testing.T) {
-	c, err := Parse([]byte(`database: {postgres: {password: x}}`))
+	c, err := Parse([]byte(`{mode: dev, database: {postgres: {password: x}}}`))
 	if assert.NoError(t, err) {
 		assert.Equal(t, ":8082", c.GRPCAddr)
 		assert.Equal(t, ":8080", c.HTTPAddr)
 	}
 
-	c, err = Parse([]byte(`{database: {postgres: {password: x}}, server: {grpc: {addr: "127.0.0.1:0"}, http: {addr: "127.0.0.1:0"}}}`))
+	c, err = Parse([]byte(`{mode: dev, database: {postgres: {password: x}}, server: {grpc: {addr: "127.0.0.1:0"}, http: {addr: "127.0.0.1:0"}}}`))
 	if assert.NoError(t, err, "port 0 on both servers is allowed (a free port each)") {
 		assert.Equal(t, "127.0.0.1:0", c.GRPCAddr)
 		assert.Equal(t, "127.0.0.1:0", c.HTTPAddr)
 	}
 
 	for name, tc := range map[string]struct{ yml, want string }{
-		"no port":   {`{database: {postgres: {password: x}}, server: {grpc: {addr: "localhost"}}}`, "server.grpc.addr must be host:port"},
-		"bad port":  {`{database: {postgres: {password: x}}, server: {http: {addr: ":http"}}}`, "server.http.addr must have a port from 0 to 65535"},
-		"high port": {`{database: {postgres: {password: x}}, server: {http: {addr: ":70000"}}}`, "server.http.addr must have a port from 0 to 65535"},
-		"empty":     {`{database: {postgres: {password: x}}, server: {grpc: {addr: ""}}}`, "server.grpc.addr must be host:port"},
-		"same addr": {`{database: {postgres: {password: x}}, server: {grpc: {addr: ":9000"}, http: {addr: ":9000"}}}`, "must not be the same address"},
+		"no port":   {`{mode: dev, database: {postgres: {password: x}}, server: {grpc: {addr: "localhost"}}}`, "server.grpc.addr must be host:port"},
+		"bad port":  {`{mode: dev, database: {postgres: {password: x}}, server: {http: {addr: ":http"}}}`, "server.http.addr must have a port from 0 to 65535"},
+		"high port": {`{mode: dev, database: {postgres: {password: x}}, server: {http: {addr: ":70000"}}}`, "server.http.addr must have a port from 0 to 65535"},
+		"empty":     {`{mode: dev, database: {postgres: {password: x}}, server: {grpc: {addr: ""}}}`, "server.grpc.addr must be host:port"},
+		"same addr": {`{mode: dev, database: {postgres: {password: x}}, server: {grpc: {addr: ":9000"}, http: {addr: ":9000"}}}`, "must not be the same address"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := Parse([]byte(tc.yml))
@@ -238,27 +240,45 @@ func TestServerAddrs(t *testing.T) {
 
 func TestParseServiceIDRange(t *testing.T) {
 	for name, id := range map[string]string{"negative": "-1", "above int32": "2147483648"} {
-		_, err := Parse([]byte("service: {id: " + id + "}\ndatabase: {postgres: {password: pw}}"))
+		_, err := Parse([]byte("mode: dev\nservice: {id: " + id + "}\ndatabase: {postgres: {password: pw}}"))
 		assert.ErrorContains(t, err, "service.id must be from 0 to 2147483647", name)
 	}
-	c, err := Parse([]byte("service: {id: 2147483647}\ndatabase: {postgres: {password: pw}}"))
+	c, err := Parse([]byte("mode: dev\nservice: {id: 2147483647}\ndatabase: {postgres: {password: pw}}"))
 	assert.NoError(t, err)
 	assert.Equal(t, 2147483647, c.ServiceID)
 }
 
 func TestParseDebugAuthMockUserID(t *testing.T) {
 	const id = "5a2c8173-cae5-4a6b-a109-af45f760824b"
-	c, err := Parse([]byte("database: {postgres: {password: pw}}\ndebug: {auth: {disable: true, mock_user_id: \"" + id + "\"}}"))
+	c, err := Parse([]byte("mode: dev\ndatabase: {postgres: {password: pw}}\ndebug: {auth: {disable: true, mock_user_id: \"" + id + "\"}}"))
 	if assert.NoError(t, err) {
 		assert.Equal(t, id, c.DebugAuthMockUserID)
 	}
-	c, err = Parse([]byte("database: {postgres: {password: pw}}"))
+	c, err = Parse([]byte("mode: dev\ndatabase: {postgres: {password: pw}}"))
 	if assert.NoError(t, err) {
 		assert.Equal(t, "", c.DebugAuthMockUserID, "the default is no user")
 	}
 	for _, bad := range []string{"x", "5A2C8173-CAE5-4A6B-A109-AF45F760824B", "{" + id + "}", "urn:uuid:" + id,
 		"5a2c8173cae54a6ba109af45f760824b", " " + id} {
-		_, err := Parse([]byte("database: {postgres: {password: pw}}\ndebug: {auth: {mock_user_id: \"" + bad + "\"}}"))
+		_, err := Parse([]byte("mode: dev\ndatabase: {postgres: {password: pw}}\ndebug: {auth: {mock_user_id: \"" + bad + "\"}}"))
 		assert.ErrorContains(t, err, "debug.auth.mock_user_id must be a UUID", bad)
+	}
+}
+
+// TestParseMode: mode is required and accepts only dev, stage and prod (exact, lower case).
+func TestParseMode(t *testing.T) {
+	for _, m := range []string{ModeDev, ModeStage, ModeProd} {
+		c, err := Parse([]byte("mode: " + m + "\ndatabase: {postgres: {password: pw}}"))
+		if assert.NoError(t, err, m) {
+			assert.Equal(t, m, c.Mode)
+		}
+	}
+	_, err := Parse([]byte("database: {postgres: {password: pw}}"))
+	assert.ErrorContains(t, err, "mode is required (dev, stage or prod)", "missing key")
+	_, err = Parse([]byte("mode: \"\"\ndatabase: {postgres: {password: pw}}"))
+	assert.ErrorContains(t, err, "mode is required (dev, stage or prod)", "empty value")
+	for _, bad := range []string{"Dev", "DEV", "development", "production", "test", " dev"} {
+		_, err := Parse([]byte("mode: \"" + bad + "\"\ndatabase: {postgres: {password: pw}}"))
+		assert.ErrorContains(t, err, "mode must be dev, stage or prod", bad)
 	}
 }

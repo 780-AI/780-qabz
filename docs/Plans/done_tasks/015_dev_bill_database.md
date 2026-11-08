@@ -1,7 +1,7 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 1.0 -->
 # 015_dev_bill_database — dev-only commands to create, seed and unseed the bill database
 
-Status: pending
+Status: done
 
 ## Description
 
@@ -104,3 +104,35 @@ The `providers` rows give no value for `inquiry_step` and `provider_fee`; they g
 ## Verification
 
 With `mode: dev`, run the create command, then the App, and call `GET /v1/services`. Pass: the 5 services from the seed, in the `id` tie order (all have `order` 0). Run the create command again: no error, same rows. Run the unseed command: the seeded rows are gone. Set `mode: prod` and run both commands: each exits with a non-zero code and the database does not change.
+
+## Decisions (operator, 2026-11-08)
+
+- Schema source: the `bill` code, not `database.html` (the HTML can miss details). Each table is the state that bill's migrations leave on a new database.
+- Unseed: deletes only the seed rows (the 5 services and 45 providers by `id`). The tables stay.
+- `mode` is a required key: a missing key or any value other than `dev`, `stage` or `prod` stops the start of the App and of every command.
+- No second guard (for example a local-host check): `mode: dev` is the only guard.
+- My decisions: the commands are `devdb seed` and `devdb unseed`; `mode` changes nothing else now (for example not `debug.auth.disable`); the run timeout is `database.migration.timeout`.
+
+## Result (2026-11-08)
+
+- `config/`: key `mode` (`ModeDev`, `ModeStage`, `ModeProd` in `constants.go`), required, checked in `validate`. `config.yml.example` has `mode: ""`; the local `config.yml` has `mode: "dev"`.
+- `system/postgres/devdb/`: `schema.sql`, `seed_services.sql`, `seed_providers.sql`, `unseed_services.sql`, `unseed_providers.sql` (embedded) and `devdb.go` (`Seed`, `Unseed`, `Counts`). Each call runs in one transaction with an advisory lock. `Seed` makes the missing tables and indexes (`IF NOT EXISTS`), inserts the seed rows (`ON CONFLICT (id) DO NOTHING`) and moves the `services` and `providers` id sequences past the largest id (never back).
+- Schema: 10 tables (`errors`, `providers`, `services`, `orders`, `bills`, `plates`, `tolls`, `bill_inquiries`, `bill_inquiry_requests`, `fees`) and the 6 indexes of migrations 22, 23 and 27. The go-pg tables are the `CREATE TABLE` text that go-pg v10.9.3 printed from bill's entities (`orm.CreateTableQuery`); the raw SQL changes that still apply on a new database are added (21: `orders.is_raw DEFAULT FALSE`; 24: `bill_inquiries.tid` and `bill_inquiry_requests.provider_trace_id` `VARCHAR(100)`).
+- Not made: `outboxes`. Migration 4 is commented out in bill, so bill's code makes no `outboxes` table; migration 13 (`ALTER TABLE outboxes`) fails on a new database.
+- The types differ from `database.html` in places (for example `services.id` is `bigserial` and `updated_at` is `timestamptz`; the HTML has `integer` and `timestamp`). The `services` and `bills` tables of the test helper `postgrestest` follow the HTML: a follow-up in `OPEN_TASKS.md`.
+- `cmd/devdb/devdb.go`: `devdb --config=... seed | unseed`, dispatched in `cmd/run.go`. With `mode` `stage` or `prod` it prints `devdb: refused: ...` and exits 1 before it connects; without `mode` the config does not load (panic, exit 2). Usage error: exit 2. Output: the inserted or deleted row counts.
+- Tests, unit: the mode table (`config`), the guard for every mode with a spy connector that proves no connection outside `dev` (`cmd/devdb`), the seed and unseed ids are the same, every `CREATE` has `IF NOT EXISTS`, errors before any statement (`system/postgres/devdb`). The config YAML of the existing tests has `mode`.
+- Tests, database (`QABZ_TEST_POSTGRES_DSN`, an empty throw-away schema from the new `postgrestest.EmptySchema`): seed (10 tables, 5 + 45 rows, the services through `ServiceRepository`, a provider row in full with bill's defaults, the `updated_at` instants, the sequences), a second seed (0 rows, an edited row stays, the sequence does not move back), unseed (only the 50 seed rows, the tables stay), a second unseed (0 rows); a failed seed changes nothing (rollback).
+- Deliberate failures (overlays): no mode guard, no mode check in `config`, no `ON CONFLICT`, no sequence step, an unseed id list out of sync: each one fails a test.
+- `go build`, `go vet`, `go test -race -count=1 ./...` pass, with the live tests on the compose Postgres.
+
+## Verification (Rule 15, 2026-11-08, by the implementer)
+
+On the compose dev database (`127.0.0.1:55432/qabz`; before the run it had only `app_hot_configs` and `qabz_schema_migrations`), with the built binary:
+- `devdb seed`: exit 0, `inserted services=5 providers=45`; 12 tables in `public`.
+- An App copy on other ports (`debug.auth.disable: true`), `GET /v1/services`: HTTP 200, the 5 services in `id` order (برق, گاز, تلفن همراه, تلفن, آب).
+- `devdb seed` again: exit 0, `inserted services=0 providers=0`; the md5 of all `services` and `providers` rows is the same as after the first run.
+- `mode: prod` and `mode: stage`, `seed` and `unseed`: each exits 1 with `devdb: refused: ...`; without `mode`: exit 2 (`config: mode is required`), also for the App. The row counts and the md5 values did not change.
+- `devdb unseed`: exit 0, `deleted services=5 providers=45`; 0 rows, 12 tables stay. A second `unseed`: `deleted services=0 providers=0`.
+- Then `devdb seed` again, so the dev database keeps the `bill` tables and the seed rows (for tasks 016 and 017).
+Verdict: the output matches the design. Operator confirmation pending (`OPEN_TASKS.md`).
