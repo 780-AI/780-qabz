@@ -1,7 +1,8 @@
-<!-- VERSION: 1.89 -->
+<!-- VERSION: 1.90 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.90 — 2026-11-08 — Added 020-task entry.
 v1.89 — 2026-11-08 — Added 019-task entry.
 v1.88 — 2026-11-08 — Added 017-mybill-list-endpoint entry.
 v1.87 — 2026-11-08 — Added session-wrap-up (tasks 015 and 018 session) entry.
@@ -95,6 +96,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — New task: 020_providers_sorted_list
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/020_providers_sorted_list.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 021), `docs/documents_manifest.md` (v0.91), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds `ProvidersService`: the deterministic sorted provider list per (bill type, action), `PickProvider`, `MoveUp` / `MoveDown`, toggle, the runtime key `tmp_priority`, and a reload every `providers.general.load_interval` in which the database always wins. No endpoint. Unit tests with many fake providers, integration tests on a real Postgres, and a feature-ON run on the dev database.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — New task: 019_mybill_delete_endpoint
 - **Type:** Minor (docs only; a new task file)
