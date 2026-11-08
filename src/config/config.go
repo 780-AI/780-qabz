@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -60,6 +61,11 @@ type Config struct {
 	// DebugAuthDisable turns the auth check off. Development only: the production config has no
 	// debug section, and a missing key is false (the check is on).
 	DebugAuthDisable bool `path:"debug.auth.disable"`
+	// DebugAuthMockUserID is the user of every call while the auth check is off (debug.auth.disable):
+	// the handlers that need a user (for example My Bills) get it as the token sub. A UUID in the
+	// canonical lower-case form, or "" for no user (those handlers then answer PermissionDenied).
+	// It has no effect while the check is on. Development only.
+	DebugAuthMockUserID string `path:"debug.auth.mock_user_id"`
 
 	MetricsAddr string `path:"metrics.prometheus.addr"`
 	// MetricsEnabled is the Prometheus switch (Implementation_Plan Step 5). It is on by default and
@@ -151,6 +157,11 @@ func (c Config) validate() error {
 	for path, d := range map[string]time.Duration{"hot_reload_interval": c.HotReloadInterval, "database.migration.timeout": c.MigrateTimeout} {
 		if d <= 0 {
 			errs = append(errs, fmt.Errorf("%s must be a positive duration (for example 30s)", path))
+		}
+	}
+	if c.DebugAuthMockUserID != "" {
+		if u, err := uuid.Parse(c.DebugAuthMockUserID); err != nil || u.String() != c.DebugAuthMockUserID {
+			errs = append(errs, errors.New("debug.auth.mock_user_id must be a UUID in the lower-case form xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"))
 		}
 	}
 	return errors.Join(errs...)

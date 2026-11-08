@@ -15,6 +15,7 @@ import (
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
 	"qabz/core/billtype"
+	"qabz/core/savedbill"
 	grpcserver "qabz/entry/grpc"
 	httpserver "qabz/entry/http"
 	"qabz/migrations"
@@ -68,6 +69,11 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
+	myBills, err := newMyBills(db, metrics, logger)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
 	opts, err := newRequestMetrics(metrics)
 	if err != nil {
@@ -75,7 +81,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		return nil, err
 	}
 	opts = append(opts, authCheck.ServerOptions()...)
-	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc))
+	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
 	}
@@ -83,7 +89,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler)
+	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler, pb.RegisterMyBillsHandler)
 	if err == nil && gw == nil {
 		err = errors.New("http gateway: New returned nil")
 	}
@@ -105,13 +111,14 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 }
 
 // newAuth builds the JWT check of every gRPC call (and so of every gateway route). With
-// debug.auth.disable it logs one warning and checks nothing; otherwise it needs
+// debug.auth.disable it logs one warning, checks nothing and gives every call the user
+// debug.auth.mock_user_id (when set); otherwise it needs
 // auth.secrets.hmac. Each rejected call adds 1 to
 // qabz_auth_rejected_total{reason} (only when metrics are on); a rejected call writes no log line.
 func newAuth(cfg config.Config, metrics *prometheus.Server, logger Logger) (*grpcserver.Auth, error) {
 	if cfg.DebugAuthDisable {
-		logger.Warn("auth check disabled (debug.auth.disable): development only")
-		return grpcserver.NewAuth(grpcserver.AuthOptions{Disabled: true})
+		logger.Warn("auth check disabled (debug.auth.disable): development only", "mock_user_id", cfg.DebugAuthMockUserID)
+		return grpcserver.NewAuth(grpcserver.AuthOptions{Disabled: true, MockUserID: cfg.DebugAuthMockUserID})
 	}
 	verifier, err := auth.NewVerifier([]byte(cfg.JWTHMACSecret.Reveal()), nil)
 	if err != nil {
@@ -159,6 +166,29 @@ func newService(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 		return nil, err
 	}
 	return grpcserver.NewService(grpcserver.ServiceDeps{Services: catalog, ServiceID: serviceID, Logger: logger}), nil
+}
+
+// newMyBills builds the gRPC MyBills service: POST /v1/mybill saves a bill in the bills table.
+// Each saved bill adds 1 to qabz_mybill_insert_total{result="created"|"existing"} (only when
+// metrics are on); a failed write writes one error log line. Rejected and failed calls are in the
+// code label of qabz_request_duration_ms.
+func newMyBills(db *postgres.Client, metrics *prometheus.Server, logger Logger) (*grpcserver.MyBills, error) {
+	var onInsert func(result string) // nil: metrics are off, nothing is recorded
+	if reg := metrics.Registry(); reg != nil {
+		inserts := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_mybill_insert_total",
+			Help: "POST /v1/mybill saved bills by result (created, existing).",
+		}, []string{"result"})
+		if err := reg.Register(inserts); err != nil {
+			return nil, fmt.Errorf("mybill: register metric: %w", err)
+		}
+		onInsert = func(result string) { inserts.WithLabelValues(result).Inc() }
+	}
+	store, err := savedbill.NewStore(postgres.NewSavedBillRepository(db))
+	if err != nil {
+		return nil, err
+	}
+	return grpcserver.NewMyBills(grpcserver.MyBillsDeps{Bills: store, Logger: logger, OnInsert: onInsert}), nil
 }
 
 // newRequestMetrics returns the gRPC server options that measure every call (and so every gateway

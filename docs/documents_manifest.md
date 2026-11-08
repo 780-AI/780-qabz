@@ -1,4 +1,4 @@
-<!-- VERSION: 0.81 -->
+<!-- VERSION: 0.82 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.80 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.81 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.81 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.28 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.82 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.29 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -43,20 +43,21 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.26 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.27 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.12 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.11 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.1 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.12 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.2 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-08
-- **Change**: New task file `017_mybill_list_endpoint.md` v0.1 (not manifest-tracked); task counter at 018. Bumped #3 CHANGELOG v1.80, #5 manifest v0.81.
-- **Previous change**: 2026-11-08 — New task file `016_mybill_insert_endpoint.md` v0.1 (not manifest-tracked); task counter at 017. Bumped #3 CHANGELOG v1.79, #5 manifest v0.80.
+- **Change**: Task 016 `mybill_insert_endpoint` done: `POST /v1/mybill` into bill's `bills` table, `common/helpers/`, `core/savedbill/`, saved bill repository, config key `debug.auth.mock_user_id`; Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.81, #5 manifest v0.82, #6 folder_structure v0.29, #28 OPEN_TASKS v1.27, #34 app README v0.12, #35 this_vs_bill v0.2.
+- **Previous change**: 2026-11-08 — New task file `017_mybill_list_endpoint.md` v0.1 (not manifest-tracked); task counter at 018. Bumped #3 CHANGELOG v1.80, #5 manifest v0.81.
+- **Earlier change**: 2026-11-08 — New task file `016_mybill_insert_endpoint.md` v0.1 (not manifest-tracked); task counter at 017. Bumped #3 CHANGELOG v1.79, #5 manifest v0.80.
 - **Earlier change**: 2026-11-08 — Session wrap-up (task 014 review session): 3 lesson candidates in OPEN_TASKS. Bumped #3 CHANGELOG v1.78, #5 manifest v0.79, #28 OPEN_TASKS v1.26.
 - **Earlier change**: 2026-11-07 — Task 014 review fixes: `assert` in place of `t.Fatalf` in a prometheus test helper; a misplaced test doc comment in `config_test.go`; Go test files have no VERSION header, so no rows. Bumped #3 CHANGELOG v1.77, #5 manifest v0.78.
 - **Earlier change**: 2026-11-07 — Session wrap-up (task 014 session): 2 lesson candidates in OPEN_TASKS. Bumped #3 CHANGELOG v1.76, #5 manifest v0.77, #28 OPEN_TASKS v1.25.

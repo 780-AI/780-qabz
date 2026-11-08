@@ -90,6 +90,57 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "MyBills",
+      "item": [
+        {
+          "name": "Insert",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": \"123455\",\n  \"name\": \"خانه\",\n  \"type\": \"water\",\n  \"operator\": \"\",\n  \"isPined\": false,\n  \"phone\": \"\",\n  \"participateCode\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/mybill",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mybill"
+              ]
+            },
+            "description": "haf80.api.bill.MyBills/Insert. Saves a bill (My Bills) for the user of the JWT in the bills table, with the bill rules: type gas, water, tel, mobile or electricity; water/electricity need a valid bill ID (check digit); gas needs a participateCode or a valid billId; mobile/tel need a phone (or the phone in billId), normalized to 98... An empty name gets the default name; mobile with no operator is saved as mci. A bill the user already has (same billId or inquiry ID) is not saved again: the answer has the existing id. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"id\",\"name\",\"type\",\"billId\",\"operator\",\"phone\",...} echoing the request. An invalid request HTTP 400 \"invalid parameter\"; without a valid token HTTP 403; a database error HTTP 500."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has an id\", function () { pm.expect(pm.response.json().id).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     }
   ]
 }

@@ -23,6 +23,10 @@ type AuthOptions struct {
 	Verifier TokenVerifier
 	// Disabled turns the check off (debug.auth.disable, development only).
 	Disabled bool
+	// MockUserID, with Disabled, is put into every call as the claims' UserID
+	// (debug.auth.mock_user_id), so the handlers that need a user work in development. Empty: the
+	// call has no claims. Ignored while the check is on.
+	MockUserID string
 	// OnReject, when set, is called with the reason of each rejected call (for a metric).
 	OnReject func(reason string)
 }
@@ -82,6 +86,9 @@ func (a *Auth) check(ctx context.Context) (context.Context, error) {
 		return ctx, errRejected
 	}
 	if a.opts.Disabled {
+		if a.opts.MockUserID != "" {
+			return auth.WithClaims(ctx, auth.Claims{UserID: a.opts.MockUserID}), nil
+		}
 		return ctx, nil
 	}
 	if a.opts.Verifier == nil {

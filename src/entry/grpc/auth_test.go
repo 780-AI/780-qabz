@@ -219,3 +219,58 @@ func TestNewWithOptionsRejectsNilOption(t *testing.T) {
 	_, err := NewWithOptions("127.0.0.1:0", []grpc.ServerOption{nil}, RegisterService(NewService(ServiceDeps{})))
 	assert.Error(t, err)
 }
+
+// TestAuthMockUserID: with the check off, MockUserID becomes the claims' UserID of every call
+// (unary and stream); without it a call has no claims; with the check on it is ignored and the
+// token decides.
+func TestAuthMockUserID(t *testing.T) {
+	const mockUser = "5a2c8173-cae5-4a6b-a109-af45f760824b"
+	seenUnary := func(a *Auth, ctx context.Context) (*auth.Claims, error) {
+		var seen *auth.Claims
+		_, err := a.Unary()(ctx, nil, &grpc.UnaryServerInfo{}, func(ctx context.Context, _ any) (any, error) {
+			if c, ok := auth.ClaimsFrom(ctx); ok {
+				seen = &c
+			}
+			return nil, nil
+		})
+		return seen, err
+	}
+
+	off, err := NewAuth(AuthOptions{Disabled: true, MockUserID: mockUser})
+	if !assert.NoError(t, err) || !assert.NotNil(t, off) {
+		return
+	}
+	seen, err := seenUnary(off, context.Background())
+	if assert.NoError(t, err) && assert.NotNil(t, seen) {
+		assert.Equal(t, auth.Claims{UserID: mockUser}, *seen)
+	}
+	var streamSeen *auth.Claims
+	err = off.Stream()(nil, fakeStream{ctx: context.Background()}, &grpc.StreamServerInfo{}, func(_ any, ss grpc.ServerStream) error {
+		if c, ok := auth.ClaimsFrom(ss.Context()); ok {
+			streamSeen = &c
+		}
+		return nil
+	})
+	if assert.NoError(t, err) && assert.NotNil(t, streamSeen) {
+		assert.Equal(t, mockUser, streamSeen.UserID)
+	}
+
+	offNoUser, err := NewAuth(AuthOptions{Disabled: true})
+	if assert.NoError(t, err) && assert.NotNil(t, offNoUser) {
+		seen, err = seenUnary(offNoUser, context.Background())
+		assert.NoError(t, err)
+		assert.Nil(t, seen, "no MockUserID: no claims")
+	}
+
+	on, err := NewAuth(AuthOptions{Verifier: authtest.Verifier(t), MockUserID: mockUser})
+	if !assert.NoError(t, err) || !assert.NotNil(t, on) {
+		return
+	}
+	_, err = seenUnary(on, context.Background())
+	assert.Equal(t, codes.PermissionDenied, status.Code(err), "check on: no token is rejected")
+	good := "Bearer " + authtest.Sign(t, authtest.Secret, authtest.Header("HS256"), authtest.ValidClaims())
+	seen, err = seenUnary(on, metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", good)))
+	if assert.NoError(t, err) && assert.NotNil(t, seen) {
+		assert.Equal(t, authtest.UserID, seen.UserID, "check on: the token's user, not MockUserID")
+	}
+}

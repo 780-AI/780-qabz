@@ -1,7 +1,8 @@
-<!-- VERSION: 1.80 -->
+<!-- VERSION: 1.81 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.81 — 2026-11-08 — Added 016-mybill-insert-endpoint entry.
 v1.80 — 2026-11-08 — Added 017-task entry.
 v1.79 — 2026-11-08 — Added 016-task entry.
 v1.78 — 2026-11-08 — Added session-wrap-up (task 014 review session) entry.
@@ -86,6 +87,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Task 016_mybill_insert_endpoint: POST /v1/mybill
+- **Type:** Major (new endpoint, new packages, new config key)
+- **Files:** `src/common/helpers/` (new: `billid.go`, `phone.go`, tests), `src/core/savedbill/` (new), `src/system/postgres/savedbill_repository.go` (new) + unit and live tests, `src/system/postgres/postgrestest/` (`BillsSchema`), `src/entry/grpc/mybills.go` (new) + test, `src/entry/grpc/auth.go` (`MockUserID`) + test, `src/entry/http/mybills_test.go`, `mybills_live_test.go` (new), `src/app/defaults.go` + test, `src/config/config.go` + test, `config.yml.example`, `qabz.postman_collection.json`, `docs/this_vs_bill.md` (v0.2), `docs/folder_structure.md` (v0.29), `src/app/README.md` (v0.12), `docs/Plans/OPEN_TASKS.md` (v1.27), task file moved to `done_tasks/`, `docs/documents_manifest.md` (v0.82), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, behavior changes. New endpoint `POST /v1/mybill` (gRPC `MyBills.Insert`): saves a bill for the JWT user in bill's `bills` table with bill's rules (type, bill ID check digit, 0/98 phone normalization, default name, `mci` for mobile); a bill the user already has gives the existing id. Invalid request: HTTP 400; failed write: HTTP 500 and one `mybill: insert failed` log line. New metric `qabz_mybill_insert_total{result}`. New config key `debug.auth.mock_user_id` (development only): with `debug.auth.disable: true`, every call gets this fake user. Differences from bill: `docs/this_vs_bill.md` items 5-8. Other endpoints unchanged.
+- **QA scenarios:** `OPEN_TASKS.md` > Pending verification > Task 016 (⏸; the feature-ON check waits for task 017 by operator decision).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — New task: 017_mybill_list_endpoint
 - **Type:** Minor (docs only; a new task file)

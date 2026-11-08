@@ -48,3 +48,4 @@ auth:
 debug:
   auth:
     disable: false
+    mock_user_id: ""  # fake user: with disable: true, the user (token sub) of every call; a lower-case UUID, or "" for none

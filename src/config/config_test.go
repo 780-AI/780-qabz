@@ -245,3 +245,20 @@ func TestParseServiceIDRange(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2147483647, c.ServiceID)
 }
+
+func TestParseDebugAuthMockUserID(t *testing.T) {
+	const id = "5a2c8173-cae5-4a6b-a109-af45f760824b"
+	c, err := Parse([]byte("database: {postgres: {password: pw}}\ndebug: {auth: {disable: true, mock_user_id: \"" + id + "\"}}"))
+	if assert.NoError(t, err) {
+		assert.Equal(t, id, c.DebugAuthMockUserID)
+	}
+	c, err = Parse([]byte("database: {postgres: {password: pw}}"))
+	if assert.NoError(t, err) {
+		assert.Equal(t, "", c.DebugAuthMockUserID, "the default is no user")
+	}
+	for _, bad := range []string{"x", "5A2C8173-CAE5-4A6B-A109-AF45F760824B", "{" + id + "}", "urn:uuid:" + id,
+		"5a2c8173cae54a6ba109af45f760824b", " " + id} {
+		_, err := Parse([]byte("database: {postgres: {password: pw}}\ndebug: {auth: {mock_user_id: \"" + bad + "\"}}"))
+		assert.ErrorContains(t, err, "debug.auth.mock_user_id must be a UUID", bad)
+	}
+}

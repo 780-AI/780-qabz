@@ -1,7 +1,8 @@
-<!-- VERSION: 1.26 -->
+<!-- VERSION: 1.27 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.27 — 2026-11-08 — Task 016 POST /v1/mybill: QA scenario added (feature-ON check waits for task 017).
 v1.26 — 2026-11-08 — Session wrap-up: 3 lesson candidates added (helper assertions in § 3; reviewer agent before the commit; positive control must not share the input under test).
 v1.25 — 2026-11-07 — Session wrap-up: 2 lesson candidates added (Step 5 policies to conventions; gate read before the guarded action).
 v1.24 — 2026-11-07 — Task 014 request metrics: QA scenario added; 013 follow-up updated.
@@ -143,6 +144,11 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: `qabz_request_duration_ms_count` is 3 for `path="/haf80.api.bill.Service/Greeting"` and 1 for `path="/haf80.api.bill.Service/Get"`; the sums are in milliseconds; no series has a raw URL as `path`; `/metrics` has no `qabz_requests_total`.
   Also pass: with the auth check on, a call with no token adds 1 to `qabz_request_duration_ms_count{code="PermissionDenied"}`; with `metrics.prometheus.enabled: false` the log shows `metrics disabled (metrics.prometheus.enabled: false)`, `curl localhost:9090/metrics` fails, and `GET /v1/greeting` still answers.
   Done 2026-11-07 by the implementer: all pass (awaiting operator confirmation).
+- ⏸ Task 016 `POST /v1/mybill` (2026-11-08). In `src/` run `go test -race -count=1 ./common/helpers/ ./core/savedbill/ ./entry/... ./config/ ./app/`, then with `QABZ_TEST_POSTGRES_DSN` set `go test -race -count=1 -run 'Live|BillsSchema' ./system/postgres/... ./entry/http/`.
+  Pass: all pass (the live tests check each saved row by a direct SQL query and by `Repository.Get`, use a throw-away schema and drop it).
+  Then (feature ON, Rule 15) WAITS FOR TASK 017 (operator decision): with the `bills` table in the dev database (task 015), run the App with `debug.auth.disable: true` and `debug.auth.mock_user_id` set (or with a real token), `POST /v1/mybill` a water bill with a valid bill ID, a mobile bill with `phone`, and the same water bill again; then `GET /v1/mybill`.
+  Pass: each POST gives HTTP 200; the second water POST returns the first `id`; GET lists each saved bill with the values that POST sent and the `id` that POST returned; a bad bill ID gives HTTP 400 `invalid parameter` and no row; `qabz_mybill_insert_total` counts `created` 2 and `existing` 1. Without the `bills` table POST gives HTTP 500 and the log has one `mybill: insert failed` line with the cause.
+  Unit and live checks done 2026-11-08 by the implementer; the App run without the `bills` table gave HTTP 500 and the `mybill: insert failed` line (`relation "bills" does not exist`).
 - ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware: request metrics done in task 014; panic recovery and tracing for all endpoints still need their own tasks.
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 

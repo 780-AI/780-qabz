@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "qabz/api/pb/qabz"
 	"qabz/common/auth/authtest"
@@ -154,6 +155,7 @@ func metricsServer(t *testing.T, b *Builder) *prometheus.Server {
 
 var qabzMetrics = []string{
 	prometheus.RequestDurationName, "qabz_auth_rejected_total", "qabz_services_cache_total",
+	"qabz_mybill_insert_total",
 }
 
 // TestDefaultBuilderMetricsSwitch: with metrics on, the composition root registers every qabz
@@ -285,4 +287,88 @@ func TestDefaultBuilderCountsRejectedCalls(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "the rejected call is counted")
+}
+
+// TestNewMyBillsRules: with metrics on the insert counter is registered once (a second call
+// conflicts); with metrics off nothing is registered, so a second call works.
+func TestNewMyBillsRules(t *testing.T) {
+	cfg := testConfig(t)
+	db, err := postgres.New(context.Background(), cfg.PostgresDSN()) // lazy: no server needed
+	if !assert.NoError(t, err) || !assert.NotNil(t, db) {
+		t.FailNow()
+	}
+	defer db.Close()
+
+	on := prometheus.New("127.0.0.1:0", true)
+	svc, err := newMyBills(db, on, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, svc)
+	_, err = newMyBills(db, on, nil)
+	assert.ErrorContains(t, err, "mybill: register metric")
+
+	off := prometheus.New("127.0.0.1:0", false)
+	for range 2 {
+		svc, err := newMyBills(db, off, nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, svc)
+	}
+}
+
+// TestDefaultBuilderServesMyBills: the composition root registers the MyBills service. With
+// debug.auth.disable a call has no user, so Insert answers PermissionDenied; an unregistered
+// service would answer Unimplemented.
+func TestDefaultBuilderServesMyBills(t *testing.T) {
+	b, err := NewDefaultBuilder(context.Background(), testConfig(t))
+	if !assert.NoError(t, err) || !assert.NotNil(t, b) {
+		return
+	}
+	a := build(t, b)
+	defer a.Database().Close()
+	defer a.Cache().Close()
+	gs, ok := b.grpc.(*grpcserver.Server)
+	if !assert.True(t, ok) || !assert.NotNil(t, gs) || !assert.NoError(t, gs.Start(context.Background())) {
+		return
+	}
+	defer func() { assert.NoError(t, gs.Stop(context.Background())) }()
+	conn, err := grpc.NewClient(gs.DialAddr(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if !assert.NoError(t, err) || !assert.NotNil(t, conn) {
+		return
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	c := pb.NewMyBillsClient(conn)
+	_, err = c.Insert(ctx, &pb.InsertBillRequest{Type: pb.InsertBillRequest_water, BillId: "123455"})
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	_, err = c.GetAll(ctx, &emptypb.Empty{}) // positive control: a method that is not written yet
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+}
+
+// TestDefaultBuilderMockUser: with debug.auth.disable and debug.auth.mock_user_id, Insert gets past the
+// user check and reaches the database. The test database does not listen (port 1), so the answer
+// is Internal, not PermissionDenied.
+func TestDefaultBuilderMockUser(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.DebugAuthMockUserID = "5a2c8173-cae5-4a6b-a109-af45f760824b"
+	b, err := NewDefaultBuilder(context.Background(), cfg)
+	if !assert.NoError(t, err) || !assert.NotNil(t, b) {
+		return
+	}
+	a := build(t, b)
+	defer a.Database().Close()
+	defer a.Cache().Close()
+	gs, ok := b.grpc.(*grpcserver.Server)
+	if !assert.True(t, ok) || !assert.NotNil(t, gs) || !assert.NoError(t, gs.Start(context.Background())) {
+		return
+	}
+	defer func() { assert.NoError(t, gs.Stop(context.Background())) }()
+	conn, err := grpc.NewClient(gs.DialAddr(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if !assert.NoError(t, err) || !assert.NotNil(t, conn) {
+		return
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = pb.NewMyBillsClient(conn).Insert(ctx, &pb.InsertBillRequest{Type: pb.InsertBillRequest_water, BillId: "123455"})
+	assert.Equal(t, codes.Internal, status.Code(err))
 }
