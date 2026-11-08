@@ -1,7 +1,8 @@
-<!-- VERSION: 1.31 -->
+<!-- VERSION: 1.32 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.32 — 2026-11-08 — Session wrap-up (tasks 015 and 018 session): 3 lesson candidates added, 1 candidate gets more evidence; push of 323c7a4..f81f4b1 held.
 v1.31 — 2026-11-08 — Task 018 `make help`: QA scenario added.
 v1.30 — 2026-11-08 — Task 015 dev bill database: QA scenario added; task 016 follow-up updated (the dev database now has the bills table); postgrestest schema follow-up added.
 v1.29 — 2026-11-08 — Session wrap-up (task 016 session): task 016 follow-up (real bills data shapes for task 017); 3 lesson candidates added.
@@ -189,4 +190,11 @@ Found in the 2026-11-08 session wrap-up (task 016 session):
 - **Shared local runtime.** The agent ran `make compose down` at the end of a check, but the operator's debug session used the same Postgres and Redis (the agent's earlier `make compose up` was a no-op because they already ran). In the same session the agent's `curl` reached the operator's debug App on `:8080` instead of its own copy, which could not bind. Candidate: before starting or stopping local services, check what is already running (`docker ps`, `lsof -iTCP -sTCP:LISTEN`); stop only what the agent started; run an agent copy of the App on other ports. Candidate home: a SESSION_OPENER § 3.2 row plus a feedback memory. Recommendation: codify.
 - **Commit the task file when it is created.** Tasks 016 and 017 were created and 016 was implemented before any of them was committed, so the five commits had to be rebuilt from saved copies to keep one commit per task. Candidate: a new task file (with the counter bump) is committed right after it is written, before work on it starts (extends the memory "One commit per task"). Recommendation: codify.
 - **Dev auth switch gave no user.** With `debug.auth.disable`, endpoints that need a user answered 403; fixed in task 016 with `debug.auth.mock_user_id`. Candidate: a development switch that removes a check must also supply what the check provided (here the user). Recommendation: queue (log it if it happens again).
+
+Found in the 2026-11-08 session wrap-up (tasks 015 and 018 session):
+
+- **Generate a copied schema with the source's own tool.** For task 015 the agent printed the `bill` tables with go-pg's own `CreateTableQuery` from bill's entities (copied into the scratchpad), in place of reading the struct tags by hand. The output found facts that a reading misses: `uint32` gives `bigint`, a `uint32` primary key gives `bigserial`, and bill's migration 13 fails on a new database. Candidate rule for the conventions doc: when qabz copies a schema or a behavior from another codebase, it produces it with that codebase's own code where it can, and records how. Recommendation: codify.
+- **A required config key changes every test config.** The required key `mode` (task 015) needed `mode: dev` in about 45 YAML strings in 6 test files. Candidate: one test helper that returns a minimal valid config YAML (required keys only), so the next required key is one change. Recommendation: queue (decide when the next required key comes).
+- **Push needs the operator.** The agent's `git push` was blocked by the Claude Code permission check; the 3 commits wait for the operator. Candidate: the wrap-up asks the operator to push (or to add a permission rule) and the register records the held push. Recommendation: discard (a tool setting, not a project rule), unless it happens again.
+- More evidence for **Shared local runtime** (above): in this session the agent checked `docker ps` and the listening ports first, used the running compose Postgres, ran its own App copy on ports 18080/18082/19090, and stopped only that copy. The operator's debug App on `:8080` and the containers stayed up. The practice worked; codify is still recommended.
 

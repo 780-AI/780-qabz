@@ -1,7 +1,8 @@
-<!-- VERSION: 1.86 -->
+<!-- VERSION: 1.87 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.87 — 2026-11-08 — Added session-wrap-up (tasks 015 and 018 session) entry.
 v1.86 — 2026-11-08 — Added 018-make-help entry.
 v1.85 — 2026-11-08 — Added 018-task entry.
 v1.84 — 2026-11-08 — Added 015-dev-bill-database entry.
@@ -92,6 +93,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Session wrap-up (tasks 015 and 018 session)
+- **Type:** Minor (docs only)
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.32), `docs/documents_manifest.md` (v0.88), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Three lesson candidates added (generate a copied schema with the source's own tool; one minimal test config helper; push needs the operator) and more evidence for "Shared local runtime". The push of 323c7a4..f81f4b1 was blocked by the agent's permission check and waits for the operator.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Task 018_make_help: make help
 - **Type:** Minor (a new Makefile target that only prints; no change to the other targets)
