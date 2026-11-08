@@ -1,7 +1,8 @@
-<!-- VERSION: 1.32 -->
+<!-- VERSION: 1.33 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.33 — 2026-11-08 — Task 017 GET /v1/mybill: QA scenario added; task 016 feature-ON check run (awaiting operator); task 016 real-data follow-up done and removed.
 v1.32 — 2026-11-08 — Session wrap-up (tasks 015 and 018 session): 3 lesson candidates added, 1 candidate gets more evidence; push of 323c7a4..f81f4b1 held.
 v1.31 — 2026-11-08 — Task 018 `make help`: QA scenario added.
 v1.30 — 2026-11-08 — Task 015 dev bill database: QA scenario added; task 016 follow-up updated (the dev database now has the bills table); postgrestest schema follow-up added.
@@ -160,10 +161,15 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 - ⏸ Task 015 follow-up: the test helper `postgrestest` makes `services` and `bills` from `database.html` (`services.id integer`, `updated_at timestamp`, `bills.created_at timestamp`); bill's code (and `devdb`) has `bigserial` and `timestamptz`. Decide whether the live tests use the `devdb` schema in place of the copies (one definition of the bill tables).
 - ⏸ Task 016 `POST /v1/mybill` (2026-11-08). In `src/` run `go test -race -count=1 ./common/helpers/ ./core/savedbill/ ./entry/... ./config/ ./app/`, then with `QABZ_TEST_POSTGRES_DSN` set `go test -race -count=1 -run 'Live|BillsSchema' ./system/postgres/... ./entry/http/`.
   Pass: all pass (the live tests check each saved row by a direct SQL query and by `Repository.Get`, use a throw-away schema and drop it).
-  Then (feature ON, Rule 15) WAITS FOR TASK 017 (operator decision): with the `bills` table in the dev database (task 015), run the App with `debug.auth.disable: true` and `debug.auth.mock_user_id` set (or with a real token), `POST /v1/mybill` a water bill with a valid bill ID, a mobile bill with `phone`, and the same water bill again; then `GET /v1/mybill`.
+  Then (feature ON, Rule 15, together with task 017): with the `bills` table in the dev database (task 015), run the App with `debug.auth.disable: true` and `debug.auth.mock_user_id` set (or with a real token), `POST /v1/mybill` a water bill with a valid bill ID, a mobile bill with `phone`, and the same water bill again; then `GET /v1/mybill`.
   Pass: each POST gives HTTP 200; the second water POST returns the first `id`; GET lists each saved bill with the values that POST sent and the `id` that POST returned; a bad bill ID gives HTTP 400 `invalid parameter` and no row; `qabz_mybill_insert_total` counts `created` 2 and `existing` 1. Without the `bills` table POST gives HTTP 500 and the log has one `mybill: insert failed` line with the cause.
   Unit and live checks done 2026-11-08 by the implementer; the App run without the `bills` table gave HTTP 500 and the `mybill: insert failed` line (`relation "bills" does not exist`).
-- ⏸ Task 016 follow-ups (for task 017, from the operator's sample of 1,453 real `bills` rows, 2026-11-08): one row has `json_data` keys `isPined` / `operator` in lower case (all others `Phone` / `IsPinned` / `Operator`), so `json_data->>'Operator'` reads it as empty; `data` is empty in most old rows (water: 7 of 42 enabled rows have `data` = `bill_id`). The GET mapping must handle both. The dev database has the `bills` table since task 015 (`devdb seed`).
+  Feature-ON run done 2026-11-08 by the implementer with task 017 (two App copies with new test users on the dev database): all pass (awaiting operator confirmation); details in `done_tasks/017_mybill_list_endpoint.md`.
+- ⏸ Task 017 `GET /v1/mybill` (2026-11-08). In `src/` run `go test -race -count=1 ./core/savedbill/ ./entry/... ./app/ ./system/postgres/`, then with `QABZ_TEST_POSTGRES_DSN` set `go test -race -count=1 -run 'Live' ./system/postgres/ ./entry/http/`.
+  Pass: all pass (`TestLiveSavedBillList` and `TestLiveMyBillListEndToEnd` compare the list with a direct SQL query on `bills`, values and order; throw-away schemas, dropped).
+  Then (feature ON, Rule 15) run the App on the dev database (task 015) with `debug.auth.disable: true` and `debug.auth.mock_user_id` set; `GET /v1/mybill`; `POST /v1/mybill` a water bill, a mobile bill with `phone` and `operator`, a gas bill with `participateCode`; `GET` again; then set another `mock_user_id`, restart and `GET`.
+  Pass: the first `GET` gives HTTP 200 `"data":[]`; the second gives the 3 bills newest first with the ids of the POST answers, the mobile `phone` and `billId` as `98...`, the gas `participateCode`, `serviceId` = `service.id`; the other user gets `"data":[]`. A row with `json_data` `{"operator": "tci", "isPined": true}` shows `operator` `tci` and `isPined` false; a row with `status = 'disable'` is not listed.
+  Done 2026-11-08 by the implementer (ports 18080 / 28080, two new test users, rows deleted after the run): all pass (awaiting operator confirmation). Not run in the App: `GET` without the `bills` table (unit test only).
 - ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware: request metrics done in task 014; panic recovery and tracing for all endpoints still need their own tasks.
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 

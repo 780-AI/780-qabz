@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/valyala/fastjson"
 
 	"qabz/core/savedbill"
 )
@@ -32,12 +34,30 @@ const getSavedBillSQL = `SELECT id::text, COALESCE(user_id::text, ''), COALESCE(
 	COALESCE(bill_id, ''), COALESCE(data, ''), COALESCE(json_data->>'Operator', ''), COALESCE(status, '')
 FROM bills WHERE id = $1`
 
+// listSavedBillsSQL reads the enabled bills of a user, newest first (bill: GetAll in
+// domain/repository/mybill). A NULL column reads as "", json_data as its JSON text.
+// @todo bill orders by created_at DESC only, so rows with the same created_at come in any order;
+// Qabz adds id DESC to make the order fixed. See docs/this_vs_bill.md, item 9.
+const listSavedBillsSQL = `SELECT id::text, COALESCE(user_id::text, ''), COALESCE(name, ''), COALESCE(type, ''),
+	COALESCE(bill_id, ''), COALESCE(data, ''), COALESCE(last_order_date, ''), COALESCE(status, ''),
+	COALESCE(json_data::text, '')
+FROM bills WHERE user_id = $1 AND status = 'enable'
+ORDER BY created_at DESC, id DESC`
+
+// The json_data keys of the bill entity.Data struct.
+var (
+	keyOperator = []byte("Operator")
+	keyPhone    = []byte("Phone")
+	keyIsPinned = []byte("IsPinned")
+)
+
 // uniqueViolation is the SQLSTATE of a broken unique key.
 const uniqueViolation = "23505"
 
 // querier is the part of the pgx pool that the repository uses (tests give a fake).
 type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
@@ -45,6 +65,9 @@ type querier interface {
 type SavedBillRepository struct {
 	db    querier
 	newID func() string
+	// parsers read json_data in List. List runs for each GET /v1/mybill, so it is a hot path
+	// (conventions § 1). The zero value is ready to use.
+	parsers fastjson.ParserPool
 }
 
 // NewSavedBillRepository returns a repository that uses the client's pool.
@@ -125,4 +148,130 @@ func (r *SavedBillRepository) Get(ctx context.Context, id string) (savedbill.Bil
 		return savedbill.Bill{}, err
 	}
 	return b, nil
+}
+
+// List returns the enabled bills of the user, newest first. A user with no bills gives an empty
+// list. A json_data that bill cannot read gives an error for the whole list, as in bill.
+func (r *SavedBillRepository) List(ctx context.Context, userID string) ([]savedbill.Bill, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("saved bill repository: no database pool")
+	}
+	rows, err := r.db.Query(ctx, listSavedBillsSQL, userID)
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return nil, errors.New("saved bill repository: no rows from Query")
+	}
+	defer rows.Close()
+	p := r.parsers.Get()
+	if p == nil {
+		return nil, errors.New("saved bill repository: no JSON parser")
+	}
+	defer r.parsers.Put(p)
+	var out []savedbill.Bill
+	for rows.Next() {
+		var b savedbill.Bill
+		var data string
+		if err := rows.Scan(&b.ID, &b.UserID, &b.Name, &b.Type, &b.BillID, &b.Data, &b.LastOrderDate, &b.Status, &data); err != nil {
+			return nil, err
+		}
+		if b.Operator, b.IsPinned, err = billData(p, data); err != nil {
+			return nil, fmt.Errorf("saved bill repository: bill %s: %w", b.ID, err)
+		}
+		out = append(out, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// billData reads json_data (raw, its JSON text; "" for NULL) as bill does. go-pg decodes it with
+// encoding/json into the struct entity.Data{Operator, Phone string; IsPinned bool}, so:
+//   - a key matches its field without case ("operator" is Operator; "isPined" matches nothing);
+//   - when two keys match one field, the later key in the object wins;
+//   - other keys, and a null value, change nothing; a JSON null json_data gives the zero values;
+//   - a value of the wrong JSON type, or a json_data that is not an object or null, is an error.
+//
+// The returned strings are copies: nothing refers to the parser after it goes back to the pool.
+func billData(p *fastjson.Parser, raw string) (operator string, pinned bool, err error) {
+	if raw == "" {
+		return "", false, nil
+	}
+	if p == nil {
+		return "", false, errors.New("json_data: no parser")
+	}
+	v, err := p.Parse(raw)
+	if err != nil {
+		return "", false, fmt.Errorf("json_data: %w", err)
+	}
+	if v == nil {
+		return "", false, errors.New("json_data: no value")
+	}
+	switch v.Type() {
+	case fastjson.TypeNull:
+		return "", false, nil
+	case fastjson.TypeObject:
+	default:
+		return "", false, fmt.Errorf("json_data is a JSON %s, not an object", v.Type())
+	}
+	o, err := v.Object()
+	if err != nil {
+		return "", false, fmt.Errorf("json_data: %w", err)
+	}
+	if o == nil {
+		return "", false, errors.New("json_data: no object")
+	}
+	o.Visit(func(key []byte, val *fastjson.Value) {
+		if err != nil || val == nil {
+			return
+		}
+		switch {
+		case bytes.EqualFold(key, keyOperator):
+			if s, ok, e := jsonString(val); e != nil {
+				err = fmt.Errorf("json_data %s: %w", key, e)
+			} else if ok {
+				operator = s
+			}
+		case bytes.EqualFold(key, keyPhone): // not in the answer, but a wrong type fails bill too
+			if _, _, e := jsonString(val); e != nil {
+				err = fmt.Errorf("json_data %s: %w", key, e)
+			}
+		case bytes.EqualFold(key, keyIsPinned):
+			switch val.Type() {
+			case fastjson.TypeTrue:
+				pinned = true
+			case fastjson.TypeFalse:
+				pinned = false
+			case fastjson.TypeNull:
+			default:
+				err = fmt.Errorf("json_data %s: a JSON %s, not a bool", key, val.Type())
+			}
+		}
+	})
+	if err != nil {
+		return "", false, err
+	}
+	return operator, pinned, nil
+}
+
+// jsonString returns a copy of the string in v. A JSON null gives ok false (the field keeps its
+// value); another type is an error.
+func jsonString(v *fastjson.Value) (s string, ok bool, err error) {
+	if v == nil {
+		return "", false, errors.New("no JSON value")
+	}
+	switch v.Type() {
+	case fastjson.TypeString:
+		b, err := v.StringBytes()
+		if err != nil {
+			return "", false, err
+		}
+		return string(b), true, nil
+	case fastjson.TypeNull:
+		return "", false, nil
+	default:
+		return "", false, fmt.Errorf("a JSON %s, not a string", v.Type())
+	}
 }

@@ -1,4 +1,4 @@
-<!-- VERSION: 0.88 -->
+<!-- VERSION: 0.89 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.87 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.88 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.88 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.31 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v0.89 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.32 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -43,20 +43,21 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.32 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.33 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.13 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.13 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.2 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.14 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.3 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-08
-- **Change**: Session wrap-up (tasks 015 and 018 session): 3 lesson candidates in OPEN_TASKS, push held. Bumped #3 CHANGELOG v1.87, #5 manifest v0.88, #28 OPEN_TASKS v1.32.
-- **Previous change**: 2026-11-08 — Task 018 `make_help` done: `Makefile` target `help` (the Makefile has no VERSION header, so no row); task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.86, #5 manifest v0.87, #6 folder_structure v0.31, #28 OPEN_TASKS v1.31.
+- **Change**: Task 017 `mybill_list_endpoint` done: `GET /v1/mybill` from bill's `bills` table with bill's mapping, `json_data` read with fastjson; Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.88, #5 manifest v0.89, #6 folder_structure v0.32, #28 OPEN_TASKS v1.33, #34 app README v0.14, #35 this_vs_bill v0.3.
+- **Previous change**: 2026-11-08 — Session wrap-up (tasks 015 and 018 session): 3 lesson candidates in OPEN_TASKS, push held. Bumped #3 CHANGELOG v1.87, #5 manifest v0.88, #28 OPEN_TASKS v1.32.
+- **Earlier change**: 2026-11-08 — Task 018 `make_help` done: `Makefile` target `help` (the Makefile has no VERSION header, so no row); task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.86, #5 manifest v0.87, #6 folder_structure v0.31, #28 OPEN_TASKS v1.31.
 - **Earlier change**: 2026-11-08 — New task file `018_make_help.md` v0.1 (not manifest-tracked); task counter at 019. Bumped #3 CHANGELOG v1.85, #5 manifest v0.86.
 - **Earlier change**: 2026-11-08 — Task 015 `dev_bill_database` done: required config key `mode`, command `devdb seed | unseed`, `system/postgres/devdb/` (bill schema and seed SQL, embedded; SQL files have no VERSION header, so no rows); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.84, #5 manifest v0.85, #6 folder_structure v0.30, #28 OPEN_TASKS v1.30, #34 app README v0.13.
 - **Earlier change**: 2026-11-08 — Session wrap-up (task 016 session): task 016 follow-up and 3 lesson candidates in OPEN_TASKS. Bumped #3 CHANGELOG v1.83, #5 manifest v0.84, #28 OPEN_TASKS v1.29.

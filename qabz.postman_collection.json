@@ -95,6 +95,32 @@
       "name": "MyBills",
       "item": [
         {
+          "name": "GetAll",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/mybill",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "mybill"]
+            },
+            "description": "haf80.api.bill.MyBills/GetAll. Returns the saved bills (My Bills) of the user of the JWT from the bills table: enabled rows only, newest first, with the bill mapping: tel/mobile give billId and phone = the stored phone (a second bill with the same phone is left out); gas gives billId and participateCode; operator and isPined come from json_data. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"serviceId\":<service.id>,\"data\":[{\"id\",\"name\",\"type\",\"lastOrderDate\",\"billId\",\"operator\",\"isPined\",\"phone\",\"participateCode\"}]}; a user with no bills gets \"data\":[]. Without a valid token HTTP 403; a database error HTTP 500."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has serviceId and a data list\", function () { const b = pm.response.json(); pm.expect(b).to.have.property(\"serviceId\"); pm.expect(b.data).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
           "name": "Insert",
           "request": {
             "method": "POST",

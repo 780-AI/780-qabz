@@ -291,7 +291,8 @@ func TestDefaultBuilderCountsRejectedCalls(t *testing.T) {
 }
 
 // TestNewMyBillsRules: with metrics on the insert counter is registered once (a second call
-// conflicts); with metrics off nothing is registered, so a second call works.
+// conflicts); with metrics off nothing is registered, so a second call works; a service.id out of
+// the int32 range is rejected.
 func TestNewMyBillsRules(t *testing.T) {
 	cfg := testConfig(t)
 	db, err := postgres.New(context.Background(), cfg.PostgresDSN()) // lazy: no server needed
@@ -301,23 +302,29 @@ func TestNewMyBillsRules(t *testing.T) {
 	defer db.Close()
 
 	on := prometheus.New("127.0.0.1:0", true)
-	svc, err := newMyBills(db, on, nil)
+	svc, err := newMyBills(cfg, db, on, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, svc)
-	_, err = newMyBills(db, on, nil)
+	_, err = newMyBills(cfg, db, on, nil)
 	assert.ErrorContains(t, err, "mybill: register metric")
 
 	off := prometheus.New("127.0.0.1:0", false)
 	for range 2 {
-		svc, err := newMyBills(db, off, nil)
+		svc, err := newMyBills(cfg, db, off, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, svc)
 	}
+
+	bad := cfg
+	bad.ServiceID = -1
+	svc, err = newMyBills(bad, db, off, nil)
+	assert.ErrorContains(t, err, "service.id")
+	assert.Nil(t, svc)
 }
 
 // TestDefaultBuilderServesMyBills: the composition root registers the MyBills service. With
-// debug.auth.disable a call has no user, so Insert answers PermissionDenied; an unregistered
-// service would answer Unimplemented.
+// debug.auth.disable a call has no user, so Insert and GetAll answer PermissionDenied; an
+// unregistered service would answer Unimplemented.
 func TestDefaultBuilderServesMyBills(t *testing.T) {
 	b, err := NewDefaultBuilder(context.Background(), testConfig(t))
 	if !assert.NoError(t, err) || !assert.NotNil(t, b) {
@@ -341,12 +348,14 @@ func TestDefaultBuilderServesMyBills(t *testing.T) {
 	c := pb.NewMyBillsClient(conn)
 	_, err = c.Insert(ctx, &pb.InsertBillRequest{Type: pb.InsertBillRequest_water, BillId: "123455"})
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
-	_, err = c.GetAll(ctx, &emptypb.Empty{}) // positive control: a method that is not written yet
+	_, err = c.GetAll(ctx, &emptypb.Empty{})
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	_, err = c.Delete(ctx, &pb.DeleteBillRequest{Id: "x"}) // positive control: a method that is not written yet
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }
 
-// TestDefaultBuilderMockUser: with debug.auth.disable and debug.auth.mock_user_id, Insert gets past the
-// user check and reaches the database. The test database does not listen (port 1), so the answer
+// TestDefaultBuilderMockUser: with debug.auth.disable and debug.auth.mock_user_id, Insert and
+// GetAll get past the user check and reach the database. The test database does not listen (port 1), so the answer
 // is Internal, not PermissionDenied.
 func TestDefaultBuilderMockUser(t *testing.T) {
 	cfg := testConfig(t)
@@ -371,5 +380,7 @@ func TestDefaultBuilderMockUser(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = pb.NewMyBillsClient(conn).Insert(ctx, &pb.InsertBillRequest{Type: pb.InsertBillRequest_water, BillId: "123455"})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	_, err = pb.NewMyBillsClient(conn).GetAll(ctx, &emptypb.Empty{})
 	assert.Equal(t, codes.Internal, status.Code(err))
 }

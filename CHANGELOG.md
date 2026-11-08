@@ -1,7 +1,8 @@
-<!-- VERSION: 1.87 -->
+<!-- VERSION: 1.88 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.88 — 2026-11-08 — Added 017-mybill-list-endpoint entry.
 v1.87 — 2026-11-08 — Added session-wrap-up (tasks 015 and 018 session) entry.
 v1.86 — 2026-11-08 — Added 018-make-help entry.
 v1.85 — 2026-11-08 — Added 018-task entry.
@@ -93,6 +94,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Task 017_mybill_list_endpoint: GET /v1/mybill
+- **Type:** Major (new endpoint)
+- **Files:** `src/core/savedbill/savedbill.go` (`List`, `IsPinned`, `LastOrderDate`) + test, `src/system/postgres/savedbill_repository.go` (`List`, `billData`) + unit and live tests, `src/entry/grpc/mybills.go` (`GetAll`) + test, `src/entry/http/mybills_test.go`, `mybills_live_test.go`, `src/app/defaults.go` + test, `qabz.postman_collection.json`, `docs/this_vs_bill.md` (v0.3), `docs/folder_structure.md` (v0.32), `src/app/README.md` (v0.14), `docs/Plans/OPEN_TASKS.md` (v1.33), task file moved to `done_tasks/`, `docs/documents_manifest.md` (v0.89), `CHANGELOG.md` (this entry).
+- **Impact:** Yes, behavior changes. New endpoint `GET /v1/mybill` (gRPC `MyBills.GetAll`): the enabled bills of the JWT user from bill's `bills` table, newest first, mapped as bill maps them (tel/mobile phone and the duplicate-phone skip, gas participate code, old types as `gas`, `operator` and `isPined` from `json_data` read as bill's `encoding/json` reads it); `serviceId` = `service.id`; no bills: `"data":[]`. A failed read or a bad `json_data` value: HTTP 500 and one `mybill: list failed` log line. Differences from bill: `docs/this_vs_bill.md` items 6, 9, 10. `POST /v1/mybill` and other endpoints unchanged.
+- **QA scenarios:** `OPEN_TASKS.md` > Pending verification > Task 017 (⏸; the feature-ON run is done by the implementer and is also the feature-ON check of task 016; awaiting operator confirmation).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Session wrap-up (tasks 015 and 018 session)
 - **Type:** Minor (docs only)

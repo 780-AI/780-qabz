@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fastjson"
 
 	"qabz/core/savedbill"
 )
@@ -30,13 +31,69 @@ func (r fakeRow) Scan(dest ...any) error {
 	return nil
 }
 
-// fakeDB answers the find queries in order (rows) and every Exec with execErr. It records the calls.
+// fakeDB answers the find queries in order (rows), every Exec with execErr and every Query with
+// list and listErr. It records the calls.
 type fakeDB struct {
 	rows     []fakeRow
 	execErr  error
 	queries  int
 	execs    int
 	execArgs []any
+
+	list      pgx.Rows
+	listErr   error
+	listSQL   string
+	listArgs  []any
+	listCalls int
+}
+
+func (f *fakeDB) Query(_ context.Context, sql string, args ...any) (pgx.Rows, error) {
+	f.listCalls++
+	f.listSQL = sql
+	f.listArgs = args
+	return f.list, f.listErr
+}
+
+// fakeRows gives each element of rows as one row of 9 text columns (the listSavedBillsSQL
+// columns). Scan of row scanErrAt (1-based; 0: none) fails with scanErr; Err answers err. The
+// embedded nil pgx.Rows gives the other methods; List does not call them (a call panics).
+type fakeRows struct {
+	pgx.Rows
+
+	rows      [][9]string
+	next      int
+	scanErrAt int
+	scanErr   error
+	err       error
+	closed    bool
+}
+
+func (r *fakeRows) Close()     { r.closed = true }
+func (r *fakeRows) Err() error { return r.err }
+
+func (r *fakeRows) Next() bool {
+	if r.closed || r.next >= len(r.rows) {
+		return false
+	}
+	r.next++
+	return true
+}
+
+func (r *fakeRows) Scan(dest ...any) error {
+	if r.scanErrAt == r.next {
+		return r.scanErr
+	}
+	if r.next < 1 || r.next > len(r.rows) || len(dest) != 9 {
+		return errors.New("bad Scan call")
+	}
+	for i, d := range dest {
+		p, ok := d.(*string)
+		if !ok || p == nil {
+			return errors.New("bad Scan destination")
+		}
+		*p = r.rows[r.next-1][i]
+	}
+	return nil
 }
 
 func (f *fakeDB) QueryRow(context.Context, string, ...any) pgx.Row {
@@ -159,4 +216,136 @@ func TestSavedBillNewIDIsUUID(t *testing.T) {
 	a, b := r.newID(), r.newID()
 	assert.Regexp(t, `^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, a)
 	assert.NotEqual(t, a, b)
+}
+
+// row is one listSavedBillsSQL row: id, user_id, name, type, bill_id, data, last_order_date,
+// status, json_data.
+func row(id, typ, billID, data, jsonData string) [9]string {
+	return [9]string{id, "u", "name " + id, typ, billID, data, "1403/01/0" + id, "enable", jsonData}
+}
+
+func TestSavedBillListMapsRows(t *testing.T) {
+	rows := &fakeRows{rows: [][9]string{
+		row("1", "mobile", "", "989121234567", `{"Phone": "", "IsPinned": true, "Operator": "mci"}`),
+		row("2", "tel", "02112345678", "", `{"isPined": true, "operator": "tci"}`), // the one real lower-case row
+		row("3", "water", "123455", "", ""),                                        // NULL json_data
+		row("4", "gas", "", "1234", `null`),
+	}}
+	db := &fakeDB{list: rows}
+	got, err := fakeRepo(db).List(context.Background(), "u")
+	assert.NoError(t, err)
+	assert.Equal(t, []savedbill.Bill{
+		{ID: "1", UserID: "u", Name: "name 1", Type: "mobile", Data: "989121234567", Operator: "mci", IsPinned: true, LastOrderDate: "1403/01/01", Status: "enable"},
+		{ID: "2", UserID: "u", Name: "name 2", Type: "tel", BillID: "02112345678", Operator: "tci", LastOrderDate: "1403/01/02", Status: "enable"},
+		{ID: "3", UserID: "u", Name: "name 3", Type: "water", BillID: "123455", LastOrderDate: "1403/01/03", Status: "enable"},
+		{ID: "4", UserID: "u", Name: "name 4", Type: "gas", Data: "1234", LastOrderDate: "1403/01/04", Status: "enable"},
+	}, got)
+	assert.Equal(t, listSavedBillsSQL, db.listSQL)
+	assert.Equal(t, []any{"u"}, db.listArgs)
+	assert.True(t, rows.closed, "the rows are closed")
+}
+
+func TestSavedBillListEmpty(t *testing.T) {
+	got, err := fakeRepo(&fakeDB{list: &fakeRows{}}).List(context.Background(), "u")
+	assert.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+func TestSavedBillListErrors(t *testing.T) {
+	boom := errors.New("boom")
+	good := row("1", "water", "123455", "", "")
+	cases := map[string]*fakeDB{
+		"query":   {listErr: boom},
+		"scan":    {list: &fakeRows{rows: [][9]string{good, good}, scanErrAt: 2, scanErr: boom}},
+		"rows":    {list: &fakeRows{rows: [][9]string{good}, err: boom}},
+		"nilRows": {},
+	}
+	for name, db := range cases {
+		got, err := fakeRepo(db).List(context.Background(), "u")
+		assert.Error(t, err, name)
+		if name != "nilRows" {
+			assert.ErrorIs(t, err, boom, name)
+		}
+		assert.Nil(t, got, name)
+	}
+}
+
+// TestSavedBillListBadJSONData: a json_data that bill cannot read fails the whole list, as in
+// bill; the error names the row.
+func TestSavedBillListBadJSONData(t *testing.T) {
+	rows := &fakeRows{rows: [][9]string{row("1", "water", "123455", "", ""), row("2", "mobile", "", "989121234567", `{"IsPinned": "true"}`)}}
+	got, err := fakeRepo(&fakeDB{list: rows}).List(context.Background(), "u")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "bill 2")
+		assert.Contains(t, err.Error(), "IsPinned")
+	}
+	assert.Nil(t, got)
+	assert.True(t, rows.closed)
+}
+
+func TestSavedBillListWithoutPool(t *testing.T) {
+	for _, r := range []*SavedBillRepository{nil, NewSavedBillRepository(nil), NewSavedBillRepository(&Client{})} {
+		got, err := r.List(context.Background(), "u")
+		assert.Error(t, err)
+		assert.Nil(t, got)
+	}
+}
+
+// TestBillData: json_data is read as encoding/json reads it into bill's entity.Data (go-pg). The
+// expected values were checked against encoding/json v1 (task 017, a scratch test outside the
+// repo, because conventions § 1 forbids encoding/json here).
+func TestBillData(t *testing.T) {
+	type want struct {
+		operator string
+		pinned   bool
+		err      bool
+	}
+	cases := map[string]want{
+		``:     {},
+		`null`: {},
+		`{}`:   {},
+		`{"Operator": "mci", "Phone": "", "IsPinned": false}`:        {operator: "mci"},
+		`{"Operator": "mci", "Phone": "", "IsPinned": true}`:         {operator: "mci", pinned: true},
+		`{"operator": "irancell", "isPined": true}`:                  {operator: "irancell"}, // isPined is not IsPinned
+		`{"OPERATOR": "x", "ISPINNED": true}`:                        {operator: "x", pinned: true},
+		`{"operator": "a", "Operator": "b"}`:                         {operator: "b"}, // the later key wins
+		`{"Operator": "b", "operator": "a"}`:                         {operator: "a"},
+		`{"ispinned": true, "IsPinned": false}`:                      {},
+		`{"Operator": null, "IsPinned": null, "Phone": null}`:        {},
+		`{"Other": 1, "Extra": {"Operator": "no"}, "Operator": "x"}`: {operator: "x"},
+		`{"Operator": "\u0645\u0631"}`:                               {operator: "مر"},
+		`{"Operator": "a\"b"}`:                                       {operator: `a"b`},
+		`[]`:                                                         {err: true},
+		`"x"`:                                                        {err: true},
+		`1`:                                                          {err: true},
+		`true`:                                                       {err: true},
+		`{"Operator": 1}`:                                            {err: true},
+		`{"operator": true}`:                                         {err: true},
+		`{"Operator": {}}`:                                           {err: true},
+		`{"Phone": 1}`:                                               {err: true},
+		`{"phone": []}`:                                              {err: true},
+		`{"IsPinned": "true"}`:                                       {err: true},
+		`{"IsPinned": 1}`:                                            {err: true},
+		`{"IsPinned": 0}`:                                            {err: true},
+		`{"Operator": "x",`:                                          {err: true}, // not JSON (jsonb never holds this)
+	}
+	var pool fastjson.ParserPool
+	p := pool.Get()
+	if !assert.NotNil(t, p) {
+		t.FailNow()
+	}
+	for in, w := range cases {
+		operator, pinned, err := billData(p, in)
+		if w.err {
+			assert.Error(t, err, in)
+			continue
+		}
+		assert.NoError(t, err, in)
+		assert.Equal(t, w.operator, operator, in)
+		assert.Equal(t, w.pinned, pinned, in)
+	}
+	_, _, err := billData(nil, `{}`)
+	assert.Error(t, err, "no parser")
+	_, _, err = jsonString(nil)
+	assert.Error(t, err, "no value")
 }

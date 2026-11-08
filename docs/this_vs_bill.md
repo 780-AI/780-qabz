@@ -1,7 +1,8 @@
-<!-- VERSION: 0.2 -->
+<!-- VERSION: 0.3 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.3 — 2026-11-08 — Task 017: item 6 also covers GET /v1/mybill; items 9-10 for GET /v1/mybill (tiebreak of the order, error answer).
 v0.2 — 2026-11-08 — Task 016: items 5-8 for POST /v1/mybill (invalid request answer, no user, no log line for a client error, unique-key retry).
 v0.1 — 2026-11-07 — Created (task 013). Items 1-4: GET /v1/services (inquiry as stored, error answer, empty Accept-Language, cache).
 -->
@@ -47,11 +48,11 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
    - **Reason:** an invalid request is a client error, not a server fault (task 016 Definition of Done). Qabz has no error-message table yet (`common/errors/` is empty).
    - **Code:** the `@todo` comment on `errInvalidParameter` in `src/entry/grpc/mybills.go`.
 
-6. **`POST /v1/mybill`: a call with no user.**
-   - **bill:** a call with no valid `user_id` fails the request check and gets the same `Unknown` answer as item 5.
+6. **`POST /v1/mybill` and `GET /v1/mybill`: a call with no user.**
+   - **bill:** a call with no valid `user_id` fails the request check and gets the same `Unknown` answer as item 5 (`POST`); `GET` reads the bills of an empty user and fails in the database (`Unknown`).
    - **Qabz:** answers gRPC `PermissionDenied` (HTTP 403) with the message `unauthenticated`, the same answer as the JWT check (task 012). This happens only with `debug.auth.disable: true` and an empty `debug.auth.mock_user_id` (a set key gives every call that user); with the check on, a call with no valid token never reaches the handler.
    - **Reason:** a missing user is an auth fault, not a bad request.
-   - **Code:** the `@todo` comment in `MyBills.Insert` in `src/entry/grpc/mybills.go`.
+   - **Code:** the `@todo` comments in `MyBills.Insert` and `MyBills.GetAll` in `src/entry/grpc/mybills.go`.
 
 7. **`POST /v1/mybill`: no log line for an invalid request.**
    - **bill:** writes one error-level log line for each invalid request, with the request and the user agent.
@@ -64,3 +65,15 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
    - **Qabz:** looks for the enabled row once more, with no wait. A row that another call saved at the same time is found and its id is returned. Otherwise the answer is gRPC `Internal` (HTTP 500), as in bill (operator decision, task 016).
    - **Reason:** the extra tries cannot find a disabled row, so they only make the error slower.
    - **Code:** the `@todo` comment on `SavedBillRepository.Insert` in `src/system/postgres/savedbill_repository.go`.
+
+9. **`GET /v1/mybill`: the order of bills saved at the same time.**
+   - **bill:** orders by `created_at DESC` only. Bills with the same `created_at` come in the order that Postgres gives, which can change from call to call.
+   - **Qabz:** orders by `created_at DESC, id DESC`. Bills with the same `created_at` always come in the same order. All other rows come in the bill order (a NULL `created_at` first, as in bill).
+   - **Reason:** a fixed order for the client and for the tests (task 017). Any order of tied rows is also a possible bill order, so a client sees no new behavior.
+   - **Code:** the `@todo` comment on `listSavedBillsSQL` in `src/system/postgres/savedbill_repository.go`.
+
+10. **`GET /v1/mybill`: the error answer.**
+    - **bill:** a database error gives gRPC `Unknown` (code 2) with bill's Persian `database_error` message. This includes a `json_data` value that go-pg cannot decode (for example `"IsPinned": "true"`): the whole list fails.
+    - **Qabz:** gives gRPC `Internal` (code 13) with the message `internal error` and no detail, and one error log line `mybill: list failed` with the cause. Both give HTTP 500. A bad `json_data` value fails the whole list too, as in bill (operator decision, task 017).
+    - **Reason:** the same as item 2.
+    - **Code:** the `@todo` comment at the `errInternal` answer in `MyBills.GetAll` in `src/entry/grpc/mybills.go`.

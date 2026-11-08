@@ -10,12 +10,15 @@ import (
 
 const testUser = "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"
 
-// fakeRepo records the bills that Insert gets and answers with id, created and err.
+// fakeRepo records the bills that Insert gets and answers with id, created and err. List records
+// the user and answers with list and err.
 type fakeRepo struct {
-	got     []Bill
-	id      string
-	created bool
-	err     error
+	got       []Bill
+	id        string
+	created   bool
+	err       error
+	list      []Bill
+	listUsers []string
 }
 
 func (f *fakeRepo) Insert(_ context.Context, b Bill) (string, bool, error) {
@@ -24,6 +27,11 @@ func (f *fakeRepo) Insert(_ context.Context, b Bill) (string, bool, error) {
 }
 
 func (f *fakeRepo) Get(context.Context, string) (Bill, error) { return Bill{}, ErrNotFound }
+
+func (f *fakeRepo) List(_ context.Context, userID string) ([]Bill, error) {
+	f.listUsers = append(f.listUsers, userID)
+	return f.list, f.err
+}
 
 // newTestStore returns a Store over repo. It stops the test if NewStore fails.
 func newTestStore(t *testing.T, repo *fakeRepo) *Store {
@@ -146,5 +154,38 @@ func TestInsertOnZeroStore(t *testing.T) {
 	_, _, err := s.Insert(context.Background(), testUser, InsertRequest{Type: TypeWater, BillID: "123455"})
 	assert.Error(t, err)
 	_, _, err = (&Store{}).Insert(context.Background(), testUser, InsertRequest{Type: TypeWater, BillID: "123455"})
+	assert.Error(t, err)
+}
+
+func TestListPassesTheUser(t *testing.T) {
+	want := []Bill{{ID: "b", UserID: testUser}, {ID: "a", UserID: testUser}}
+	repo := &fakeRepo{list: want}
+	got, err := newTestStore(t, repo).List(context.Background(), testUser)
+	assert.NoError(t, err)
+	assert.Equal(t, want, got)
+	assert.Equal(t, []string{testUser}, repo.listUsers)
+}
+
+func TestListWithoutUser(t *testing.T) {
+	repo := &fakeRepo{}
+	got, err := newTestStore(t, repo).List(context.Background(), "")
+	assert.ErrorIs(t, err, ErrInvalid)
+	assert.Nil(t, got)
+	assert.Empty(t, repo.listUsers, "the repository is not called")
+}
+
+func TestListRepositoryError(t *testing.T) {
+	boom := errors.New("boom")
+	got, err := newTestStore(t, &fakeRepo{err: boom}).List(context.Background(), testUser)
+	assert.ErrorIs(t, err, boom)
+	assert.NotErrorIs(t, err, ErrInvalid)
+	assert.Nil(t, got)
+}
+
+func TestListOnZeroStore(t *testing.T) {
+	var s *Store
+	_, err := s.List(context.Background(), testUser)
+	assert.Error(t, err)
+	_, err = (&Store{}).List(context.Background(), testUser)
 	assert.Error(t, err)
 }

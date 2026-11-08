@@ -69,7 +69,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	myBills, err := newMyBills(db, metrics, logger)
+	myBills, err := newMyBills(cfg, db, metrics, logger)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -168,11 +168,16 @@ func newService(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 	return grpcserver.NewService(grpcserver.ServiceDeps{Services: catalog, ServiceID: serviceID, Logger: logger}), nil
 }
 
-// newMyBills builds the gRPC MyBills service: POST /v1/mybill saves a bill in the bills table.
-// Each saved bill adds 1 to qabz_mybill_insert_total{result="created"|"existing"} (only when
-// metrics are on); a failed write writes one error log line. Rejected and failed calls are in the
-// code label of qabz_request_duration_ms.
-func newMyBills(db *postgres.Client, metrics *prometheus.Server, logger Logger) (*grpcserver.MyBills, error) {
+// newMyBills builds the gRPC MyBills service: POST /v1/mybill saves a bill in the bills table and
+// GET /v1/mybill lists the user's bills (serviceId is config service.id). Each saved bill adds 1
+// to qabz_mybill_insert_total{result="created"|"existing"} (only when metrics are on); a failed
+// write or read writes one error log line. Rejected and failed calls are in the code label of
+// qabz_request_duration_ms.
+func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Server, logger Logger) (*grpcserver.MyBills, error) {
+	serviceID, err := grpcserver.ServiceIDFromConfig(cfg.ServiceID)
+	if err != nil {
+		return nil, err
+	}
 	var onInsert func(result string) // nil: metrics are off, nothing is recorded
 	if reg := metrics.Registry(); reg != nil {
 		inserts := promclient.NewCounterVec(promclient.CounterOpts{
@@ -188,7 +193,13 @@ func newMyBills(db *postgres.Client, metrics *prometheus.Server, logger Logger) 
 	if err != nil {
 		return nil, err
 	}
-	return grpcserver.NewMyBills(grpcserver.MyBillsDeps{Bills: store, Logger: logger, OnInsert: onInsert}), nil
+	return grpcserver.NewMyBills(grpcserver.MyBillsDeps{
+		Bills:     store,
+		Lister:    store,
+		ServiceID: serviceID,
+		Logger:    logger,
+		OnInsert:  onInsert,
+	}), nil
 }
 
 // newRequestMetrics returns the gRPC server options that measure every call (and so every gateway

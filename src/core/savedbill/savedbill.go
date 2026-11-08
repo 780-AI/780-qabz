@@ -53,7 +53,11 @@ type Bill struct {
 	Data string
 	// Operator is json_data.Operator.
 	Operator string
-	Status   string
+	// IsPinned is json_data.IsPinned. Only List reads it.
+	IsPinned bool
+	// LastOrderDate is last_order_date. Only List reads it.
+	LastOrderDate string
+	Status        string
 }
 
 // InsertRequest is a bill that a user saves.
@@ -74,6 +78,9 @@ type Repository interface {
 	Insert(ctx context.Context, b Bill) (id string, created bool, err error)
 	// Get returns the row with the id, or ErrNotFound.
 	Get(ctx context.Context, id string) (Bill, error)
+	// List returns the enabled bills of the user, newest first (bill: GetAll in
+	// domain/repository/mybill). A user with no bills gives an empty list and no error.
+	List(ctx context.Context, userID string) ([]Bill, error)
 }
 
 // Store applies the My Bills rules and saves through a Repository.
@@ -127,6 +134,17 @@ func (s *Store) Insert(ctx context.Context, userID string, req InsertRequest) (B
 	}
 	b.ID = id
 	return b, created, nil
+}
+
+// List returns the saved bills of userID that the user can see (status enable), newest first.
+func (s *Store) List(ctx context.Context, userID string) ([]Bill, error) {
+	if s == nil || s.repo == nil {
+		return nil, errors.New("savedbill: store not created with NewStore")
+	}
+	if userID == "" {
+		return nil, fmt.Errorf("%w: no user", ErrInvalid)
+	}
+	return s.repo.List(ctx, userID)
 }
 
 // inquiryID checks req by its type and returns the value of the data column (bill
