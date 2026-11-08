@@ -1,4 +1,4 @@
-<!-- VERSION: 0.89 -->
+<!-- VERSION: 0.90 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.88 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.89 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.89 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.90 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.32 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-08
-- **Change**: Task 017 `mybill_list_endpoint` done: `GET /v1/mybill` from bill's `bills` table with bill's mapping, `json_data` read with fastjson; Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.88, #5 manifest v0.89, #6 folder_structure v0.32, #28 OPEN_TASKS v1.33, #34 app README v0.14, #35 this_vs_bill v0.3.
-- **Previous change**: 2026-11-08 — Session wrap-up (tasks 015 and 018 session): 3 lesson candidates in OPEN_TASKS, push held. Bumped #3 CHANGELOG v1.87, #5 manifest v0.88, #28 OPEN_TASKS v1.32.
+- **Change**: New task file `019_mybill_delete_endpoint.md` v0.1 (not manifest-tracked); task counter at 020. Bumped #3 CHANGELOG v1.89, #5 manifest v0.90.
+- **Previous change**: 2026-11-08 — Task 017 `mybill_list_endpoint` done: `GET /v1/mybill` from bill's `bills` table with bill's mapping, `json_data` read with fastjson; Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.88, #5 manifest v0.89, #6 folder_structure v0.32, #28 OPEN_TASKS v1.33, #34 app README v0.14, #35 this_vs_bill v0.3.
+- **Earlier change**: 2026-11-08 — Session wrap-up (tasks 015 and 018 session): 3 lesson candidates in OPEN_TASKS, push held. Bumped #3 CHANGELOG v1.87, #5 manifest v0.88, #28 OPEN_TASKS v1.32.
 - **Earlier change**: 2026-11-08 — Task 018 `make_help` done: `Makefile` target `help` (the Makefile has no VERSION header, so no row); task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.86, #5 manifest v0.87, #6 folder_structure v0.31, #28 OPEN_TASKS v1.31.
 - **Earlier change**: 2026-11-08 — New task file `018_make_help.md` v0.1 (not manifest-tracked); task counter at 019. Bumped #3 CHANGELOG v1.85, #5 manifest v0.86.
 - **Earlier change**: 2026-11-08 — Task 015 `dev_bill_database` done: required config key `mode`, command `devdb seed | unseed`, `system/postgres/devdb/` (bill schema and seed SQL, embedded; SQL files have no VERSION header, so no rows); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.84, #5 manifest v0.85, #6 folder_structure v0.30, #28 OPEN_TASKS v1.30, #34 app README v0.13.

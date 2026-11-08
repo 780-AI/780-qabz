@@ -1,7 +1,8 @@
-<!-- VERSION: 1.88 -->
+<!-- VERSION: 1.89 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.89 — 2026-11-08 — Added 019-task entry.
 v1.88 — 2026-11-08 — Added 017-mybill-list-endpoint entry.
 v1.87 — 2026-11-08 — Added session-wrap-up (tasks 015 and 018 session) entry.
 v1.86 — 2026-11-08 — Added 018-make-help entry.
@@ -94,6 +95,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — New task: 019_mybill_delete_endpoint
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/019_mybill_delete_endpoint.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 020), `docs/documents_manifest.md` (v0.90), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds `DELETE /v1/mybill/{id}`, which must behave exactly like bill (soft delete to `status = 'disable'`), with unit tests, integration tests on a throw-away schema and a feature-ON run on the dev database.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Task 017_mybill_list_endpoint: GET /v1/mybill
 - **Type:** Major (new endpoint)
