@@ -1,7 +1,8 @@
-<!-- VERSION: 1.82 -->
+<!-- VERSION: 1.83 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.83 — 2026-11-08 — Added session-wrap-up (task 016 session) entry.
 v1.82 — 2026-11-08 — Added error-logging-convention entry.
 v1.81 — 2026-11-08 — Added 016-mybill-insert-endpoint entry.
 v1.80 — 2026-11-08 — Added 017-task entry.
@@ -88,6 +89,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Session wrap-up: task 016 follow-up and lesson candidates (task 016 session)
+- **Type:** Minor (docs only)
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.29), `docs/documents_manifest.md` (v0.84), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. A task 016 follow-up for task 017 (real `bills` data: one row with lower-case `json_data` keys, `data` empty in most old rows) and three lesson candidates for an operator decision: shared local runtime (do not stop or collide with the operator's services), commit a task file when it is created, a dev switch that removes a check must supply what the check provided.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Conventions § 10: logging of fatal and critical errors
 - **Type:** Minor (governance doc; no code change)

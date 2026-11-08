@@ -1,7 +1,8 @@
-<!-- VERSION: 1.28 -->
+<!-- VERSION: 1.29 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.29 — 2026-11-08 — Session wrap-up (task 016 session): task 016 follow-up (real bills data shapes for task 017); 3 lesson candidates added.
 v1.28 — 2026-11-08 — Lesson candidate "Logging of dependency failures" removed: codified as conventions § 10.
 v1.27 — 2026-11-08 — Task 016 POST /v1/mybill: QA scenario added (feature-ON check waits for task 017).
 v1.26 — 2026-11-08 — Session wrap-up: 3 lesson candidates added (helper assertions in § 3; reviewer agent before the commit; positive control must not share the input under test).
@@ -150,6 +151,7 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Then (feature ON, Rule 15) WAITS FOR TASK 017 (operator decision): with the `bills` table in the dev database (task 015), run the App with `debug.auth.disable: true` and `debug.auth.mock_user_id` set (or with a real token), `POST /v1/mybill` a water bill with a valid bill ID, a mobile bill with `phone`, and the same water bill again; then `GET /v1/mybill`.
   Pass: each POST gives HTTP 200; the second water POST returns the first `id`; GET lists each saved bill with the values that POST sent and the `id` that POST returned; a bad bill ID gives HTTP 400 `invalid parameter` and no row; `qabz_mybill_insert_total` counts `created` 2 and `existing` 1. Without the `bills` table POST gives HTTP 500 and the log has one `mybill: insert failed` line with the cause.
   Unit and live checks done 2026-11-08 by the implementer; the App run without the `bills` table gave HTTP 500 and the `mybill: insert failed` line (`relation "bills" does not exist`).
+- ⏸ Task 016 follow-ups (for task 017, from the operator's sample of 1,453 real `bills` rows, 2026-11-08): one row has `json_data` keys `isPined` / `operator` in lower case (all others `Phone` / `IsPinned` / `Operator`), so `json_data->>'Operator'` reads it as empty; `data` is empty in most old rows (water: 7 of 42 enabled rows have `data` = `bill_id`). The GET mapping must handle both. Also: the dev database has no `bills` table until task 015 is done, so `POST /v1/mybill` gives HTTP 500 there.
 - ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware: request metrics done in task 014; panic recovery and tracing for all endpoints still need their own tasks.
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 
@@ -170,3 +172,10 @@ Found in the 2026-11-08 session wrap-up (task 014 review session):
 - **Assertions in test helpers.** The `code-reviewer` agent rejected a `t.Fatalf` in the lookup helper `family` (task 014) as a "borderline call": conventions § 3 does not say how a helper fails, and its "setup error" exception exists only in the agent file. Candidate rule for § 3: a helper that checks product behavior fails with `assert.Fail*` (or another `assert`) and then `t.FailNow()`; `t.Fatal*` is allowed only for a setup error (a temp dir, a listener), named in the text. Recommendation: codify.
 - **Run the `code-reviewer` agent before the task commit.** The `t.Fatalf` and a misplaced test comment in task 014 passed the in-chat Rule 10 review and reached `origin/main`; the agent found them only after the push, so the fix needed a second commit (317522b). Candidate: the commit pattern of a task runs the `code-reviewer` agent on the staged change before `git add`, and its verdict is part of the Rule 10 table. Recommendation: codify (conventions doc or the task template Definition of Done).
 - **A positive control must not share the input under test.** The first deliberate failure for the `family` fix renamed the constant `RequestDurationName`; the test reads the same constant, so it still passed. A changed test input (a missing name) was needed. Suite lesson L082 covers positive controls; this is a recurrence detail. Candidate: an `E0NN` entry in `docs/STANDARDS_LOG.md`. Recommendation: queue (log it if it happens again).
+
+Found in the 2026-11-08 session wrap-up (task 016 session):
+
+- **Shared local runtime.** The agent ran `make compose down` at the end of a check, but the operator's debug session used the same Postgres and Redis (the agent's earlier `make compose up` was a no-op because they already ran). In the same session the agent's `curl` reached the operator's debug App on `:8080` instead of its own copy, which could not bind. Candidate: before starting or stopping local services, check what is already running (`docker ps`, `lsof -iTCP -sTCP:LISTEN`); stop only what the agent started; run an agent copy of the App on other ports. Candidate home: a SESSION_OPENER § 3.2 row plus a feedback memory. Recommendation: codify.
+- **Commit the task file when it is created.** Tasks 016 and 017 were created and 016 was implemented before any of them was committed, so the five commits had to be rebuilt from saved copies to keep one commit per task. Candidate: a new task file (with the counter bump) is committed right after it is written, before work on it starts (extends the memory "One commit per task"). Recommendation: codify.
+- **Dev auth switch gave no user.** With `debug.auth.disable`, endpoints that need a user answered 403; fixed in task 016 with `debug.auth.mock_user_id`. Candidate: a development switch that removes a check must also supply what the check provided (here the user). Recommendation: queue (log it if it happens again).
+
