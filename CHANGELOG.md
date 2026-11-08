@@ -1,7 +1,8 @@
-<!-- VERSION: 1.81 -->
+<!-- VERSION: 1.82 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.82 — 2026-11-08 — Added error-logging-convention entry.
 v1.81 — 2026-11-08 — Added 016-mybill-insert-endpoint entry.
 v1.80 — 2026-11-08 — Added 017-task entry.
 v1.79 — 2026-11-08 — Added 016-task entry.
@@ -87,6 +88,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Conventions § 10: logging of fatal and critical errors
+- **Type:** Minor (governance doc; no code change)
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.13), `docs/Plans/OPEN_TASKS.md` (v1.28), `docs/documents_manifest.md` (v0.83), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. New binding rule: every fatal or critical error that is not a common error (failed dependency call, unexpected fault, start or process failure, failed background job) MUST write one `error` log line with the cause; common errors (client errors, canceled calls) are not logged. Every server-fault answer needs a test of its log line. The current code already follows the rule (both `Internal` answers log the cause; start failures go to stderr). The lesson candidate "Logging of dependency failures" is codified and removed from OPEN_TASKS. The local `code-reviewer` agent (git-ignored) checks the rule.
+- **QA scenarios:** None needed (Rule 11 exempts governance-doc edits with no behavior impact).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Task 016_mybill_insert_endpoint: POST /v1/mybill
 - **Type:** Major (new endpoint, new packages, new config key)

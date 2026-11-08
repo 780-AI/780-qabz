@@ -1,7 +1,8 @@
-<!-- VERSION: 0.12 -->
-<!-- Last Updated: 2026-11-07 -->
+<!-- VERSION: 0.13 -->
+<!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.13 — 2026-11-08 — Section 10: every fatal or critical error that is not a common error MUST be logged (one error line with the cause); common errors are not logged.
 v0.12 — 2026-11-07 — Section 9: every recorded duration (metric, log field) is in milliseconds; metric names end with `_ms`.
 v0.11 — 2026-11-07 — Section 8: layout examples no longer name `auth.jwt.*` (task 011 removed its only key).
 v0.10 — 2026-11-07 — Section 8: every config key is in both `config.yml` (local, git-ignored) and `config.yml.example` (tracked, default or zero values); the two stay in sync.
@@ -226,3 +227,30 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator decision, 2026-11-07 (task 014). It deviates from the Prometheus base-unit naming (`_seconds`): dashboards and alert rules for `qabz` read milliseconds.
 
 **Review.** The `code-reviewer` agent checks each new or changed metric and log field that holds a duration. A duration not in milliseconds, or a duration metric whose name does not end with `_ms`, is a defect. The verdict is NOT READY.
+
+## 10. Logging of fatal and critical errors
+
+**Every fatal or critical error that is not a common error MUST be logged.** The code writes one log line at level `error` (or higher) with the cause. A failure that the client or the operator sees must never be silent.
+
+**Fatal or critical errors (log them):**
+- A failed call to a dependency in a request path: the database, the cache, a provider, another service. The client gets gRPC `Internal` (HTTP 500) or another server-fault code, with no detail.
+- An unexpected fault in the code: a broken invariant, a nil result where a value is required, a panic that a recovery middleware catches.
+- A failure that stops the start or ends the process: a missing or bad config value, a failed connection or migration, a listener that cannot bind. Before the logger exists, print the error to stderr in place of a log line.
+- A failed background job (a cron run, a consumer message) that is not retried.
+
+**Common errors (do not log them):**
+- A client error: an invalid request (`InvalidArgument`), a rejected token (`PermissionDenied`), a missing row (`NotFound`), a duplicate.
+- A call that the client canceled, or a deadline that the client set.
+- These are counted by metrics (`qabz_request_duration_ms{code}` and the feature's own metrics). A log line for each of them fills the log and hides the real faults.
+
+**How to log:**
+- One line per failure, at the place where the error becomes the answer (the handler) or ends the work. Do not log the same error again in each layer.
+- The message names the feature and the action (for example `mybill: insert failed`), and the key `error` holds the cause.
+- The cause is never sent to the client: the answer has no detail (for example `internal error`).
+- No secret in a log line: no password, token, key or full DSN (`Secret` values print `***`).
+
+**Check.** Every answer with a server-fault code (`Internal`, `Unknown`, `DataLoss`, `Unavailable`) has a log line on the same path. A test checks the log line for each such path (for example `TestInsertErrorIsInternal`: one line, the message and the cause), and a test checks that a client error writes no line.
+
+**Why.** Operator decision, 2026-11-08 (task 016). An HTTP 500 with no log line cannot be investigated. Task 013 first returned 500 for a failed database read with no log line (lesson candidate of 2026-11-07); this rule makes the practice binding.
+
+**Review.** The `code-reviewer` agent finds each server-fault answer and each fatal start path. A path with no log line, or a common error that writes a log line, is a defect. The verdict is NOT READY.
