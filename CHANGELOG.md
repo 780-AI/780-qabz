@@ -1,7 +1,8 @@
-<!-- VERSION: 1.78 -->
-<!-- Last Updated: 2026-11-07 -->
+<!-- VERSION: 1.79 -->
+<!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.79 — 2026-11-08 — Added 016-task entry.
 v1.78 — 2026-11-08 — Added session-wrap-up (task 014 review session) entry.
 v1.77 — 2026-11-07 — Added 014-review-test-fixes entry.
 v1.76 — 2026-11-07 — Added session-wrap-up (task 014 session) entry.
@@ -84,6 +85,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — New task: 016_mybill_insert_endpoint
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/016_mybill_insert_endpoint.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 017), `docs/documents_manifest.md` (v0.80), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds `POST /v1/mybill` (save a bill for the JWT user in bill's `bills` table), with unit tests on mocks and fakes and database tests that check each row by a direct SQL query and a repository lookup. Its feature-ON verification waits for the GET counterpart.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Session wrap-up: lesson candidates (task 014 review session)
 - **Type:** Minor (docs only)
