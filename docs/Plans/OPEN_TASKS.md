@@ -1,7 +1,8 @@
-<!-- VERSION: 1.35 -->
+<!-- VERSION: 1.36 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.36 — 2026-11-08 — Session wrap-up (agents and conventions § 12 session): 2 lesson candidates added, 1 candidate gets more evidence; push of 95c29ce..HEAD held.
 v1.35 — 2026-11-08 — Task 019b DELETE success text: QA scenario added; task 019 scenario updated to the new success text.
 v1.34 — 2026-11-08 — Task 019 DELETE /v1/mybill/{id}: QA scenario added (feature-ON run done by the implementer, awaiting operator).
 v1.33 — 2026-11-08 — Task 017 GET /v1/mybill: QA scenario added; task 016 feature-ON check run (awaiting operator); task 016 real-data follow-up done and removed.
@@ -214,4 +215,6 @@ Found in the 2026-11-08 session wrap-up (tasks 015 and 018 session):
 - **A required config key changes every test config.** The required key `mode` (task 015) needed `mode: dev` in about 45 YAML strings in 6 test files. Candidate: one test helper that returns a minimal valid config YAML (required keys only), so the next required key is one change. Recommendation: queue (decide when the next required key comes).
 - **Push needs the operator.** The agent's `git push` was blocked by the Claude Code permission check; the 3 commits wait for the operator. Candidate: the wrap-up asks the operator to push (or to add a permission rule) and the register records the held push. Recommendation: discard (a tool setting, not a project rule), unless it happens again.
 - More evidence for **Shared local runtime** (above): in this session the agent checked `docker ps` and the listening ports first, used the running compose Postgres, ran its own App copy on ports 18080/18082/19090, and stopped only that copy. The operator's debug App on `:8080` and the containers stayed up. The practice worked; codify is still recommended.
-
+- **One writer per working tree.** In the 2026-11-08 agents session, the task 019b executor ran in the same working tree while this session edited `CHANGELOG.md` and `documents_manifest.md` for conventions § 12. Both changes ended up in the same two files, so a separate commit per task needed hand-built partial staging; the operator chose one commit for both (d5ad23d). Candidate: a session that runs a task (`task-master`) works in its own git worktree, or a session checks `git status` for another active task before it edits a shared doc (CHANGELOG, manifest, OPEN_TASKS). Recommendation: queue (decide if it happens again).
+- **Test each command in an agent file.** A Python one-liner written into the new `artifacts_agent` file failed on this machine (Python 3.9: no backslash in an f-string expression). Running each command once before saving the agent file found it. Candidate: an agent file (local, `.claude/agents/`) gets each of its commands run once on this machine before it is used; same idea as suite lessons L082/L083 (positive controls, tools on the extracted text). Recommendation: queue.
+- More evidence for **Run the `code-reviewer` agent before the task commit** (above): task 019b was committed (d5ad23d) on the in-chat Rule 10 review only; neither `code-reviewer` nor `artifacts_agent` ran on it, because it was committed from a session that did not run the task.

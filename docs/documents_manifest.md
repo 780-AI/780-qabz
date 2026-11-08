@@ -1,4 +1,4 @@
-<!-- VERSION: 0.96 -->
+<!-- VERSION: 0.97 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.95 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.96 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.96 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.97 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.33 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.35 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.36 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.15 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-08
-- **Change**: Task 019b `mybill_delete_success_text`: a successful `DELETE /v1/mybill/{id}` answers `{"message":"عملیات با موفقیت انجام شد"}` in place of bill's internal-error text (`this_vs_bill.md` item 12); Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.95, #5 manifest v0.96, #28 OPEN_TASKS v1.35, #34 app README v0.16, #35 this_vs_bill v0.5.
-- **Previous change**: 2026-11-08 — Conventions § 12 metrics for every feature (feature metric per outcome the `code` label cannot tell apart, registered only when metrics are on, fixed-set labels, `system.html` row, tests). Bumped #3 CHANGELOG v1.94, #5 manifest v0.95, #30 PROJECT_SPECIFIC_CONVENTIONS v0.15.
+- **Change**: Session wrap-up (agents and conventions § 12 session): 2 lesson candidates and more evidence for one; push of 95c29ce..HEAD held. Bumped #3 CHANGELOG v1.96, #5 manifest v0.97, #28 OPEN_TASKS v1.36.
+- **Previous change**: 2026-11-08 — Task 019b `mybill_delete_success_text`: a successful `DELETE /v1/mybill/{id}` answers `{"message":"عملیات با موفقیت انجام شد"}` in place of bill's internal-error text (`this_vs_bill.md` item 12); Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.95, #5 manifest v0.96, #28 OPEN_TASKS v1.35, #34 app README v0.16, #35 this_vs_bill v0.5.
+- **Earlier change**: 2026-11-08 — Conventions § 12 metrics for every feature (feature metric per outcome the `code` label cannot tell apart, registered only when metrics are on, fixed-set labels, `system.html` row, tests). Bumped #3 CHANGELOG v1.94, #5 manifest v0.95, #30 PROJECT_SPECIFIC_CONVENTIONS v0.15.
 - **Earlier change**: 2026-11-08 — New task file `019b_mybill_delete_success_text.md` v0.1 (not manifest-tracked; letter suffix of 019, task counter unchanged at 021). Bumped #3 CHANGELOG v1.93, #5 manifest v0.94.
 - **Earlier change**: 2026-11-08 — Conventions § 11 coverage gate: each changed Go package has 70.0% statement coverage or more, measured with the database tests included (live tests run, not skipped). Bumped #3 CHANGELOG v1.92, #5 manifest v0.93, #30 PROJECT_SPECIFIC_CONVENTIONS v0.14.
 - **Earlier change**: 2026-11-08 — Task 019 `mybill_delete_endpoint` done: `DELETE /v1/mybill/{id}` disables a bill of the JWT user in bill's `bills` table, exactly as bill (id check with `github.com/google/uuid` v1.6.0, now a direct requirement in `src/go.mod`); Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.91, #5 manifest v0.92, #6 folder_structure v0.33, #28 OPEN_TASKS v1.34, #34 app README v0.15, #35 this_vs_bill v0.4.

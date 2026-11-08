@@ -1,7 +1,8 @@
-<!-- VERSION: 1.95 -->
+<!-- VERSION: 1.96 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.96 — 2026-11-08 — Added session-wrap-up (agents and conventions § 12 session) entry.
 v1.95 — 2026-11-08 — Added 019b-mybill-delete-success-text entry.
 v1.94 — 2026-11-08 — Added metrics-convention entry.
 v1.93 — 2026-11-08 — Added 019b-task entry.
@@ -101,6 +102,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Session wrap-up (agents and conventions § 12 session)
+- **Type:** Minor (docs only)
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.36), `docs/documents_manifest.md` (v0.97), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Two lesson candidates added (one writer per working tree; test each command in an agent file) and more evidence for "Run the `code-reviewer` agent before the task commit". The local agents changed this session (git-ignored, not in a commit): `supervisor` renamed to `task-master`, which now runs `code-reviewer` and the new `artifacts_agent` in parallel; `task_executor` reports its metrics, log lines and Postman changes. The push of 95c29ce..HEAD waits for the operator.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Task 019b: DELETE /v1/mybill/{id} sends a success text on success
 - **Type:** Minor (fix-forward of task 019, Rule 3; one answer text, operator decision)
