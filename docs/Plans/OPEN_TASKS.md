@@ -1,7 +1,8 @@
-<!-- VERSION: 1.25 -->
-<!-- Last Updated: 2026-11-07 -->
+<!-- VERSION: 1.26 -->
+<!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.26 — 2026-11-08 — Session wrap-up: 3 lesson candidates added (helper assertions in § 3; reviewer agent before the commit; positive control must not share the input under test).
 v1.25 — 2026-11-07 — Session wrap-up: 2 lesson candidates added (Step 5 policies to conventions; gate read before the guarded action).
 v1.24 — 2026-11-07 — Task 014 request metrics: QA scenario added; 013 follow-up updated.
 v1.23 — 2026-11-07 — Session wrap-up: Lesson candidates section added (2 candidates).
@@ -157,3 +158,9 @@ Found in the 2026-11-07 session wrap-up. Each one waits for an operator decision
 - **Differences from bill.** Every intended difference from the old `bill` service is a numbered item in `docs/this_vs_bill.md` and has a `@todo` comment at the code that makes it (task 013, operator). Candidate rule for the conventions doc, so later tasks follow it. Recommendation: codify.
 - **Step 5 policies are not enforced.** The Prometheus switch was "mandatory" in Implementation_Plan Step 5, but no task built it; task 014 found it missing and added it. The other Step 5 policies (testable app, logging policy) are also only in the plan, so the `code-reviewer` agent does not check them. Candidate: move the Step 5 policies (Prometheus switch, testable app, logging) into `PROJECT_SPECIFIC_CONVENTIONS.md` (the plan's own open point), and check the code against each one. Recommendation: codify.
 - **Read a gate before the guarded action.** In the task 014 session, a content check of the staged files and `git commit` ran in one command, so the commit ran before the check output was read (the content was correct). Suite lesson L084 already says that each gate is its own step; this is a recurrence. Candidate: an `E0NN` entry in `docs/STANDARDS_LOG.md` (recurrence evidence for L084). Recommendation: queue (log it if it happens again).
+
+Found in the 2026-11-08 session wrap-up (task 014 review session):
+
+- **Assertions in test helpers.** The `code-reviewer` agent rejected a `t.Fatalf` in the lookup helper `family` (task 014) as a "borderline call": conventions § 3 does not say how a helper fails, and its "setup error" exception exists only in the agent file. Candidate rule for § 3: a helper that checks product behavior fails with `assert.Fail*` (or another `assert`) and then `t.FailNow()`; `t.Fatal*` is allowed only for a setup error (a temp dir, a listener), named in the text. Recommendation: codify.
+- **Run the `code-reviewer` agent before the task commit.** The `t.Fatalf` and a misplaced test comment in task 014 passed the in-chat Rule 10 review and reached `origin/main`; the agent found them only after the push, so the fix needed a second commit (317522b). Candidate: the commit pattern of a task runs the `code-reviewer` agent on the staged change before `git add`, and its verdict is part of the Rule 10 table. Recommendation: codify (conventions doc or the task template Definition of Done).
+- **A positive control must not share the input under test.** The first deliberate failure for the `family` fix renamed the constant `RequestDurationName`; the test reads the same constant, so it still passed. A changed test input (a missing name) was needed. Suite lesson L082 covers positive controls; this is a recurrence detail. Candidate: an `E0NN` entry in `docs/STANDARDS_LOG.md`. Recommendation: queue (log it if it happens again).

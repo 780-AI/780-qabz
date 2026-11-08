@@ -1,4 +1,4 @@
-<!-- VERSION: 0.78 -->
+<!-- VERSION: 0.79 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.77 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.78 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.78 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v0.79 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.28 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.25 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.26 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.12 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -54,9 +54,10 @@
 
 ## Last Updated
 
-- **Date**: 2026-11-07
-- **Change**: Task 014 review fixes: `assert` in place of `t.Fatalf` in a prometheus test helper; a misplaced test doc comment in `config_test.go`; Go test files have no VERSION header, so no rows. Bumped #3 CHANGELOG v1.77, #5 manifest v0.78.
-- **Previous change**: 2026-11-07 — Session wrap-up (task 014 session): 2 lesson candidates in OPEN_TASKS. Bumped #3 CHANGELOG v1.76, #5 manifest v0.77, #28 OPEN_TASKS v1.25.
+- **Date**: 2026-11-08
+- **Change**: Session wrap-up (task 014 review session): 3 lesson candidates in OPEN_TASKS. Bumped #3 CHANGELOG v1.78, #5 manifest v0.79, #28 OPEN_TASKS v1.26.
+- **Previous change**: 2026-11-07 — Task 014 review fixes: `assert` in place of `t.Fatalf` in a prometheus test helper; a misplaced test doc comment in `config_test.go`; Go test files have no VERSION header, so no rows. Bumped #3 CHANGELOG v1.77, #5 manifest v0.78.
+- **Earlier change**: 2026-11-07 — Session wrap-up (task 014 session): 2 lesson candidates in OPEN_TASKS. Bumped #3 CHANGELOG v1.76, #5 manifest v0.77, #28 OPEN_TASKS v1.25.
 - **Earlier change**: 2026-11-07 — Task 014 `request_metrics_middleware` done: request duration histogram in ms (its `_count` = request counter) for every gRPC call and gateway route, Prometheus switch `metrics.prometheus.enabled`; Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.75, #5 manifest v0.76, #6 folder_structure v0.28, #21 system.html v1.4, #28 OPEN_TASKS v1.24, #34 app README v0.11.
 - **Earlier change**: 2026-11-07 — Conventions § 9 durations in milliseconds; `system.html` rule and planned metric names changed to `_ms`. Bumped #3 CHANGELOG v1.74, #5 manifest v0.75, #21 system.html v1.3, #30 PROJECT_SPECIFIC_CONVENTIONS v0.12.
 - **Earlier change**: 2026-11-07 — Session wrap-up: OPEN_TASKS gets a Lesson candidates section. Bumped #3 CHANGELOG v1.73, #5 manifest v0.74, #28 OPEN_TASKS v1.23.

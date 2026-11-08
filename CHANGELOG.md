@@ -1,7 +1,8 @@
-<!-- VERSION: 1.77 -->
+<!-- VERSION: 1.78 -->
 <!-- Last Updated: 2026-11-07 -->
 <!--
 CHANGE LOG
+v1.78 — 2026-11-08 — Added session-wrap-up (task 014 review session) entry.
 v1.77 — 2026-11-07 — Added 014-review-test-fixes entry.
 v1.76 — 2026-11-07 — Added session-wrap-up (task 014 session) entry.
 v1.75 — 2026-11-07 — Added 014-request-metrics-middleware entry.
@@ -83,6 +84,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — Session wrap-up: lesson candidates (task 014 review session)
+- **Type:** Minor (docs only)
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.26), `docs/documents_manifest.md` (v0.79), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. Three lesson candidates queued for an operator decision: how a test helper fails (conventions § 3), the `code-reviewer` agent before the task commit, and a positive-control recurrence detail (L082).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-07] — Task 014 review fixes: two test files
 - **Type:** Minor (tests only; no runtime code)
