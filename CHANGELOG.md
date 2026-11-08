@@ -1,7 +1,8 @@
-<!-- VERSION: 1.79 -->
+<!-- VERSION: 1.80 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v1.80 — 2026-11-08 — Added 017-task entry.
 v1.79 — 2026-11-08 — Added 016-task entry.
 v1.78 — 2026-11-08 — Added session-wrap-up (task 014 review session) entry.
 v1.77 — 2026-11-07 — Added 014-review-test-fixes entry.
@@ -85,6 +86,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-08] — New task: 017_mybill_list_endpoint
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/017_mybill_list_endpoint.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 018), `docs/documents_manifest.md` (v0.81), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds `GET /v1/mybill` (the saved bills of the JWT user), with unit tests on mocks and fakes and database tests. It is the GET counterpart of task 016: the two endpoints verify each other.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — New task: 016_mybill_insert_endpoint
 - **Type:** Minor (docs only; a new task file)
