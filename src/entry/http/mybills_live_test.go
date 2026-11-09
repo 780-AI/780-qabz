@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -24,12 +23,9 @@ import (
 // the gateway, the JWT check, the handler, the store and the repository into a bills table (a
 // throw-away schema of a real Postgres). The row is then checked two ways: a direct SQL query and a
 // lookup through the repository. A second POST of the same bill returns the same id and adds no
-// row. It needs QABZ_TEST_POSTGRES_DSN.
+// row. It needs QABZ_TEST_RUN_DSN (make test).
 func TestLiveMyBillInsertEndToEnd(t *testing.T) {
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := postgres.New(ctx, postgrestest.BillsSchema(t, ctx, dsn))
@@ -93,12 +89,9 @@ func TestLiveMyBillInsertEndToEnd(t *testing.T) {
 // /v1/mybill and rows of another user and a disabled row (direct SQL) are in one bills table (a
 // throw-away schema of a real Postgres). GET returns only the enabled bills of the token's user,
 // newest first, with the values that POST sent and the ids that POST returned. The list is also
-// compared with a direct SQL query on bills. It needs QABZ_TEST_POSTGRES_DSN.
+// compared with a direct SQL query on bills. It needs QABZ_TEST_RUN_DSN (make test).
 func TestLiveMyBillListEndToEnd(t *testing.T) {
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := postgres.New(ctx, postgrestest.BillsSchema(t, ctx, dsn))
@@ -237,12 +230,9 @@ func listedIDs(t *testing.T, gw *Gateway) []string {
 // After each call every row is checked by a direct SQL query (only the target row changed, only
 // its status, nothing removed) and GET /v1/mybill is checked (the bill is not listed; the other
 // bills are). The answers: HTTP 200 with the success text (task 019b), or bill's HTTP 500 (gRPC
-// Unknown) with bill's text. It needs QABZ_TEST_POSTGRES_DSN.
+// Unknown) with bill's text. It needs QABZ_TEST_RUN_DSN (make test).
 func TestLiveMyBillDeleteEndToEnd(t *testing.T) {
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := postgres.New(ctx, postgrestest.BillsSchema(t, ctx, dsn))

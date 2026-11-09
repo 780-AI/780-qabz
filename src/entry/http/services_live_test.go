@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -19,12 +18,9 @@ import (
 // TestLiveServicesEndToEnd is the integration test of GET /v1/services: mock rows in a mock
 // services table (a throw-away schema of a real Postgres) go through the repository, the cache,
 // the gRPC server and the gateway, and must come back exactly as inserted, in display order.
-// It needs QABZ_TEST_POSTGRES_DSN.
+// It needs QABZ_TEST_RUN_DSN (make test).
 func TestLiveServicesEndToEnd(t *testing.T) {
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := postgres.New(ctx, postgrestest.ServicesSchema(t, ctx, dsn))

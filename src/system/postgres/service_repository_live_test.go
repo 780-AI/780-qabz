@@ -2,7 +2,6 @@ package postgres_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -16,10 +15,7 @@ import (
 // TestLiveListServices reads mock rows from a mock services table (bill's columns) in a throw-away
 // schema, so a real services table in the same database is never touched.
 func TestLiveListServices(t *testing.T) {
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	schemaDSN := postgrestest.ServicesSchema(t, ctx, dsn)

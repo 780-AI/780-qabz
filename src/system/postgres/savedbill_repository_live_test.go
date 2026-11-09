@@ -3,7 +3,6 @@ package postgres_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -44,13 +43,10 @@ func readBillRow(t *testing.T, ctx context.Context, db *postgres.Client, id stri
 func ptr(s string) *string { return &s }
 
 // liveBills returns a client on a throw-away schema with an empty bills table and a repository on
-// it. It skips the test without QABZ_TEST_POSTGRES_DSN and stops it if a step fails.
+// it. It skips the test without the run database (QABZ_TEST_RUN_DSN) and stops it if a step fails.
 func liveBills(t *testing.T, ctx context.Context) (*postgres.Client, *postgres.SavedBillRepository) {
 	t.Helper()
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	db, err := postgres.New(ctx, postgrestest.BillsSchema(t, ctx, dsn))
 	if !assert.NoError(t, err) || !assert.NotNil(t, db) {
 		t.FailNow()

@@ -1,8 +1,7 @@
-package postgres
+package postgres_test
 
 import (
 	"context"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -10,38 +9,27 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"qabz/config"
+	"qabz/system/postgres"
+	"qabz/system/postgres/postgrestest"
 
 	"qabz/migrations"
 )
 
-// These tests need a real Postgres. Set QABZ_TEST_POSTGRES_DSN, for example
-// postgres://qabz:pw@127.0.0.1:55432/qabz. The tests use a throw-away schema state:
-// they drop the tables of the migrations at the start and at the end.
+// liveDSN returns the DSN of a new empty throw-away schema in the run database of `make test`
+// (QABZ_TEST_RUN_DSN), so each test starts with no migration tables (there are no down migrations)
+// and never touches the development database. The schema is dropped at the end of the test. It
+// skips the test without the run database.
 func liveDSN(t *testing.T) string {
-	t.Helper()
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
-	return dsn
-}
-
-// reset drops the tables the migrations create, so each test starts from an empty database.
-// (There are no down migrations.)
-func reset(t *testing.T, dsn string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	c := newClient(t, ctx, dsn)
-	defer c.Close()
-	_, err := c.Pool().Exec(ctx, `DROP TABLE IF EXISTS app_hot_configs, qabz_schema_migrations`)
-	assert.NoError(t, err)
+	return postgrestest.EmptySchema(t, ctx, postgrestest.RunDSN(t))
 }
 
 // newClient opens a pool and stops the test if it fails, so no test calls a method on a nil *Client.
-func newClient(t *testing.T, ctx context.Context, dsn string) *Client {
+func newClient(t *testing.T, ctx context.Context, dsn string) *postgres.Client {
 	t.Helper()
-	c, err := New(ctx, dsn)
+	c, err := postgres.New(ctx, dsn)
 	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
 		t.FailNow()
 	}
@@ -50,9 +38,7 @@ func newClient(t *testing.T, ctx context.Context, dsn string) *Client {
 
 func TestLiveConcurrentUp(t *testing.T) {
 	dsn := liveDSN(t)
-	m := NewMigrator(dsn, migrations.FS)
-	reset(t, dsn)
-	t.Cleanup(func() { reset(t, dsn) })
+	m := postgres.NewMigrator(dsn, migrations.FS)
 
 	const n = 8
 	errs := make([]error, n)
@@ -63,7 +49,7 @@ func TestLiveConcurrentUp(t *testing.T) {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			errs[i] = NewMigrator(dsn, migrations.FS).Up(ctx)
+			errs[i] = postgres.NewMigrator(dsn, migrations.FS).Up(ctx)
 		}(i)
 	}
 	wg.Wait()
@@ -78,15 +64,13 @@ func TestLiveConcurrentUp(t *testing.T) {
 
 func TestLiveRepositoryLoad(t *testing.T) {
 	dsn := liveDSN(t)
-	m := NewMigrator(dsn, migrations.FS)
-	reset(t, dsn)
+	m := postgres.NewMigrator(dsn, migrations.FS)
 	ctx := context.Background()
 	assert.NoError(t, m.Up(ctx))
-	t.Cleanup(func() { reset(t, dsn) })
 
 	c := newClient(t, ctx, dsn)
 	defer c.Close()
-	repo := NewConfigRepository(c)
+	repo := postgres.NewConfigRepository(c)
 
 	rows, err := repo.Load(ctx)
 	assert.NoError(t, err)
@@ -107,7 +91,7 @@ func TestLiveRepositoryLoad(t *testing.T) {
 }
 
 func TestMigrateUpTimeout(t *testing.T) {
-	m := NewMigrator("postgres://u:p@127.0.0.1:1/db", migrations.FS)
+	m := postgres.NewMigrator("postgres://u:p@127.0.0.1:1/db", migrations.FS)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	err := m.Up(ctx)
@@ -131,17 +115,15 @@ func (testLog) Error(string, ...any) {}
 // End to end: a row changed in Postgres reaches the config field within the interval.
 func TestLiveHotReloadEndToEnd(t *testing.T) {
 	dsn := liveDSN(t)
-	m := NewMigrator(dsn, migrations.FS)
-	reset(t, dsn)
+	m := postgres.NewMigrator(dsn, migrations.FS)
 	ctx := context.Background()
 	assert.NoError(t, m.Up(ctx))
-	t.Cleanup(func() { reset(t, dsn) })
 
 	c := newClient(t, ctx, dsn)
 	defer c.Close()
 
 	holder := config.NewHolder(liveCfg{LogLevel: "info", Workers: 1, Frozen: "keep"})
-	rel, err := config.NewReloader[liveCfg](NewConfigRepository(c), holder, 100*time.Millisecond, testLog{})
+	rel, err := config.NewReloader[liveCfg](postgres.NewConfigRepository(c), holder, 100*time.Millisecond, testLog{})
 	if !assert.NoError(t, err) || !assert.NotNil(t, rel) {
 		return
 	}

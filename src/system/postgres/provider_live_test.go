@@ -3,7 +3,6 @@ package postgres_test
 import (
 	"cmp"
 	"context"
-	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -18,14 +17,11 @@ import (
 )
 
 // seededClient connects to a new throw-away schema with the devdb bill tables and the 45 seed
-// providers (QABZ_TEST_POSTGRES_DSN), so the real tables are never touched. It skips the test
+// providers (QABZ_TEST_RUN_DSN, make test), so the real tables are never touched. It skips the test
 // without the DSN and stops it if a step fails.
 func seededClient(t *testing.T, ctx context.Context) *postgres.Client {
 	t.Helper()
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	c, err := postgres.New(ctx, postgrestest.SeededSchema(t, ctx, dsn))
 	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
 		t.FailNow()

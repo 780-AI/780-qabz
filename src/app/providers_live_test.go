@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -108,7 +107,7 @@ func gapsIn(t *testing.T, times []time.Time, lo, hi time.Duration, msg string) b
 	return ok
 }
 
-// TestLiveProvidersLoadIntervalHotReload needs a real Postgres (QABZ_TEST_POSTGRES_DSN). It proves
+// TestLiveProvidersLoadIntervalHotReload needs a real Postgres (QABZ_TEST_RUN_DSN, make test). It proves
 // end to end that providers.general.load_interval is hot-reloadable (operator, 2026-11-09): an App
 // with the real migrator, the real config reloader (config.Config, so the hot_reload tag of
 // ProvidersLoadInterval decides) and the real ProvidersService of newProviders (interval read from
@@ -119,10 +118,7 @@ func gapsIn(t *testing.T, times []time.Time, lo, hi time.Duration, msg string) b
 // work); a row value of 200ms makes the routine use the 1 s minimum (the same effective value: no
 // restart, no extra load) and write one warn line.
 func TestLiveProvidersLoadIntervalHotReload(t *testing.T) {
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	schemaDSN := postgrestest.SeededSchema(t, ctx, dsn)

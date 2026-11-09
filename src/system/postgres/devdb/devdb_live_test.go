@@ -2,7 +2,6 @@ package devdb_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -14,14 +13,11 @@ import (
 	"qabz/system/postgres/postgrestest"
 )
 
-// liveClient connects to a new empty throw-away schema (QABZ_TEST_POSTGRES_DSN), so the real tables
+// liveClient connects to a new empty throw-away schema (QABZ_TEST_RUN_DSN, make test), so the real tables
 // of the database are never touched. The schema is dropped at the end of the test.
 func liveClient(t *testing.T, ctx context.Context) *postgres.Client {
 	t.Helper()
-	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
-	}
+	dsn := postgrestest.RunDSN(t)
 	c, err := postgres.New(ctx, postgrestest.EmptySchema(t, ctx, dsn))
 	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
 		t.FailNow()

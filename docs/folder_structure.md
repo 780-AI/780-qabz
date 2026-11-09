@@ -1,7 +1,8 @@
-<!-- VERSION: 0.34 -->
-<!-- Last Updated: 2026-11-08 -->
+<!-- VERSION: 0.35 -->
+<!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v0.35 — 2026-11-09 — Task 020b: Makefile line names `make test` and `make test-db-clean`; postgrestest/ gets the run-database guard (RunDSN) and testdb/ (the test database tool behind `make test`).
 v0.34 — 2026-11-08 — Task 020: provider/selector.go (ProvidersService, the sorted provider list); system/postgres provider repository; postgrestest/ gets SeededSchema (devdb tables and seed).
 v0.33 — 2026-11-08 — Task 019: entry/grpc MyBills.Delete; savedbill Store deletes (disables) bills.
 v0.32 — 2026-11-08 — Task 017: entry/grpc MyBills.GetAll; savedbill Store lists bills.
@@ -52,7 +53,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 ├── config.yml.example                 # config template: every key with its default or zero value (conventions § 8)
 ├── docker-compose.yml                 # local dev stack: postgres, redis, qabz (profile `app`)
 ├── qabz.postman_collection.json      # Postman collection of the HTTP API; updated with every API change (conventions § 7)
-├── Makefile                           # `make help` (lists the targets), `make proto`, `make compose up|down|ps|logs` (YAML -> config_generated.env -> docker compose <action>), `make test-scripts`
+├── Makefile                           # `make help` (lists the targets), `make proto`, `make compose up|down|ps|logs` (YAML -> config_generated.env -> docker compose <action>), `make test-scripts`, `make test` (all Go tests in one throw-away database `qabz_test_<hex>`), `make test-db-clean` (drops leftover `qabz_test_%` databases, then leftover `qabz_test_` roles; keeps a role with objects or privileges in a non-test database and exits 1)
 ├── src/                               # all Go code and the Go module
 │   ├── go.mod                         # Go module `qabz` (go 1.27.3)
 │   ├── go.sum                         # module checksums
@@ -70,7 +71,7 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── config/                        # settings: Config from YAML (config.go; example_test.go keeps config.yml.example in sync), consts (constants.go: CacheServicesTTL, the mode values dev / stage / prod), YAML mapper (decode.go), --config boot (boot.go); hot-reload: Holder, Reloader (hot.go)
 │   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs.up.sql (no down files)
 │   ├── system/                        # what the service connects to
-│   │   └── postgres/  redis/          # pgx pool, migrator, config repository, services, saved bill and provider repositories (bill tables); devdb/ = the bill tables as bill's code makes them + the services / providers seed (embedded SQL; development only); postgrestest/ = throw-away schema, empty, with the services or bills table, or seeded with the devdb tables and rows (tests only); go-redis client (kafka/, nats/ still empty)
+│   │   └── postgres/  redis/          # pgx pool, migrator, config repository, services, saved bill and provider repositories (bill tables); devdb/ = the bill tables as bill's code makes them + the services / providers seed (embedded SQL; development only); postgrestest/ = RunDSN (the run database of `make test`, `QABZ_TEST_RUN_DSN`, guarded to `qabz_test_*`) and throw-away schemas in it, empty, with the services or bills table, or seeded with the devdb tables and rows (tests only); postgrestest/testdb/ = the test database tool behind `make test` and `make test-db-clean` (tests only); go-redis client (kafka/, nats/ still empty)
 │   ├── common/                        # shared by every package
 │   │   ├── logging/                   # zap/ (logger, done), logstash/ (log shipping, empty)
 │   │   ├── monitoring/                # jaeger/ (tracing), prometheus/ (metrics endpoint with the Prometheus switch; requests.go: request duration histogram in ms, its _count = request counter)

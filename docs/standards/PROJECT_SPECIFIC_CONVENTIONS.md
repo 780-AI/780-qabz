@@ -1,7 +1,8 @@
-<!-- VERSION: 0.16 -->
-<!-- Last Updated: 2026-11-08 -->
+<!-- VERSION: 0.17 -->
+<!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v0.17 — 2026-11-09 — Section 14: tests never touch the development database; one throw-away run database per `make test` (`QABZ_TEST_RUN_DSN`), the `postgrestest` guard, `make test-db-clean` (task 020b); the guard checks the database the driver uses (`pgconn.ParseConfig`), no DSN or password on a command line, `config_generated.env` parsed (never sourced as shell), trap before create, `GO_TEST_PKGS` operator-approved, `make test-db-clean` also drops the `qabz_test_` roles and a test login role has a random password (decision 7); nothing outside the `qabz_test_` databases is touched, a role with objects or privileges outside them is kept and the command exits 1, no `REASSIGN OWNED` / `DROP OWNED` (decision 8); the kept line labels each place (`(not a test database)` only next to a non-`qabz_test_` database, a shared object by its catalog) and a 2BP01 with no `pg_shdepend` row has its own line (fix round 4). Section 11: measured with `make test` (the run database), not `QABZ_TEST_POSTGRES_DSN`.
 v0.16 — 2026-11-08 — Section 13: providers only through `ProvidersService` (task 020). No other code reads the `providers` table or `postgres.ProviderRepository`.
 v0.15 — 2026-11-08 — Section 12: metrics for every feature. A feature metric counts each outcome that the `code` label cannot tell apart; metrics registered only when on; fixed-set labels; `system.html` row and tests; the `artifacts_agent` checks it.
 v0.14 — 2026-11-08 — Section 11: coverage gate. Each changed Go package has 70.0% statement coverage or more, measured with the database tests included.
@@ -265,9 +266,9 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Changed package.** A package that has a new or modified non-test `.go` file. A package with only changed test files is not gated.
 
 **How to measure:**
-- Set `QABZ_TEST_POSTGRES_DSN` to a real Postgres (the compose Postgres), so that the live (database) tests run. Never print the password.
-- Run `go test -race -count=1 -v -coverprofile=<file> <package>` in `src/`, then read the total with `go tool cover -func=<file>`. Keep the profile outside the repo.
-- Check in the `-v` output that the live tests ran and did not skip. A unit-only number (no DSN, live tests skipped) is not the gate value.
+- Start the compose Postgres (`make compose up`) and run the tests with `make test` from the repo root (§ 14). The target makes the throw-away run database and gives its DSN to the tests in `QABZ_TEST_RUN_DSN`, so the live (database) tests run. Do not set the variable by hand.
+- Run `make test GO_TEST_ARGS="-race -count=1 -cover -v"` and read the `coverage:` value on the `ok` line of each changed package. To measure one package only, add `GO_TEST_PKGS=./<package>/`. Never print the password.
+- Check in the `-v` output that the live tests ran and did not skip. A unit-only number (a plain `go test` with no run database, live tests skipped) is not the gate value.
 - If no database is available, the gate is "not measured". A change cannot pass a gate that was not measured.
 
 **Not counted:** generated code (`api/pb/`, `api/swagger/`), the `pb/` submodule and test files. A package with no tests has 0% and fails.
@@ -321,3 +322,41 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator decision, 2026-11-08 (task 020). One sorted, concurrent-safe list gives every caller the same deterministic pick, without a database read on the hot path. A second read path would pick a different provider (`bill` picks any enabled row, with no order) or bypass the runtime changes.
 
 **Review.** The `code-reviewer` agent searches each change for `providers` in SQL text and for uses of `ProviderRepository` and `ListProviders`. A use outside the places above is a defect. The verdict is NOT READY.
+
+## 14. Tests never touch the development database
+
+**No test may create, change, drop or reset any object (database, schema, table, row, migration state) in the development database** (`database.postgres.*` in `config.yml`, the compose `qabz` database). Every live (database) test works in the run database of `make test` only.
+
+**Nothing outside the `qabz_test_` databases is touched** (operator rule, 2026-11-09, task 020b decision 8: "Nothing in the databases other than test_* databases must be touched."). No test, Make target or `testdb` verb may create, change, drop, reassign, grant or revoke anything inside a database whose name does not start with `qabz_test_` (the development database `qabz`, `postgres`, the templates, any other). Every connection that writes is to a `qabz_test_` database. The admin connection (database `postgres`) only reads catalogs (`pg_database`, `pg_roles`, `pg_shdepend`) and runs server-level `CREATE DATABASE` / `DROP DATABASE` of `qabz_test_` databases and `CREATE ROLE` / `DROP ROLE` of `qabz_test_` roles. A test that needs a database outside its clean (for example to keep a role) uses the run database with a longer clean prefix of its own; it creates no database without the `qabz_test_` prefix. `DROP OWNED` is not used even in a `qabz_test_` database: it also revokes the privileges of the role on shared objects (other databases).
+
+**One run database for each test run.** `make test` (repo root) is one test run: the whole `go test ./...`. `GO_TEST_PKGS` (operator-approved, 2026-11-09) can name fewer packages for a QA scenario or the § 11 gate; each such run still gets its own random database.
+- The target creates ONE database `qabz_test_<16 random hex>` on the Postgres server, runs the tests, and drops it at the end (`DROP DATABASE ... WITH (FORCE)`), also when a test fails or the run is interrupted (Ctrl-C, SIGTERM: the shell trap drops it). The trap is set BEFORE the database is created; when the run stops before the database exists, the drop does nothing (`testdb: no database <name>, nothing to drop`).
+- The tool behind the target is `src/system/postgres/postgrestest/testdb` (tests only; `admin-dsn <env file>`, `name`, `create <name>`, `drop <name>`, `clean`). Only the Makefile calls it.
+- **No DSN or password on a command line** (any process list shows it). A `testdb` verb takes at most a file path or a database name as its argument; `create`, `drop` and `clean` read the admin DSN from `QABZ_TEST_ADMIN_DSN` in their environment. `create` and `drop` refuse a name that is not `qabz_test_` + letters, digits and `_` before they connect.
+- **`config_generated.env` is never sourced as shell** (a password with a quote or a backtick would break it or run a command). `testdb admin-dsn` parses it (the `KEY=VALUE` format of `scripts/yml_to_env`, with its quoting).
+- **What a killed run can leave.** A run that is killed so the shell cannot trap it (`kill -9`, a crash), or a test stopped before its `t.Cleanup` (a `-timeout`, a panic), can leave: the run database `qabz_test_<16 hex>`; the extra databases `qabz_test_...` that a test made for itself; the login roles `qabz_test_...` that a test made for itself. A SIGINT while `CREATE DATABASE` runs can also leave the run database (the drop of the trap can start before the server ends the create); `make test-db-clean` removes it.
+- **Only `make test-db-clean` removes leftovers.** It drops every database whose name starts with `qabz_test_`, then every role whose name is `qabz_test_` + letters, digits and `_` (the databases first: a role that owns a database cannot be dropped before it). The prefix is matched with `starts_with`, never with a `LIKE` pattern (`_` is a wildcard there). A role that `DROP ROLE` cannot drop (SQLSTATE 2BP01: it still owns objects or has privileges in a database that is not a test database) is KEPT and nothing is changed: `testdb: kept role <name>: it has objects or privileges in <place list>; remove them by hand` (the list is read from `pg_shdepend`, each place labeled for what it is: `database <name>`, with ` (not a test database)` only when the name does not start with `qabz_test_`; a privilege on or the ownership of a database names that database, never the database of the connection; `a shared object (<catalog>)` for another shared object), for example `testdb: kept role qabz_test_r: it has objects or privileges in a shared object (pg_tablespace), database qabz_tmp (not a test database); remove them by hand`. When `DROP ROLE` reports 2BP01 but `pg_shdepend` has no row for the role any more, the line is `testdb: kept role <name>: DROP ROLE reports dependencies but none were found; run make test-db-clean again` (still kept and counted). Then a final `testdb: <n> test role(s) kept`, and the command exits 1 (so `make test-db-clean` fails visibly) after it finished everything else. `testdb` never runs `REASSIGN OWNED`, `DROP OWNED`, `GRANT`, `REVOKE` or `ALTER`. A role without the prefix, and the role of the admin connection, are never touched. It prints `testdb: dropped database <name>` / `testdb: dropped role <name>` for each and the two counts. Nothing removes leftovers by itself. `make test-db-clean` also drops the database of a `make test` that is still running: run it only when no `make test` is running.
+- **No usable password in the repository.** A test that makes a login role gives it a password that is new for each run (fixed special characters and random hex from `crypto/rand`), so a role left by a killed run cannot be used with a password written in the code.
+
+**Two DSNs, kept apart:**
+- `QABZ_TEST_RUN_DSN`: the DSN of the run database. Only `make test` sets it. A test gets it only from `postgrestest.RunDSN(t)`. Without it the live tests skip (a plain `go test ./...` runs the unit tests only).
+- `QABZ_TEST_ADMIN_DSN`: the admin DSN, server only (the maintenance database `postgres`). `testdb admin-dsn` builds it from `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER` and `POSTGRES_PASSWORD` of `config_generated.env`; the target gives it only to the `testdb` commands. No test gets it.
+- `QABZ_TEST_POSTGRES_DSN` is no longer used. No test reads it, or any other DSN of the development database.
+
+**The guard.** `postgrestest.RunDSN` and every schema helper (`ServicesSchema`, `BillsSchema`, `EmptySchema`, `SeededSchema`) stop the test (`FailNow`) before they connect when the database name of the DSN does not start with `qabz_test_`. The name checked is the one the driver connects to (`pgconn.ParseConfig(dsn).Database`): a `?dbname=` or `?database=` parameter overrides the URL path, and `PGDATABASE` fills a DSN with no name; a check of the URL path alone is a defect. The tool refuses to create or drop a database whose name does not start with `qabz_test_`.
+
+**Inside the run database:**
+- The per-test isolation stays: each live test makes its own throw-away schema with a `postgrestest` helper (`qabz_test_<random>`, dropped at the end of the test), because the packages run in parallel in the same run database.
+- A test may drop and recreate its OWN objects (its schema, or an extra database or a login role of its own named `qabz_test_...` + letters, digits and `_`, dropped at the end of the test) inside the run. Every database and role a test makes has this name, so that `make test-db-clean` removes it when the test is killed. It never drops, truncates or resets an object that it did not create.
+- A test that needs an empty database (for example the migration tests) uses `postgrestest.EmptySchema`.
+
+**What the target needs:**
+- The compose Postgres running (`make compose up`) and `config.yml` (the target runs `make env`).
+- A role with `CREATEDB` (to create and drop the run database). The compose role (`POSTGRES_USER`) is the superuser of the official image, so it has it (checked on 2026-11-09: `rolsuper = t`, `rolcreatedb = t`).
+- No `psql` on the host: the tool uses the Go Postgres driver.
+
+**Check.** A search of the Go code (not `vendor/`) for `DROP`, `TRUNCATE`, `CREATE SCHEMA`, `CREATE DATABASE`, `CREATE ROLE` and `DROP ROLE` shows only `postgrestest` (the schema helpers), the `testdb` tool and SQL that works inside a schema the test created. No test reads `QABZ_TEST_POSTGRES_DSN`, `config.yml` or the `POSTGRES_*` variables to reach a database.
+
+**Why.** Operator decision, 2026-11-09 (task 020b). The task 003 live tests dropped `app_hot_configs` and `qabz_schema_migrations` in the database of `QABZ_TEST_POSTGRES_DSN`; with the development DSN, each full run deleted the migration state of the development database, and the config reloader of the running App wrote an error line at each interval.
+
+**Review.** The `code-reviewer` agent checks each new or changed test that uses Postgres: the DSN comes from `postgrestest.RunDSN`, the test works in its own schema or its own objects, and nothing reads the development DSN. A test that can change the development database is a defect. The verdict is NOT READY.

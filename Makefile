@@ -17,11 +17,21 @@ COMPOSE_ACTIONS := up down ps logs
 COMPOSE_ACTION  := $(word 2,$(MAKECMDGOALS))
 ARGS            ?=
 
-.PHONY: help venv env compose test-scripts $(COMPOSE_ACTIONS)
+# `make test`: the Go tests run in ONE throw-away database qabz_test_<random hex> (task 020b).
+# GO_TEST_ARGS passes the flags of `go test`, for example GO_TEST_ARGS="-race -count=1 -v -run Live".
+# GO_TEST_PKGS is ./... (the whole run); a QA scenario can name packages, for example GO_TEST_PKGS=./app/.
+# TESTDB runs the test database tool (tests only). It parses $(ENV_OUT) itself (never sourced as shell)
+# and gets the admin DSN in QABZ_TEST_ADMIN_DSN: no DSN or password is ever on a command line.
+TESTDB       := go run ./system/postgres/postgrestest/testdb
+TESTDB_ENV   := $(abspath $(ENV_OUT))
+GO_TEST_ARGS ?= -race -count=1 -cover
+GO_TEST_PKGS ?= ./...
+
+.PHONY: help venv env compose test-scripts test test-db-clean $(COMPOSE_ACTIONS)
 
 ## help: list the make targets with their descriptions (read from the "## target:" comments in this file).
 help:
-	@echo 'usage: make <target> [VAR=value ...]   (variables: CONFIG, ENV_OUT, ARGS, PB_DIR)'
+	@echo 'usage: make <target> [VAR=value ...]   (variables: CONFIG, ENV_OUT, ARGS, PB_DIR, GO_TEST_ARGS, GO_TEST_PKGS)'
 	@awk -v config='$(CONFIG)' -v env_out='$(ENV_OUT)' -v pb_dir='$(PB_DIR)' ' \
 		/^## [A-Za-z0-9_-]+:/ { sub(/^## /, ""); t = substr($$0, 1, index($$0, ":") - 1); \
 			d = substr($$0, index($$0, ":") + 2); last = t; printf "  %-14s %s\n", t, sub_vars(d); next } \
@@ -58,6 +68,24 @@ $(COMPOSE_ACTIONS):
 ## test-scripts: run the tests of the env generator.
 test-scripts: venv
 	$(VENV_PY) -m unittest discover -s $(GEN_DIR) -p '*_test.py'
+
+## test: run the Go tests (go test $(GO_TEST_ARGS) $(GO_TEST_PKGS)) in ONE new database qabz_test_<random hex>
+## on the Postgres server of $(ENV_OUT) (make compose up; the role needs CREATEDB). The tests get its DSN
+## in QABZ_TEST_RUN_DSN; the database is dropped at the end, also when a test fails or on Ctrl-C.
+test: env
+	@cd src && admin=$$($(TESTDB) admin-dsn "$(TESTDB_ENV)") && name=$$($(TESTDB) name) || exit 1; \
+	trap 'QABZ_TEST_ADMIN_DSN="$$admin" $(TESTDB) drop "$$name"' EXIT; \
+	trap 'exit 130' INT; trap 'exit 143' TERM; \
+	run=$$(QABZ_TEST_ADMIN_DSN="$$admin" $(TESTDB) create "$$name") || exit 1; \
+	QABZ_TEST_RUN_DSN="$$run" go test $(GO_TEST_ARGS) $(GO_TEST_PKGS)
+
+## test-db-clean: drop every qabz_test_% database, then every qabz_test_ role, on the Postgres server of
+## $(ENV_OUT): the leftovers of a killed `make test`. Nothing else removes them. A role with objects or
+## privileges outside the test databases is kept and named, and the target then exits 1. It also drops the
+## database of a `make test` that is still running: run it only when no `make test` is running.
+test-db-clean: env
+	@cd src && admin=$$($(TESTDB) admin-dsn "$(TESTDB_ENV)") && \
+	QABZ_TEST_ADMIN_DSN="$$admin" $(TESTDB) clean
 
 .PHONY: proto
 ## proto: regenerate Go, gRPC, gateway and swagger code from pb/proto/$(PB_DIR). Run after every fresh pull.
