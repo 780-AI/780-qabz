@@ -8,18 +8,19 @@ import (
 
 // Builder makes an App. Every dependency is an interface, so tests inject fakes.
 // The config, logger, database, cache and metrics are required. The tracer, migrator, config reloader,
-// gRPC server and HTTP gateway are optional.
+// provider list, gRPC server and HTTP gateway are optional.
 type Builder struct {
-	cfg      *config.Holder[config.Config]
-	logger   Logger
-	db       Database
-	cache    Cache
-	metrics  Metrics
-	tracer   Tracer
-	migrator Migrator
-	reloader ConfigReloader
-	grpc     Server
-	http     Server
+	cfg       *config.Holder[config.Config]
+	logger    Logger
+	db        Database
+	cache     Cache
+	metrics   Metrics
+	tracer    Tracer
+	migrator  Migrator
+	reloader  ConfigReloader
+	providers Providers
+	grpc      Server
+	http      Server
 }
 
 // NewBuilder returns an empty Builder.
@@ -36,6 +37,9 @@ func (b *Builder) WithMigrator(m Migrator) *Builder { b.migrator = m; return b }
 
 // WithConfigReloader sets the hot-reload loop. Skip it to turn hot-reload off.
 func (b *Builder) WithConfigReloader(r ConfigReloader) *Builder { b.reloader = r; return b }
+
+// WithProviders sets the provider list. Skip it to load no providers.
+func (b *Builder) WithProviders(p Providers) *Builder { b.providers = p; return b }
 
 // WithGRPCServer sets the gRPC server. Skip it to run no gRPC server.
 func (b *Builder) WithGRPCServer(s Server) *Builder { b.grpc = s; return b }
@@ -80,5 +84,5 @@ func (b *Builder) Build() (*App, error) {
 		return nil, err
 	}
 	return &App{cfg: b.cfg, logger: b.logger, db: b.db, cache: b.cache, metrics: b.metrics, tracer: b.tracer,
-		migrator: b.migrator, reloader: b.reloader, grpc: b.grpc, http: b.http}, nil
+		migrator: b.migrator, reloader: b.reloader, providers: b.providers, grpc: b.grpc, http: b.http}, nil
 }

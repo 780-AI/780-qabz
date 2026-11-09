@@ -84,6 +84,11 @@ type Config struct {
 	MigrateOnStart bool `path:"database.migration.on_start"`
 	// MigrateTimeout limits the wait for the migration lock plus the migration run.
 	MigrateTimeout time.Duration `path:"database.migration.timeout"`
+
+	// ProvidersLoadInterval is how often ProvidersService loads the providers table again
+	// (task 020). At least 1s. Hot-reloadable (key providers_load_interval, type duration, in
+	// app_hot_configs): the reload routine reads the current value before each wait.
+	ProvidersLoadInterval time.Duration `path:"providers.general.load_interval" hot_reload:"true"`
 }
 
 func defaults() Config {
@@ -103,6 +108,8 @@ func defaults() Config {
 		HotReloadInterval: 30 * time.Second,
 		MigrateOnStart:    true,
 		MigrateTimeout:    60 * time.Second,
+
+		ProvidersLoadInterval: time.Minute,
 	}
 }
 
@@ -169,6 +176,9 @@ func (c Config) validate() error {
 		if d <= 0 {
 			errs = append(errs, fmt.Errorf("%s must be a positive duration (for example 30s)", path))
 		}
+	}
+	if c.ProvidersLoadInterval < ProvidersMinLoadInterval {
+		errs = append(errs, fmt.Errorf("providers.general.load_interval must be at least %s", ProvidersMinLoadInterval))
 	}
 	if c.DebugAuthMockUserID != "" {
 		if u, err := uuid.Parse(c.DebugAuthMockUserID); err != nil || u.String() != c.DebugAuthMockUserID {

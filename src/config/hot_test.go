@@ -189,7 +189,7 @@ func TestHasHotFields(t *testing.T) {
 	assert.True(t, r.HasHotFields())
 	r2, err := NewReloader[Config](&fakeRepo{}, NewHolder(Config{}), time.Second, &fakeLog{})
 	if assert.NoError(t, err) && assert.NotNil(t, r2) {
-		assert.False(t, r2.HasHotFields(), "Config has no hot field yet")
+		assert.True(t, r2.HasHotFields(), "Config has providers.general.load_interval (task 020)")
 	}
 }
 

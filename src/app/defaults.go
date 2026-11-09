@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
@@ -19,6 +20,7 @@ import (
 	grpcserver "qabz/entry/grpc"
 	httpserver "qabz/entry/http"
 	"qabz/migrations"
+	"qabz/provider"
 	"qabz/system/postgres"
 	"qabz/system/redis"
 )
@@ -63,6 +65,13 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	}
 	b.WithCache(redis.New(cfg.RedisAddr(), cfg.RedisPassword.Reveal()))
 	b.WithMetrics(metrics)
+
+	providers, err := newProviders(holder, postgres.NewProviderRepository(db), metrics, logger)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	b.WithProviders(providers)
 
 	svc, err := newService(cfg, db, metrics, logger)
 	if err != nil {
@@ -214,6 +223,69 @@ func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 		OnInsert:  onInsert,
 		OnDelete:  onDelete,
 	}), nil
+}
+
+// newProviders builds the provider list (task 020): ProvidersService on repo (the providers table). App
+// Start loads it once before the servers start, then it reloads at providers.general.load_interval,
+// read from holder before each wait (hot-reloadable). With metrics on, each load adds 1 to
+// qabz_providers_loads_total{result="ok"|"error"} and observes qabz_providers_load_duration_ms (an
+// aborted load, canceled by Stop or by the App.Start context, is neither counted nor timed); a
+// good load sets qabz_providers_last_load_success_timestamp_ms; each MoveUp, MoveDown, Enable and
+// Disable adds 1 to qabz_providers_changes_total{change,result}; qabz_providers_active_count is set
+// to the number of enabled providers in all groups after each good load and each Enable or Disable
+// that changed the list (a failed load keeps the last value). A failed load writes one error log
+// line.
+func newProviders(holder *config.Holder[config.Config], repo provider.Repository, metrics *prometheus.Server, logger Logger) (*provider.ProvidersService, error) {
+	if holder == nil {
+		return nil, errors.New("providers: config holder is required")
+	}
+	var onLoad func(result string, d time.Duration) // nil: metrics are off, nothing is recorded
+	var onChange func(change, result string)        // nil: metrics are off, nothing is recorded
+	var onActive func(n int)                        // nil: metrics are off, nothing is recorded
+	if reg := metrics.Registry(); reg != nil {
+		loads := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_providers_loads_total",
+			Help: "Loads of the providers table by ProvidersService, by result (ok, error). An aborted load (canceled by Stop or by the App.Start context) is neither counted nor timed.",
+		}, []string{"result"})
+		duration := promclient.NewHistogram(promclient.HistogramOpts{
+			Name:    "qabz_providers_load_duration_ms",
+			Help:    "Duration of each load of the providers table (ok and error) in milliseconds. An aborted load (canceled by Stop or by the App.Start context) is neither counted nor timed.",
+			Buckets: []float64{1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000},
+		})
+		lastOK := promclient.NewGauge(promclient.GaugeOpts{
+			Name: "qabz_providers_last_load_success_timestamp_ms",
+			Help: "Unix time in milliseconds of the last good load of the providers table (0: none yet).",
+		})
+		changes := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_providers_changes_total",
+			Help: "Runtime changes of the provider list, by change (move_up, move_down, enable, disable) and result (changed, unchanged, unknown_id).",
+		}, []string{"change", "result"})
+		active := promclient.NewGauge(promclient.GaugeOpts{
+			Name: "qabz_providers_active_count",
+			Help: "Enabled providers in all groups of the current provider list (set after each good load and each Enable or Disable that changed the list).",
+		})
+		for _, c := range []promclient.Collector{loads, duration, lastOK, changes, active} {
+			if err := reg.Register(c); err != nil {
+				return nil, fmt.Errorf("providers: register metric: %w", err)
+			}
+		}
+		onLoad = func(result string, d time.Duration) {
+			loads.WithLabelValues(result).Inc()
+			duration.Observe(float64(d) / float64(time.Millisecond))
+			if result == provider.LoadOK {
+				lastOK.Set(float64(time.Now().UnixMilli()))
+			}
+		}
+		onChange = func(change, result string) { changes.WithLabelValues(change, result).Inc() }
+		onActive = func(n int) { active.Set(float64(n)) }
+	}
+	return provider.NewProvidersService(repo, provider.Options{
+		Interval:      func() time.Duration { return holder.Get().ProvidersLoadInterval },
+		Logger:        logger,
+		OnLoad:        onLoad,
+		OnChange:      onChange,
+		OnActiveCount: onActive,
+	})
 }
 
 // newRequestMetrics returns the gRPC server options that measure every call (and so every gateway

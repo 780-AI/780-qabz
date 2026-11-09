@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"qabz/system/postgres"
+	"qabz/system/postgres/devdb"
 )
 
 // servicesTableSQL is the services table of the bill database (docs/initial-discovery/database.html).
@@ -65,6 +66,23 @@ func BillsSchema(t testing.TB, ctx context.Context, dsn string) string {
 func EmptySchema(t testing.TB, ctx context.Context, dsn string) string {
 	t.Helper()
 	return newSchema(t, ctx, dsn, "")
+}
+
+// SeededSchema is EmptySchema with every bill table as the devdb command makes it (one definition
+// of the bill tables, task 015) and the devdb seed rows (45 providers, 5 services). For the
+// providers tests (task 020). For tests only.
+func SeededSchema(t testing.TB, ctx context.Context, dsn string) string {
+	t.Helper()
+	schemaDSN := newSchema(t, ctx, dsn, "")
+	c, err := postgres.New(ctx, schemaDSN)
+	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
+		t.FailNow()
+	}
+	defer c.Close()
+	if _, err := devdb.Seed(ctx, c.Pool()); !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	return schemaDSN
 }
 
 // newSchema creates a throw-away schema, runs ddl in it (no ddl: an empty schema) and returns dsn

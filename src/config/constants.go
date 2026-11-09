@@ -12,3 +12,7 @@ const (
 	ModeStage = "stage"
 	ModeProd  = "prod"
 )
+
+// ProvidersMinLoadInterval is the lowest allowed providers.general.load_interval (task 020). It
+// equals provider.MinLoadInterval (a test in app checks it).
+const ProvidersMinLoadInterval = time.Second

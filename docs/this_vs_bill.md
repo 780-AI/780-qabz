@@ -1,7 +1,8 @@
-<!-- VERSION: 0.5 -->
+<!-- VERSION: 0.6 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.6 — 2026-11-08 — Task 020: item 13 for the provider pick (sorted order from memory, no Redis cache).
 v0.5 — 2026-11-08 — Task 019b: item 12 for DELETE /v1/mybill/{id} (the success text); item 11 no longer names the success message as bill's.
 v0.4 — 2026-11-08 — Task 019: item 11 for DELETE /v1/mybill/{id} (no log line for a call with no user). The answers of DELETE match bill, so they are not an item.
 v0.3 — 2026-11-08 — Task 017: item 6 also covers GET /v1/mybill; items 9-10 for GET /v1/mybill (tiebreak of the order, error answer).
@@ -91,3 +92,9 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **Qabz:** answers HTTP 200 with `message` = "عملیات با موفقیت انجام شد" ("the operation was done successfully") in each of these cases. The HTTP status and every failure answer (`Unknown`, HTTP 500, with bill's text) stay as in bill.
     - **Reason:** clients read the error text on success as a failure (operator decision, task 019b, 2026-11-08).
     - **Code:** the `@todo` comment on `deleteSuccessText` in `src/entry/grpc/mybills.go`.
+
+13. **Providers: the pick of a provider for a bill type and an action.**
+    - **bill:** `GetProviderByBillTypeAndAction` (`domain/repository/provider/provider_dto.go`) runs `WHERE bill_type = ? AND action = ? AND status = 'enable' LIMIT 1` with no `ORDER BY`. The `priority` column is never used: the pick is any enabled row that Postgres returns first, and it can change with the physical row order. The pick is cached in Redis per (bill type, action) for `caching.provider`, so a change of the table shows only after the cache entry ends.
+    - **Qabz:** `ProvidersService` (`src/provider/selector.go`) keeps every row in memory, sorted in each (bill type, action) group by `tmp_priority` (equal to `priority` after each load), then `id`. `PickProvider` returns the first enabled provider of that order: always the same provider for the same rows. There is no Redis cache: the list is loaded again from the table every `providers.general.load_interval` (default 1 minute), and a change shows after the next load.
+    - **Reason:** a deterministic pick by the stored priority, read with no database or cache call on the hot path (operator, task 020, 2026-11-08; `system.html`, Provider Switcher).
+    - **Code:** the `@todo` comment on `ProvidersService.PickProvider` in `src/provider/selector.go`.

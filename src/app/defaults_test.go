@@ -157,6 +157,9 @@ func metricsServer(t *testing.T, b *Builder) *prometheus.Server {
 var qabzMetrics = []string{
 	prometheus.RequestDurationName, "qabz_auth_rejected_total", "qabz_services_cache_total",
 	"qabz_mybill_insert_total", "qabz_mybill_delete_total",
+	"qabz_providers_loads_total", "qabz_providers_load_duration_ms",
+	"qabz_providers_last_load_success_timestamp_ms", "qabz_providers_changes_total",
+	"qabz_providers_active_count",
 }
 
 // TestDefaultBuilderMetricsSwitch: with metrics on, the composition root registers every qabz
@@ -207,7 +210,7 @@ func TestRequestMetricsWiring(t *testing.T) {
 	assert.Empty(t, opts)
 }
 
-// TestMetricsOffRegistersNothing: with metrics off, newAuth and newService create no metric, so a
+// TestMetricsOffRegistersNothing: with metrics off, newAuth, newService and newProviders create no metric, so a
 // second call cannot conflict (with metrics on the second newService fails, see TestNewServiceRules).
 func TestMetricsOffRegistersNothing(t *testing.T) {
 	cfg := testConfig(t)
@@ -226,6 +229,9 @@ func TestMetricsOffRegistersNothing(t *testing.T) {
 		check, err := newAuth(cfg, off, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, check)
+		providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), off, &fakeLogger{c: &calls{}})
+		assert.NoError(t, err)
+		assert.NotNil(t, providers)
 	}
 
 	on := prometheus.New("127.0.0.1:0", true)

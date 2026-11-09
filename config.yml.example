@@ -41,6 +41,10 @@ database:
     on_start: true
     timeout: "60s"
 
+providers:
+  general:
+    load_interval: "1m"     # how often the providers table is loaded again; at least 1s; hot-reloadable (key providers_load_interval)
+
 auth:
   secrets:
     hmac: ""                 # the auth service JWT secret; required while the auth check is on

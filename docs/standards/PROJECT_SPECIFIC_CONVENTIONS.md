@@ -1,7 +1,8 @@
-<!-- VERSION: 0.15 -->
+<!-- VERSION: 0.16 -->
 <!-- Last Updated: 2026-11-08 -->
 <!--
 CHANGE LOG
+v0.16 — 2026-11-08 — Section 13: providers only through `ProvidersService` (task 020). No other code reads the `providers` table or `postgres.ProviderRepository`.
 v0.15 — 2026-11-08 — Section 12: metrics for every feature. A feature metric counts each outcome that the `code` label cannot tell apart; metrics registered only when on; fixed-set labels; `system.html` row and tests; the `artifacts_agent` checks it.
 v0.14 — 2026-11-08 — Section 11: coverage gate. Each changed Go package has 70.0% statement coverage or more, measured with the database tests included.
 v0.13 — 2026-11-08 — Section 10: every fatal or critical error that is not a common error MUST be logged (one error line with the cause); common errors are not logged.
@@ -303,3 +304,20 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator decision, 2026-11-08. `system.html` names the lack of custom metrics as the main gap of the current system. The pattern exists in tasks 013, 014, 016 and 019 but was not binding, so a new feature could ship without a way to measure it.
 
 **Review.** The `artifacts_agent` agent checks each feature of the change against this section, with § 7 (Postman) and § 10 (logging). A missing feature metric, a free-input label, a metric not registered behind the switch, a missing `system.html` row or a missing test is a defect. The verdict is NOT READY.
+
+## 13. Providers only through ProvidersService
+
+**`provider.ProvidersService` (`src/provider/selector.go`) is the only way to read providers.** Every other part of the code (order, inquiry, fee, the provider adapters, the Provider Switcher, later endpoints and crons) gets a single provider, a list or any other provider data from this service, through its methods (`PickProvider`, `List`, `Group`) or the `provider.ProviderSelector` interface.
+
+**Forbidden outside the service and its wiring:**
+- A query on the `providers` table (raw SQL or any other access) in any package other than `postgres.ProviderRepository` (`src/system/postgres/provider_repository.go`).
+- A call to `postgres.ProviderRepository` or to `provider.Repository.ListProviders` from any code other than `ProvidersService` itself. The composition root (`src/app/defaults.go`) only creates the repository and passes it to the service.
+- A second cache or copy of the provider list (for example a Redis key or a package map) that is kept apart from the service.
+
+**Allowed:** tests of the repository and of the service; the dev seed SQL of `system/postgres/devdb` (it writes the dev table, it does not read providers for the App).
+
+**Changes at runtime** (order, status) go through the service too (`MoveUp`, `MoveDown`, `Enable`, `Disable`), so every reader sees the same list. A load replaces the list with the database rows (the database wins, operator decision of task 020).
+
+**Why.** Operator decision, 2026-11-08 (task 020). One sorted, concurrent-safe list gives every caller the same deterministic pick, without a database read on the hot path. A second read path would pick a different provider (`bill` picks any enabled row, with no order) or bypass the runtime changes.
+
+**Review.** The `code-reviewer` agent searches each change for `providers` in SQL text and for uses of `ProviderRepository` and `ListProviders`. A use outside the places above is a defect. The verdict is NOT READY.

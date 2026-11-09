@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -281,4 +282,40 @@ func TestParseMode(t *testing.T) {
 		_, err := Parse([]byte("mode: \"" + bad + "\"\ndatabase: {postgres: {password: pw}}"))
 		assert.ErrorContains(t, err, "mode must be dev, stage or prod", bad)
 	}
+}
+
+// TestProvidersLoadInterval: providers.general.load_interval (task 020) defaults to 1m, takes any
+// duration of 1s or more, and rejects a lower value. It is the one hot-reloadable key.
+func TestProvidersLoadInterval(t *testing.T) {
+	c, err := Parse([]byte(`{mode: dev, database: {postgres: {password: pw}}}`))
+	assert.NoError(t, err)
+	assert.Equal(t, time.Minute, c.ProvidersLoadInterval, "default")
+
+	for raw, want := range map[string]time.Duration{"1s": time.Second, "5s": 5 * time.Second, "1500ms": 1500 * time.Millisecond, "1h": time.Hour} {
+		c, err := Parse([]byte(`{mode: dev, database: {postgres: {password: pw}}, providers: {general: {load_interval: "` + raw + `"}}}`))
+		assert.NoError(t, err, raw)
+		assert.Equal(t, want, c.ProvidersLoadInterval, raw)
+	}
+	for _, raw := range []string{`"999ms"`, `"0s"`, `"-1s"`, `"1ns"`} {
+		_, err := Parse([]byte(`{mode: dev, database: {postgres: {password: pw}}, providers: {general: {load_interval: ` + raw + `}}}`))
+		assert.ErrorContains(t, err, "providers.general.load_interval must be at least 1s", raw)
+	}
+	for _, raw := range []string{`soon`, `60`} {
+		_, err := Parse([]byte(`{mode: dev, database: {postgres: {password: pw}}, providers: {general: {load_interval: ` + raw + `}}}`))
+		assert.Error(t, err, raw)
+	}
+
+	fields, err := hotFields[Config]()
+	assert.NoError(t, err)
+	assert.Equal(t, []hotField{{index: fieldIndex(t, "ProvidersLoadInterval"), key: "providers_load_interval", typ: "duration"}}, fields)
+}
+
+// fieldIndex returns the index of the Config field name. It stops the test if there is none.
+func fieldIndex(t *testing.T, name string) int {
+	t.Helper()
+	f, ok := reflect.TypeFor[Config]().FieldByName(name)
+	if !assert.True(t, ok, name) || !assert.Len(t, f.Index, 1) {
+		t.FailNow()
+	}
+	return f.Index[0]
 }

@@ -59,6 +59,14 @@ type ConfigReloader interface {
 	Stop(ctx context.Context) error
 }
 
+// Providers is the provider list (provider.ProvidersService). Start loads it once,
+// synchronously, and starts its reload routine; a failed load must not fail Start (task 020,
+// operator decision 2). Stop ends the routine.
+type Providers interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
 // Tracer exports traces.
 type Tracer interface {
 	Shutdown(ctx context.Context) error
@@ -67,16 +75,17 @@ type Tracer interface {
 // App owns every long-lived dependency. It starts and stops them in a fixed order.
 // Make one with NewBuilder.
 type App struct {
-	cfg      *config.Holder[config.Config]
-	logger   Logger
-	db       Database
-	cache    Cache
-	metrics  Metrics
-	tracer   Tracer         // nil when tracing is off
-	migrator Migrator       // nil: no migration at start
-	reloader ConfigReloader // nil: no hot-reload
-	grpc     Server         // nil: no gRPC server
-	http     Server         // nil: no HTTP gateway
+	cfg       *config.Holder[config.Config]
+	logger    Logger
+	db        Database
+	cache     Cache
+	metrics   Metrics
+	tracer    Tracer         // nil when tracing is off
+	migrator  Migrator       // nil: no migration at start
+	reloader  ConfigReloader // nil: no hot-reload
+	providers Providers      // nil: no provider list
+	grpc      Server         // nil: no gRPC server
+	http      Server         // nil: no HTTP gateway
 
 	mu      sync.Mutex
 	started bool
@@ -95,7 +104,7 @@ func (a *App) Database() Database { return a.db }
 func (a *App) Cache() Cache { return a.cache }
 
 // Start pings the database and the cache, runs the migrations (when enabled), starts the config
-// reloader, the gRPC server, the HTTP gateway and the metrics endpoint. If a step fails, Start stops
+// reloader, loads the providers (before the servers start), the gRPC server, the HTTP gateway and the metrics endpoint. If a step fails, Start stops
 // what it opened and returns the error.
 func (a *App) Start(ctx context.Context) error {
 	a.mu.Lock()
@@ -128,6 +137,14 @@ func (a *App) Start(ctx context.Context) error {
 		}
 		run.reloader = true
 		a.logger.Info("config reloader started", "interval", cfg.HotReloadInterval.String())
+	}
+	if a.providers != nil {
+		if err := a.providers.Start(ctx); err != nil {
+			a.logger.Error("providers start failed", "error", err)
+			return a.abort(fmt.Errorf("providers: %w", err), run)
+		}
+		run.providers = true
+		a.logger.Info("providers started", "load_interval", cfg.ProvidersLoadInterval.String())
 	}
 	if a.grpc != nil {
 		if err := a.grpc.Start(ctx); err != nil {
@@ -168,7 +185,7 @@ func (a *App) Stop(ctx context.Context) error {
 	}
 	a.started = false
 	a.logger.Info("app stopping")
-	return a.release(ctx, running{reloader: true, grpc: true, http: true, metrics: true})
+	return a.release(ctx, running{reloader: true, providers: true, grpc: true, http: true, metrics: true})
 }
 
 // Run starts the App, waits until ctx is done, then stops it.
@@ -194,7 +211,7 @@ func (a *App) ping(ctx context.Context, name, target string, c Connection) error
 }
 
 // running records which parts Start has started, so a failed Start stops only those parts.
-type running struct{ reloader, grpc, http, metrics bool }
+type running struct{ reloader, providers, grpc, http, metrics bool }
 
 // abort releases the dependencies after a failed Start. run holds the parts that started.
 func (a *App) abort(cause error, run running) error {
@@ -215,6 +232,9 @@ func (a *App) release(ctx context.Context, run running) error {
 	}
 	if a.grpc != nil && run.grpc {
 		errs = append(errs, a.grpc.Stop(ctx))
+	}
+	if a.providers != nil && run.providers {
+		errs = append(errs, a.providers.Stop(ctx))
 	}
 	if a.reloader != nil && run.reloader {
 		errs = append(errs, a.reloader.Stop(ctx))

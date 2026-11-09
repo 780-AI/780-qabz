@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<!-- VERSION: 1.4 -->
-<!-- Last Updated: 2026-11-07 -->
+<!-- VERSION: 1.6 -->
+<!-- Last Updated: 2026-11-09 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v1.6 — 2026-11-08 — Task 020 fix round: gauge qabz_providers_active_count (enabled providers in all groups); the fixed 10 s load timeout of ProvidersService documented; fix round 3 (2026-11-09): the loads_total and load_duration_ms rows state that an aborted load is neither counted nor timed.
+v1.5 — 2026-11-08 — Task 020: ProvidersService (provider/selector.go) metrics qabz_providers_loads_total, qabz_providers_load_duration_ms, qabz_providers_last_load_success_timestamp_ms, qabz_providers_changes_total; the providers row of the Hot Reload table names providers.general.load_interval.
 v1.4 — 2026-11-07 — Task 014: request histogram qabz_request_duration_ms (path = gRPC method, code; its _count is the request counter); Prometheus switch metrics.prometheus.enabled.
 v1.3 — 2026-11-07 — Durations in milliseconds (conventions § 9): metric times use the suffix _ms; the planned *_seconds metrics renamed to *_ms.
 v1.2 — 2026-11-02 — No down migrations: only NNNNNN_name.up.sql files; migrate command is up, force V, version.
@@ -203,7 +205,7 @@ Only certain configs are hot reloadable. The new system must say which, and trea
 
 | Config | Hot reloadable | Why |
 |---|---|---|
-| Provider order, status and priority (the `providers` table) | Yes | It is read from the database, so a change needs no restart |
+| Provider order, status and priority (the `providers` table) | Yes | It is read from the database every `providers.general.load_interval` (`ProvidersService`, `provider/selector.go`; the interval itself is hot-reloadable), so a change needs no restart. Each load has a fixed timeout of 10 s (`loadTimeout`, not a config key): a slower load fails, is counted as `error`, writes one error line and keeps the last list |
 | Switch demotion period | Yes | It is read each time a provider is demoted |
 | Cron intervals and the order time window | Yes | The runner can re-read them before each run |
 | Circuit breaker thresholds | Yes | Applied to the breaker's next count |
@@ -401,6 +403,11 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | `qabz_provider_call_duration_ms` | histogram | Latency of each provider call |
 | `qabz_provider_calls_total` | counter | Calls and errors per provider |
 | `qabz_provider_timeouts_total` | counter | Timeouts, which trigger a switch |
+| `qabz_providers_loads_total` | counter | Loads of the `providers` table by `ProvidersService`, by `result` (`ok`, `error`). A rise of `error` means the list is stale. An aborted load (canceled by `Stop` or by the `App.Start` context) is neither counted nor timed |
+| `qabz_providers_load_duration_ms` | histogram | Duration of each load of the `providers` table (ok and error) in milliseconds; buckets 1 ms to 10 000 ms (the fixed 10 s load timeout). An aborted load (canceled by `Stop` or by the `App.Start` context) is neither counted nor timed |
+| `qabz_providers_last_load_success_timestamp_ms` | gauge | Unix time in milliseconds of the last good load (0: none yet). Alert when it is older than a few load intervals |
+| `qabz_providers_changes_total` | counter | Runtime changes of the provider list, by `change` (`move_up`, `move_down`, `enable`, `disable`) and `result` (`changed`, `unchanged`, `unknown_id`) |
+| `qabz_providers_active_count` | gauge | Enabled providers (`status = 'enable'`) in all groups of the current provider list, one total with no labels. Set after each good load and after each `Enable` / `Disable` that changed the list; a failed load keeps the last value. 0 means `PickProvider` finds no provider for any group |
 
 ### Circuit breaker and switcher
 

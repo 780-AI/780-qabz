@@ -93,3 +93,26 @@ func TestBillsSchema(t *testing.T) {
 	_, err = c.Pool().Exec(ctx, insert) // the same user, type and bill_id
 	assert.ErrorContains(t, err, "23505")
 }
+
+// TestSeededSchema needs a real Postgres (QABZ_TEST_POSTGRES_DSN). It checks that the helper makes
+// the devdb bill tables with the 45 seed providers in its own schema.
+func TestSeededSchema(t *testing.T) {
+	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("QABZ_TEST_POSTGRES_DSN is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	schemaDSN := SeededSchema(t, ctx, dsn)
+	c, err := postgres.New(ctx, schemaDSN)
+	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
+		return
+	}
+	defer c.Close()
+	var current string
+	var providers, services int
+	assert.NoError(t, c.Pool().QueryRow(ctx, `SELECT current_schema(), (SELECT count(*) FROM providers), (SELECT count(*) FROM services)`).Scan(&current, &providers, &services))
+	assert.True(t, strings.HasPrefix(current, "qabz_test_"), current)
+	assert.Equal(t, 45, providers)
+	assert.Equal(t, 5, services)
+}
