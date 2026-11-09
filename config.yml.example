@@ -49,7 +49,7 @@ auth:
   secrets:
     hmac: ""                 # the auth service JWT secret; required while the auth check is on
 
-# Development only: the production config has no debug section.
+# Development only: a mode other than dev fully removes this section (every debug key keeps its default).
 debug:
   auth:
     disable: false

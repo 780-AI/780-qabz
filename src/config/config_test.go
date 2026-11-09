@@ -319,3 +319,46 @@ func fieldIndex(t *testing.T, name string) int {
 	}
 	return f.Index[0]
 }
+
+// TestParseDebugSectionOnlyInDev (task 020c): a mode other than dev fully removes the debug section,
+// so a config with the section gives the same Config as the same config without it. In dev the
+// section is read.
+func TestParseDebugSectionOnlyInDev(t *testing.T) {
+	const id = "5a2c8173-cae5-4a6b-a109-af45f760824b"
+	const base = "database: {postgres: {password: pw}}\n"
+	sections := map[string]string{
+		"full":    "debug: {auth: {disable: true, mock_user_id: \"" + id + "\"}}\n",
+		"partial": "debug: {auth: {disable: true}}\n",
+		"empty":   "debug: {}\n",
+		"null":    "debug:\n",
+		"bad":     "debug: {auth: {mock_user_id: \"not-a-uuid\"}}\n", // not checked: the section is removed
+	}
+	for _, mode := range []string{ModeStage, ModeProd} {
+		want, err := Parse([]byte("mode: " + mode + "\n" + base))
+		if !assert.NoError(t, err, mode) {
+			continue
+		}
+		assert.False(t, want.DebugAuthDisable, mode)
+		for name, debug := range sections {
+			got, err := Parse([]byte("mode: " + mode + "\n" + base + debug))
+			if assert.NoError(t, err, mode+" "+name) {
+				assert.Equal(t, want, got, mode+" "+name)
+			}
+		}
+	}
+
+	c, err := Parse([]byte("mode: dev\n" + base + sections["full"]))
+	if assert.NoError(t, err) {
+		assert.True(t, c.DebugAuthDisable, "dev reads debug.auth.disable")
+		assert.Equal(t, id, c.DebugAuthMockUserID, "dev reads debug.auth.mock_user_id")
+	}
+	_, err = Parse([]byte("mode: dev\n" + base + sections["bad"]))
+	assert.ErrorContains(t, err, "debug.auth.mock_user_id must be a UUID", "dev checks the debug values")
+	c, err = Parse([]byte("mode: dev\n" + base + sections["empty"]))
+	if assert.NoError(t, err, "empty") {
+		assert.False(t, c.DebugAuthDisable, "empty")
+	}
+	// A null section in dev stays an error, as before the task (the decoder wants an object).
+	_, err = Parse([]byte("mode: dev\n" + base + sections["null"]))
+	assert.ErrorContains(t, err, "debug is null, want an object", "null")
+}

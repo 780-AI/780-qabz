@@ -33,8 +33,8 @@ func (s Secret) Reveal() string { return string(s) }
 // that dotted path of the YAML tree (see decode.go). A path that is missing keeps the default.
 type Config struct {
 	// Mode is the run environment: ModeDev, ModeStage or ModeProd. The key is required: a missing
-	// key or any other value stops the start. The development commands (devdb) run only in ModeDev.
-	// It changes nothing else.
+	// key or any other value stops the start. A mode other than ModeDev fully removes the debug
+	// section (task 020c). The development commands (devdb) run only in ModeDev.
 	Mode        string `path:"mode"`
 	ServiceName string `path:"service_name"`
 	// ServiceID is the ID of this service in the payment flow. GET /v1/services sends it as
@@ -62,8 +62,8 @@ type Config struct {
 	// HS512). The raw string is the key. It sits in the main config with the other auth secrets
 	// (auth.secrets). Qabz only verifies tokens with it. Required while the auth check is on.
 	JWTHMACSecret Secret `path:"auth.secrets.hmac"`
-	// DebugAuthDisable turns the auth check off. Development only: the production config has no
-	// debug section, and a missing key is false (the check is on).
+	// DebugAuthDisable turns the auth check off. Development only: a mode other than dev removes
+	// the debug section, and a missing key is false (the check is on).
 	DebugAuthDisable bool `path:"debug.auth.disable"`
 	// DebugAuthMockUserID is the user of every call while the auth check is off (debug.auth.disable):
 	// the handlers that need a user (for example My Bills) get it as the token sub. A UUID in the
@@ -122,7 +122,8 @@ func LoadFile(path string) (Config, error) {
 	return Parse(data)
 }
 
-// Parse reads a YAML document into a Config. Paths that are missing keep their default; the
+// Parse reads a YAML document into a Config. When mode is not dev, it first removes the debug
+// section, so every debug.* field keeps its default. Paths that are missing keep their default; the
 // rules (required password, port range, positive durations) are checked after the mapping.
 // It returns all rule errors together.
 func Parse(data []byte) (Config, error) {
@@ -136,6 +137,11 @@ func Parse(data []byte) (Config, error) {
 	m, ok := root.(map[string]any)
 	if !ok {
 		return Config{}, errors.New("config yaml: the document must be an object")
+	}
+	// Task 020c: a mode other than dev fully removes the debug section. Every debug.* field then
+	// keeps its default, and no value of the section is read or checked.
+	if mode, _ := m["mode"].(string); mode != ModeDev {
+		delete(m, debugSection)
 	}
 	c := defaults()
 	if err := decodeStruct(m, reflect.ValueOf(&c).Elem(), ""); err != nil {

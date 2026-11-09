@@ -1,7 +1,8 @@
-<!-- VERSION: 2.2 -->
+<!-- VERSION: 2.3 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v2.3 — 2026-11-09 — Added 020c-debug-section-dev-only entry.
 v2.2 — 2026-11-09 — Added 020b-test-database-isolation entry.
 v2.1 — 2026-11-09 — Added 020b and 020c task entry.
 v2.0 — 2026-11-09 — 020-providers-sorted-list entry: fix round 4 (operator decision 9, "Apply at once": a hot change of providers.general.load_interval applies at once; config.Holder.Changed).
@@ -108,6 +109,14 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-09] — Task 020c: a mode other than dev fully removes the debug config section
+- **Type:** Major (config behavior in `stage` and `prod`)
+- **Files:** `src/config/config.go` (`Parse` removes the top-level `debug` key when `mode` is not `dev`; comments of `Mode`, `DebugAuthDisable`, `Parse`), `src/config/constants.go` (`debugSection`), `src/config/config_test.go` (`TestParseDebugSectionOnlyInDev`), `config.yml.example` (comment of the `debug` section; YAML, no row), `src/app/README.md` (v0.20), `docs/Plans/OPEN_TASKS.md` (v1.41), `docs/documents_manifest.md` (v1.4), `CHANGELOG.md` (this entry); task file `020c_debug_section_dev_only.md` (v0.3; not manifest-tracked). Go files have no VERSION header, so no rows.
+- **Task rewrite:** the operator rewrote the task on 2026-11-09 (v0.2): "a mode other than "dev" fully removes debug section of the config", and nothing else. The first text (v0.1: stop the start with an error, a conventions section, the `devdb` and hot-reload points) is replaced; the `devdb` dev-only guard is not changed.
+- **Impact:** Yes, behavior changes in `mode: stage` and `mode: prod`: `config.Parse` deletes the whole `debug` section from the YAML tree before it reads the values, so every `debug.*` field keeps its default (`debug.auth.disable` false, so the auth check is on; `debug.auth.mock_user_id` empty). A value in the removed section is not read or checked, so a bad value there does not stop the start. A missing or wrong `mode` also removes the section (the start stops anyway with the mode error). `mode: dev` is unchanged (a null `debug:` in dev is still an error, as before).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → Pending verification → "Task 020c debug section dev only": the unit test (stage and prod with a full, partial, empty, null or bad section equal the config without it; dev reads and checks it); the positive control (`go test -overlay` with the delete taken out: the 8 stage / prod cases with values fail, the empty case passes as it changes nothing); the App binary with `debug.auth.disable: true`: dev gives HTTP 200 with the `auth check disabled` warning, stage and prod give HTTP 403 and no warning. Done by the implementer on 2026-11-09, awaiting operator confirmation.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-09] — Task 020b: tests never touch the development database (one throw-away run database per make test)
 - **Type:** Major (test infrastructure: new Make targets, new test tool package, new binding convention § 14; no App code changes)
