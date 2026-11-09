@@ -227,7 +227,8 @@ func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 
 // newProviders builds the provider list (task 020): ProvidersService on repo (the providers table). App
 // Start loads it once before the servers start, then it reloads at providers.general.load_interval,
-// read from holder before each wait (hot-reloadable). With metrics on, each load adds 1 to
+// read from holder before each wait (hot-reloadable); holder.Changed wakes the routine, so a hot
+// change of the effective interval applies at once (operator decision 9). With metrics on, each load adds 1 to
 // qabz_providers_loads_total{result="ok"|"error"} and observes qabz_providers_load_duration_ms (an
 // aborted load, canceled by Stop or by the App.Start context, is neither counted nor timed); a
 // good load sets qabz_providers_last_load_success_timestamp_ms; each MoveUp, MoveDown, Enable and
@@ -281,6 +282,7 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 	}
 	return provider.NewProvidersService(repo, provider.Options{
 		Interval:      func() time.Duration { return holder.Get().ProvidersLoadInterval },
+		Changed:       holder.Changed,
 		Logger:        logger,
 		OnLoad:        onLoad,
 		OnChange:      onChange,

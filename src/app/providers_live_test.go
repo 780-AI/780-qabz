@@ -112,11 +112,12 @@ func gapsIn(t *testing.T, times []time.Time, lo, hi time.Duration, msg string) b
 // end to end that providers.general.load_interval is hot-reloadable (operator, 2026-11-09): an App
 // with the real migrator, the real config reloader (config.Config, so the hot_reload tag of
 // ProvidersLoadInterval decides) and the real ProvidersService of newProviders (interval read from
-// the holder), all on a throw-away schema with the devdb tables and seed rows. The migration makes
-// app_hot_configs in that schema. The App starts with a 4 s interval; a row
-// providers_load_interval = 1s makes the loads come every second once the 4 s wait in progress
-// ends (a new value applies from the next wait); a row value of 200ms makes the routine use the
-// 1 s minimum and write one warn line.
+// the holder, woken by holder.Changed), all on a throw-away schema with the devdb tables and seed
+// rows. The migration makes app_hot_configs in that schema. The App starts with a 1 h interval; a
+// row providers_load_interval = 1s makes the loads come every second at once, not after the 1 h
+// wait in progress (operator decision 9; the test fails within seconds when the wake-up does not
+// work); a row value of 200ms makes the routine use the 1 s minimum (the same effective value: no
+// restart, no extra load) and write one warn line.
 func TestLiveProvidersLoadIntervalHotReload(t *testing.T) {
 	dsn := os.Getenv("QABZ_TEST_POSTGRES_DSN")
 	if dsn == "" {
@@ -131,7 +132,7 @@ func TestLiveProvidersLoadIntervalHotReload(t *testing.T) {
 	}
 	t.Cleanup(db.Close) // the App closes it too; a second Close is a no-op
 
-	const startInterval = 4 * time.Second
+	const startInterval = time.Hour
 	cfg := testConfig(t)
 	cfg.ProvidersLoadInterval = startInterval
 	cfg.HotReloadInterval = 100 * time.Millisecond
@@ -176,14 +177,19 @@ func TestLiveProvidersLoadIntervalHotReload(t *testing.T) {
 		"the config reloader sets the hot value 1s") {
 		return
 	}
-	// The 4 s wait in progress ends, then a load every second: the first load + 4 more.
-	if !waitUntil(t, 15*time.Second, func() bool { return repo.count() >= 5 }, "loads every second") {
+	hot := time.Now()
+	// The 1 h wait stops at once: the next load is due at (first load + 1 s), then one every second.
+	if !waitUntil(t, 3*time.Second, func() bool { return repo.count() >= 2 }, "a load within about 1 s, not after 1 h") {
+		return
+	}
+	if !waitUntil(t, 8*time.Second, func() bool { return repo.count() >= 5 }, "loads every second") {
 		return
 	}
 	loads := repo.since(started.Add(-time.Hour))
 	if !assert.GreaterOrEqual(t, len(loads), 5) {
 		return
 	}
+	assert.Less(t, loads[1].Sub(hot), 2500*time.Millisecond, "the second load follows the hot change")
 	gapsIn(t, loads[len(loads)-4:], 800*time.Millisecond, 2500*time.Millisecond, "1s hot value")
 
 	// A hot value under the 1 s minimum: the routine uses 1 s and writes one warn line.
@@ -205,5 +211,6 @@ func TestLiveProvidersLoadIntervalHotReload(t *testing.T) {
 	assert.LessOrEqual(t, len(low), 5, "not every 200 ms")
 	gapsIn(t, low, 800*time.Millisecond, 2500*time.Millisecond, "200ms hot value uses 1s")
 	assert.Equal(t, 1, log.count("warn", warn), "one warn line for the same low value")
+	gapsIn(t, repo.since(hot), 800*time.Millisecond, 2500*time.Millisecond, "no extra load at the 200ms change (the same effective 1 s)")
 	assert.Zero(t, log.count("error", "providers: load failed; keeping the last list"))
 }

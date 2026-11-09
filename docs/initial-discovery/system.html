@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 1.6 -->
+<!-- VERSION: 1.7 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v1.7 — 2026-11-09 — Task 020 fix round 4 (operator decision 9): the providers row of the Hot Reload table states that a change of providers.general.load_interval applies at once (config.Holder.Changed wakes the reload routine).
 v1.6 — 2026-11-08 — Task 020 fix round: gauge qabz_providers_active_count (enabled providers in all groups); the fixed 10 s load timeout of ProvidersService documented; fix round 3 (2026-11-09): the loads_total and load_duration_ms rows state that an aborted load is neither counted nor timed.
 v1.5 — 2026-11-08 — Task 020: ProvidersService (provider/selector.go) metrics qabz_providers_loads_total, qabz_providers_load_duration_ms, qabz_providers_last_load_success_timestamp_ms, qabz_providers_changes_total; the providers row of the Hot Reload table names providers.general.load_interval.
 v1.4 — 2026-11-07 — Task 014: request histogram qabz_request_duration_ms (path = gRPC method, code; its _count is the request counter); Prometheus switch metrics.prometheus.enabled.
@@ -205,7 +206,7 @@ Only certain configs are hot reloadable. The new system must say which, and trea
 
 | Config | Hot reloadable | Why |
 |---|---|---|
-| Provider order, status and priority (the `providers` table) | Yes | It is read from the database every `providers.general.load_interval` (`ProvidersService`, `provider/selector.go`; the interval itself is hot-reloadable), so a change needs no restart. Each load has a fixed timeout of 10 s (`loadTimeout`, not a config key): a slower load fails, is counted as `error`, writes one error line and keeps the last list |
+| Provider order, status and priority (the `providers` table) | Yes | It is read from the database every `providers.general.load_interval` (`ProvidersService`, `provider/selector.go`), so a change needs no restart. The interval itself is hot-reloadable and a change applies at once: `config.Holder.Changed()` wakes the reload routine, which stops the wait in progress when the effective interval (after the 1 s minimum) changed and runs the next load at (start of the last load + new interval), at once when that time is past; the same effective value restarts nothing and a load in progress is not interrupted. Each load has a fixed timeout of 10 s (`loadTimeout`, not a config key): a slower load fails, is counted as `error`, writes one error line and keeps the last list |
 | Switch demotion period | Yes | It is read each time a provider is demoted |
 | Cron intervals and the order time window | Yes | The runner can re-read them before each run |
 | Circuit breaker thresholds | Yes | Applied to the breaker's next count |

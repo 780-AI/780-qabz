@@ -222,3 +222,103 @@ func TestConcurrentReadsDuringReload(t *testing.T) {
 	close(stop)
 	wg.Wait()
 }
+
+// closed reports whether ch is closed now.
+func closed(ch <-chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
+}
+
+func TestHolderChangedOnSet(t *testing.T) {
+	h := NewHolder(hotCfg{Workers: 1})
+	c1 := h.Changed()
+	assert.False(t, closed(c1), "no Set yet")
+	assert.Equal(t, c1, h.Changed(), "the same channel until the next Set")
+	h.Set(hotCfg{Workers: 2})
+	assert.True(t, closed(c1), "Set closes the channel")
+	assert.Equal(t, 2, h.Get().Workers)
+	c2 := h.Changed()
+	assert.False(t, closed(c2), "a new channel after the Set")
+	h.Set(hotCfg{Workers: 2})
+	assert.True(t, closed(c2), "a Set of the same value also notifies; the subscriber compares")
+	h.Set(hotCfg{Workers: 3}) // no subscriber: nothing to close, no panic
+	assert.Equal(t, 3, h.Get().Workers)
+}
+
+func TestHolderChangedByReload(t *testing.T) {
+	repo := &fakeRepo{rows: []Row{{"workers", "int", "4"}}}
+	r, h, _ := newRel(t, repo, time.Hour)
+	ch := h.Changed()
+	r.Reload(context.Background())
+	assert.True(t, closed(ch), "a reload that changed a value notifies")
+
+	ch = h.Changed()
+	r.Reload(context.Background())
+	assert.False(t, closed(ch), "a reload with no change does not notify")
+	repo.set(nil, errors.New("db down"))
+	r.Reload(context.Background())
+	assert.False(t, closed(ch), "a failed reload does not notify")
+	repo.set([]Row{{"workers", "int", "bad"}}, nil)
+	r.Reload(context.Background())
+	assert.False(t, closed(ch), "a reload with only a bad row does not notify")
+}
+
+// Run with -race: many subscribers wait while many goroutines Set; every subscriber ends on the
+// last value.
+func TestHolderChangedConcurrent(t *testing.T) {
+	h := NewHolder(hotCfg{Workers: 0})
+	const subs, setters, sets = 8, 4, 200
+	final := setters * sets
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	seen := make([]int, subs)
+	for i := 0; i < subs; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			for {
+				ch := h.Changed()
+				if v := h.Get().Workers; v == final {
+					seen[i] = v
+					return
+				}
+				select {
+				case <-ch:
+				case <-stop:
+					return
+				}
+			}
+		}(i)
+	}
+	var sw sync.WaitGroup
+	var next atomic.Int32
+	for i := 0; i < setters; i++ {
+		sw.Add(1)
+		go func() {
+			defer sw.Done()
+			for j := 0; j < sets; j++ {
+				if n := int(next.Add(1)); n < final {
+					h.Set(hotCfg{Workers: n})
+				}
+			}
+		}()
+	}
+	sw.Wait()
+	h.Set(hotCfg{Workers: final})
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		close(stop)
+		<-done
+		assert.Fail(t, "a subscriber missed the last Set")
+	}
+	for i, v := range seen {
+		assert.Equal(t, final, v, "subscriber %d", i)
+	}
+}

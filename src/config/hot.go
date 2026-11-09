@@ -39,7 +39,19 @@ type Logger interface {
 
 // Holder keeps the current value of T. Get returns a copy, so a reader never sees a half-written
 // value and needs no lock. Set swaps the whole value with one atomic store.
-type Holder[T any] struct{ p atomic.Pointer[T] }
+//
+// Changed gives a change notification: it returns a channel that the next Set closes. A
+// subscriber takes the channel first and then reads Get, so a Set after that read always closes
+// the channel it holds; after a wake-up it takes a new channel. The channel tells only that Set
+// ran (the Reloader calls Set only after a reload that changed a value, never after a failed
+// reload); the subscriber compares the values it needs. Holder is safe for concurrent use: any
+// number of goroutines may call Get, Set and Changed at the same time.
+type Holder[T any] struct {
+	p atomic.Pointer[T]
+
+	mu      sync.Mutex
+	changed chan struct{} // closed by the next Set; nil when no subscriber asked since the last Set
+}
 
 // NewHolder returns a Holder with v as its first value.
 func NewHolder[T any](v T) *Holder[T] {
@@ -51,8 +63,27 @@ func NewHolder[T any](v T) *Holder[T] {
 // Get returns a copy of the current value.
 func (h *Holder[T]) Get() T { return *h.p.Load() }
 
-// Set replaces the value.
-func (h *Holder[T]) Set(v T) { h.p.Store(&v) }
+// Set replaces the value and closes the channel returned by Changed since the last Set.
+func (h *Holder[T]) Set(v T) {
+	h.p.Store(&v)
+	h.mu.Lock()
+	if h.changed != nil {
+		close(h.changed)
+		h.changed = nil
+	}
+	h.mu.Unlock()
+}
+
+// Changed returns a channel that the next Set closes. All callers between two Set calls get the
+// same channel. Take it before reading Get (see Holder). Safe for concurrent use.
+func (h *Holder[T]) Changed() <-chan struct{} {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.changed == nil {
+		h.changed = make(chan struct{})
+	}
+	return h.changed
+}
 
 type hotField struct {
 	index int

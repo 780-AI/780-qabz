@@ -114,8 +114,16 @@ type ProviderSelector interface {
 // Options configures NewProvidersService.
 type Options struct {
 	// Interval returns the current providers.general.load_interval. The reload routine calls it
-	// before each wait, so a hot-reloaded value applies from the next wait. Required.
+	// before each wait and after each Changed notification. Required.
 	Interval func() time.Duration
+	// Changed returns a channel that is closed when the value of Interval may have changed (for
+	// example config.Holder.Changed). The routine takes the channel before it reads Interval. When
+	// the effective interval (after the MinLoadInterval floor) changes, the wait in progress stops
+	// and the next load runs at (start of the last load + new interval), at once when that time is
+	// past (operator decision 9). A notification with the same effective interval changes nothing.
+	// A load in progress is not interrupted. Nil: no notification; a new value applies from the
+	// next wait.
+	Changed func() <-chan struct{}
 	// Logger is required.
 	Logger Logger
 	// OnLoad is called once per load with LoadOK or LoadError and the load duration. Nil: no call.
@@ -168,6 +176,7 @@ var emptySnapshot = &snapshot{groups: map[groupKey]*group{}, byID: map[int64]gro
 type ProvidersService struct {
 	repo     Repository
 	interval func() time.Duration
+	changed  func() <-chan struct{}
 	log      Logger
 	onLoad   func(result string, d time.Duration)
 	onChange func(change, result string)
@@ -202,7 +211,7 @@ func NewProvidersService(repo Repository, opts Options) (*ProvidersService, erro
 	if opts.Logger == nil {
 		return nil, errors.New("providers: logger is required")
 	}
-	s := &ProvidersService{repo: repo, interval: opts.Interval, log: opts.Logger, onLoad: opts.OnLoad,
+	s := &ProvidersService{repo: repo, interval: opts.Interval, changed: opts.Changed, log: opts.Logger, onLoad: opts.OnLoad,
 		onChange: opts.OnChange, onActive: opts.OnActiveCount, minInterval: MinLoadInterval, loadTimeout: loadTimeout}
 	s.snap.Store(emptySnapshot)
 	return s, nil
@@ -471,10 +480,11 @@ func (s *ProvidersService) Start(ctx context.Context) error {
 	if s.repo == nil || s.log == nil || s.interval == nil || s.minInterval <= 0 {
 		return errNotBuilt
 	}
+	first := time.Now()
 	s.loadOnce(ctx, ctx)
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	s.cancel, s.done = cancel, make(chan struct{})
-	go s.loop(loopCtx, s.done)
+	go s.loop(loopCtx, s.done, first)
 	return nil
 }
 
@@ -510,9 +520,13 @@ func (s *ProvidersService) loadOnce(ctx, abort context.Context) {
 	_ = s.load(lctx, abort) // load logs and counts a failure; the last good list stays
 }
 
-// loop reloads at each interval until ctx is done. It reads the interval before each wait
-// (operator decision 3: a hot-reloaded value applies without restart).
-func (s *ProvidersService) loop(ctx context.Context, done chan struct{}) {
+// loop reloads at each interval until ctx is done. lastStart is the start time of the first load
+// (in Start). It reads the interval before each wait (operator decision 3: a hot-reloaded value
+// applies without restart). With Options.Changed it also wakes on each notification: when the
+// effective interval changed, it stops the wait in progress and waits until (start of the last load
+// + new interval), or loads at once when that time is past (operator decision 9). The normal wait
+// after a load starts when that load ends.
+func (s *ProvidersService) loop(ctx context.Context, done chan struct{}, lastStart time.Time) {
 	defer close(done)
 	var lastBad time.Duration // the low value that was logged, when warned
 	warned := false
@@ -529,15 +543,37 @@ func (s *ProvidersService) loop(ctx context.Context, done chan struct{}) {
 		warned = false
 		return d
 	}
-	t := time.NewTimer(next())
+	// subscribe takes the notification channel; it is called before each read of the interval, so
+	// a change after the read always closes the channel the routine holds. A nil channel (no
+	// Options.Changed) never fires.
+	subscribe := func() <-chan struct{} {
+		if s.changed == nil {
+			return nil
+		}
+		return s.changed()
+	}
+	changed := subscribe()
+	cur := next()
+	t := time.NewTimer(cur)
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-changed:
+			changed = subscribe()
+			d := next()
+			if d == cur {
+				continue // the same effective interval: the wait in progress goes on
+			}
+			cur = d
+			t.Reset(max(time.Until(lastStart.Add(d)), 0)) // Reset stops the wait in progress (Go 1.23+ timers)
 		case <-t.C:
+			lastStart = time.Now()
 			s.loadOnce(ctx, ctx)
-			t.Reset(next())
+			changed = subscribe()
+			cur = next()
+			t.Reset(cur)
 		}
 	}
 }
