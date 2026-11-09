@@ -1,4 +1,4 @@
-<!-- VERSION: 0.99 -->
+<!-- VERSION: 1.0 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v1.98 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v1.99 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v0.99 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v1.0 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.34 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,9 +54,10 @@
 
 ## Last Updated
 
-- **Date**: 2026-11-08
-- **Change**: Task 020 `providers_sorted_list` (in progress, awaiting operator verification): `provider.ProvidersService` (`src/provider/selector.go`), the in-memory sorted provider list (`PickProvider`, `List`, `Group`, `MoveUp` / `MoveDown`, `Enable` / `Disable`, reload every `providers.general.load_interval`, hot-reloadable); `postgres.ProviderRepository`; `postgrestest.SeededSchema`; App loads the providers before the servers start (each load with a fixed 10 s timeout; a shutdown cancel or a cancel of the App start context is not a failure); 5 metrics, with the gauge `qabz_providers_active_count` (`system.html` rows); follow-up for the planned `qabz_db_query_duration_ms` in OPEN_TASKS; conventions § 13 (providers only through `ProvidersService`); `this_vs_bill.md` item 13; config key in `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task file stays in `in-progress_tasks/` until the operator confirms the feature-ON runs (not manifest-tracked). Bumped #3 CHANGELOG v1.98, #5 manifest v0.99, #6 folder_structure v0.34, #21 system.html v1.6, #28 OPEN_TASKS v1.38, #30 PROJECT_SPECIFIC_CONVENTIONS v0.16, #34 app README v0.18, #35 this_vs_bill v0.6.
-- **Previous change**: 2026-11-08 — Session wrap-up (agents and conventions § 12 session): 2 lesson candidates and more evidence for one; push of 95c29ce..HEAD held. Bumped #3 CHANGELOG v1.96, #5 manifest v0.97, #28 OPEN_TASKS v1.36.
+- **Date**: 2026-11-09
+- **Change**: New task file `021_water_inquiry_endpoint.md` v0.1 (not manifest-tracked); task counter at 022. Bumped #3 CHANGELOG v1.99, #5 manifest v1.0.
+- **Previous change**: 2026-11-08 — Task 020 `providers_sorted_list` (in progress, awaiting operator verification): `provider.ProvidersService` (`src/provider/selector.go`), the in-memory sorted provider list (`PickProvider`, `List`, `Group`, `MoveUp` / `MoveDown`, `Enable` / `Disable`, reload every `providers.general.load_interval`, hot-reloadable); `postgres.ProviderRepository`; `postgrestest.SeededSchema`; App loads the providers before the servers start (each load with a fixed 10 s timeout; a shutdown cancel or a cancel of the App start context is not a failure); 5 metrics, with the gauge `qabz_providers_active_count` (`system.html` rows); follow-up for the planned `qabz_db_query_duration_ms` in OPEN_TASKS; conventions § 13 (providers only through `ProvidersService`); `this_vs_bill.md` item 13; config key in `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task file stays in `in-progress_tasks/` until the operator confirms the feature-ON runs (not manifest-tracked). Bumped #3 CHANGELOG v1.98, #5 manifest v0.99, #6 folder_structure v0.34, #21 system.html v1.6, #28 OPEN_TASKS v1.38, #30 PROJECT_SPECIFIC_CONVENTIONS v0.16, #34 app README v0.18, #35 this_vs_bill v0.6.
+- **Earlier change**: 2026-11-08 — Session wrap-up (agents and conventions § 12 session): 2 lesson candidates and more evidence for one; push of 95c29ce..HEAD held. Bumped #3 CHANGELOG v1.96, #5 manifest v0.97, #28 OPEN_TASKS v1.36.
 - **Earlier change**: 2026-11-08 — Task 019b `mybill_delete_success_text`: a successful `DELETE /v1/mybill/{id}` answers `{"message":"عملیات با موفقیت انجام شد"}` in place of bill's internal-error text (`this_vs_bill.md` item 12); Postman updated (JSON, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v1.95, #5 manifest v0.96, #28 OPEN_TASKS v1.35, #34 app README v0.16, #35 this_vs_bill v0.5.
 - **Earlier change**: 2026-11-08 — Conventions § 12 metrics for every feature (feature metric per outcome the `code` label cannot tell apart, registered only when metrics are on, fixed-set labels, `system.html` row, tests). Bumped #3 CHANGELOG v1.94, #5 manifest v0.95, #30 PROJECT_SPECIFIC_CONVENTIONS v0.15.
 - **Earlier change**: 2026-11-08 — New task file `019b_mybill_delete_success_text.md` v0.1 (not manifest-tracked; letter suffix of 019, task counter unchanged at 021). Bumped #3 CHANGELOG v1.93, #5 manifest v0.94.

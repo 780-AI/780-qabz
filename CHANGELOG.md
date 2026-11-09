@@ -1,7 +1,8 @@
-<!-- VERSION: 1.98 -->
+<!-- VERSION: 1.99 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v1.99 — 2026-11-09 — Added 021-task entry.
 v1.98 — 2026-11-08 — 020-providers-sorted-list entry: fix round (active-count gauge, nil safety, shutdown cancel, maps.Clone, load timeout docs); fix round 2 (2026-11-09: aborted-start cancel rule, load-timeout and live Stop-during-query tests, test guards); fix round 3 (2026-11-09: live hot-reload test of providers.general.load_interval, test guards, change-metric pairs, aborted-load Help text).
 v1.97 — 2026-11-08 — Added 020-providers-sorted-list entry.
 v1.96 — 2026-11-08 — Added session-wrap-up (agents and conventions § 12 session) entry.
@@ -104,6 +105,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-09] — New task: 021_water_inquiry_endpoint
+- **Type:** Minor (docs only; a new task file)
+- **Files:** `docs/Plans/pending_tasks/021_water_inquiry_endpoint.md` (v0.1), `docs/Plans/pending_tasks/task_counter.json` (next ID 022), `docs/documents_manifest.md` (v1.0), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. The task adds `POST /v1/water/inquiry` (database first, Qabzino only when no valid `bill_inquiries` row exists, the answer saved), `ProviderInterface` with Qabzino as its first implementation (config `providers.qabzino`), and the development-only provider mocks `debug.mocks.<provider>` (`enable`, `return_type: success | error`).
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-08] — Task 020: ProvidersService, the sorted provider list and PickProvider
 - **Type:** Major (new package `provider`, domain logic, new config key, App start order, Critical File `system.html`)
