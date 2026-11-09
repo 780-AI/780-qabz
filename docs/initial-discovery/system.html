@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 1.7 -->
+<!-- VERSION: 1.8 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v1.8 — 2026-11-09 — Task 021 water inquiry: the config section is `providers` (not `provider`), with `providers.qabzino` and the `debug.mocks.<provider>` mocks; `caching.water`; ProviderInterface.Name returns string and the interface types are in provider/provider.go, the ProviderRegistry in provider/registry.go; metrics qabz_inquiries_total (bill_type, provider, result), qabz_provider_calls_total (provider, action, result), qabz_provider_call_duration_ms (provider, action); the Hot Reload table lists the water cache TTL, the provider settings and the mocks as startup-only.
 v1.7 — 2026-11-09 — Task 020 fix round 4 (operator decision 9): the providers row of the Hot Reload table states that a change of providers.general.load_interval applies at once (config.Holder.Changed wakes the reload routine).
 v1.6 — 2026-11-08 — Task 020 fix round: gauge qabz_providers_active_count (enabled providers in all groups); the fixed 10 s load timeout of ProvidersService documented; fix round 3 (2026-11-09): the loads_total and load_duration_ms rows state that an aborted load is neither counted nor timed.
 v1.5 — 2026-11-08 — Task 020: ProvidersService (provider/selector.go) metrics qabz_providers_loads_total, qabz_providers_load_duration_ms, qabz_providers_last_load_success_timestamp_ms, qabz_providers_changes_total; the providers row of the Hot Reload table names providers.general.load_interval.
@@ -184,14 +185,34 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 
 Config now contains more entries. It must include the config entries of every provider as well.
 
-Every provider has its own block under `provider`. Example, for `parsian`:
+Every provider has its own block under `providers` (the section is `providers`, as in the code; the key `providers.general` holds the settings of `ProvidersService`). Example, for `parsian`, and the real block of `qabzino` (task 021):
 
 ```yaml
-provider:
+providers:
+  general:
+    load_interval: 1m
   parsian:
     url: parsian-v2:8081
     timeout: 30s
+  qabzino:
+    grpc_address: qabzino:9000   # host:port, gRPC, no TLS; empty: every Qabzino call fails as "provider down"
+    timeout: 10s                 # limit of each call; positive
+
+caching:
+  water: 1h                      # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
 ```
+
+Provider mocks (task 021). Development only: the `debug` section is removed in every mode but `dev` (task 020c). One block per provider, `debug.mocks.<provider>`; the mechanism is generic (`provider.NewMock`, `src/provider/mock.go`) and every later provider follows it:
+
+```yaml
+debug:
+  mocks:
+    qabzino:
+      enable: true
+      return_type: success   # success or error
+```
+
+With `enable: true` the adapter does not call the backend. `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
 
 Rules:
 - **Services that stay.** `parsian-v2`, `jiring-switch` and `irancell` keep their own config. `Parsian` and `Irancell` also have other clients (Issue #3).
@@ -213,7 +234,9 @@ Only certain configs are hot reloadable. The new system must say which, and trea
 | Log level | Yes | A runtime flag |
 | Fee rules (the `fees` table) | Yes | It is read from the database |
 | JWT public keys | Yes | Already reloaded through etcd |
-| Provider URLs and timeouts | No | Held by the client built at startup |
+| Provider URLs and timeouts (`providers.qabzino.*`) | No | Held by the client built at startup |
+| Water inquiry cache TTL (`caching.water`) | No | Read at startup (task 021); hot reload would need an `app_hot_configs` key and a migration |
+| Provider mocks (`debug.mocks.<provider>`) | No | Applied when the adapters are built, in dev mode only |
 | Credentials and tokens | No | Held by the client built at startup |
 | Database, Redis, Kafka and NATS connections | No | The connections are made once, at startup |
 | Ports and the listening addresses | No | Bound once, at startup |
@@ -228,7 +251,7 @@ Both `Parsian` and `Irancell` are also used by other services (see Issue #3), so
 
 ```go
 type ProviderInterface interface {
-	Name() entity.InternalProvider
+	Name() string
 	Inquiry(ctx context.Context, req InquiryRequest) (*InquiryResponse, error)
 	Pay(ctx context.Context, req PaymentRequest) (*PaymentResponse, error)
 	Status(ctx context.Context, req StatusRequest) (*StatusResponse, error)
@@ -238,7 +261,7 @@ type ProviderInterface interface {
 
 type ProviderRegistry interface {
 	Register(p ProviderInterface) error
-	Get(name entity.InternalProvider) (ProviderInterface, bool)
+	Get(name string) (ProviderInterface, bool)
 }
 ```
 
@@ -392,7 +415,7 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | Metric | Type | What it tells you |
 |---|---|---|
 | `qabz_request_duration_ms` | histogram | Duration of every incoming request (gRPC and HTTP gateway) in milliseconds, by `path` (the gRPC method, for example `/haf80.api.bill.Service/Get`) and `code` (the gRPC code); buckets 5 ms to 10 000 ms. Its `_count` series is the request counter. A call that the auth check rejects is counted. An unknown HTTP route is not counted |
-| `qabz_inquiries_total` | counter | Inquiries per bill type, provider and outcome |
+| `qabz_inquiries_total` | counter | Inquiries by `bill_type`, `provider` (`none` when no provider was picked) and `result`: `db_hit` (answered from saved inquiries, no provider call), `provider_ok`, `provider_refused` (the provider has no inquiry), `provider_down` (the call failed), `no_provider`, `canceled` (the client left during the provider call), `error`. Implemented for water (task 021) |
 | `qabz_orders_total` | counter | Every order status change (the state machine) |
 | `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |
 | `qabz_order_complete_duration_ms` | histogram | How long `OrderComplete` takes |
@@ -401,8 +424,8 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 
 | Metric | Type | What it tells you |
 |---|---|---|
-| `qabz_provider_call_duration_ms` | histogram | Latency of each provider call |
-| `qabz_provider_calls_total` | counter | Calls and errors per provider |
+| `qabz_provider_call_duration_ms` | histogram | Latency of each provider call in milliseconds, by `provider` and `action` (`inquiry`), for every result; buckets 5 ms to 30 000 ms. Implemented for the inquiry call (task 021) |
+| `qabz_provider_calls_total` | counter | Calls per `provider`, `action` (`inquiry`) and `result`: `ok`, `refused` (the provider has no inquiry), `down` (the call failed), `canceled` (the client left), `error`. Implemented for the inquiry call (task 021) |
 | `qabz_provider_timeouts_total` | counter | Timeouts, which trigger a switch |
 | `qabz_providers_loads_total` | counter | Loads of the `providers` table by `ProvidersService`, by `result` (`ok`, `error`). A rise of `error` means the list is stale. An aborted load (canceled by `Stop` or by the `App.Start` context) is neither counted nor timed |
 | `qabz_providers_load_duration_ms` | histogram | Duration of each load of the `providers` table (ok and error) in milliseconds; buckets 1 ms to 10 000 ms (the fixed 10 s load timeout). An aborted load (canceled by `Stop` or by the `App.Start` context) is neither counted nor timed |

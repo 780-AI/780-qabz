@@ -160,6 +160,7 @@ var qabzMetrics = []string{
 	"qabz_providers_loads_total", "qabz_providers_load_duration_ms",
 	"qabz_providers_last_load_success_timestamp_ms", "qabz_providers_changes_total",
 	"qabz_providers_active_count",
+	"qabz_inquiries_total", "qabz_provider_calls_total", "qabz_provider_call_duration_ms",
 }
 
 // TestDefaultBuilderMetricsSwitch: with metrics on, the composition root registers every qabz

@@ -1,0 +1,441 @@
+// Package inquiry is the bill inquiry flow (system.html, core/inquiry). It copies the old bill
+// service (service/billInquiry/inquiry.go): pick the provider of the bill type, answer from the
+// saved inquiries when they are still valid, else call the provider and save the answer. The rows
+// are in the bill_inquiries and bill_inquiry_requests tables of the bill database. Task 021
+// implements water.
+package inquiry
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/rand/v2"
+	"time"
+
+	"github.com/google/uuid"
+
+	"qabz/common/helpers"
+	"qabz/provider"
+)
+
+// RequestInitial is bill_inquiry_requests.status of a row before the provider answers (bill:
+// entity.INITIAL).
+const RequestInitial = "initial"
+
+// Results of one Inquire call, for Options.OnInquiry (a fixed set: metric labels).
+const (
+	ResultDBHit           = "db_hit"           // answered from saved inquiries, no provider call
+	ResultProviderOK      = "provider_ok"      // the provider answered with inquiries
+	ResultProviderRefused = "provider_refused" // the provider answered with no inquiry
+	ResultProviderDown    = "provider_down"    // the call to the provider failed
+	ResultNoProvider      = "no_provider"      // no enabled provider for the bill type
+	ResultCanceled        = "canceled"         // the client left during the provider call
+	ResultError           = "error"            // any other failure (database, adapter missing, ...)
+)
+
+// Results of one provider call, for Options.OnProviderCall (a fixed set: metric labels).
+const (
+	CallOK       = "ok"
+	CallRefused  = "refused"
+	CallDown     = "down"
+	CallCanceled = "canceled"
+	CallError    = "error"
+)
+
+// NoProviderLabel is the provider label of a result with no picked provider.
+const NoProviderLabel = "none"
+
+// finishTimeout limits the write of the final status of a request row. It runs on a context that
+// the client cannot cancel, so a client that leaves during the provider call does not leave the
+// row at RequestInitial. It is fixed (not a config key).
+const finishTimeout = 5 * time.Second
+
+// tidPrefixes are the first digit of the tid of a request row for each bill type (bill:
+// pkg/reference WaterReference).
+var tidPrefixes = map[string]int{provider.BillTypeWater: 1}
+
+var (
+	// ErrInvalid is the error of a request that breaks a rule. Test it with errors.Is.
+	ErrInvalid = errors.New("inquiry: invalid request")
+	// ErrNoAdapter is the error when the provider that was picked has no adapter in the registry.
+	ErrNoAdapter = errors.New("inquiry: no adapter for the provider")
+)
+
+// RefusedError is the error of a provider that answered with no inquiry (a bill that is not
+// found, a failed status). Message is the text of the provider. Test it with errors.As.
+type RefusedError struct {
+	Message string
+	Code    int32
+}
+
+func (e *RefusedError) Error() string { return "inquiry: the provider has no inquiry: " + e.Message }
+
+// Request is one inquiry.
+type Request struct {
+	BillType  string // for example provider.BillTypeWater
+	InquiryID string // the bill ID
+	UserID    string // a UUID
+	Dialer    string // the mobile of the user (bill_inquiry_requests.dialer)
+}
+
+// Inquiry is one inquiry of the answer.
+type Inquiry struct {
+	ID              string
+	BillID          string
+	PayID           string
+	Amount          uint64
+	PaymentDeadline string // yyyy-mm-dd, or "" when the date did not parse
+	InquiryType     string
+}
+
+// Result is the answer of Inquire.
+type Result struct {
+	BillID    string
+	Inquiries []Inquiry
+	// FromDatabase is true when the answer came from saved inquiries (no provider call).
+	FromDatabase bool
+}
+
+// Row is one row of bill_inquiries. An empty string is a NULL column.
+type Row struct {
+	ID              string
+	UserID          string
+	InquiryID       string
+	ProviderID      int64
+	ProviderName    string
+	BillType        string
+	ProviderTraceID string // the tid column
+	InquiryType     string
+	BillID          string
+	PayID           string
+	PaymentDeadline string
+	Amount          uint64
+	IsCached        bool
+}
+
+// RequestRow is one row of bill_inquiry_requests.
+type RequestRow struct {
+	ID              string
+	UserID          string
+	Dialer          string
+	InquiryID       string
+	BillType        string
+	TID             string
+	ProviderName    string
+	ProviderTraceID string
+	Status          string
+}
+
+// Repository reads and writes the bill_inquiries and bill_inquiry_requests tables.
+type Repository interface {
+	// FindValid returns up to two rows of the bill (inquiry_id) that the provider (providerID)
+	// answered less than ttl ago, newest first, that are not copies (is_cached false) and not paid
+	// (is_paid false). The rows of every user count (the cache is shared). No row is not an error.
+	FindValid(ctx context.Context, inquiryID string, ttl time.Duration, providerID int64) ([]Row, error)
+	// SaveInquiries adds the rows in one write: all or none.
+	SaveInquiries(ctx context.Context, rows []Row) error
+	// CreateRequest adds a request row.
+	CreateRequest(ctx context.Context, r RequestRow) error
+	// FinishRequest sets the status and the provider trace ID of the request row with the id.
+	FinishRequest(ctx context.Context, id, status, providerTraceID string) error
+}
+
+// Selector picks the provider of a bill type and an action (provider.ProvidersService).
+type Selector interface {
+	PickProvider(billType, action string) (provider.Provider, error)
+}
+
+// Adapters gives the adapter of a provider name (provider.ProviderRegistry).
+type Adapters interface {
+	Get(name string) (provider.ProviderInterface, bool)
+}
+
+// Logger writes the info lines and the errors of the flow (the App logger has both).
+type Logger interface {
+	Info(msg string, kv ...any)
+	Error(msg string, kv ...any)
+}
+
+// Options configure NewService.
+type Options struct {
+	// Repository, Providers and Adapters are required.
+	Repository Repository
+	Providers  Selector
+	Adapters   Adapters
+	// CacheTTL returns how long saved inquiries of a bill type answer the same bill again. 0 or
+	// less: no cache for the bill type. Nil: no cache.
+	CacheTTL func(billType string) time.Duration
+	// Logger gets the info lines and the errors that the flow handles itself. Nil: no log line.
+	Logger Logger
+	// OnInquiry is called once per Inquire call that passed the request check, with the bill type,
+	// the provider name (NoProviderLabel when none was picked) and one of the Result values. Nil:
+	// no call.
+	OnInquiry func(billType, providerName, result string)
+	// OnProviderCall is called once per provider call with the provider name, the action, one of
+	// the Call values and the duration of the call. Nil: no call.
+	OnProviderCall func(providerName, action, result string, d time.Duration)
+}
+
+// Service is the inquiry flow. It is safe for concurrent use.
+type Service struct {
+	repo           Repository
+	providers      Selector
+	adapters       Adapters
+	cacheTTL       func(billType string) time.Duration
+	log            Logger
+	onInquiry      func(billType, providerName, result string)
+	onProviderCall func(providerName, action, result string, d time.Duration)
+
+	// newID and newTID are replaced by tests.
+	newID  func() string
+	newTID func(billType string) (string, error)
+}
+
+// NewService returns the flow.
+func NewService(o Options) (*Service, error) {
+	switch {
+	case o.Repository == nil:
+		return nil, errors.New("inquiry: repository is required")
+	case o.Providers == nil:
+		return nil, errors.New("inquiry: provider selector is required")
+	case o.Adapters == nil:
+		return nil, errors.New("inquiry: adapters are required")
+	}
+	return &Service{
+		repo: o.Repository, providers: o.Providers, adapters: o.Adapters, cacheTTL: o.CacheTTL,
+		log: o.Logger, onInquiry: o.OnInquiry, onProviderCall: o.OnProviderCall,
+		newID: uuid.NewString, newTID: generateTID,
+	}, nil
+}
+
+// generateTID makes the tid of a request row (bill: GenerateBillInquiryTidIDByBillType): the type
+// prefix, a random number from 100 to 90000000099 and the day of the year.
+func generateTID(billType string) (string, error) {
+	prefix, ok := tidPrefixes[billType]
+	if !ok {
+		return "", fmt.Errorf("inquiry: no tid prefix for bill type %q", billType)
+	}
+	return fmt.Sprintf("%d%d%d", prefix, rand.Int64N(90000000000)+100, time.Now().YearDay()), nil
+}
+
+// Inquire answers the inquiry of a bill:
+//  1. A request that breaks a rule (bill ID, user) gives an error that wraps ErrInvalid.
+//  2. It picks the provider of the bill type (an error that wraps provider.ErrNoProvider when none
+//     is enabled) and its adapter (ErrNoAdapter).
+//  3. Saved inquiries of the same bill and provider that are valid answer the call with no
+//     provider call; copies for the user are saved (is_cached true). A failed read or a failed
+//     copy write is logged and does not fail the call.
+//  4. Else it writes the request row (RequestInitial), calls the provider, writes the final status
+//     and the provider trace ID, and saves each inquiry of the answer. A call that fails gives an
+//     error that wraps provider.ErrProviderDown; an answer with no inquiry gives *RefusedError.
+//
+// Every other error is a failure of the database or of the code, with the stage in its text.
+func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
+	if s == nil || s.repo == nil || s.providers == nil || s.adapters == nil {
+		return Result{}, errors.New("inquiry: service not created with NewService")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, ok := tidPrefixes[req.BillType]; !ok {
+		return Result{}, fmt.Errorf("inquiry: unsupported bill type %q", req.BillType)
+	}
+	if !helpers.ValidBillID(req.InquiryID) {
+		return Result{}, fmt.Errorf("%w: bill id", ErrInvalid)
+	}
+	if u, err := uuid.Parse(req.UserID); err != nil || u.String() != req.UserID {
+		return Result{}, fmt.Errorf("%w: user", ErrInvalid)
+	}
+
+	pro, err := s.providers.PickProvider(req.BillType, provider.ActionInquiry)
+	if err != nil {
+		label, result := NoProviderLabel, ResultError
+		if errors.Is(err, provider.ErrNoProvider) {
+			result = ResultNoProvider
+		}
+		s.countInquiry(req.BillType, label, result)
+		return Result{}, fmt.Errorf("pick provider for %s %s: %w", req.BillType, provider.ActionInquiry, err)
+	}
+	adapter, ok := s.adapters.Get(pro.Name)
+	if !ok || adapter == nil {
+		s.countInquiry(req.BillType, pro.Name, ResultError)
+		return Result{}, fmt.Errorf("%w %q", ErrNoAdapter, pro.Name)
+	}
+
+	if res, ok := s.fromDatabase(ctx, req, pro); ok {
+		s.countInquiry(req.BillType, pro.Name, ResultDBHit)
+		return res, nil
+	}
+	res, result, err := s.fromProvider(ctx, req, pro, adapter)
+	s.countInquiry(req.BillType, pro.Name, result)
+	return res, err
+}
+
+func (s *Service) countInquiry(billType, providerName, result string) {
+	if s.onInquiry != nil {
+		s.onInquiry(billType, providerName, result)
+	}
+}
+
+// fromDatabase answers from valid saved inquiries (bill: getFromCache). ok is false when there is
+// no valid row, the cache is off, or the read failed (logged).
+func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Provider) (Result, bool) {
+	var ttl time.Duration
+	if s.cacheTTL != nil {
+		ttl = s.cacheTTL(req.BillType)
+	}
+	if ttl <= 0 {
+		return Result{}, false
+	}
+	rows, err := s.repo.FindValid(ctx, req.InquiryID, ttl, pro.ID)
+	if err != nil {
+		// bill also goes on to the provider after a failed read. A client that left is not a fault.
+		if ctx.Err() == nil && s.log != nil {
+			s.log.Error("inquiry: read saved inquiries failed", "bill_type", req.BillType, "provider", pro.Name, "error", err)
+		}
+		return Result{}, false
+	}
+	if len(rows) == 0 {
+		return Result{}, false
+	}
+	res := Result{FromDatabase: true, Inquiries: make([]Inquiry, 0, len(rows))}
+	copies := make([]Row, 0, len(rows))
+	for _, r := range rows {
+		res.BillID = r.BillID
+		c := r
+		c.ID, c.UserID, c.IsCached = s.newID(), req.UserID, true
+		copies = append(copies, c)
+		res.Inquiries = append(res.Inquiries, Inquiry{
+			ID: c.ID, BillID: r.BillID, PayID: r.PayID, Amount: r.Amount,
+			PaymentDeadline: fixPaymentDeadline(r.PaymentDeadline), InquiryType: r.InquiryType,
+		})
+	}
+	// The copies are the user's own rows (bill does the same). The answer does not depend on them.
+	if err := s.repo.SaveInquiries(ctx, copies); err != nil && ctx.Err() == nil && s.log != nil {
+		s.log.Error("inquiry: save copies of saved inquiries failed", "bill_type", req.BillType, "provider", pro.Name, "error", err)
+	}
+	if s.log != nil {
+		s.log.Info("inquiry: answered from database, no provider call", "bill_type", req.BillType, "provider", pro.Name, "inquiry_id", req.InquiryID, "rows", len(rows))
+	}
+	return res, true
+}
+
+// fromProvider calls the provider and saves the answer (bill: the step loop with one step). The
+// second value is the Result of the call, for the metric.
+func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Provider, adapter provider.ProviderInterface) (Result, string, error) {
+	tid, err := s.newTID(req.BillType)
+	if err != nil {
+		return Result{}, ResultError, fmt.Errorf("make tid: %w", err)
+	}
+	row := RequestRow{
+		ID: s.newID(), UserID: req.UserID, Dialer: req.Dialer, InquiryID: req.InquiryID,
+		BillType: req.BillType, TID: tid, ProviderName: pro.Name, Status: RequestInitial,
+	}
+	if err := s.repo.CreateRequest(ctx, row); err != nil {
+		return Result{}, ResultError, fmt.Errorf("save request row: %w", err)
+	}
+
+	start := time.Now()
+	resp, callErr := adapter.Inquiry(ctx, provider.InquiryRequest{
+		BillType: req.BillType, UserID: req.UserID, Dialer: req.Dialer, InquiryID: req.InquiryID,
+	})
+	d := time.Since(start)
+
+	switch {
+	case callErr != nil && ctx.Err() != nil:
+		s.callDone(pro.Name, CallCanceled, d)
+		s.finish(row.ID, provider.ResponseFailed, "")
+		return Result{}, ResultCanceled, ctx.Err()
+	case callErr != nil:
+		result, outcome := CallError, ResultError
+		if errors.Is(callErr, provider.ErrProviderDown) {
+			result, outcome = CallDown, ResultProviderDown
+		}
+		s.callDone(pro.Name, result, d)
+		s.finish(row.ID, provider.ResponseFailed, "")
+		return Result{}, outcome, fmt.Errorf("provider %s inquiry: %w", pro.Name, callErr)
+	case resp == nil:
+		s.callDone(pro.Name, CallError, d)
+		s.finish(row.ID, provider.ResponseFailed, "")
+		return Result{}, ResultError, fmt.Errorf("provider %s inquiry: empty answer", pro.Name)
+	}
+
+	if s.log != nil {
+		s.log.Info("inquiry: provider call", "bill_type", req.BillType, "provider", pro.Name, "inquiry_id", req.InquiryID,
+			"status", resp.Status, "inquiries", len(resp.Inquiries), "duration_ms", float64(d)/float64(time.Millisecond))
+	}
+	if err := s.finishErr(row.ID, resp.Status, resp.ProviderTraceID); err != nil {
+		s.callDone(pro.Name, CallError, d)
+		return Result{}, ResultError, fmt.Errorf("save request status: %w", err)
+	}
+	if resp.Status != provider.ResponseSuccess || len(resp.Inquiries) == 0 {
+		s.callDone(pro.Name, CallRefused, d)
+		return Result{}, ResultProviderRefused, &RefusedError{Message: resp.Message, Code: resp.Code}
+	}
+	s.callDone(pro.Name, CallOK, d)
+
+	res := Result{BillID: resp.BillID, Inquiries: make([]Inquiry, 0, len(resp.Inquiries))}
+	rows := make([]Row, 0, len(resp.Inquiries))
+	for _, it := range resp.Inquiries {
+		r := Row{
+			ID: s.newID(), UserID: req.UserID, InquiryID: req.InquiryID, ProviderID: pro.ID, ProviderName: pro.Name,
+			BillType: req.BillType, ProviderTraceID: resp.ProviderTraceID, InquiryType: it.InquiryType, BillID: resp.BillID,
+			PayID: it.PayID, PaymentDeadline: fixPaymentDeadline(it.PaymentDeadline), Amount: it.Amount,
+		}
+		rows = append(rows, r)
+		res.Inquiries = append(res.Inquiries, Inquiry{
+			ID: r.ID, BillID: r.BillID, PayID: r.PayID, Amount: r.Amount, PaymentDeadline: r.PaymentDeadline, InquiryType: r.InquiryType,
+		})
+	}
+	// bill ignores the result of this write: the answer does not depend on it (a failed write only
+	// means that the next call asks the provider again). Qabz logs it.
+	if err := s.repo.SaveInquiries(ctx, rows); err != nil && s.log != nil {
+		s.log.Error("inquiry: save inquiries failed", "bill_type", req.BillType, "provider", pro.Name, "error", err)
+	}
+	return res, ResultProviderOK, nil
+}
+
+func (s *Service) callDone(providerName, result string, d time.Duration) {
+	if s.onProviderCall != nil {
+		s.onProviderCall(providerName, provider.ActionInquiry, result, d)
+	}
+}
+
+// finishErr writes the final status of a request row on a context that the client cannot cancel.
+func (s *Service) finishErr(id, status, traceID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), finishTimeout)
+	defer cancel()
+	return s.repo.FinishRequest(ctx, id, status, traceID)
+}
+
+// finish is finishErr for a failed call: the answer is already an error, so a failed write is only logged.
+func (s *Service) finish(id, status, traceID string) {
+	if err := s.finishErr(id, status, traceID); err != nil && s.log != nil {
+		s.log.Error("inquiry: save request status failed", "request_id", id, "status", status, "error", err)
+	}
+}
+
+// paymentDeadlineLayouts are the date formats that fixPaymentDeadline tries, in this order (bill:
+// validateAndFixPaymentDeadline).
+var paymentDeadlineLayouts = []string{
+	"2006-01-02", "2006/01/02",
+	"02-01-2006", "02/01/2006", "02.01.2006",
+	"01-02-2006", "01/02/2006", "01.02.2006",
+	"2006-01-02 15:04", "2006-01-02 15:04:05", "2006/01/02 15:04:05", "02-01-2006 15:04:05", "02/01/2006 15:04:05",
+	"2006-01-02 03:04PM", "2006-01-02 03:04:05PM",
+	time.RFC3339,
+}
+
+// fixPaymentDeadline turns a date in one of the known formats into yyyy-mm-dd. A date that no
+// format reads (and an empty date) gives "".
+func fixPaymentDeadline(date string) string {
+	if date == "" {
+		return ""
+	}
+	for _, layout := range paymentDeadlineLayouts {
+		if t, err := time.Parse(layout, date); err == nil {
+			return t.Format("2006-01-02")
+		}
+	}
+	return ""
+}

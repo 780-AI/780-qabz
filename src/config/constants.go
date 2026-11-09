@@ -20,3 +20,12 @@ const debugSection = "debug"
 // ProvidersMinLoadInterval is the lowest allowed providers.general.load_interval (task 020). It
 // equals provider.MinLoadInterval (a test in app checks it).
 const ProvidersMinLoadInterval = time.Second
+
+// The values of the return_type key of a provider mock (debug.mocks.<provider>.return_type, task 021).
+const (
+	MockReturnSuccess = "success"
+	MockReturnError   = "error"
+)
+
+// ValidMockReturnType reports whether v is a value of a provider mock return_type.
+func ValidMockReturnType(v string) bool { return v == MockReturnSuccess || v == MockReturnError }

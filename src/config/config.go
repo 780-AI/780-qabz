@@ -89,6 +89,26 @@ type Config struct {
 	// (task 020). At least 1s. Hot-reloadable (key providers_load_interval, type duration, in
 	// app_hot_configs): the reload routine reads the current value before each wait.
 	ProvidersLoadInterval time.Duration `path:"providers.general.load_interval" hot_reload:"true"`
+
+	// QabzinoGRPCAddress is the host:port of the Qabzino backend (gRPC, no TLS, as in bill:
+	// qabzino.grpcAddress). Empty: every call to Qabzino fails as "provider down" (task 021). Not
+	// hot-reloadable: the client is built at start.
+	QabzinoGRPCAddress string `path:"providers.qabzino.grpc_address"`
+	// QabzinoTimeout limits each call to the Qabzino backend. Positive. Not hot-reloadable.
+	QabzinoTimeout time.Duration `path:"providers.qabzino.timeout"`
+
+	// CachingWater is how long a saved water inquiry answers the same bill again with no provider
+	// call (bill: caching.water, 1h). 0 turns the cache off; a negative value is rejected. Not
+	// hot-reloadable (task 021, decision 1): read at start.
+	CachingWater time.Duration `path:"caching.water"`
+
+	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
+	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
+	// the key is false there (and the app ignores it outside dev again). Not hot-reloadable.
+	DebugMockQabzinoEnable bool `path:"debug.mocks.qabzino.enable"`
+	// DebugMockQabzinoReturnType is the answer of the Qabzino mock: MockReturnSuccess or
+	// MockReturnError. It has no effect while the mock is off. Development only.
+	DebugMockQabzinoReturnType string `path:"debug.mocks.qabzino.return_type"`
 }
 
 func defaults() Config {
@@ -110,6 +130,10 @@ func defaults() Config {
 		MigrateTimeout:    60 * time.Second,
 
 		ProvidersLoadInterval: time.Minute,
+
+		QabzinoTimeout:             10 * time.Second,
+		CachingWater:               time.Hour,
+		DebugMockQabzinoReturnType: MockReturnSuccess,
 	}
 }
 
@@ -185,6 +209,15 @@ func (c Config) validate() error {
 	}
 	if c.ProvidersLoadInterval < ProvidersMinLoadInterval {
 		errs = append(errs, fmt.Errorf("providers.general.load_interval must be at least %s", ProvidersMinLoadInterval))
+	}
+	if c.QabzinoTimeout <= 0 {
+		errs = append(errs, errors.New("providers.qabzino.timeout must be a positive duration (for example 10s)"))
+	}
+	if c.CachingWater < 0 {
+		errs = append(errs, errors.New("caching.water must not be negative (0 turns the cache off)"))
+	}
+	if !ValidMockReturnType(c.DebugMockQabzinoReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.qabzino.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if c.DebugAuthMockUserID != "" {
 		if u, err := uuid.Parse(c.DebugAuthMockUserID); err != nil || u.String() != c.DebugAuthMockUserID {

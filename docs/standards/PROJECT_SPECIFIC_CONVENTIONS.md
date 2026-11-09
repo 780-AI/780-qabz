@@ -1,7 +1,8 @@
-<!-- VERSION: 0.17 -->
+<!-- VERSION: 0.18 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v0.18 — 2026-11-09 — Section 15: every provider adapter has a development mock (`debug.mocks.<provider>`, `provider.NewMock`), applied in dev mode only (task 021).
 v0.17 — 2026-11-09 — Section 14: tests never touch the development database; one throw-away run database per `make test` (`QABZ_TEST_RUN_DSN`), the `postgrestest` guard, `make test-db-clean` (task 020b); the guard checks the database the driver uses (`pgconn.ParseConfig`), no DSN or password on a command line, `config_generated.env` parsed (never sourced as shell), trap before create, `GO_TEST_PKGS` operator-approved, `make test-db-clean` also drops the `qabz_test_` roles and a test login role has a random password (decision 7); nothing outside the `qabz_test_` databases is touched, a role with objects or privileges outside them is kept and the command exits 1, no `REASSIGN OWNED` / `DROP OWNED` (decision 8); the kept line labels each place (`(not a test database)` only next to a non-`qabz_test_` database, a shared object by its catalog) and a 2BP01 with no `pg_shdepend` row has its own line (fix round 4). Section 11: measured with `make test` (the run database), not `QABZ_TEST_POSTGRES_DSN`.
 v0.16 — 2026-11-08 — Section 13: providers only through `ProvidersService` (task 020). No other code reads the `providers` table or `postgres.ProviderRepository`.
 v0.15 — 2026-11-08 — Section 12: metrics for every feature. A feature metric counts each outcome that the `code` label cannot tell apart; metrics registered only when on; fixed-set labels; `system.html` row and tests; the `artifacts_agent` checks it.
@@ -360,3 +361,18 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator decision, 2026-11-09 (task 020b). The task 003 live tests dropped `app_hot_configs` and `qabz_schema_migrations` in the database of `QABZ_TEST_POSTGRES_DSN`; with the development DSN, each full run deleted the migration state of the development database, and the config reloader of the running App wrote an error line at each interval.
 
 **Review.** The `code-reviewer` agent checks each new or changed test that uses Postgres: the DSN comes from `postgrestest.RunDSN`, the test works in its own schema or its own objects, and nothing reads the development DSN. A test that can change the development database is a defect. The verdict is NOT READY.
+
+## 15. Provider mocks (development only)
+
+**Every provider adapter has a mock.** The mock lets a developer run the whole flow (provider pick, cache lookup, request rows, saving the answer) with no call to the provider's backend.
+
+- **Config.** One block for each provider: `debug.mocks.<provider>.enable` (bool, default `false`) and `debug.mocks.<provider>.return_type` (`success` or `error`, default `success`). Both keys are in `config.yml.example` and `config.yml` (§ 8). The `debug` section is removed in every mode but `dev` (task 020c), so a mock key in another mode is dropped, not an error.
+- **Code.** The adapter package gives its fixed answers as `provider.MockFixtures` (for example `qabzino.MockFixtures()`); the composition root (`src/app/defaults.go`, `newProviderRegistry`) wraps the adapter with `provider.NewMock`. Do not write a second mock mechanism. With the mock off, `NewMock` returns the adapter itself (OFF is the same as no mock).
+- **Dev mode twice.** The composition root applies a mock only when `Config.Mode` is `dev`, and writes one warn line when it does. The mock never runs in `stage` or `prod`.
+- **`return_type: success`** is a valid answer with fixed values (the values are documented in the fixtures and in the Postman description of the endpoint). **`error`** is `provider.ErrProviderDown`, the same error as a failed call.
+- **Settings are read at start.** A mock is not hot-reloadable.
+- **Tests.** A test of the mock for each return type, with the mock off, and with the mode that is not dev.
+
+**Why.** Operator decision, 2026-11-09 (task 021). The feature-ON checks (Rule 15) and the front-end work need a provider answer in development; a mock inside the adapter keeps every other step of the flow real.
+
+**Review.** The `code-reviewer` agent checks each new provider adapter for its mock, its config keys and its tests. A provider with no mock is a defect. The verdict is NOT READY.

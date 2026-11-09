@@ -1,7 +1,8 @@
-<!-- VERSION: 0.35 -->
+<!-- VERSION: 0.36 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v0.36 — 2026-11-09 — Task 021: core/inquiry (the inquiry flow), provider/provider.go + registry.go + mock.go + qabzino/ (the first adapter), entry/grpc water.go, system/postgres inquiry repository; Makefile `proto` also generates the Qabzino client.
 v0.35 — 2026-11-09 — Task 020b: Makefile line names `make test` and `make test-db-clean`; postgrestest/ gets the run-database guard (RunDSN) and testdb/ (the test database tool behind `make test`).
 v0.34 — 2026-11-08 — Task 020: provider/selector.go (ProvidersService, the sorted provider list); system/postgres provider repository; postgrestest/ gets SeededSchema (devdb tables and seed).
 v0.33 — 2026-11-08 — Task 019: entry/grpc MyBills.Delete; savedbill Store deletes (disables) bills.
@@ -71,16 +72,16 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── config/                        # settings: Config from YAML (config.go; example_test.go keeps config.yml.example in sync), consts (constants.go: CacheServicesTTL, the mode values dev / stage / prod), YAML mapper (decode.go), --config boot (boot.go); hot-reload: Holder, Reloader (hot.go)
 │   ├── migrations/                    # embedded SQL files (migrations.go) + 000001_app_hot_configs.up.sql (no down files)
 │   ├── system/                        # what the service connects to
-│   │   └── postgres/  redis/          # pgx pool, migrator, config repository, services, saved bill and provider repositories (bill tables); devdb/ = the bill tables as bill's code makes them + the services / providers seed (embedded SQL; development only); postgrestest/ = RunDSN (the run database of `make test`, `QABZ_TEST_RUN_DSN`, guarded to `qabz_test_*`) and throw-away schemas in it, empty, with the services or bills table, or seeded with the devdb tables and rows (tests only); postgrestest/testdb/ = the test database tool behind `make test` and `make test-db-clean` (tests only); go-redis client (kafka/, nats/ still empty)
+│   │   └── postgres/  redis/          # pgx pool, migrator, config repository, services, saved bill, provider and inquiry repositories (bill tables); devdb/ = the bill tables as bill's code makes them + the services / providers seed (embedded SQL; development only); postgrestest/ = RunDSN (the run database of `make test`, `QABZ_TEST_RUN_DSN`, guarded to `qabz_test_*`) and throw-away schemas in it, empty, with the services or bills table, or seeded with the devdb tables and rows (tests only); postgrestest/testdb/ = the test database tool behind `make test` and `make test-db-clean` (tests only); go-redis client (kafka/, nats/ still empty)
 │   ├── common/                        # shared by every package
 │   │   ├── logging/                   # zap/ (logger, done), logstash/ (log shipping, empty)
 │   │   ├── monitoring/                # jaeger/ (tracing), prometheus/ (metrics endpoint with the Prometheus switch; requests.go: request duration histogram in ms, its _count = request counter)
 │   │   ├── auth/                      # JWT verifier (HMAC HS256/384/512, shared secret); authtest/ = test secret, tokens and the shared JWT input table (tests only)
 │   │   ├── helpers/                   # bill ID check (billid.go), phone normalization and checks (phone.go); bill rules
 │   │   └── errors/  validation/  crypto/
-│   ├── core/                          # order, inquiry, savedbill, fee, reconcile, billtype (services.go: Service, ServiceRepository, ServiceCatalog = in-memory cache of the service list); savedbill (savedbill.go: Bill, Repository, Store = My Bills rules: Insert, List, Delete)
-│   ├── provider/                      # selector.go: ProvidersService = the in-memory sorted provider list (PickProvider, List, Group, MoveUp/MoveDown, Enable/Disable, reload); the only way to read providers (conventions § 13); adapter folders parsianproxy, jiring, irancellproxy, qabzino, tavanir, karashop (empty)
-│   ├── entry/                         # grpc/: gRPC server + Service (Greeting, Get = GET /v1/services) + MyBills (mybills.go: Insert = POST /v1/mybill, GetAll = GET /v1/mybill, Delete = DELETE /v1/mybill/{id}) + request metrics interceptor (requests.go, runs first) + JWT auth interceptor (auth.go); http/: grpc-gateway HTTP server; cron/ (empty)
+│   ├── core/                          # order, inquiry (inquiry.go: Service = the inquiry flow: provider pick, saved-inquiry lookup, provider call, request rows; Repository), savedbill, fee, reconcile, billtype (services.go: Service, ServiceRepository, ServiceCatalog = in-memory cache of the service list); savedbill (savedbill.go: Bill, Repository, Store = My Bills rules: Insert, List, Delete)
+│   ├── provider/                      # selector.go: ProvidersService = the in-memory sorted provider list (PickProvider, List, Group, MoveUp/MoveDown, Enable/Disable, reload); the only way to read providers (conventions § 13); provider.go: ProviderInterface and its request / response types; registry.go: ProviderRegistry (name -> adapter); mock.go: NewMock (the dev mock of every adapter, conventions § 15); qabzino/ = the Qabzino adapter (gRPC client, fixed mock answers); adapter folders parsianproxy, jiring, irancellproxy, tavanir, karashop (empty)
+│   ├── entry/                         # grpc/: gRPC server + Service (Greeting, Get = GET /v1/services) + Water (water.go: Inquiry = POST /v1/water/inquiry) + MyBills (mybills.go: Insert = POST /v1/mybill, GetAll = GET /v1/mybill, Delete = DELETE /v1/mybill/{id}) + request metrics interceptor (requests.go, runs first) + JWT auth interceptor (auth.go); http/: grpc-gateway HTTP server; cron/ (empty)
 │   └── api/                           # generated by `make proto`; git-ignored
 │       ├── pb/                        # Go, gRPC and gateway code
 │       └── swagger/                   # OpenAPI files

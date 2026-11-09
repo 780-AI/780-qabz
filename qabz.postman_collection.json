@@ -206,6 +206,57 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Water",
+      "item": [
+        {
+          "name": "Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": \"1234567890125\",\n  \"payId\": \"\",\n  \"participateCode\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/water/inquiry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "water",
+                "inquiry"
+              ]
+            },
+            "description": "haf80.api.bill.Water/Inquiry. Inquires a water bill by billId (payId and participateCode are ignored, as in bill). The provider of (water, inquiry) is picked with ProvidersService; the saved inquiries of the same bill and provider that are younger than caching.water (default 1h; any user's rows count) answer with NO provider call, else the provider is called (Qabzino) and the answer is saved. With debug.mocks.qabzino.enable true (dev mode only) the Qabzino adapter answers a fixed answer: price 25000000, payId 2500012345, paymentDeadline 2030-01-01 (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"price\":<rials>,\"paymentDeadline\":\"yyyy-mm-dd\",\"payId\":\"...\",\"billId\":\"...\"} (a paid bill: price 0 and an empty payId). An invalid billId (6 to 13 digits with a valid check digit) HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the bill HTTP 400 with the provider message; any other failure HTTP 500."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has price, payId, billId and paymentDeadline\", function () { const b = pm.response.json(); pm.expect(b).to.have.property(\"price\"); pm.expect(b.price).to.be.a(\"number\"); pm.expect(b).to.have.property(\"payId\"); pm.expect(b).to.have.property(\"billId\"); pm.expect(b).to.have.property(\"paymentDeadline\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     }
   ]
 }

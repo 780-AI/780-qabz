@@ -1,7 +1,8 @@
-<!-- VERSION: 0.6 -->
-<!-- Last Updated: 2026-11-08 -->
+<!-- VERSION: 0.7 -->
+<!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v0.7 — 2026-11-09 — Task 021: items 14-22 for POST /v1/water/inquiry (invalid request and no user, no provider, provider down, provider has no inquiry, adapter details, request rows, inquiry_step, tiebreak of the lookup, amount above uint32).
 v0.6 — 2026-11-08 — Task 020: item 13 for the provider pick (sorted order from memory, no Redis cache).
 v0.5 — 2026-11-08 — Task 019b: item 12 for DELETE /v1/mybill/{id} (the success text); item 11 no longer names the success message as bill's.
 v0.4 — 2026-11-08 — Task 019: item 11 for DELETE /v1/mybill/{id} (no log line for a call with no user). The answers of DELETE match bill, so they are not an item.
@@ -98,3 +99,57 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **Qabz:** `ProvidersService` (`src/provider/selector.go`) keeps every row in memory, sorted in each (bill type, action) group by `tmp_priority` (equal to `priority` after each load), then `id`. `PickProvider` returns the first enabled provider of that order: always the same provider for the same rows. There is no Redis cache: the list is loaded again from the table every `providers.general.load_interval` (default 1 minute), and a change shows after the next load.
     - **Reason:** a deterministic pick by the stored priority, read with no database or cache call on the hot path (operator, task 020, 2026-11-08; `system.html`, Provider Switcher).
     - **Code:** the `@todo` comment on `ProvidersService.PickProvider` in `src/provider/selector.go`.
+
+14. **`POST /v1/water/inquiry`: an invalid request and a call with no user.**
+    - **bill:** an invalid `billId` (empty, not 6 to 13 digits, wrong check digit) returns bill's `invalid_parameter_error` as a plain Go error: gRPC `Unknown`, HTTP 500, with the Persian text. A call with no `user_id` panics (`uuid.MustParse`) and the recovery handler answers the same.
+    - **Qabz:** an invalid `billId` answers gRPC `InvalidArgument` (HTTP 400) with `invalid parameter` and writes no log line. A call with no user answers `PermissionDenied` (HTTP 403, `unauthenticated`). The rules that decide "invalid" are the same as in bill (`helpers.ValidBillID`).
+    - **Reason:** the same as items 5 and 6.
+    - **Code:** the `@todo` comments in `Water.Inquiry` and `Water.answerError` in `src/entry/grpc/water.go`.
+
+15. **`POST /v1/water/inquiry`: no enabled provider.**
+    - **bill:** `GetProviderByBillTypeAndAction` returns the raw database error (`pg: no rows in result set`), so the client gets gRPC `Unknown` (HTTP 500) with that text.
+    - **Qabz:** answers gRPC `Unavailable` (HTTP 503) with the provider-down text of item 16 and writes one error log line (`water: no enabled provider for inquiry`). The same answer is given when the picked provider has no adapter in the registry (bill: `invalid_parameter_error`, `Unknown`).
+    - **Reason:** a missing provider is an operations fault, not a server bug; no internal text reaches the client. Task 021 design decision 5.
+    - **Code:** the `@todo` comment on `errProviderDown` in `src/entry/grpc/water.go`.
+
+16. **`POST /v1/water/inquiry`: the call to the provider fails.**
+    - **bill:** the gateway turns a gRPC error into `provider_inquiry_is_down_error`, and the service returns its text as a plain error: gRPC `Unknown`, HTTP 500.
+    - **Qabz:** answers gRPC `Unavailable` (HTTP 503) with the same Persian text ("the inquiry from the provider is temporarily disabled") and writes one error log line (`water: provider inquiry failed`, with the cause), as conventions § 10 asks for a failed dependency call. The request row gets the status `failed`. A client that leaves during the call gets its context error and no log line.
+    - **Reason:** the same as item 15.
+    - **Code:** the `@todo` comment on `errProviderDown` in `src/entry/grpc/water.go`.
+
+17. **`POST /v1/water/inquiry`: the provider has no inquiry for the bill.**
+    - **bill:** an answer with no inquiries and a status other than `success` returns the provider message as a plain error: gRPC `Unknown`, HTTP 500.
+    - **Qabz:** answers gRPC `FailedPrecondition` (HTTP 400) with the message of the provider (`inquiry failed` when it sent none). No log line: it is not a server fault. The request row gets the status and the trace ID of the provider; no inquiry is saved.
+    - **Reason:** the provider answered; the bill cannot be inquired. It is not a server fault (task 021 design decision 4).
+    - **Code:** the `@todo` comment in `Water.answerError` in `src/entry/grpc/water.go`.
+
+18. **Qabzino adapter: the trace ID and an empty status.**
+    - **bill:** for an answer with no inquiry, `QabzinoWater.Execute` drops the trace ID (`tid`) of the provider, so `bill_inquiry_requests.provider_trace_id` is empty. An empty status is stored as an empty status.
+    - **Qabz:** keeps the trace ID in the request row for every answer, and stores `failed` for an empty status. The `billId` of an answer with no inquiry stays empty, as in bill.
+    - **Reason:** the trace ID is what an operator needs to ask Qabzino about a failed call; an empty status has no meaning.
+    - **Code:** the `@todo` comment on `Adapter.Inquiry` in `src/provider/qabzino/qabzino.go`.
+
+19. **`bill_inquiry_requests`: one row for each provider call.**
+    - **bill:** writes two rows for each call with the same `tid`: one with the status `initial`, one (new `id`) with the final status. The table has `UNIQUE (tid, status)` for this.
+    - **Qabz:** writes one row with the status `initial` and updates it (`status`, `provider_trace_id`) after the call. A call that Qabz never finishes (a crash) leaves the `initial` row, as in bill.
+    - **Reason:** the task Description asks for one row ("INITIAL, then the provider status and trace ID"). A reader that counts rows gets one row for each call; a reader of bill's pairs (two rows with one `tid`) must read one row.
+    - **Code:** the `@todo` comment on `finishInquiryRequestSQL` in `src/system/postgres/inquiry_repository.go`.
+
+20. **`POST /v1/water/inquiry`: `inquiry_step`.**
+    - **bill:** repeats the provider call `providers.inquiry_step` times (for the paired types, tel and mobile, the second call uses the pair type; for water the pair type is water itself, so the call and the request rows repeat).
+    - **Qabz:** one provider call, whatever `providers.inquiry_step` holds. The column is read and kept in `provider.Provider`, but the water flow does not use it.
+    - **Reason:** the loop exists for the paired types; water has one inquiry. Task 021 design decision 3.
+    - **Code:** `Service.fromProvider` in `src/core/inquiry/inquiry.go` (no loop).
+
+21. **`POST /v1/water/inquiry`: the order of saved rows with the same time.**
+    - **bill:** the lookup orders by `created_at DESC` and takes 2 rows. Rows saved in one transaction have the same `created_at`, so their order is not fixed.
+    - **Qabz:** orders by `created_at DESC, id DESC`. Any order of tied rows is also a possible bill order.
+    - **Reason:** a fixed answer for the client and for the tests.
+    - **Code:** the `@todo` comment on `findValidInquiriesSQL` in `src/system/postgres/inquiry_repository.go`.
+
+22. **`POST /v1/water/inquiry`: an amount above 4 294 967 295 rials.**
+    - **bill:** `uint32(inq.Amount)` cuts the value, so the client gets a wrong price.
+    - **Qabz:** answers gRPC `Internal` (HTTP 500) and writes one error log line (`water: inquiry amount does not fit the price field`).
+    - **Reason:** a wrong price is worse than an error. The proto field is `uint32`; the amount of a water bill is far below the limit.
+    - **Code:** the `@todo` comment in `Water.Inquiry` in `src/entry/grpc/water.go`.

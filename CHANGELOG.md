@@ -1,7 +1,8 @@
-<!-- VERSION: 2.3 -->
+<!-- VERSION: 2.4 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v2.4 — 2026-11-09 — Added 021-water-inquiry-endpoint entry.
 v2.3 — 2026-11-09 — Added 020c-debug-section-dev-only entry.
 v2.2 — 2026-11-09 — Added 020b-test-database-isolation entry.
 v2.1 — 2026-11-09 — Added 020b and 020c task entry.
@@ -109,6 +110,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-09] — Task 021: POST /v1/water/inquiry, the first provider (Qabzino) and the provider mocks
+- **Type:** Major (new endpoint, new packages `core/inquiry` and `provider/qabzino`, domain logic, new config keys, new metrics, Critical File `system.html`)
+- **Files:** `src/core/inquiry/inquiry.go` (new: `Service`, the flow) + tests; `src/provider/provider.go` (new: `ProviderInterface` and its types), `registry.go` (new: `ProviderRegistry`), `mock.go` (new: `NewMock`) + tests; `src/provider/qabzino/qabzino.go` (new: the adapter, `Dial`, `MockFixtures`) + tests; `src/system/postgres/inquiry_repository.go` (new) + unit and live tests; `src/entry/grpc/water.go` (new: `Water.Inquiry`) + tests; `src/entry/http/water_test.go`; `src/app/defaults.go` (`newProviderRegistry`, `newWater`, wiring) + `defaults_test.go`, `water_test.go`, `water_live_test.go`; `src/config/config.go`, `constants.go` + tests; `Makefile` (`proto` also generates the Qabzino client); `config.yml.example` (and the local `config.yml`); `qabz.postman_collection.json` (Water / Inquiry); `docs/initial-discovery/system.html` (v1.8); `docs/this_vs_bill.md` (v0.7, items 14-22); `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.18, § 15); `docs/folder_structure.md` (v0.36); `src/app/README.md` (v0.21); `docs/documents_manifest.md`; `docs/Plans/OPEN_TASKS.md`; the task file v0.3 (design decisions, operator confirmation; moved to `done_tasks/`). Postman: the Water / Inquiry test checks that `price` is a number (0 and negative values are valid, operator and PM).
+- **Impact:** Yes, behavior changes. (1) New endpoint `POST /v1/water/inquiry` (`Water.Inquiry`): the provider of (`water`, `inquiry`) is picked with `ProvidersService`; valid saved rows of `bill_inquiries` (same `inquiry_id` and provider, younger than `caching.water`, not a copy, not paid; any user's rows) answer with no provider call and a copy is saved for the user (`is_cached = true`); else a `bill_inquiry_requests` row (`initial`) is written, the Qabzino adapter is called, the row gets the status and the trace ID, and each inquiry is saved. Answers: `InvalidArgument` (HTTP 400) for an invalid `billId`; `PermissionDenied` (403) with no user; `Unavailable` (503) with no enabled provider, a failed call or an adapter missing, with one error log line; `FailedPrecondition` (400) with the provider message when it has no inquiry; `Internal` (500) otherwise. The differences from `bill` are items 14-22 of `docs/this_vs_bill.md`. (2) New config keys (both config files): `providers.qabzino.grpc_address` (empty), `providers.qabzino.timeout` (`10s`), `caching.water` (`1h`), `debug.mocks.qabzino.enable` (`false`), `debug.mocks.qabzino.return_type` (`success`); none is hot-reloadable. A config without them starts as before (the defaults apply), but every Qabzino call fails as "provider down" until `providers.qabzino.grpc_address` is set (one warn line at start). (3) Provider mocks (development only, conventions § 15): with `mode: dev` and `debug.mocks.qabzino.enable: true` the Qabzino adapter answers a fixed answer and never calls the backend; in any other mode the key is dropped with the `debug` section. (4) New metrics `qabz_inquiries_total{bill_type,provider,result}`, `qabz_provider_calls_total{provider,action,result}`, `qabz_provider_call_duration_ms{provider,action}` (only with metrics on). (5) `make proto` also generates `src/api/pb/qabzino/` (git-ignored): run it before the first build after the pull. No database migration; no change to the `bill` tables.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → Pending verification → "Task 021 `POST /v1/water/inquiry`": unit and live tests (`make test`); feature ON against the compose dev database with `debug.mocks.qabzino.enable: true` (steps 1-4 of the task Verification: success answer and rows, second call from the database with no provider call, `return_type: error`, the saved answer still served while the mock errors); mock off in another mode.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-09] — Task 020c: a mode other than dev fully removes the debug config section
 - **Type:** Major (config behavior in `stage` and `prod`)

@@ -362,3 +362,66 @@ func TestParseDebugSectionOnlyInDev(t *testing.T) {
 	_, err = Parse([]byte("mode: dev\n" + base + sections["null"]))
 	assert.ErrorContains(t, err, "debug is null, want an object", "null")
 }
+
+// TestParseWaterInquiryKeys (task 021): the Qabzino keys and caching.water have their defaults, take
+// their values and reject a value out of range.
+func TestParseWaterInquiryKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "", c.QabzinoGRPCAddress, "default address")
+	assert.Equal(t, 10*time.Second, c.QabzinoTimeout, "default timeout")
+	assert.Equal(t, time.Hour, c.CachingWater, "default cache TTL (bill: caching.water 1h)")
+	assert.False(t, c.DebugMockQabzinoEnable, "the mock is off by default")
+	assert.Equal(t, MockReturnSuccess, c.DebugMockQabzinoReturnType)
+
+	c, err = Parse([]byte(base + `providers: {qabzino: {grpc_address: "q:9", timeout: "2s"}}
+caching: {water: "0s"}
+debug: {mocks: {qabzino: {enable: true, return_type: error}}}
+`))
+	if assert.NoError(t, err) {
+		assert.Equal(t, "q:9", c.QabzinoGRPCAddress)
+		assert.Equal(t, 2*time.Second, c.QabzinoTimeout)
+		assert.Equal(t, time.Duration(0), c.CachingWater, "0 turns the cache off")
+		assert.True(t, c.DebugMockQabzinoEnable)
+		assert.Equal(t, MockReturnError, c.DebugMockQabzinoReturnType)
+	}
+
+	for yml, want := range map[string]string{
+		"providers: {qabzino: {timeout: \"0s\"}}":                      "providers.qabzino.timeout must be a positive duration",
+		"providers: {qabzino: {timeout: \"-1s\"}}":                     "providers.qabzino.timeout must be a positive duration",
+		"caching: {water: \"-1s\"}":                                    "caching.water must not be negative",
+		"debug: {mocks: {qabzino: {return_type: \"maybe\"}}}":          "debug.mocks.qabzino.return_type must be",
+		"debug: {mocks: {qabzino: {enable: true, return_type: \"\"}}}": "debug.mocks.qabzino.return_type must be",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+}
+
+// TestMockSectionOnlyInDev (task 021, decision 4): a mode other than dev removes the debug section
+// (task 020c), so debug.mocks.qabzino.enable: true is ignored there: the mock is off and the real
+// provider is used. It is not an error at start.
+func TestMockSectionOnlyInDev(t *testing.T) {
+	const base = "database: {postgres: {password: pw}}\ndebug: {mocks: {qabzino: {enable: true, return_type: error}}}\n"
+	for _, mode := range []string{ModeStage, ModeProd} {
+		c, err := Parse([]byte("mode: " + mode + "\n" + base))
+		if assert.NoError(t, err, mode) {
+			assert.False(t, c.DebugMockQabzinoEnable, mode)
+			assert.Equal(t, MockReturnSuccess, c.DebugMockQabzinoReturnType, mode)
+		}
+	}
+	c, err := Parse([]byte("mode: dev\n" + base))
+	if assert.NoError(t, err) {
+		assert.True(t, c.DebugMockQabzinoEnable)
+	}
+}
+
+func TestValidMockReturnType(t *testing.T) {
+	assert.True(t, ValidMockReturnType("success"))
+	assert.True(t, ValidMockReturnType("error"))
+	assert.False(t, ValidMockReturnType(""))
+	assert.False(t, ValidMockReturnType("Success"))
+}
