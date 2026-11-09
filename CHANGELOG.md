@@ -1,7 +1,8 @@
-<!-- VERSION: 2.0 -->
+<!-- VERSION: 2.1 -->
 <!-- Last Updated: 2026-11-09 -->
 <!--
 CHANGE LOG
+v2.1 — 2026-11-09 — Added 020b and 020c task entry.
 v2.0 — 2026-11-09 — 020-providers-sorted-list entry: fix round 4 (operator decision 9, "Apply at once": a hot change of providers.general.load_interval applies at once; config.Holder.Changed).
 v1.99 — 2026-11-09 — Added 021-task entry.
 v1.98 — 2026-11-08 — 020-providers-sorted-list entry: fix round (active-count gauge, nil safety, shutdown cancel, maps.Clone, load timeout docs); fix round 2 (2026-11-09: aborted-start cancel rule, load-timeout and live Stop-during-query tests, test guards); fix round 3 (2026-11-09: live hot-reload test of providers.general.load_interval, test guards, change-metric pairs, aborted-load Help text).
@@ -106,6 +107,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-09] — New tasks: 020b_test_database_isolation, 020c_debug_section_dev_only
+- **Type:** Minor (docs only; two new task files)
+- **Files:** `docs/Plans/pending_tasks/020b_test_database_isolation.md` (v0.1), `docs/Plans/pending_tasks/020c_debug_section_dev_only.md` (v0.1), `docs/documents_manifest.md` (v1.2), `CHANGELOG.md` (this entry). Letter suffixes on 020, so both tasks sort before 021 and are done next (operator request); the task counter does not change (next ID 022).
+- **Impact:** No runtime impact. 020b: tests never touch the development database; each test run creates one random throw-away database (`qabz_test_<random>`), runs in it and drops it at the end; `reset()` of the task 003 live tests no longer drops `app_hot_configs` / `qabz_schema_migrations` in the DSN database; new conventions section. 020c: the `debug` config section is allowed only in `mode: dev`; `stage` / `prod` with a `debug` section stop the start; new conventions section.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-09] — New task: 021_water_inquiry_endpoint
 - **Type:** Minor (docs only; a new task file)
