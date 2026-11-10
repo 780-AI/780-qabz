@@ -55,6 +55,18 @@ providers:
   tavanir:
     grpc_address: ""         # host:port of the Tavanir backend (gRPC, no TLS); empty: every Tavanir call fails as "provider down"
     timeout: "10s"           # limit of each call to the Tavanir backend; positive
+    auth_endpoint: "https://esrv.saapa.ir/api/Users/authenticate"
+    basic_branch_endpoint: "https://esrv.saapa.ir/api/ebills/getbranchdata"
+    bill_document_endpoint: "https://esrv.saapa.ir/api/ebills/GetLastBillDocument"
+    branch_debit_endpoint: "https://esrv.saapa.ir/api/ebills/getbranchdebit"
+    username: ""             # Tavanir (SAAPA) user name; the real value only in config.yml
+    password: ""             # Tavanir (SAAPA) password (secret); the real value only in config.yml
+    circuit_breaker:
+      name: "tavanir"
+      max_requests: 100000
+      interval: "1s"
+      timeout: "10s"
+      failure_ratio: 99      # percent, 0 to 100
 
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.46 -->
+<!-- VERSION: 1.47 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v1.47 — 2026-11-10 — Task 033 Tavanir provider config: QA scenario added; follow-up for the direct Tavanir adapter; task 030 closed.
 v1.46 — 2026-11-10 — Inquiry database answers write no log line: the task 021 and 022 QA steps 2 check the counter db_hit.
 v1.45 — 2026-11-10 — Task 030 direct Qabzino adapter: QA scenario and follow-ups added; task 030 is prioritized before tasks 023 to 025 (operator).
 v1.44 — 2026-11-10 — Task 029 Qabzino provider keys: QA scenario added.
@@ -244,6 +245,10 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 - ⏸ Task 020b follow-up (2026-11-09): `make help` prints the `test` line with the literal `$(GO_TEST_ARGS) $(GO_TEST_PKGS)` (the awk of `help` expands only `$(CONFIG)`, `$(ENV_OUT)` and `$(PB_DIR)`). Decide whether `help` shows the default values or the variable names in another form.
 - ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware: request metrics done in task 014; panic recovery and tracing for all endpoints still need their own tasks.
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
+- ⏸ Task 033 Tavanir provider config (2026-11-10). In `src/` run `go test -race -count=1 -run TavanirProviderKeys ./config/`.
+  Pass: the test passes (defaults, values read from YAML, `failure_ratio` 100 valid and 101 rejected, the password does not print). Feature ON is not possible: no code reads the keys yet.
+  Done 2026-11-10 by the implementer: pass; the real `config.yml` also parses (timeout 2m0s, password masked) (awaiting operator confirmation).
+  Follow-up (operator, 2026-11-10): qabz implements the Tavanir provider itself (no request to the `tavanir` service). Next task: the direct Tavanir adapter (authenticate, `getbranchdata`, `getbranchdebit`, `GetLastBillDocument`, circuit breaker) with the keys of task 033; then electricity inquiry uses it and `providers.tavanir.grpc_address` goes away. Task 031 (`debug.cache_inquiries`) is also pending.
 
 ## Maintenance / housekeeping
 

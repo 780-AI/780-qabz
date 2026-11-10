@@ -117,6 +117,21 @@ type Config struct {
 	TavanirGRPCAddress string `path:"providers.tavanir.grpc_address"`
 	// TavanirTimeout limits each call to the Tavanir backend. Positive. Not hot-reloadable.
 	TavanirTimeout time.Duration `path:"providers.tavanir.timeout"`
+	// The direct Tavanir adapter's config (task 033; the tavanir service: tavanir.authEndpoint and so
+	// on). Config only: no code reads these keys yet. The password is a Secret (never printed).
+	TavanirAuthEndpoint         string `path:"providers.tavanir.auth_endpoint"`
+	TavanirBasicBranchEndpoint  string `path:"providers.tavanir.basic_branch_endpoint"`
+	TavanirBillDocumentEndpoint string `path:"providers.tavanir.bill_document_endpoint"`
+	TavanirBranchDebitEndpoint  string `path:"providers.tavanir.branch_debit_endpoint"`
+	TavanirUsername             string `path:"providers.tavanir.username"`
+	TavanirPassword             Secret `path:"providers.tavanir.password"`
+	// The circuit breaker (task 033, as the tavanir service): TavanirCircuitBreakerFailureRatio is a
+	// percentage, 0 to 100.
+	TavanirCircuitBreakerName         string        `path:"providers.tavanir.circuit_breaker.name"`
+	TavanirCircuitBreakerMaxRequests  uint32        `path:"providers.tavanir.circuit_breaker.max_requests"`
+	TavanirCircuitBreakerInterval     time.Duration `path:"providers.tavanir.circuit_breaker.interval"`
+	TavanirCircuitBreakerTimeout      time.Duration `path:"providers.tavanir.circuit_breaker.timeout"`
+	TavanirCircuitBreakerFailureRatio uint8         `path:"providers.tavanir.circuit_breaker.failure_ratio"`
 
 	// CachingWater is how long a saved water inquiry answers the same bill again with no provider
 	// call (bill: caching.water, 1h). 0 turns the cache off; a negative value is rejected. Not
@@ -168,10 +183,20 @@ func defaults() Config {
 		QabzinoGasBillEndpoint:         "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry",
 		QabzinoWaterBillEndpoint:       "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry",
 		TavanirTimeout:                 10 * time.Second,
-		CachingWater:                   time.Hour,
-		CachingElectricity:             time.Hour,
-		DebugMockQabzinoReturnType:     MockReturnSuccess,
-		DebugMockTavanirReturnType:     MockReturnSuccess,
+		TavanirAuthEndpoint:            "https://esrv.saapa.ir/api/Users/authenticate",
+		TavanirBasicBranchEndpoint:     "https://esrv.saapa.ir/api/ebills/getbranchdata",
+		TavanirBillDocumentEndpoint:    "https://esrv.saapa.ir/api/ebills/GetLastBillDocument",
+		TavanirBranchDebitEndpoint:     "https://esrv.saapa.ir/api/ebills/getbranchdebit",
+
+		TavanirCircuitBreakerName:         "tavanir",
+		TavanirCircuitBreakerMaxRequests:  100000,
+		TavanirCircuitBreakerInterval:     time.Second,
+		TavanirCircuitBreakerTimeout:      10 * time.Second,
+		TavanirCircuitBreakerFailureRatio: 99,
+		CachingWater:                      time.Hour,
+		CachingElectricity:                time.Hour,
+		DebugMockQabzinoReturnType:        MockReturnSuccess,
+		DebugMockTavanirReturnType:        MockReturnSuccess,
 	}
 }
 
@@ -250,6 +275,9 @@ func (c Config) validate() error {
 	}
 	if c.QabzinoTimeout <= 0 {
 		errs = append(errs, errors.New("providers.qabzino.timeout must be a positive duration (for example 10s)"))
+	}
+	if c.TavanirCircuitBreakerFailureRatio > 100 {
+		errs = append(errs, errors.New("providers.tavanir.circuit_breaker.failure_ratio must be a percentage from 0 to 100"))
 	}
 	if c.TavanirTimeout <= 0 {
 		errs = append(errs, errors.New("providers.tavanir.timeout must be a positive duration (for example 10s)"))

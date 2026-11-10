@@ -1,7 +1,7 @@
 <!-- VERSION: 0.1 -->
 # 030_qabzino_direct_provider — `providers.qabzino.enabled` and a direct Qabzino (Ayantech) adapter; the gRPC adapter becomes QabzinoProxy
 
-Status: in-progress
+Status: done
 
 Priority (operator, 2026-11-10): this task is done next, before tasks 023 to 025.
 

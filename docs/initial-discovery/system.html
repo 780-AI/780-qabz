@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.1 -->
+<!-- VERSION: 2.2 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.2 — 2026-11-10 — Task 033 Tavanir provider config: the endpoint, credential and circuit breaker keys under `providers.tavanir` in the config example (config only; no code reads them yet; qabz implements the Tavanir provider itself, it does not call the tavanir service).
 v2.1 — 2026-11-10 — Task 030 direct Qabzino adapter: `providers.qabzino.enabled`; the Qabzino adapter calls Ayantech over HTTPS with the token and the water endpoint; the gRPC adapter is renamed QabzinoProxy (not used); the Providers table row and the config example are updated.
 v2.0 — 2026-11-10 — Task 029 Qabzino provider config: `providers.qabzino.token` and the three bill endpoint keys in the config example (config only; no code reads them yet).
 v1.9 — 2026-11-10 — Task 022 electricity inquiry: `providers.tavanir`, `caching.electricity` and `debug.mocks.tavanir` in the config examples and the Hot Reload table; the inquiry answer of ProviderInterface carries details (`InquiryResponse.Details`, saved in `bill_inquiries.extra_data` and returned the same from saved inquiries); the metrics qabz_inquiries_total, qabz_provider_calls_total and qabz_provider_call_duration_ms are implemented for electricity and Tavanir too.
@@ -208,6 +209,13 @@ providers:
   tavanir:
     grpc_address: tavanir:8084   # host:port, gRPC, no TLS; empty: every Tavanir call fails as "provider down"
     timeout: 10s                 # limit of each call; positive
+    auth_endpoint: https://esrv.saapa.ir/api/Users/authenticate           # task 033 (config only; no code reads these yet)
+    basic_branch_endpoint: https://esrv.saapa.ir/api/ebills/getbranchdata
+    bill_document_endpoint: https://esrv.saapa.ir/api/ebills/GetLastBillDocument
+    branch_debit_endpoint: https://esrv.saapa.ir/api/ebills/getbranchdebit
+    username: ""                 # Tavanir (SAAPA) user name; the real value only in config.yml
+    password: ""                 # Tavanir (SAAPA) password (secret); the real value only in config.yml
+    circuit_breaker: {name: tavanir, max_requests: 100000, interval: 1s, timeout: 10s, failure_ratio: 99}   # failure_ratio in percent
 
 caching:
   water: 1h                      # how long a saved water inquiry answers the same bill with no provider call; 0: cache off

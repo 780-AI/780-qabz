@@ -1,7 +1,8 @@
-<!-- VERSION: 2.9 -->
+<!-- VERSION: 3.0 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v3.0 — 2026-11-10 — Added 033-tavanir-provider-config entry.
 v2.9 — 2026-11-10 — Added inquiry-database-answer-log-removed entry.
 v2.8 — 2026-11-10 — Added 030-qabzino-direct-provider entry.
 v2.7 — 2026-11-10 — Added 029-qabzino-provider-config entry.
@@ -121,6 +122,13 @@ v1.0 — 2026-10-28 — Initial.
 - **Files:** `src/core/inquiry/inquiry.go` (the `inquiry: answered from database, no provider call` info line removed from `fromDatabase`); `src/app/water_live_test.go`, `src/app/electricity_live_test.go` (the log assertion became "no such line"; the existing `qabz_inquiries_total{result="db_hit"}` assertions stay); `docs/Plans/OPEN_TASKS.md` (v1.46: QA steps 2 of tasks 021 and 022 check the counter).
 - **Impact:** Yes, a log line is gone. A database answer is now counted only by `qabz_inquiries_total{bill_type,provider,result="db_hit"}` (a Prometheus counter, with metrics on). No change to answers, rows or other metrics.
 - **QA scenarios:** `make test` (the two live tests check that the line is not written and that `db_hit` is counted); feature ON: call the same bill twice, then `curl localhost:9090/metrics`. Pass: the second call has no `answered from database` line and `qabz_inquiries_total{...result="db_hit"}` is 1.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-10] — Task 033: Tavanir provider config (endpoints, credentials, circuit breaker); 030 closed
+- **Type:** Major (new config keys, Critical File `system.html`)
+- **Files:** `src/config/config.go` (11 new `providers.tavanir.*` fields: `auth_endpoint`, `basic_branch_endpoint`, `bill_document_endpoint`, `branch_debit_endpoint`, `username`, `password` as a `Secret`, `circuit_breaker.{name,max_requests,interval,timeout,failure_ratio}`; `failure_ratio` above 100 is rejected) + `config_test.go` (`TestParseTavanirProviderKeys`); `config.yml.example` (default URLs and circuit breaker, empty username and password); `config.yml` (git-ignored; the real username and password, `timeout: "120s"`); `docs/initial-discovery/system.html`; task file `033_tavanir_provider_config.md` (in `done_tasks/`); task 030 moved to `done_tasks/`; new pending task files `031_debug_cache_inquiries.md` and `034_tavanir_direct_provider.md`; `task_counter.json` (next ID 035; ID 032 is not used).
+- **Impact:** No runtime impact: config only, no code reads the keys. Operator decision: qabz implements the Tavanir provider itself and does not call the `tavanir` service (`providers.tavanir.grpc_address` stays and is read by the current adapter only).
+- **QA scenarios:** `go test -race -count=1 -run TavanirProviderKeys ./config/` from `src/`. Pass: the test passes (defaults, values, `failure_ratio` 100 valid and 101 rejected, the password does not print). Also: the real `config.yml` parses (checked 2026-11-10 with a scratch test: timeout 2m0s, password masked).
 - **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-10] — Task 030: direct Qabzino (Ayantech) adapter, `providers.qabzino.enabled`, QabzinoProxy
