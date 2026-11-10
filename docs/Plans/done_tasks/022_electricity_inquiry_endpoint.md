@@ -1,7 +1,7 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 0.2 -->
 # 022_electricity_inquiry_endpoint — POST /v1/electricity/inquiry, the Tavanir provider adapter and its mock
 
-Status: pending
+Status: done
 
 ## Description
 
@@ -45,3 +45,27 @@ Feature ON (Rule 15), in dev mode against the compose dev database, with `debug.
 2. Call again with the same `billId` within the TTL. Pass: the same answer with the same details, no provider call (log line or metric shows the database source), no new provider request row.
 3. `return_type: error`. Call with another new `billId`. Pass: the error answer; the request row has the failed status; no `bill_inquiries` row is saved.
 4. With `return_type: error`, call with the `billId` of step 1 within the TTL. Pass: the success answer from the database (the provider is not called, so the mock error does not show).
+
+## Design decisions (implementer, 2026-11-10)
+
+The "Points for the design step" are decided as follows. The `bill` differences that a client or the database can see are items 23 to 25 of `docs/this_vs_bill.md`, each with a `@todo` at the code.
+
+1. **Cache TTL.** Key `caching.electricity` (`Config.CachingElectricity`), default `1h` (as in `bill`). `0` turns the cache off; a negative value is rejected at start. Not hot-reloadable, for the reason of task 021 decision 1. The paid-bill TTL (`caching.paidElectricity`) belongs to the order flow and is not added.
+2. **Details: saved in `extra_data`, all of them.** `bill` saves only `city` and `region` and answers a cache hit with no details (`getFromCache` returns `Details: nil`). The Definition of Done asks for the same details on a cache hit, so Qabz saves the fields that the client sees as more keys of the same JSON object (`phase`, `company_name`, `tariff_type`, `customer_type`, `serial_number`, `service_address`, `service_post_code`, `customer_name`), next to bill's `city` and `region`. No schema change. Effect: `bill_inquiries.extra_data` now holds the customer name, the address and the post code (item 23). A row that bill wrote answers with empty detail fields and `customerType` `"0"`. An `extra_data` that cannot be read is logged and the provider is asked.
+3. **`ProviderInterface`: no new method.** `InquiryResponse` gets the field `Details *provider.Details` (`Details.Electricity`); an adapter with no details leaves it nil (`system.html`, Provider Adapter Interface, updated). `PaymentRequest`, `DocumentRequest` and the others are unchanged.
+4. **One flow for every bill type.** `core/inquiry.Service` is unchanged in structure: a bill type is supported when it has a `tid` prefix (`electricity`: 2, as bill's `ElectricityReference`); `Result` and `Row` carry `*provider.Details`; `Options.CacheTTL` already takes the bill type. The composition root builds the flow once (`newInquiryFlow`, which registers the three metrics once) and gives it to `newWater` and `newElectricity`. The error mapping of the handlers is one function (`answerInquiryError`; the log line starts with the bill type), so the water log lines are unchanged. The JSON of `extra_data` is written and read in `system/postgres/inquiry_details.go` (read with fastjson: a hot path, conventions § 1).
+5. **Tavanir adapter.** As `TavanirElectricity.Execute` of `bill`: the request has no trace number; the amount, the pay ID and the deadline of each inquiry are passed on unchanged (no amount-from-pay-ID rule, an empty pay ID keeps its amount); the inquiry type is `regular`; no trace ID; an answer with no inquiry has no bill ID and no details, and a `success` one is one inquiry with amount 0; the saved `city` is the company name (bill maps it so). An empty status is stored as `failed` (item 24, as Qabzino).
+6. **Mock.** `debug.mocks.tavanir.enable` (default `false`) and `.return_type` (`success` or `error`), with the rules of conventions § 15. `return_type: success`: bill ID of the request, pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01`, no trace ID, phase `تک فاز`, company `توزیع برق تهران بزرگ`, tariff `خانگی`, customer type `1`, serial number `12345678`, address `تهران، خیابان آزادی، پلاک ۱`, post code `1234567890`, customer name `مشترک آزمایشی`, region `تهران` (the `Mock...` constants of `provider/tavanir`). `return_type: error` is `provider.ErrProviderDown`.
+7. **No enabled provider, errors, metrics, logs.** The same as water (task 021 decisions 4, 6 and 7): `Unavailable` (HTTP 503) with the provider-down text and one error line; `FailedPrecondition` (HTTP 400) for a provider with no inquiry; the three metrics with `bill_type="electricity"` and `provider="tavanir"` (no new metric); the log lines `electricity: no enabled provider for inquiry`, `electricity: provider inquiry failed`, `electricity: inquiry failed`, `electricity: inquiry amount does not fit the price field`.
+8. **Other.** (a) `customerType` is the number of the provider as text (bill: `fmt.Sprint`); an answer with no details has an empty `customerType`. (b) `make proto` also generates the Tavanir client (`pb/proto/tavanir/internalService.proto`, read-only) into `src/api/pb/tavanir/` (git-ignored). (c) The metric registration error prefix changed from `water: register metric` to `inquiry: register metric` (the flow is shared). (d) `Electricity.InquiryDocument` stays `Unimplemented` (HTTP 501), as the task says.
+
+## Verification record (implementer, 2026-11-10)
+
+Feature ON (Rule 15), the compose dev database, `mode: dev`, `debug.auth.disable: true` with a mock user, `debug.mocks.tavanir.enable: true`, ports 18080 / 18082 / 19090. The seed has Tavanir (id 2) enabled for (`electricity`, `inquiry`).
+
+1. `return_type: success`, `POST /v1/electricity/inquiry` `{"billId":"4410000000009"}`: HTTP 200 with the mock values and all eight details. Database: one `bill_inquiry_requests` row (`success`, no trace, `tavanir`, `tid` starts with 2); one `bill_inquiries` row (`is_cached` false) whose `extra_data` has the ten keys. Log: `provider mock: inquiry answered with no call to the provider`, `inquiry: provider call`. PASS.
+2. The same call again: the same body, byte for byte. Log: `inquiry: answered from database, no provider call`, no second mock line. Still one request row; one copy row (`is_cached` true) with the same `extra_data`. Metrics: `provider_ok` 1, `db_hit` 1, `qabz_provider_calls_total{result="ok"}` 1. PASS.
+3. Restart with `return_type: error`, `{"billId":"4410000009987"}`: HTTP 503 with the provider-down text; the request row has `failed`; no `bill_inquiries` row for the bill; one error line `electricity: provider inquiry failed`; `provider_down` 1. PASS.
+4. With `return_type: error`, `{"billId":"4410000000009"}`: HTTP 200 with the answer and the details of step 1, from the database. PASS.
+
+Also: `{"billId":"12345"}` gives HTTP 400 `invalid parameter`; `POST /v1/electricity/inquiry/document` gives HTTP 501. The test rows were deleted after the run. Not tested: a call to a real Tavanir backend (none in development).

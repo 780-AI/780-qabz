@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"qabz/core/inquiry"
+	"qabz/provider"
 )
 
 // inqDB is a querier for the inquiry repository: Query gives rows, Exec gives tag and execErr. It
@@ -42,11 +43,11 @@ func (f *inqDB) Exec(_ context.Context, sql string, args ...any) (pgconn.Command
 	return f.tag, f.execErr
 }
 
-// inqRows gives rows of 12 columns (the findValidInquiriesSQL columns). Scan of row scanErrAt
+// inqRows gives rows of 13 columns (the findValidInquiriesSQL columns). Scan of row scanErrAt
 // (1-based) fails with scanErr; Err answers err.
 type inqRows struct {
 	pgx.Rows
-	data      [][12]any
+	data      [][13]any
 	next      int
 	scanErrAt int
 	scanErr   error
@@ -68,7 +69,7 @@ func (r *inqRows) Scan(dest ...any) error {
 	if r.scanErrAt == r.next {
 		return r.scanErr
 	}
-	if len(dest) != 12 {
+	if len(dest) != 13 {
 		return errors.New("bad Scan call")
 	}
 	for i, d := range dest {
@@ -100,9 +101,9 @@ func TestInquiryRepositoryNoPool(t *testing.T) {
 }
 
 func TestFindValidMapsRowsAndArgs(t *testing.T) {
-	db := &inqDB{rows: &inqRows{data: [][12]any{
-		{"id1", "u1", "bill1", int64(36), "qabzino", "water", "tid1", "regular", "b1", "p1", "2030-01-01", int64(25000000)},
-		{"id2", "u2", "bill1", int64(36), "qabzino", "water", "", "", "", "", "", int64(0)},
+	db := &inqDB{rows: &inqRows{data: [][13]any{
+		{"id1", "u1", "bill1", int64(36), "qabzino", "water", "tid1", "regular", "b1", "p1", "2030-01-01", int64(25000000), ""},
+		{"id2", "u2", "bill1", int64(36), "qabzino", "water", "", "", "", "", "", int64(0), `{"city":"ignored for water"}`},
 	}}}
 	got, err := newInqRepo(db).FindValid(context.Background(), "bill1", 90*time.Minute, 36)
 	if !assert.NoError(t, err) || !assert.Len(t, got, 2) {
@@ -111,6 +112,8 @@ func TestFindValidMapsRowsAndArgs(t *testing.T) {
 	assert.Equal(t, inquiry.Row{ID: "id1", UserID: "u1", InquiryID: "bill1", ProviderID: 36, ProviderName: "qabzino", BillType: "water",
 		ProviderTraceID: "tid1", InquiryType: "regular", BillID: "b1", PayID: "p1", PaymentDeadline: "2030-01-01", Amount: 25000000}, got[0])
 	assert.Equal(t, uint64(0), got[1].Amount)
+	assert.Nil(t, got[1].Details, "a water row has no details, whatever extra_data holds")
+	assert.Contains(t, db.querySQL, "COALESCE(extra_data::text, '')")
 	assert.Equal(t, []any{"bill1", 5400.0, int64(36)}, db.queryArgs, "the ttl goes in seconds")
 	assert.True(t, db.rows.(*inqRows).closed)
 	for _, must := range []string{"is_cached = false", "is_paid = false", "provider_id = $3", "inquiry_id = $1", "make_interval", "LIMIT 2", "created_at DESC"} {
@@ -132,26 +135,47 @@ func TestFindValidErrors(t *testing.T) {
 	assert.ErrorIs(t, err, boom)
 	_, err = newInqRepo(&inqDB{}).FindValid(ctx, "b", time.Hour, 1) // nil rows, nil error
 	assert.Error(t, err)
-	row := [12]any{"i", "u", "b", int64(1), "p", "w", "", "", "", "", "", int64(1)}
-	_, err = newInqRepo(&inqDB{rows: &inqRows{data: [][12]any{row}, scanErrAt: 1, scanErr: boom}}).FindValid(ctx, "b", time.Hour, 1)
+	row := [13]any{"i", "u", "b", int64(1), "p", "w", "", "", "", "", "", int64(1), ""}
+	_, err = newInqRepo(&inqDB{rows: &inqRows{data: [][13]any{row}, scanErrAt: 1, scanErr: boom}}).FindValid(ctx, "b", time.Hour, 1)
 	assert.ErrorIs(t, err, boom)
-	_, err = newInqRepo(&inqDB{rows: &inqRows{data: [][12]any{row}, err: boom}}).FindValid(ctx, "b", time.Hour, 1)
+	_, err = newInqRepo(&inqDB{rows: &inqRows{data: [][13]any{row}, err: boom}}).FindValid(ctx, "b", time.Hour, 1)
 	assert.ErrorIs(t, err, boom)
 	neg := row
 	neg[11] = int64(-1)
-	_, err = newInqRepo(&inqDB{rows: &inqRows{data: [][12]any{neg}}}).FindValid(ctx, "b", time.Hour, 1)
+	_, err = newInqRepo(&inqDB{rows: &inqRows{data: [][13]any{neg}}}).FindValid(ctx, "b", time.Hour, 1)
 	assert.ErrorContains(t, err, "negative amount")
+	bad := row
+	bad[5], bad[12] = "electricity", `["not an object"]`
+	_, err = newInqRepo(&inqDB{rows: &inqRows{data: [][13]any{bad}}}).FindValid(ctx, "b", time.Hour, 1)
+	assert.ErrorContains(t, err, "inquiry i: extra_data is a JSON array, not an object", "the flow then asks the provider")
+}
+
+// TestFindValidReadsElectricityDetails: extra_data of an electricity row becomes the details of
+// the row (task 022); a NULL extra_data gives no details.
+func TestFindValidReadsElectricityDetails(t *testing.T) {
+	db := &inqDB{rows: &inqRows{data: [][13]any{
+		{"id1", "u1", "bill1", int64(2), "tavanir", "electricity", "", "regular", "b1", "p1", "2030-01-01", int64(18000000),
+			`{"city": "c", "region": "r", "phase": "ph", "company_name": "co", "tariff_type": "ta", "customer_type": 3, "serial_number": "se", "service_address": "ad", "service_post_code": "po", "customer_name": "na"}`},
+		{"id2", "u1", "bill1", int64(2), "tavanir", "electricity", "", "regular", "b1", "p1", "2030-01-01", int64(1), ""},
+	}}}
+	got, err := newInqRepo(db).FindValid(context.Background(), "bill1", time.Hour, 2)
+	if !assert.NoError(t, err) || !assert.Len(t, got, 2) || !assert.NotNil(t, got[0].Details) {
+		return
+	}
+	assert.Equal(t, &provider.ElectricityDetails{Phase: "ph", CompanyName: "co", TariffType: "ta", CustomerType: 3, SerialNumber: "se",
+		ServiceAddress: "ad", ServicePostCode: "po", CustomerName: "na", City: "c", Region: "r"}, got[0].Details.Electricity)
+	assert.Nil(t, got[1].Details)
 }
 
 func TestInsertInquiriesSQL(t *testing.T) {
 	one := insertInquiriesSQL(1)
 	assert.Equal(t, 1, strings.Count(one, "VALUES "))
-	assert.Contains(t, one, "INSERT INTO bill_inquiries (id, user_id, inquiry_id, provider_id, provider_name, bill_type, tid, inquiry_type, bill_id, pay_id, payment_deadline, amount, is_cached, is_paid)")
-	assert.Contains(t, one, "($1, $2, $3, $4, $5, $6, NULLIF($7, ''), NULLIF($8, ''), NULLIF($9, ''), NULLIF($10, ''), NULLIF($11, ''), $12, $13, false)")
+	assert.Contains(t, one, "INSERT INTO bill_inquiries (id, user_id, inquiry_id, provider_id, provider_name, bill_type, tid, inquiry_type, bill_id, pay_id, payment_deadline, amount, is_cached, extra_data, is_paid)")
+	assert.Contains(t, one, "($1, $2, $3, $4, $5, $6, NULLIF($7, ''), NULLIF($8, ''), NULLIF($9, ''), NULLIF($10, ''), NULLIF($11, ''), $12, $13, NULLIF($14::text, '')::jsonb, false)")
 	two := insertInquiriesSQL(2)
-	assert.Contains(t, two, "), ($14, $15, $16")
-	assert.Contains(t, two, "$25, $26, false)")
-	assert.NotContains(t, two, "$27")
+	assert.Contains(t, two, "), ($15, $16, $17")
+	assert.Contains(t, two, "$26, $27, NULLIF($28::text, '')::jsonb, false)")
+	assert.NotContains(t, two, "$29")
 }
 
 func TestSaveInquiries(t *testing.T) {
@@ -163,10 +187,20 @@ func TestSaveInquiries(t *testing.T) {
 	}
 	assert.NoError(t, r.SaveInquiries(context.Background(), rows))
 	assert.Equal(t, 1, db.execs, "one statement: all or none")
-	assert.Len(t, db.execArgs, 26)
-	assert.Equal(t, []any{"a", "u", "b", int64(36), "qabzino", "water", "t", "regular", "bb", "p", "2030-01-01", int64(7), false}, db.execArgs[:13])
-	assert.Equal(t, true, db.execArgs[25])
-	assert.Equal(t, int64(0), db.execArgs[24])
+	if !assert.Len(t, db.execArgs, 28) {
+		return
+	}
+	assert.Equal(t, []any{"a", "u", "b", int64(36), "qabzino", "water", "t", "regular", "bb", "p", "2030-01-01", int64(7), false, ""}, db.execArgs[:14],
+		"no details: extra_data is \"\" (NULL)")
+	assert.Equal(t, true, db.execArgs[26])
+	assert.Equal(t, int64(0), db.execArgs[25])
+
+	// Details go to extra_data as JSON text (task 022).
+	withDetails := []inquiry.Row{{ID: "e", BillType: "electricity", Details: &provider.Details{Electricity: &provider.ElectricityDetails{City: "c", Region: "r", CustomerType: 2}}}}
+	assert.NoError(t, r.SaveInquiries(context.Background(), withDetails))
+	if assert.Len(t, db.execArgs, 14) {
+		assert.Equal(t, `{"city":"c","region":"r","customer_type":2}`, db.execArgs[13])
+	}
 
 	db.execs = 0
 	assert.NoError(t, r.SaveInquiries(context.Background(), nil))

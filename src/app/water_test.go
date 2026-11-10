@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "qabz/api/pb/qabz"
+	"qabz/common/auth"
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
 	grpcserver "qabz/entry/grpc"
@@ -50,7 +51,7 @@ func TestNewProviderRegistry(t *testing.T) {
 		{"dev, mock error", "mode: dev\ndebug: {mocks: {qabzino: {enable: true, return_type: error}}}", true, true, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
 		{"dev, mock off, no address", "mode: dev\ndebug: {mocks: {qabzino: {enable: false}}}", false, false, "providers.qabzino.grpc_address is empty: every inquiry to Qabzino fails as provider down"},
 		{"stage, enable ignored", "mode: stage\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, "providers.qabzino.grpc_address is empty: every inquiry to Qabzino fails as provider down"},
-		{"prod, address set", "mode: prod\nproviders: {qabzino: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}}", false, false, ""},
+		{"prod, address set", "mode: prod\nproviders: {qabzino: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}, tavanir: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}}", false, false, ""},
 	}
 	for _, c := range cases {
 		log := &liveLogger{}
@@ -78,7 +79,7 @@ func TestNewProviderRegistry(t *testing.T) {
 		if c.wantWarn != "" {
 			assert.Equal(t, 1, log.count("warn", c.wantWarn), c.name)
 		} else {
-			assert.Equal(t, 0, len(log.lines)-log.count("info", "provider mock: inquiry answered with no call to the provider"), c.name+": no warn line")
+			assert.Equal(t, 0, len(log.lines)-log.count("info", "provider mock: inquiry answered with no call to the provider"), c.name+": no warn line (Qabzino and Tavanir have an address)")
 		}
 	}
 	// A nil logger writes nothing and does not panic.
@@ -90,9 +91,10 @@ func TestNewProviderRegistry(t *testing.T) {
 	}
 }
 
-// TestNewWaterRules: with metrics on the three metrics are registered once (a second call
-// conflicts, also when only one is taken); with metrics off nothing is registered.
-func TestNewWaterRules(t *testing.T) {
+// TestNewInquiryFlowRules: with metrics on the three metrics are registered once (a second call
+// conflicts, also when only one is taken); with metrics off nothing is registered. The flow is
+// built once for all inquiry endpoints (task 022).
+func TestNewInquiryFlowRules(t *testing.T) {
 	cfg := testConfig(t)
 	db, err := postgres.New(context.Background(), cfg.PostgresDSN()) // lazy: no server needed
 	if !assert.NoError(t, err) || !assert.NotNil(t, db) {
@@ -106,32 +108,41 @@ func TestNewWaterRules(t *testing.T) {
 	sel := &provider.ProvidersService{}
 
 	on := prometheus.New("127.0.0.1:0", true)
-	svc, err := newWater(cfg, db, sel, reg, on, nil)
+	flow, err := newInquiryFlow(cfg, db, sel, reg, on, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, svc)
+	assert.NotNil(t, flow)
 	for _, name := range []string{"qabz_inquiries_total", "qabz_provider_calls_total", "qabz_provider_call_duration_ms"} {
 		assert.True(t, registered(t, on.Registry(), name), name)
 	}
-	_, err = newWater(cfg, db, sel, reg, on, nil)
-	assert.ErrorContains(t, err, "water: register metric")
+	_, err = newInquiryFlow(cfg, db, sel, reg, on, nil)
+	assert.ErrorContains(t, err, "inquiry: register metric")
 
 	taken := prometheus.New("127.0.0.1:0", true)
 	if assert.NotNil(t, taken.Registry()) {
 		assert.NoError(t, taken.Registry().Register(promclient.NewCounter(promclient.CounterOpts{Name: "qabz_provider_calls_total", Help: "taken"})))
-		svc, err = newWater(cfg, db, sel, reg, taken, nil)
-		assert.ErrorContains(t, err, "water: register metric")
-		assert.Nil(t, svc)
+		flow, err = newInquiryFlow(cfg, db, sel, reg, taken, nil)
+		assert.ErrorContains(t, err, "inquiry: register metric")
+		assert.Nil(t, flow)
 	}
 
 	off := prometheus.New("127.0.0.1:0", false)
 	for range 2 {
-		svc, err := newWater(cfg, db, sel, reg, off, nil)
+		flow, err := newInquiryFlow(cfg, db, sel, reg, off, nil)
 		assert.NoError(t, err)
-		assert.NotNil(t, svc)
+		assert.NotNil(t, flow)
+		assert.NotNil(t, newWater(flow, nil))
+		assert.NotNil(t, newElectricity(flow, nil))
 	}
 	// A flow that cannot be built: the selector is required.
-	_, err = newWater(cfg, db, nil, reg, off, nil)
+	_, err = newInquiryFlow(cfg, db, nil, reg, off, nil)
 	assert.Error(t, err)
+
+	// No flow: the services exist and their Inquiry is not available (no typed nil in the interface).
+	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"})
+	_, err = newWater(nil, nil).Inquiry(ctx, &pb.InquiryBillPayRequest{BillId: "1234567890125"})
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+	_, err = newElectricity(nil, nil).Inquiry(ctx, &pb.InquiryBillPayRequest{BillId: "1234567890125"})
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }
 
 // TestDefaultBuilderServesWater: the composition root registers the Water service. With

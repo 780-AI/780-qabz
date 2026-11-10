@@ -23,16 +23,19 @@ const providerDownText = "استعلام از سوی تامین کننده مو�
 // message of its own.
 const providerRefusedDefaultText = "inquiry failed"
 
-// errProviderDown is the answer when no provider can answer: none is enabled for water inquiry, the
-// call to the provider failed, or the picked provider has no adapter.
+// errProviderDown is the answer when no provider can answer: none is enabled for the inquiry of the
+// bill type, the call to the provider failed, or the picked provider has no adapter.
 // @todo bill sends the same text as a plain error (gRPC Unknown, HTTP 500) for a failed call, and
 // the raw database error for a missing provider. See docs/this_vs_bill.md, items 15 and 16.
 var errProviderDown = status.Error(codes.Unavailable, providerDownText)
 
-// WaterInquirer answers the inquiry of a bill (inquiry.Service).
-type WaterInquirer interface {
+// Inquirer answers the inquiry of a bill (inquiry.Service). Every bill type uses the same flow.
+type Inquirer interface {
 	Inquire(ctx context.Context, req inquiry.Request) (inquiry.Result, error)
 }
+
+// WaterInquirer is the Inquirer of the Water service.
+type WaterInquirer = Inquirer
 
 // WaterDeps are the dependencies of Water. A zero value is valid: Inquiry then answers
 // codes.Unimplemented.
@@ -121,15 +124,26 @@ func (w *Water) Inquiry(ctx context.Context, req *pb.InquiryBillPayRequest) (*pb
 	return out, nil
 }
 
-// answerError turns an error of the flow into the gRPC answer and writes the log line of a
-// server fault (conventions § 10).
+// answerError turns an error of the flow into the gRPC answer (answerInquiryError).
 func (w *Water) answerError(ctx context.Context, err error) error {
+	return answerInquiryError(ctx, w.logger, provider.BillTypeWater, err)
+}
+
+// answerInquiryError turns an error of the inquiry flow into the gRPC answer and writes the log
+// line of a server fault (conventions § 10). It is the same for every bill type; billType starts
+// the log message (for example "water: provider inquiry failed"). A nil logger writes no line.
+func answerInquiryError(ctx context.Context, logger ErrorLogger, billType string, err error) error {
+	logError := func(msg string) {
+		if logger != nil {
+			logger.Error(billType+": "+msg, "error", err)
+		}
+	}
 	var refused *inquiry.RefusedError
 	switch {
 	case errors.Is(err, inquiry.ErrInvalid):
 		// @todo bill answers gRPC Unknown (HTTP 500). See docs/this_vs_bill.md, item 14.
 		return errInvalidParameter
-	case ctx.Err() != nil:
+	case ctx != nil && ctx.Err() != nil:
 		return status.FromContextError(ctx.Err()).Err() // the client left: not a server error
 	case errors.As(err, &refused) && refused != nil:
 		// @todo bill answers gRPC Unknown (HTTP 500) with the message. See docs/this_vs_bill.md, item 17.
@@ -139,19 +153,13 @@ func (w *Water) answerError(ctx context.Context, err error) error {
 		}
 		return status.Error(codes.FailedPrecondition, msg)
 	case errors.Is(err, provider.ErrNoProvider):
-		w.logError("water: no enabled provider for inquiry", err)
+		logError("no enabled provider for inquiry")
 		return errProviderDown
 	case errors.Is(err, provider.ErrProviderDown), errors.Is(err, inquiry.ErrNoAdapter):
-		w.logError("water: provider inquiry failed", err)
+		logError("provider inquiry failed")
 		return errProviderDown
 	default:
-		w.logError("water: inquiry failed", err)
+		logError("inquiry failed")
 		return errInternal
-	}
-}
-
-func (w *Water) logError(msg string, err error) {
-	if w.logger != nil {
-		w.logger.Error(msg, "error", err)
 	}
 }

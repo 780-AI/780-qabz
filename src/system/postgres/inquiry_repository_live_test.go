@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"qabz/core/inquiry"
+	"qabz/provider"
 	"qabz/system/postgres"
 )
 
@@ -181,4 +182,112 @@ func TestLiveInquiryRequestRow(t *testing.T) {
 
 	assert.ErrorContains(t, r.FinishRequest(ctx, "99999999-9999-4999-8999-999999999999", "failed", ""), "0 rows updated")
 	assert.Error(t, r.CreateRequest(ctx, q), "the primary key is unique")
+}
+
+// TestLiveInquiryExtraData (task 022): the details of an electricity inquiry are written to
+// extra_data (jsonb) and read back unchanged, for more than one shape; a row with no details has a
+// NULL extra_data; three successive writes and reads of the same bill keep the values.
+func TestLiveInquiryExtraData(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	c, r := liveInquiryRepo(t, ctx)
+	row := func(id, bill string, d *provider.Details) inquiry.Row {
+		return inquiry.Row{ID: id, UserID: inqUser1, InquiryID: bill, ProviderID: 2, ProviderName: "tavanir", BillType: "electricity",
+			InquiryType: "regular", BillID: bill, PayID: "1800012345", PaymentDeadline: "2030-01-01", Amount: 18000000, Details: d}
+	}
+	full := &provider.ElectricityDetails{Phase: "تک فاز", CompanyName: "co \"quoted\"", TariffType: "ta", CustomerType: -3, SerialNumber: "se",
+		ServiceAddress: "line 1\nline 2 \\ end", ServicePostCode: "po", CustomerName: "na'me", City: "ci", Region: "re"}
+	shapes := []struct {
+		id, bill  string
+		details   *provider.Details
+		wantExtra string // the jsonb text; "" for NULL
+	}{
+		{"a1111111-1111-4111-8111-111111111111", "1000000000001", &provider.Details{Electricity: full}, "x"},
+		{"a2222222-2222-4222-8222-222222222222", "1000000000002", &provider.Details{Electricity: &provider.ElectricityDetails{City: "c", Region: "r"}}, `{"city": "c", "region": "r"}`},
+		{"a3333333-3333-4333-8333-333333333333", "1000000000003", &provider.Details{Electricity: &provider.ElectricityDetails{}}, `{}`},
+		{"a4444444-4444-4444-8444-444444444444", "1000000000004", nil, ""},
+		{"a5555555-5555-4555-8555-555555555555", "1000000000005", &provider.Details{}, ""},
+	}
+	for _, sh := range shapes {
+		if !assert.NoError(t, r.SaveInquiries(ctx, []inquiry.Row{row(sh.id, sh.bill, sh.details)}), sh.id) {
+			continue
+		}
+		var extra *string
+		var typ *string
+		if !assert.NoError(t, c.Pool().QueryRow(ctx, `SELECT extra_data::text, jsonb_typeof(extra_data) FROM bill_inquiries WHERE id = $1`, sh.id).Scan(&extra, &typ), sh.id) {
+			continue
+		}
+		switch sh.wantExtra {
+		case "":
+			assert.Nil(t, extra, sh.id+": NULL, not a JSON null")
+		case "x":
+			if assert.NotNil(t, typ, sh.id) {
+				assert.Equal(t, "object", *typ, sh.id)
+			}
+		default:
+			if assert.NotNil(t, extra, sh.id) {
+				assert.Equal(t, sh.wantExtra, *extra, sh.id)
+			}
+		}
+		got, err := r.FindValid(ctx, sh.bill, time.Hour, 2)
+		if !assert.NoError(t, err, sh.id) || !assert.Len(t, got, 1, sh.id) {
+			continue
+		}
+		if sh.details == nil || sh.details.Electricity == nil {
+			assert.Nil(t, got[0].Details, sh.id)
+		} else if assert.NotNil(t, got[0].Details, sh.id) {
+			assert.Equal(t, sh.details.Electricity, got[0].Details.Electricity, sh.id+": read back unchanged")
+		}
+	}
+
+	// Each key of the full row, by a direct SQL query.
+	var city, customer, address string
+	var customerType int
+	err := c.Pool().QueryRow(ctx, `SELECT extra_data->>'city', extra_data->>'customer_name', extra_data->>'service_address', (extra_data->>'customer_type')::int
+		FROM bill_inquiries WHERE id = $1`, shapes[0].id).Scan(&city, &customer, &address, &customerType)
+	if assert.NoError(t, err) {
+		assert.Equal(t, []any{"ci", "na'me", "line 1\nline 2 \\ end", -3}, []any{city, customer, address, customerType})
+	}
+
+	// Three successive writes of what was read (the copies of a cache hit): the values stay the same.
+	prev, err := r.FindValid(ctx, shapes[0].bill, time.Hour, 2)
+	if !assert.NoError(t, err) || !assert.Len(t, prev, 1) {
+		return
+	}
+	for i, id := range []string{"b1111111-1111-4111-8111-111111111111", "b2222222-2222-4222-8222-222222222222", "b3333333-3333-4333-8333-333333333333"} {
+		cp := prev[0]
+		cp.ID, cp.UserID, cp.IsCached = id, inqUser2, true
+		if !assert.NoError(t, r.SaveInquiries(ctx, []inquiry.Row{cp}), i) {
+			return
+		}
+		var same bool
+		err := c.Pool().QueryRow(ctx, `SELECT c.extra_data = o.extra_data FROM bill_inquiries c, bill_inquiries o WHERE c.id = $1 AND o.id = $2`, id, shapes[0].id).Scan(&same)
+		assert.NoError(t, err, i)
+		assert.True(t, same, i)
+		prev, err = r.FindValid(ctx, shapes[0].bill, time.Hour, 2)
+		if !assert.NoError(t, err, i) || !assert.Len(t, prev, 1, "copies do not answer") || !assert.NotNil(t, prev[0].Details) {
+			return
+		}
+		assert.Equal(t, full, prev[0].Details.Electricity, i)
+	}
+
+	// A water row keeps a NULL extra_data, and extra_data of another writer does not become details.
+	_, err = c.Pool().Exec(ctx, `UPDATE bill_inquiries SET bill_type = 'water' WHERE id = $1`, shapes[1].id)
+	assert.NoError(t, err)
+	got, err := r.FindValid(ctx, shapes[1].bill, time.Hour, 2)
+	if assert.NoError(t, err) && assert.Len(t, got, 1) {
+		assert.Nil(t, got[0].Details)
+	}
+	// An extra_data that is not an object is an error of the read.
+	_, err = c.Pool().Exec(ctx, `UPDATE bill_inquiries SET extra_data = '"text"'::jsonb WHERE id = $1`, shapes[2].id)
+	assert.NoError(t, err)
+	_, err = r.FindValid(ctx, shapes[2].bill, time.Hour, 2)
+	assert.ErrorContains(t, err, "extra_data is a JSON string, not an object")
+	// A JSON null is no details.
+	_, err = c.Pool().Exec(ctx, `UPDATE bill_inquiries SET extra_data = 'null'::jsonb WHERE id = $1`, shapes[2].id)
+	assert.NoError(t, err)
+	got, err = r.FindValid(ctx, shapes[2].bill, time.Hour, 2)
+	if assert.NoError(t, err) && assert.Len(t, got, 1) {
+		assert.Nil(t, got[0].Details)
+	}
 }

@@ -25,14 +25,16 @@ const (
 	liveUserTwo = "0b9d2c4e-8a3f-4e61-b7d2-5c1a9e0f3d22"
 )
 
-// liveWaterStack is the Water service of the composition root on a throw-away schema with the devdb
-// tables and the seed providers, after setupSQL ran. The providers are loaded (a real
-// ProvidersService), the mock is on with returnType (dev mode), metrics are on.
+// liveWaterStack is the Water and the Electricity service of the composition root (one inquiry
+// flow) on a throw-away schema with the devdb tables and the seed providers, after setupSQL ran.
+// The providers are loaded (a real ProvidersService), the Qabzino and Tavanir mocks are on with
+// returnType (dev mode), metrics are on.
 type liveWaterStack struct {
-	db      *postgres.Client
-	water   *grpcserver.Water
-	metrics *prometheus.Server
-	log     *liveLogger
+	db          *postgres.Client
+	water       *grpcserver.Water
+	electricity *grpcserver.Electricity
+	metrics     *prometheus.Server
+	log         *liveLogger
 }
 
 func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string) *liveWaterStack {
@@ -51,7 +53,10 @@ func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string
 	cfg := testConfig(t)
 	cfg.DebugMockQabzinoEnable = true
 	cfg.DebugMockQabzinoReturnType = returnType
+	cfg.DebugMockTavanirEnable = true
+	cfg.DebugMockTavanirReturnType = returnType
 	cfg.CachingWater = time.Hour
+	cfg.CachingElectricity = time.Hour
 	log := &liveLogger{}
 	providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), prometheus.New("127.0.0.1:0", false), log)
 	if !assert.NoError(t, err) || !assert.NotNil(t, providers) || !assert.NoError(t, providers.Start(ctx)) {
@@ -63,11 +68,11 @@ func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string
 		t.FailNow()
 	}
 	metrics := prometheus.New("127.0.0.1:0", true)
-	water, err := newWater(cfg, db, providers, registry, metrics, log)
-	if !assert.NoError(t, err) || !assert.NotNil(t, water) {
+	flow, err := newInquiryFlow(cfg, db, providers, registry, metrics, log)
+	if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 		t.FailNow()
 	}
-	return &liveWaterStack{db: db, water: water, metrics: metrics, log: log}
+	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), metrics: metrics, log: log}
 }
 
 func (s *liveWaterStack) ask(user, bill string) (*pb.InquiryBillPayResponse, error) {

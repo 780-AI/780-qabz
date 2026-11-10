@@ -96,11 +96,21 @@ type Config struct {
 	QabzinoGRPCAddress string `path:"providers.qabzino.grpc_address"`
 	// QabzinoTimeout limits each call to the Qabzino backend. Positive. Not hot-reloadable.
 	QabzinoTimeout time.Duration `path:"providers.qabzino.timeout"`
+	// TavanirGRPCAddress is the host:port of the Tavanir backend (gRPC, no TLS, as in bill:
+	// tavanir.grpcAddress). Empty: every call to Tavanir fails as "provider down" (task 022). Not
+	// hot-reloadable: the client is built at start.
+	TavanirGRPCAddress string `path:"providers.tavanir.grpc_address"`
+	// TavanirTimeout limits each call to the Tavanir backend. Positive. Not hot-reloadable.
+	TavanirTimeout time.Duration `path:"providers.tavanir.timeout"`
 
 	// CachingWater is how long a saved water inquiry answers the same bill again with no provider
 	// call (bill: caching.water, 1h). 0 turns the cache off; a negative value is rejected. Not
 	// hot-reloadable (task 021, decision 1): read at start.
 	CachingWater time.Duration `path:"caching.water"`
+	// CachingElectricity is how long a saved electricity inquiry answers the same bill again with
+	// no provider call (bill: caching.electricity, 1h). 0 turns the cache off; a negative value is
+	// rejected. Not hot-reloadable (task 022, as caching.water): read at start.
+	CachingElectricity time.Duration `path:"caching.electricity"`
 
 	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -109,6 +119,13 @@ type Config struct {
 	// DebugMockQabzinoReturnType is the answer of the Qabzino mock: MockReturnSuccess or
 	// MockReturnError. It has no effect while the mock is off. Development only.
 	DebugMockQabzinoReturnType string `path:"debug.mocks.qabzino.return_type"`
+
+	// DebugMockTavanirEnable makes the Tavanir adapter answer with a fixed answer, with no call to
+	// the backend (task 022). Development only, as DebugMockQabzinoEnable. Not hot-reloadable.
+	DebugMockTavanirEnable bool `path:"debug.mocks.tavanir.enable"`
+	// DebugMockTavanirReturnType is the answer of the Tavanir mock: MockReturnSuccess or
+	// MockReturnError. It has no effect while the mock is off. Development only.
+	DebugMockTavanirReturnType string `path:"debug.mocks.tavanir.return_type"`
 }
 
 func defaults() Config {
@@ -132,8 +149,11 @@ func defaults() Config {
 		ProvidersLoadInterval: time.Minute,
 
 		QabzinoTimeout:             10 * time.Second,
+		TavanirTimeout:             10 * time.Second,
 		CachingWater:               time.Hour,
+		CachingElectricity:         time.Hour,
 		DebugMockQabzinoReturnType: MockReturnSuccess,
+		DebugMockTavanirReturnType: MockReturnSuccess,
 	}
 }
 
@@ -213,11 +233,20 @@ func (c Config) validate() error {
 	if c.QabzinoTimeout <= 0 {
 		errs = append(errs, errors.New("providers.qabzino.timeout must be a positive duration (for example 10s)"))
 	}
+	if c.TavanirTimeout <= 0 {
+		errs = append(errs, errors.New("providers.tavanir.timeout must be a positive duration (for example 10s)"))
+	}
 	if c.CachingWater < 0 {
 		errs = append(errs, errors.New("caching.water must not be negative (0 turns the cache off)"))
 	}
+	if c.CachingElectricity < 0 {
+		errs = append(errs, errors.New("caching.electricity must not be negative (0 turns the cache off)"))
+	}
 	if !ValidMockReturnType(c.DebugMockQabzinoReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.qabzino.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
+	}
+	if !ValidMockReturnType(c.DebugMockTavanirReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.tavanir.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if c.DebugAuthMockUserID != "" {
 		if u, err := uuid.Parse(c.DebugAuthMockUserID); err != nil || u.String() != c.DebugAuthMockUserID {

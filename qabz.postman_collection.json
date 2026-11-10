@@ -257,6 +257,58 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Electricity",
+      "item": [
+        {
+          "name": "Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": \"1234567890125\",\n  \"payId\": \"\",\n  \"participateCode\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/electricity/inquiry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "electricity",
+                "inquiry"
+              ]
+            },
+            "description": "haf80.api.bill.Electricity/Inquiry. Inquires an electricity bill by billId (payId and participateCode are ignored, as in bill), with its details. The provider of (electricity, inquiry) is picked with ProvidersService; the saved inquiries of the same bill and provider that are younger than caching.electricity (default 1h; any user's rows count) answer with NO provider call and with the SAME details (saved in bill_inquiries.extra_data), else the provider is called (Tavanir) and the answer is saved. With debug.mocks.tavanir.enable true (dev mode only) the Tavanir adapter answers a fixed answer: price 18000000, payId 1800012345, paymentDeadline 2030-01-01, phase \"تک فاز\", companyName \"توزیع برق تهران بزرگ\", tariffType \"خانگی\", customerType \"1\", serialNumber 12345678, serviceAddress \"تهران، خیابان آزادی، پلاک ۱\", servicePostCode 1234567890, customerName \"مشترک آزمایشی\" (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"payId\":\"...\",\"billId\":\"...\",\"price\":<rials>,\"paymentDeadline\":\"yyyy-mm-dd\",\"phase\":\"...\",\"companyName\":\"...\",\"tariffType\":\"...\",\"customerType\":\"<number as text>\",\"serialNumber\":\"...\",\"serviceAddress\":\"...\",\"servicePostCode\":\"...\",\"customerName\":\"...\"} (a paid bill: price 0, an empty payId and empty details; an answer with no details: empty detail fields). An invalid billId (6 to 13 digits with a valid check digit) HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the bill HTTP 400 with the provider message; any other failure HTTP 500. POST /v1/electricity/inquiry/document (InquiryDocument) is not implemented yet (HTTP 501)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has price, payId, billId and paymentDeadline\", function () { const b = pm.response.json(); pm.expect(b).to.have.property(\"price\"); pm.expect(b.price).to.be.a(\"number\"); pm.expect(b).to.have.property(\"payId\"); pm.expect(b).to.have.property(\"billId\"); pm.expect(b).to.have.property(\"paymentDeadline\"); });",
+                  "pm.test(\"has the details\", function () { const b = pm.response.json(); [\"phase\", \"companyName\", \"tariffType\", \"customerType\", \"serialNumber\", \"serviceAddress\", \"servicePostCode\", \"customerName\"].forEach(function (k) { pm.expect(b).to.have.property(k); pm.expect(b[k]).to.be.a(\"string\"); }); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     }
   ]
 }

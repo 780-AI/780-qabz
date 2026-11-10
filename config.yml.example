@@ -47,9 +47,13 @@ providers:
   qabzino:
     grpc_address: ""         # host:port of the Qabzino backend (gRPC, no TLS); empty: every Qabzino call fails as "provider down"
     timeout: "10s"           # limit of each call to the Qabzino backend; positive
+  tavanir:
+    grpc_address: ""         # host:port of the Tavanir backend (gRPC, no TLS); empty: every Tavanir call fails as "provider down"
+    timeout: "10s"           # limit of each call to the Tavanir backend; positive
 
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
+  electricity: "1h"          # how long a saved electricity inquiry answers the same bill with no provider call; 0: cache off
 
 auth:
   secrets:
@@ -62,5 +66,8 @@ debug:
     mock_user_id: ""  # fake user: with disable: true, the user (token sub) of every call; a lower-case UUID, or "" for none
   mocks:                     # provider mocks: the adapter answers a fixed answer, with no call to the backend
     qabzino:
+      enable: false
+      return_type: "success" # "success" or "error"
+    tavanir:
       enable: false
       return_type: "success" # "success" or "error"

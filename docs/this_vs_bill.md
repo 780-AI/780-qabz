@@ -1,7 +1,8 @@
-<!-- VERSION: 0.7 -->
-<!-- Last Updated: 2026-11-09 -->
+<!-- VERSION: 0.8 -->
+<!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v0.8 — 2026-11-10 — Task 022: items 23 to 25 for POST /v1/electricity/inquiry (details saved in extra_data and returned from saved inquiries, an empty status of Tavanir, items 14-17 and 19-22 apply to electricity too).
 v0.7 — 2026-11-09 — Task 021: items 14-22 for POST /v1/water/inquiry (invalid request and no user, no provider, provider down, provider has no inquiry, adapter details, request rows, inquiry_step, tiebreak of the lookup, amount above uint32).
 v0.6 — 2026-11-08 — Task 020: item 13 for the provider pick (sorted order from memory, no Redis cache).
 v0.5 — 2026-11-08 — Task 019b: item 12 for DELETE /v1/mybill/{id} (the success text); item 11 no longer names the success message as bill's.
@@ -153,3 +154,21 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **Qabz:** answers gRPC `Internal` (HTTP 500) and writes one error log line (`water: inquiry amount does not fit the price field`).
     - **Reason:** a wrong price is worse than an error. The proto field is `uint32`; the amount of a water bill is far below the limit.
     - **Code:** the `@todo` comment in `Water.Inquiry` in `src/entry/grpc/water.go`.
+
+23. **`POST /v1/electricity/inquiry`: the details of an answer from saved inquiries, and `extra_data`.**
+    - **bill:** saves only `city` and `region` of the electricity details in `bill_inquiries.extra_data` (the other fields of `ElectricityDetails` have `json:"-"`). An answer from saved inquiries (`getFromCache`) has `Details: nil`, so the client gets the price, the pay ID and the deadline with empty `phase`, `companyName`, `tariffType`, `customerType`, `serialNumber`, `serviceAddress`, `servicePostCode` and `customerName`. Only the first call within `caching.electricity` has the details.
+    - **Qabz:** saves the details that the client sees too, as more keys of the same JSON object: `city`, `region` (as bill) and `phase`, `company_name`, `tariff_type`, `customer_type` (a number), `serial_number`, `service_address`, `service_post_code`, `customer_name`. An empty value is not written, as in bill. An answer from saved inquiries has the same details as the answer of the provider. The copies of a database answer (`is_cached = true`) keep `extra_data`, as in bill. A saved row that bill wrote (only `city` and `region`) answers with empty detail fields and `customerType` `"0"`; an `extra_data` that is not a JSON object is logged (`inquiry: read saved inquiries failed`) and the provider is asked.
+    - **Database effect:** `bill_inquiries.extra_data` of an electricity row now holds the customer name, the service address and the post code (personal data that bill did not store). A reader of `city` and `region` (the fee rules of bill's order flow) is not affected: the two keys are unchanged.
+    - **Reason:** the task Definition of Done: "the answer and its details saved and returned the same on a cache hit" (task 022, design decision 2).
+    - **Code:** the `@todo` comment on `electricityExtra` in `src/system/postgres/inquiry_details.go`.
+
+24. **Tavanir adapter: an empty status.**
+    - **bill:** an answer of Tavanir with no inquiry and an empty status is stored with an empty status in `bill_inquiry_requests`.
+    - **Qabz:** stores `failed`, as for Qabzino (item 18). Tavanir sends no trace ID, so `provider_trace_id` stays NULL (as in bill). As in bill, an answer with no inquiry has no bill ID and no details; a `success` answer with no inquiry is one inquiry with amount 0; the saved `city` is the company name (bill maps it so: the backend has no city field).
+    - **Reason:** the same as item 18.
+    - **Code:** the `@todo` comment on `Adapter.Inquiry` in `src/provider/tavanir/tavanir.go`.
+
+25. **`POST /v1/electricity/inquiry`: the differences of the water inquiry apply.**
+    - **bill / Qabz:** the flow and the error mapping are the same code as for water (`core/inquiry`, `answerInquiryError` in `src/entry/grpc/water.go`), so items 14 (invalid request, no user), 15 (no enabled provider), 16 (the provider call fails), 17 (the provider has no inquiry), 19 (one request row), 20 (`inquiry_step`: one provider call, whatever the column holds), 21 (order of saved rows) and 22 (an amount above the `uint32` price field) apply to electricity with the log prefix `electricity:`.
+    - **Reason:** one flow for every bill type (task 022: "Do not copy the water flow").
+    - **Code:** `Electricity.Inquiry` in `src/entry/grpc/electricity.go` (the `@todo` comments name items 14 and 22).

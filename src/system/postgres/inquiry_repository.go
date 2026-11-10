@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valyala/fastjson"
+
 	"qabz/core/inquiry"
 )
 
@@ -16,12 +18,12 @@ import (
 // GetValidInquiryByInquiryID): the same inquiry_id and provider_id, newer than the ttl, not a copy
 // (is_cached = false) and not paid (is_paid = false); the rows of every user count. The
 // interval is built from the seconds of $2 (bill builds it as SQL text). A NULL column reads as
-// "" (amount 0).
+// "" (amount 0). extra_data (the details, task 022) is read as its JSON text.
 // @todo bill orders by created_at DESC only; rows saved in one transaction have the same
 // created_at, so their order is not fixed. Qabz adds id DESC. See docs/this_vs_bill.md, item 21.
 const findValidInquiriesSQL = `SELECT id::text, user_id::text, inquiry_id, provider_id, provider_name, bill_type,
 	COALESCE(tid, ''), COALESCE(inquiry_type, ''), COALESCE(bill_id, ''), COALESCE(pay_id, ''),
-	COALESCE(payment_deadline, ''), COALESCE(amount, 0)
+	COALESCE(payment_deadline, ''), COALESCE(amount, 0), COALESCE(extra_data::text, '')
 FROM bill_inquiries
 WHERE inquiry_id = $1 AND created_at > NOW() - make_interval(secs => $2::float8)
 	AND is_cached = false AND provider_id = $3 AND is_paid = false
@@ -29,15 +31,16 @@ ORDER BY created_at DESC, id DESC
 LIMIT 2`
 
 // insertInquiryColumns are the columns that SaveInquiries writes, in the order of its arguments.
-// An empty string is stored as NULL, as bill (go-pg) does. extra_data stays NULL (the Qabzino
-// water answer has no details). created_at and updated_at get their column defaults.
+// An empty string is stored as NULL, as bill (go-pg) does. extra_data is the JSON text of the
+// details (inquiryExtraData), NULL when the answer has none (the Qabzino water answer). created_at
+// and updated_at get their column defaults.
 var insertInquiryColumns = []struct {
 	name string
-	cast string // wraps the placeholder: "" (as is) or NULLIF(..., '')
+	cast string // wraps the placeholder: "" (as is), "nullif" (NULLIF(..., '')) or "jsonb" (NULLIF(..., '')::jsonb)
 }{
 	{"id", ""}, {"user_id", ""}, {"inquiry_id", ""}, {"provider_id", ""}, {"provider_name", ""},
 	{"bill_type", ""}, {"tid", "nullif"}, {"inquiry_type", "nullif"}, {"bill_id", "nullif"}, {"pay_id", "nullif"},
-	{"payment_deadline", "nullif"}, {"amount", ""}, {"is_cached", ""},
+	{"payment_deadline", "nullif"}, {"amount", ""}, {"is_cached", ""}, {"extra_data", "jsonb"},
 }
 
 // insertInquiriesSQL builds one INSERT with a row of placeholders for each of n inquiries, so the
@@ -63,9 +66,12 @@ func insertInquiriesSQL(n int) string {
 				b.WriteString(", ")
 			}
 			arg++
-			if c.cast == "nullif" {
+			switch c.cast {
+			case "nullif":
 				b.WriteString("NULLIF($" + strconv.Itoa(arg) + ", '')")
-			} else {
+			case "jsonb":
+				b.WriteString("NULLIF($" + strconv.Itoa(arg) + "::text, '')::jsonb")
+			default:
 				b.WriteString("$" + strconv.Itoa(arg))
 			}
 		}
@@ -86,7 +92,11 @@ const finishInquiryRequestSQL = `UPDATE bill_inquiry_requests SET status = $2, p
 
 // InquiryRepository implements inquiry.Repository on the bill_inquiries and bill_inquiry_requests
 // tables. Raw queries, no ORM.
-type InquiryRepository struct{ db querier }
+type InquiryRepository struct {
+	db querier
+	// parsers are the fastjson parsers that read extra_data (a hot path, conventions § 1).
+	parsers fastjson.ParserPool
+}
 
 var _ inquiry.Repository = (*InquiryRepository)(nil)
 
@@ -101,7 +111,9 @@ func NewInquiryRepository(c *Client) *InquiryRepository {
 
 var errNoInquiryPool = errors.New("inquiry repository: no database pool")
 
-// FindValid returns the saved inquiries that can answer the bill again (see findValidInquiriesSQL).
+// FindValid returns the saved inquiries that can answer the bill again (see findValidInquiriesSQL),
+// each with the details of its extra_data (inquiryDetails). An extra_data that cannot be read is an
+// error: the flow then asks the provider.
 func (r *InquiryRepository) FindValid(ctx context.Context, inquiryID string, ttl time.Duration, providerID int64) ([]inquiry.Row, error) {
 	if r == nil || r.db == nil {
 		return nil, errNoInquiryPool
@@ -114,18 +126,24 @@ func (r *InquiryRepository) FindValid(ctx context.Context, inquiryID string, ttl
 		return nil, errors.New("inquiry repository: no rows from Query")
 	}
 	defer rows.Close()
+	parser := r.parsers.Get()
+	defer r.parsers.Put(parser)
 	var out []inquiry.Row
 	for rows.Next() {
 		var x inquiry.Row
 		var amount int64
+		var extra string
 		if err := rows.Scan(&x.ID, &x.UserID, &x.InquiryID, &x.ProviderID, &x.ProviderName, &x.BillType,
-			&x.ProviderTraceID, &x.InquiryType, &x.BillID, &x.PayID, &x.PaymentDeadline, &amount); err != nil {
+			&x.ProviderTraceID, &x.InquiryType, &x.BillID, &x.PayID, &x.PaymentDeadline, &amount, &extra); err != nil {
 			return nil, err
 		}
 		if amount < 0 {
 			return nil, fmt.Errorf("inquiry repository: inquiry %s has a negative amount", x.ID)
 		}
 		x.Amount = uint64(amount)
+		if x.Details, err = inquiryDetails(parser, x.BillType, extra); err != nil {
+			return nil, fmt.Errorf("inquiry repository: inquiry %s: %w", x.ID, err)
+		}
 		out = append(out, x)
 	}
 	if err := rows.Err(); err != nil {
@@ -147,8 +165,12 @@ func (r *InquiryRepository) SaveInquiries(ctx context.Context, rows []inquiry.Ro
 		if x.Amount > math.MaxInt64 {
 			return fmt.Errorf("inquiry repository: inquiry %s has an amount that does not fit bigint", x.ID)
 		}
+		extra, err := inquiryExtraData(x.Details)
+		if err != nil {
+			return fmt.Errorf("inquiry repository: inquiry %s: %w", x.ID, err)
+		}
 		args = append(args, x.ID, x.UserID, x.InquiryID, x.ProviderID, x.ProviderName, x.BillType, x.ProviderTraceID,
-			x.InquiryType, x.BillID, x.PayID, x.PaymentDeadline, int64(x.Amount), x.IsCached)
+			x.InquiryType, x.BillID, x.PayID, x.PaymentDeadline, int64(x.Amount), x.IsCached, extra)
 	}
 	_, err := r.db.Exec(ctx, insertInquiriesSQL(len(rows)), args...)
 	return err

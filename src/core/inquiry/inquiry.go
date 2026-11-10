@@ -1,8 +1,9 @@
 // Package inquiry is the bill inquiry flow (system.html, core/inquiry). It copies the old bill
 // service (service/billInquiry/inquiry.go): pick the provider of the bill type, answer from the
 // saved inquiries when they are still valid, else call the provider and save the answer. The rows
-// are in the bill_inquiries and bill_inquiry_requests tables of the bill database. Task 021
-// implements water.
+// are in the bill_inquiries and bill_inquiry_requests tables of the bill database. The flow is the
+// same for every bill type: task 021 implements water, task 022 adds electricity and the details of
+// an answer (provider.Details).
 package inquiry
 
 import (
@@ -51,8 +52,9 @@ const NoProviderLabel = "none"
 const finishTimeout = 5 * time.Second
 
 // tidPrefixes are the first digit of the tid of a request row for each bill type (bill:
-// pkg/reference WaterReference).
-var tidPrefixes = map[string]int{provider.BillTypeWater: 1}
+// pkg/reference WaterReference, ElectricityReference). A bill type is supported by the flow when it
+// has a prefix here.
+var tidPrefixes = map[string]int{provider.BillTypeWater: 1, provider.BillTypeElectricity: 2}
 
 var (
 	// ErrInvalid is the error of a request that breaks a rule. Test it with errors.Is.
@@ -92,6 +94,9 @@ type Inquiry struct {
 type Result struct {
 	BillID    string
 	Inquiries []Inquiry
+	// Details are the details of the answer (electricity), or nil. Saved inquiries give the details
+	// that were saved with them, so the two sources answer the same. Read-only.
+	Details *provider.Details
 	// FromDatabase is true when the answer came from saved inquiries (no provider call).
 	FromDatabase bool
 }
@@ -111,6 +116,8 @@ type Row struct {
 	PaymentDeadline string
 	Amount          uint64
 	IsCached        bool
+	// Details is the extra_data column: the details of the answer, or nil (NULL). Read-only.
+	Details *provider.Details
 }
 
 // RequestRow is one row of bill_inquiry_requests.
@@ -223,11 +230,12 @@ func generateTID(billType string) (string, error) {
 //  2. It picks the provider of the bill type (an error that wraps provider.ErrNoProvider when none
 //     is enabled) and its adapter (ErrNoAdapter).
 //  3. Saved inquiries of the same bill and provider that are valid answer the call with no
-//     provider call; copies for the user are saved (is_cached true). A failed read or a failed
-//     copy write is logged and does not fail the call.
+//     provider call, with the details that were saved with them; copies for the user are saved
+//     (is_cached true). A failed read or a failed copy write is logged and does not fail the call.
 //  4. Else it writes the request row (RequestInitial), calls the provider, writes the final status
-//     and the provider trace ID, and saves each inquiry of the answer. A call that fails gives an
-//     error that wraps provider.ErrProviderDown; an answer with no inquiry gives *RefusedError.
+//     and the provider trace ID, and saves each inquiry of the answer with the details. A call
+//     that fails gives an error that wraps provider.ErrProviderDown; an answer with no inquiry
+//     gives *RefusedError.
 //
 // Every other error is a failure of the database or of the code, with the stage in its text.
 func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
@@ -302,6 +310,9 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 	copies := make([]Row, 0, len(rows))
 	for _, r := range rows {
 		res.BillID = r.BillID
+		if r.Details != nil {
+			res.Details = r.Details // as the inquiry that the handler sends: the last one wins
+		}
 		c := r
 		c.ID, c.UserID, c.IsCached = s.newID(), req.UserID, true
 		copies = append(copies, c)
@@ -374,13 +385,14 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 	}
 	s.callDone(pro.Name, CallOK, d)
 
-	res := Result{BillID: resp.BillID, Inquiries: make([]Inquiry, 0, len(resp.Inquiries))}
+	res := Result{BillID: resp.BillID, Details: resp.Details, Inquiries: make([]Inquiry, 0, len(resp.Inquiries))}
 	rows := make([]Row, 0, len(resp.Inquiries))
 	for _, it := range resp.Inquiries {
 		r := Row{
 			ID: s.newID(), UserID: req.UserID, InquiryID: req.InquiryID, ProviderID: pro.ID, ProviderName: pro.Name,
 			BillType: req.BillType, ProviderTraceID: resp.ProviderTraceID, InquiryType: it.InquiryType, BillID: resp.BillID,
 			PayID: it.PayID, PaymentDeadline: fixPaymentDeadline(it.PaymentDeadline), Amount: it.Amount,
+			Details: resp.Details,
 		}
 		rows = append(rows, r)
 		res.Inquiries = append(res.Inquiries, Inquiry{

@@ -425,3 +425,70 @@ func TestValidMockReturnType(t *testing.T) {
 	assert.False(t, ValidMockReturnType(""))
 	assert.False(t, ValidMockReturnType("Success"))
 }
+
+// TestParseElectricityInquiryKeys (task 022): the Tavanir keys and caching.electricity have their
+// defaults, take their values and are checked; they do not depend on the Qabzino and water keys.
+func TestParseElectricityInquiryKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "", c.TavanirGRPCAddress, "default address")
+	assert.Equal(t, 10*time.Second, c.TavanirTimeout, "default timeout")
+	assert.Equal(t, time.Hour, c.CachingElectricity, "default cache TTL (bill: caching.electricity 1h)")
+	assert.False(t, c.DebugMockTavanirEnable, "the mock is off by default")
+	assert.Equal(t, MockReturnSuccess, c.DebugMockTavanirReturnType)
+
+	c, err = Parse([]byte(base + `providers: {tavanir: {grpc_address: "t:8084", timeout: "3s"}}
+caching: {electricity: "0s"}
+debug: {mocks: {tavanir: {enable: true, return_type: error}}}
+`))
+	if assert.NoError(t, err) {
+		assert.Equal(t, "t:8084", c.TavanirGRPCAddress)
+		assert.Equal(t, 3*time.Second, c.TavanirTimeout)
+		assert.Equal(t, time.Duration(0), c.CachingElectricity, "0 turns the cache off")
+		assert.True(t, c.DebugMockTavanirEnable)
+		assert.Equal(t, MockReturnError, c.DebugMockTavanirReturnType)
+		assert.Equal(t, "", c.QabzinoGRPCAddress, "the Qabzino keys keep their defaults")
+		assert.Equal(t, 10*time.Second, c.QabzinoTimeout)
+		assert.Equal(t, time.Hour, c.CachingWater)
+		assert.False(t, c.DebugMockQabzinoEnable)
+	}
+	c, err = Parse([]byte(base + "caching: {electricity: \"90m\", water: \"5m\"}\n"))
+	if assert.NoError(t, err) {
+		assert.Equal(t, 90*time.Minute, c.CachingElectricity)
+		assert.Equal(t, 5*time.Minute, c.CachingWater)
+	}
+
+	for yml, want := range map[string]string{
+		"providers: {tavanir: {timeout: \"0s\"}}":                      "providers.tavanir.timeout must be a positive duration",
+		"providers: {tavanir: {timeout: \"-1s\"}}":                     "providers.tavanir.timeout must be a positive duration",
+		"caching: {electricity: \"-1s\"}":                              "caching.electricity must not be negative",
+		"debug: {mocks: {tavanir: {return_type: \"maybe\"}}}":          "debug.mocks.tavanir.return_type must be",
+		"debug: {mocks: {tavanir: {enable: true, return_type: \"\"}}}": "debug.mocks.tavanir.return_type must be",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+}
+
+// TestTavanirMockSectionOnlyInDev (task 022): a mode other than dev removes the debug section (task
+// 020c), so debug.mocks.tavanir.enable: true is ignored there and a bad return type is not checked.
+func TestTavanirMockSectionOnlyInDev(t *testing.T) {
+	const base = "database: {postgres: {password: pw}}\ndebug: {mocks: {tavanir: {enable: true, return_type: error}}}\n"
+	for _, mode := range []string{"stage", "prod"} {
+		c, err := Parse([]byte("mode: " + mode + "\n" + base))
+		if assert.NoError(t, err, mode) {
+			assert.False(t, c.DebugMockTavanirEnable, mode)
+			assert.Equal(t, MockReturnSuccess, c.DebugMockTavanirReturnType, mode)
+		}
+		_, err = Parse([]byte("mode: " + mode + "\ndatabase: {postgres: {password: pw}}\ndebug: {mocks: {tavanir: {return_type: maybe}}}\n"))
+		assert.NoError(t, err, mode+": the section is removed, not checked")
+	}
+	c, err := Parse([]byte("mode: dev\n" + base))
+	if assert.NoError(t, err) {
+		assert.True(t, c.DebugMockTavanirEnable)
+		assert.Equal(t, MockReturnError, c.DebugMockTavanirReturnType)
+	}
+}

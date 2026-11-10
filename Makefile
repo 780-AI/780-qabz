@@ -88,7 +88,7 @@ test-db-clean: env
 	QABZ_TEST_ADMIN_DSN="$$admin" $(TESTDB) clean
 
 .PHONY: proto
-## proto: regenerate Go, gRPC, gateway and swagger code from pb/proto/$(PB_DIR), and the Qabzino backend client from pb/proto/qabzino. Run after every fresh pull.
+## proto: regenerate Go, gRPC, gateway and swagger code from pb/proto/$(PB_DIR), and the Qabzino and Tavanir backend clients from pb/proto/qabzino and pb/proto/tavanir. Run after every fresh pull.
 proto:
 	@test -d $(PB_PROTO)/$(PB_DIR) || { echo "missing $(PB_PROTO)/$(PB_DIR): run 'git submodule update --init'"; exit 1; }
 	@for tool in protoc protoc-gen-go protoc-gen-go-grpc protoc-gen-grpc-gateway protoc-gen-openapiv2; do \
@@ -115,3 +115,11 @@ proto:
 		--go-grpc_out $(PB_OUT) \
 		--go-grpc_opt paths=source_relative \
 		$(PB_PROTO)/qabzino/internalService.proto
+	@# The Tavanir backend client (task 022): the internal inquiry service, read-only from pb/ (conventions § 6).
+	rm -rf $(PB_OUT)/tavanir
+	protoc -I $(PB_PROTO) -I $(PB_AUX) \
+		--go_out $(PB_OUT) \
+		--go_opt paths=source_relative \
+		--go-grpc_out $(PB_OUT) \
+		--go-grpc_opt paths=source_relative \
+		$(PB_PROTO)/tavanir/internalService.proto
