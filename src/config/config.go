@@ -111,14 +111,16 @@ type Config struct {
 	QabzinoGasBillEndpoint         string `path:"providers.qabzino.gas_bill_endpoint"`
 	QabzinoWaterBillEndpoint       string `path:"providers.qabzino.water_bill_endpoint"`
 
-	// TavanirGRPCAddress is the host:port of the Tavanir backend (gRPC, no TLS, as in bill:
-	// tavanir.grpcAddress). Empty: every call to Tavanir fails as "provider down" (task 022). Not
-	// hot-reloadable: the client is built at start.
-	TavanirGRPCAddress string `path:"providers.tavanir.grpc_address"`
-	// TavanirTimeout limits each call to the Tavanir backend. Positive. Not hot-reloadable.
+	// TavanirEnabled turns the Tavanir provider on (task 034). False (the default): every call to
+	// Tavanir fails as "provider down", nothing is sent to Tavanir and the mock
+	// (debug.mocks.tavanir) does not apply. Not hot-reloadable.
+	TavanirEnabled bool `path:"providers.tavanir.enabled"`
+	// TavanirTimeout limits each HTTP call to Tavanir (the login and the inquiry each). Positive. Not hot-reloadable.
 	TavanirTimeout time.Duration `path:"providers.tavanir.timeout"`
-	// The direct Tavanir adapter's config (task 033; the tavanir service: tavanir.authEndpoint and so
-	// on). Config only: no code reads these keys yet. The password is a Secret (never printed).
+	// The config of the Tavanir adapter (task 033; the tavanir service: tavanir.authEndpoint and so
+	// on). The adapter (task 034) uses auth_endpoint, basic_branch_endpoint, username and password;
+	// bill_document_endpoint and branch_debit_endpoint are not used yet. The password is a Secret
+	// (never printed).
 	TavanirAuthEndpoint         string `path:"providers.tavanir.auth_endpoint"`
 	TavanirBasicBranchEndpoint  string `path:"providers.tavanir.basic_branch_endpoint"`
 	TavanirBillDocumentEndpoint string `path:"providers.tavanir.bill_document_endpoint"`
@@ -126,7 +128,8 @@ type Config struct {
 	TavanirUsername             string `path:"providers.tavanir.username"`
 	TavanirPassword             Secret `path:"providers.tavanir.password"`
 	// The circuit breaker (task 033, as the tavanir service): TavanirCircuitBreakerFailureRatio is a
-	// percentage, 0 to 100.
+	// percentage, 0 to 100. Not used yet: no provider has a circuit breaker (operator decision of
+	// task 034; it comes at the end of the project).
 	TavanirCircuitBreakerName         string        `path:"providers.tavanir.circuit_breaker.name"`
 	TavanirCircuitBreakerMaxRequests  uint32        `path:"providers.tavanir.circuit_breaker.max_requests"`
 	TavanirCircuitBreakerInterval     time.Duration `path:"providers.tavanir.circuit_breaker.interval"`

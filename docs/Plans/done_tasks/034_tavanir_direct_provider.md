@@ -1,9 +1,23 @@
-<!-- VERSION: 0.1 -->
-# 034_tavanir_direct_provider — the Tavanir provider calls the Tavanir (SAAPA) endpoints directly; the gRPC adapter becomes TavanirProxy
+<!-- VERSION: 0.2 -->
+# 034_tavanir_direct_provider — the Tavanir provider is a direct client of the Tavanir (SAAPA) endpoints; no gRPC, no rename, no circuit breaker
 
-Status: pending
+Status: done
 
-Depends on task 033 (the config keys), which is in progress.
+Depends on task 033 (the config keys), done.
+
+## Operator decisions (2026-11-10, they replace the matching text of the Description below)
+
+1. **Tavanir stays `tavanir`.** Nothing is renamed: there is no `tavanirproxy`. The package `src/provider/tavanir/` keeps its name and its provider name.
+2. **No circuit breaker for now.** A circuit breaker is added to every provider at the end of the project. The keys `providers.tavanir.circuit_breaker.*` (task 033) stay parsed and are not used.
+3. **Tavanir implements `ProviderInterface` and is, inside, a client of the Tavanir endpoints of the config.** It does not call the microservice named `tavanir`, not at all. So the gRPC client of that microservice is removed from `provider/tavanir`, the key `providers.tavanir.grpc_address` is removed (nothing reads it), and `make proto` no longer generates the Tavanir backend client.
+4. Accepted with the design: `providers.tavanir.enabled` (default `false`); after an HTTP 401 the call logs in again and is sent one more time.
+
+## Result
+
+- `src/provider/tavanir/tavanir.go`: login (`auth_endpoint`, `username`, `password`), the token in memory (one login at a time; a 401 drops the token only when it is still the token of that call; one new login and one more send; a second 401 is provider down), the inquiry (`basic_branch_endpoint`, `Authorization: Bearer <token>`), the mapping with details, the status codes (19 refused codes give `failed` with the text; every other code is provider down), the system TLS roots, `providers.tavanir.timeout` for each HTTP call.
+- The chain of `esrv.saapa.ir` verifies with the system roots (handshake only, 2026-11-10; no HTTP request was sent).
+- Metrics (conventions § 12): no new metric. The login is part of the provider call that `qabz_provider_calls_total` and `qabz_provider_call_duration_ms` already count (`provider="tavanir"`); a failed login counts as `down`.
+- Verification evidence (2026-11-10): `make test GO_TEST_ARGS="-race -count=1 -cover -v"`: 648 pass, 0 fail, 0 skip; `provider/tavanir` 98.0%, `app` 88.9%, `config` 97.6%. Positive controls (temporary overlay, source unchanged): with no token drop 4 tests fail; with no login lock 2 tests fail. Feature ON in the running App (ports 18080 / 18082 / 19090, scratch config with no real credential and no real endpoint): (1) mock on, `enabled: true`: HTTP 200 with the mock answer and details, the second call from the database (`provider_ok` 1, `db_hit` 1, one mock line); (2) mock on, `enabled: false`: HTTP 503, the warn line at start, one error line `providers.tavanir.enabled is false`, no mock line; (3) mock off, the real adapter against a local fake Tavanir server: one login for two bills, the token rejected once gives a second login and one more send, HTTP 200 with the mapped details (`payId` `2200012345`, deadline `2031-03-04`); status 507 gives HTTP 400 with `شناسه قبض متعلق به برق نمی باشد`; status 502 gives HTTP 503 and one error line `status 502`; the log has no password and no token. The test rows were deleted. No call reached `esrv.saapa.ir`.
 
 ## Description
 

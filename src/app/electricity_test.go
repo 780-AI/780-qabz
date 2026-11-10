@@ -18,16 +18,17 @@ import (
 )
 
 const (
-	tavanirMockWarn      = "provider mock enabled (debug.mocks.tavanir): development only, no call to the Tavanir backend"
-	tavanirNoAddressWarn = "providers.tavanir.grpc_address is empty: every inquiry to Tavanir fails as provider down"
-	mockInfoLine         = "provider mock: inquiry answered with no call to the provider"
+	tavanirMockWarn     = "provider mock enabled (debug.mocks.tavanir): development only, no call to the Tavanir backend"
+	tavanirDisabledWarn = "providers.tavanir.enabled is false: every inquiry to Tavanir fails as provider down; the Tavanir mock does not apply"
+	mockInfoLine        = "provider mock: inquiry answered with no call to the provider"
 )
 
-// TestNewProviderRegistryTavanir (task 022): the registry has the Tavanir adapter next to Qabzino;
-// its mock wraps it only in dev mode with debug.mocks.tavanir.enable, and does not depend on the
-// Qabzino mock.
+// TestNewProviderRegistryTavanir (task 022, task 034): the registry has the Tavanir adapter next to
+// Qabzino; its mock wraps it only in dev mode with debug.mocks.tavanir.enable and
+// providers.tavanir.enabled (false wins over the mock), and does not depend on the Qabzino mock.
 func TestNewProviderRegistryTavanir(t *testing.T) {
 	req := provider.InquiryRequest{BillType: "electricity", UserID: "u", InquiryID: "1234567890125"}
+	const on = "providers: {tavanir: {enabled: true}}\n"
 	cases := []struct {
 		name     string
 		yml      string
@@ -35,14 +36,14 @@ func TestNewProviderRegistryTavanir(t *testing.T) {
 		wantErr  bool // a mock error answer
 		wantWarn string
 	}{
-		{"dev, mock success", "mode: dev\ndebug: {mocks: {tavanir: {enable: true, return_type: success}}}", true, false, tavanirMockWarn},
-		{"dev, mock error", "mode: dev\ndebug: {mocks: {tavanir: {enable: true, return_type: error}}}", true, true, tavanirMockWarn},
-		{"dev, mock on, address set", "mode: dev\nproviders: {tavanir: {grpc_address: \"127.0.0.1:1\"}}\ndebug: {mocks: {tavanir: {enable: true}}}", true, false, tavanirMockWarn},
-		{"dev, mock off, no address", "mode: dev\ndebug: {mocks: {tavanir: {enable: false}}}", false, false, tavanirNoAddressWarn},
-		{"dev, only the Qabzino mock", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, tavanirNoAddressWarn},
-		{"stage, enable ignored", "mode: stage\ndebug: {mocks: {tavanir: {enable: true}}}", false, false, tavanirNoAddressWarn},
-		{"prod, enable ignored", "mode: prod\ndebug: {mocks: {tavanir: {enable: true, return_type: error}}}", false, false, tavanirNoAddressWarn},
-		{"prod, address set", "mode: prod\nproviders: {tavanir: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}}", false, false, ""},
+		{"dev, mock success", "mode: dev\n" + on + "debug: {mocks: {tavanir: {enable: true, return_type: success}}}", true, false, tavanirMockWarn},
+		{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {tavanir: {enable: true, return_type: error}}}", true, true, tavanirMockWarn},
+		{"dev, mock on, tavanir disabled", "mode: dev\ndebug: {mocks: {tavanir: {enable: true}}}", false, false, tavanirDisabledWarn},
+		{"dev, mock off, tavanir disabled", "mode: dev\ndebug: {mocks: {tavanir: {enable: false}}}", false, false, tavanirDisabledWarn},
+		{"dev, only the Qabzino mock", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, tavanirDisabledWarn},
+		{"stage, enable ignored, tavanir disabled", "mode: stage\ndebug: {mocks: {tavanir: {enable: true}}}", false, false, tavanirDisabledWarn},
+		{"prod, mock ignored, enabled, no credentials", "mode: prod\n" + on + "debug: {mocks: {tavanir: {enable: true, return_type: error}}}", false, false, ""},
+		{"prod, enabled, local endpoint (nothing listens)", "mode: prod\nproviders: {tavanir: {enabled: true, username: u, password: p, auth_endpoint: \"http://127.0.0.1:1/a\", basic_branch_endpoint: \"http://127.0.0.1:1/b\", timeout: 300ms}}", false, false, ""},
 	}
 	for _, c := range cases {
 		log := &liveLogger{}
@@ -75,10 +76,10 @@ func TestNewProviderRegistryTavanir(t *testing.T) {
 			assert.Equal(t, 0, log.count("info", mockInfoLine), c.name)
 		}
 		assert.Equal(t, btoi(c.wantWarn == tavanirMockWarn), log.count("warn", tavanirMockWarn), c.name)
-		assert.Equal(t, btoi(c.wantWarn == tavanirNoAddressWarn), log.count("warn", tavanirNoAddressWarn), c.name)
+		assert.Equal(t, btoi(c.wantWarn == tavanirDisabledWarn), log.count("warn", tavanirDisabledWarn), c.name)
 	}
 	// A nil logger writes nothing and does not panic.
-	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\ndebug: {mocks: {tavanir: {enable: true}}}"), nil)
+	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\n"+on+"debug: {mocks: {tavanir: {enable: true}}}"), nil)
 	if assert.NoError(t, err) && assert.NotNil(t, reg) {
 		if p, ok := reg.Get("tavanir"); assert.True(t, ok) && assert.NotNil(t, p) {
 			_, err = p.Inquiry(context.Background(), req)
@@ -97,11 +98,7 @@ func btoi(b bool) int {
 // TestRegisterAdapterRules: a nil registry or adapter is an error; a second adapter with the same
 // name is rejected; a bad return type of a mock that is on is an error.
 func TestRegisterAdapterRules(t *testing.T) {
-	c, err := tavanir.Dial("")
-	if !assert.NoError(t, err) {
-		return
-	}
-	a, err := tavanir.New(tavanir.Options{Client: c, Timeout: time.Second})
+	a, err := tavanir.New(tavanir.Options{Timeout: time.Second})
 	if !assert.NoError(t, err) || !assert.NotNil(t, a) {
 		return
 	}

@@ -54,6 +54,7 @@ func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string
 	cfg.QabzinoEnabled = true
 	cfg.DebugMockQabzinoEnable = true
 	cfg.DebugMockQabzinoReturnType = returnType
+	cfg.TavanirEnabled = true
 	cfg.DebugMockTavanirEnable = true
 	cfg.DebugMockTavanirReturnType = returnType
 	cfg.CachingWater = time.Hour

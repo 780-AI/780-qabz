@@ -1,7 +1,8 @@
-<!-- VERSION: 0.9 -->
+<!-- VERSION: 0.10 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v0.10 — 2026-11-10 — Task 034: item 27 for the direct Tavanir adapter (status codes, login, token, TLS check, no circuit breaker, field formats); item 24 updated (the direct adapter gives no empty status).
 v0.9 — 2026-11-10 — Task 030: item 26 for the direct Qabzino (Ayantech) adapter (status codes, TLS check).
 v0.8 — 2026-11-10 — Task 022: items 23 to 25 for POST /v1/electricity/inquiry (details saved in extra_data and returned from saved inquiries, an empty status of Tavanir, items 14-17 and 19-22 apply to electricity too).
 v0.7 — 2026-11-09 — Task 021: items 14-22 for POST /v1/water/inquiry (invalid request and no user, no provider, provider down, provider has no inquiry, adapter details, request rows, inquiry_step, tiebreak of the lookup, amount above uint32).
@@ -165,7 +166,7 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
 
 24. **Tavanir adapter: an empty status.**
     - **bill:** an answer of Tavanir with no inquiry and an empty status is stored with an empty status in `bill_inquiry_requests`.
-    - **Qabz:** stores `failed`, as for Qabzino (item 18). Tavanir sends no trace ID, so `provider_trace_id` stays NULL (as in bill). As in bill, an answer with no inquiry has no bill ID and no details; a `success` answer with no inquiry is one inquiry with amount 0; the saved `city` is the company name (bill maps it so: the backend has no city field).
+    - **Qabz:** stores `failed`, as for Qabzino (item 18): since task 034 the direct adapter gives a status for every answer (`success`, or `failed` for a refused code, item 27), so an empty status cannot occur. `provider_trace_id` stays NULL (as in bill). As in bill, an answer with no inquiry has no bill ID and no details; the saved `city` is the company name (bill maps it so).
     - **Reason:** the same as item 18.
     - **Code:** the `@todo` comment on `Adapter.Inquiry` in `src/provider/tavanir/tavanir.go`.
 
@@ -179,3 +180,9 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **Qabz:** the adapter (`provider/qabzino`, task 030) calls Ayantech itself. It maps `G00000` (success), `GD2068` (paid: success, amount 0) and `GD2061`, `GD2062`, `GD2067` (failed, with the code and the text of bill); `GD2066` and every other code (token, IP, internal and update codes included), a bad HTTP status or an unreadable body are "provider down" (HTTP 503, one error line with the code). It checks the TLS certificate. The trace ID of the answer is the `TraceNumber` that Qabz sent (Ayantech has none).
     - **Reason:** the unmapped codes are faults of the service or of the config, not of the user's input; the TLS check is a security default.
     - **Code:** the `@todo` comment on `Adapter.Inquiry` in `src/provider/qabzino/qabzino.go`.
+
+27. **Direct Tavanir adapter: status codes, login, token, TLS check, circuit breaker and field formats.**
+    - **bill / tavanir service:** bill calls the `tavanir` microservice over gRPC, and that service calls Tavanir (SAAPA). (a) Each Tavanir status code of its table gives a `failed` answer with a Persian message (500 gives `pending`); a code that is not in the table gives `pending` with the internal-error text. (b) A status 200 with an empty `error` array (`[]`) is not a success. (c) The login is a success when the `errors` table of its database says so for the status. (d) The token is kept with no lock; an HTTP 401 drops it and that call fails. (e) The HTTP client skips the TLS certificate check (`InsecureSkipVerify`). (f) It has a circuit breaker (`gobreaker`). (g) A numeric `service_post_code` prints as a float text (for example `1.23456789e+09`) and a null one as `<nil>`; a null pay ID prints as `<nil>`; a bill ID or a pay ID of more than 19 digits loses digits; `payment_dead_line` is read as RFC 3339 only; the customer name of an answer with no name is one space.
+    - **Qabz:** the adapter (`provider/tavanir`, task 034) calls Tavanir itself; Qabz sends nothing to the `tavanir` microservice. (a) The codes 500, 502, 506, 508, 509, 512, 513, 517, 524, 527, 528 and every code that the table does not have are "provider down" (HTTP 503, one error line with the code); the other 19 codes of the table give `failed` with the code and the text of the tavanir service. (b) A status 200 with no error item (missing, null or `[]`) is a success. (c) The login is a success when its status is 200 and the token is not empty; there is no database table. (d) One login runs at a time, the other calls wait for it; an HTTP 401 drops the token (only when it is still the token of that call), then the call logs in again and is sent one more time; a second 401 is provider down. (e) It checks the TLS certificate (the chain of `esrv.saapa.ir` verified on 2026-11-10). (f) It has no circuit breaker yet (operator decision: every provider gets one at the end of the project; `providers.tavanir.circuit_breaker.*` is parsed and not used). (g) A flexible field prints its digits (`1234567890`), null gives an empty value; all digits of a long number are kept; a deadline with no time zone is read too; the customer name has no space at its ends; a negative debt is amount 0.
+    - **Reason:** (a) the "down" codes are faults of Tavanir or of the distribution company, not of the user's input; (c) the adapter has no database; (d) Qabz serves many calls at once, so the token needs a lock and an expired token must not fail the user's call; (e) a security default; (f) operator decision of 2026-11-10; (g) the old texts are format faults.
+    - **Code:** the `@todo` comments on `Adapter.Inquiry` and `dateOnly` in `src/provider/tavanir/tavanir.go`.

@@ -53,15 +53,15 @@ providers:
     gas_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry"
     water_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry"
   tavanir:
-    grpc_address: ""         # host:port of the Tavanir backend (gRPC, no TLS); empty: every Tavanir call fails as "provider down"
-    timeout: "10s"           # limit of each call to the Tavanir backend; positive
+    enabled: false           # false: every Tavanir call fails as "provider down", nothing is sent to Tavanir, the mock does not apply
+    timeout: "10s"           # limit of each HTTP call to Tavanir (the login and the inquiry each); positive
     auth_endpoint: "https://esrv.saapa.ir/api/Users/authenticate"
     basic_branch_endpoint: "https://esrv.saapa.ir/api/ebills/getbranchdata"
     bill_document_endpoint: "https://esrv.saapa.ir/api/ebills/GetLastBillDocument"
     branch_debit_endpoint: "https://esrv.saapa.ir/api/ebills/getbranchdebit"
     username: ""             # Tavanir (SAAPA) user name; the real value only in config.yml
     password: ""             # Tavanir (SAAPA) password (secret); the real value only in config.yml
-    circuit_breaker:
+    circuit_breaker:         # not used yet: no provider has a circuit breaker
       name: "tavanir"
       max_requests: 100000
       interval: "1s"

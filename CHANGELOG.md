@@ -1,7 +1,8 @@
-<!-- VERSION: 3.0 -->
+<!-- VERSION: 3.1 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v3.1 — 2026-11-10 — Added 034-tavanir-direct-provider entry.
 v3.0 — 2026-11-10 — Added 033-tavanir-provider-config entry.
 v2.9 — 2026-11-10 — Added inquiry-database-answer-log-removed entry.
 v2.8 — 2026-11-10 — Added 030-qabzino-direct-provider entry.
@@ -123,6 +124,13 @@ v1.0 — 2026-10-28 — Initial.
 - **Impact:** Yes, a log line is gone. A database answer is now counted only by `qabz_inquiries_total{bill_type,provider,result="db_hit"}` (a Prometheus counter, with metrics on). No change to answers, rows or other metrics.
 - **QA scenarios:** `make test` (the two live tests check that the line is not written and that `db_hit` is counted); feature ON: call the same bill twice, then `curl localhost:9090/metrics`. Pass: the second call has no `answered from database` line and `qabz_inquiries_total{...result="db_hit"}` is 1.
 - **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-10] — Task 034: direct Tavanir (SAAPA) adapter, `providers.tavanir.enabled`; the gRPC client is removed
+- **Type:** Major (provider adapter replaced, config key added and removed, Critical File `system.html`)
+- **Files:** `src/provider/tavanir/tavanir.go` + `tavanir_test.go` (rewritten: an HTTPS client of the Tavanir endpoints; login, token in memory, inquiry with details, status codes; the package and the provider name stay `tavanir`); `src/config/config.go` (`TavanirEnabled`, default `false`; `TavanirGRPCAddress` removed) + `config_test.go`; `src/app/defaults.go` (registers the direct adapter; `disabledNotice` replaces `qabzinoNotice` and `noAddressNotice`; `enabled: false` wins over the mock) + `electricity_test.go`, `water_test.go`, `water_live_test.go`; `config.yml.example` (`enabled: false` in place of `grpc_address`); `config.yml` (git-ignored; `enabled: true` in place of `grpc_address`); `Makefile` (`make proto` no longer generates the Tavanir backend client); `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (item 27, item 24), `docs/folder_structure.md`, `src/app/README.md`; `docs/Plans/OPEN_TASKS.md`; task file `034_tavanir_direct_provider.md` (in `done_tasks/`).
+- **Impact:** Behavior changes. An electricity inquiry no longer goes to the `tavanir` microservice: Qabz logs in to Tavanir (SAAPA) and calls its basic branch endpoint itself. With the default config (`enabled: false`) every Tavanir call is "provider down" (HTTP 503) and nothing is sent. **Config migration:** remove `providers.tavanir.grpc_address`, add `providers.tavanir.enabled`. Operator decisions: no rename (no `tavanirproxy`), no circuit breaker for now (the `circuit_breaker` keys are parsed and not used), no call to the `tavanir` microservice. `POST /v1/electricity/inquiry` keeps its request and its answer fields (no Postman change). No new metric (the login is part of the counted provider call).
+- **QA scenarios:** `make test GO_TEST_ARGS="-race -count=1 -v"` (648 pass, no skip; `provider/tavanir` uses a local `httptest` server only). Feature ON, dev mode: mock on with `enabled: true` gives the mock answer and the second call from the database; `enabled: false` gives HTTP 503, the warn line and no mock line; the real adapter against a local fake Tavanir server (login, token reuse, new login after a 401, refused code 507, down code 502). All pass (2026-11-10). No call to `esrv.saapa.ir`; the first real call is for the operator. Details in `docs/Plans/OPEN_TASKS.md` and the task file.
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-10] — Task 033: Tavanir provider config (endpoints, credentials, circuit breaker); 030 closed
 - **Type:** Major (new config keys, Critical File `system.html`)

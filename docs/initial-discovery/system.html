@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.2 -->
+<!-- VERSION: 2.3 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.3 — 2026-11-10 — Task 034 direct Tavanir adapter: `providers.tavanir.enabled` (replaces `grpc_address`); the Tavanir adapter is an HTTPS client of the Tavanir (SAAPA) endpoints (login, token in memory, basic branch data) and calls no other service; no circuit breaker yet (the `circuit_breaker` keys are not used); the Providers table rows and the config example are updated.
 v2.2 — 2026-11-10 — Task 033 Tavanir provider config: the endpoint, credential and circuit breaker keys under `providers.tavanir` in the config example (config only; no code reads them yet; qabz implements the Tavanir provider itself, it does not call the tavanir service).
 v2.1 — 2026-11-10 — Task 030 direct Qabzino adapter: `providers.qabzino.enabled`; the Qabzino adapter calls Ayantech over HTTPS with the token and the water endpoint; the gRPC adapter is renamed QabzinoProxy (not used); the Providers table row and the config example are updated.
 v2.0 — 2026-11-10 — Task 029 Qabzino provider config: `providers.qabzino.token` and the three bill endpoint keys in the config example (config only; no code reads them yet).
@@ -178,8 +179,8 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 | `irancell` | gRPC | `pb.InternalService/BillInquiry` | internal | Inquiry | `Irancell` mobile |
 | `irancell` | gRPC | `pb.InternalService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | `Irancell` mobile (also called by `recharge`, so it has to stay) |
 | `irancell` | NATS | `irancell-bill` | internal | Order | `Irancell` mobile payment |
-| `tavanir` | gRPC | `haf80.api.tavanir.InternalInquiryService/BillInquiry` | internal | Inquiry | Electricity |
-| `tavanir` | gRPC | `haf80.api.tavanir.InternalInquiryService/BillDocument` | internal | Inquiry | Electricity |
+| `tavanir` | HTTPS (Tavanir SAAPA, direct since task 034; Qabz does not call the `tavanir` microservice) | `providers.tavanir.auth_endpoint` (login), `providers.tavanir.basic_branch_endpoint` (inquiry) | user name and password, then a Bearer token kept in memory | Inquiry | Electricity |
+| `tavanir` | HTTPS (not implemented yet) | `providers.tavanir.bill_document_endpoint`, `providers.tavanir.branch_debit_endpoint` | the same token | Inquiry (bill document, debit) | Electricity |
 | `Karashab` (outside our projects) | HTTP | inquiry URL, called by `bill` (`BillInquiry`) | internal | Inquiry | Landline |
 | `Karashab` (outside our projects) | HTTP | payment URL, called by `bill` (`SendPaymentInfo`) | internal | Order | Landline |
 
@@ -207,15 +208,15 @@ providers:
     gas_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry
     water_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry
   tavanir:
-    grpc_address: tavanir:8084   # host:port, gRPC, no TLS; empty: every Tavanir call fails as "provider down"
-    timeout: 10s                 # limit of each call; positive
-    auth_endpoint: https://esrv.saapa.ir/api/Users/authenticate           # task 033 (config only; no code reads these yet)
+    enabled: false               # false (default): every Tavanir call fails as "provider down", nothing is sent, the mock does not apply (task 034)
+    timeout: 10s                 # limit of each HTTP call (the login and the inquiry each); positive
+    auth_endpoint: https://esrv.saapa.ir/api/Users/authenticate           # the login; the adapter uses auth_endpoint, basic_branch_endpoint, username and password (task 034)
     basic_branch_endpoint: https://esrv.saapa.ir/api/ebills/getbranchdata
     bill_document_endpoint: https://esrv.saapa.ir/api/ebills/GetLastBillDocument
     branch_debit_endpoint: https://esrv.saapa.ir/api/ebills/getbranchdebit
     username: ""                 # Tavanir (SAAPA) user name; the real value only in config.yml
     password: ""                 # Tavanir (SAAPA) password (secret); the real value only in config.yml
-    circuit_breaker: {name: tavanir, max_requests: 100000, interval: 1s, timeout: 10s, failure_ratio: 99}   # failure_ratio in percent
+    circuit_breaker: {name: tavanir, max_requests: 100000, interval: 1s, timeout: 10s, failure_ratio: 99}   # failure_ratio in percent; not used yet (no provider has a circuit breaker)
 
 caching:
   water: 1h                      # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
@@ -235,7 +236,7 @@ debug:
       return_type: success   # success or error
 ```
 
-With `enable: true` the adapter does not call the backend (Qabzino: only when `providers.qabzino.enabled` is `true`; `enabled: false` wins over the mock, task 030). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
+With `enable: true` the adapter does not call the backend (only when `providers.qabzino.enabled` / `providers.tavanir.enabled` is `true`; `enabled: false` wins over the mock, tasks 030 and 034). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
 
 Rules:
 - **Services that stay.** `parsian-v2`, `jiring-switch` and `irancell` keep their own config. `Parsian` and `Irancell` also have other clients (Issue #3).
@@ -296,7 +297,7 @@ type ProviderRegistry interface {
 
 `ProviderSwitcher` switches a call to a new provider if the current one doesn't respond. Every provider has a circuit breaker. An open breaker means the provider is skipped, without waiting for a timeout.
 
-**Gap.** `bill` has no circuit breaker. Only `irancell` and `tavanir` have one. The new system must have one for every provider.
+**Gap.** `bill` has no circuit breaker. Only `irancell` and `tavanir` have one. The new system must have one for every provider. Until then no provider adapter of `qabz` has one (operator decision of task 034: it is added to every provider at the end of the project); the keys `providers.tavanir.circuit_breaker.*` are parsed and not used.
 
 A circuit breaker counts the recent failures of one provider. When too many calls fail, it opens and stops sending calls to that provider, so requests don't wait for a timeout one by one. After a short time it lets one test call through. If the test succeeds, it closes and the provider is used again.
 

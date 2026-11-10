@@ -306,8 +306,9 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 
 // newProviderRegistry builds the provider adapters: Qabzino (task 021; since task 030 the direct
 // HTTP adapter with providers.qabzino.enabled, token, water_bill_endpoint and timeout, not the gRPC
-// QabzinoProxy) and Tavanir (task 022: the client of providers.tavanir.grpc_address, lazy; empty:
-// every call fails as "provider down", one warn line; and providers.tavanir.timeout). The mock of a provider
+// QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
+// endpoints with providers.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
+// and timeout; it calls no other service). The mock of a provider
 // (debug.mocks.<provider>) is applied only when Config.Mode is dev and its enable key is true (one
 // warn line); then Inquiry answers a fixed answer and never calls the backend. Every provider that
 // is added later follows the same pattern (registerAdapter) with its own debug.mocks.<provider>. A
@@ -328,22 +329,26 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	// providers.qabzino.enabled: false wins over the mock. The adapter then fails every call as
 	// "provider down" and the mock must not answer instead of it (task 030).
 	qabzinoMock := provider.MockSettings{Enable: dev && cfg.DebugMockQabzinoEnable && cfg.QabzinoEnabled, ReturnType: cfg.DebugMockQabzinoReturnType}
-	if err := registerAdapter(registry, qabzinoAdapter, "Qabzino", qabzinoNotice(cfg.QabzinoEnabled),
+	if err := registerAdapter(registry, qabzinoAdapter, "Qabzino", disabledNotice("qabzino", "Qabzino", cfg.QabzinoEnabled),
 		qabzinoMock, qabzino.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
 
-	tavanirClient, err := tavanir.Dial(cfg.TavanirGRPCAddress)
+	tavanirAdapter, err := tavanir.New(tavanir.Options{
+		Enabled:             cfg.TavanirEnabled,
+		AuthEndpoint:        cfg.TavanirAuthEndpoint,
+		BasicBranchEndpoint: cfg.TavanirBasicBranchEndpoint,
+		Username:            cfg.TavanirUsername,
+		Password:            cfg.TavanirPassword.Reveal(),
+		Timeout:             cfg.TavanirTimeout,
+	})
 	if err != nil {
 		return nil, err
 	}
-	tavanirAdapter, err := tavanir.New(tavanir.Options{Client: tavanirClient, Timeout: cfg.TavanirTimeout})
-	if err != nil {
-		return nil, err
-	}
-	if err := registerAdapter(registry, tavanirAdapter, "Tavanir", noAddressNotice("tavanir", "Tavanir", cfg.TavanirGRPCAddress),
-		provider.MockSettings{Enable: dev && cfg.DebugMockTavanirEnable, ReturnType: cfg.DebugMockTavanirReturnType},
-		tavanir.MockFixtures(), logger); err != nil {
+	// providers.tavanir.enabled: false wins over the mock, as for Qabzino (task 034).
+	tavanirMock := provider.MockSettings{Enable: dev && cfg.DebugMockTavanirEnable && cfg.TavanirEnabled, ReturnType: cfg.DebugMockTavanirReturnType}
+	if err := registerAdapter(registry, tavanirAdapter, "Tavanir", disabledNotice("tavanir", "Tavanir", cfg.TavanirEnabled),
+		tavanirMock, tavanir.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
 	return registry, nil
@@ -376,21 +381,13 @@ func registerAdapter(registry *provider.Registry, adapter provider.ProviderInter
 	return registry.Register(p)
 }
 
-// noAddressNotice is the warn text of a provider with a gRPC address key and no address ("" when
-// the address is set).
-func noAddressNotice(name, title, addr string) string {
-	if addr != "" {
-		return ""
-	}
-	return "providers." + name + ".grpc_address is empty: every inquiry to " + title + " fails as provider down"
-}
-
-// qabzinoNotice is the warn text of Qabzino with providers.qabzino.enabled false ("" when enabled).
-func qabzinoNotice(enabled bool) string {
+// disabledNotice is the warn text of a provider with providers.<name>.enabled false ("" when
+// enabled). title is the name of the provider in the text (for example "Qabzino").
+func disabledNotice(name, title string, enabled bool) string {
 	if enabled {
 		return ""
 	}
-	return "providers.qabzino.enabled is false: every inquiry to Qabzino fails as provider down; the Qabzino mock does not apply"
+	return "providers." + name + ".enabled is false: every inquiry to " + title + " fails as provider down; the " + title + " mock does not apply"
 }
 
 // newInquiryFlow builds the inquiry flow (inquiry.Service) that every inquiry endpoint uses (water:

@@ -434,18 +434,18 @@ func TestParseElectricityInquiryKeys(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Equal(t, "", c.TavanirGRPCAddress, "default address")
+	assert.False(t, c.TavanirEnabled, "Tavanir is off by default (task 034)")
 	assert.Equal(t, 10*time.Second, c.TavanirTimeout, "default timeout")
 	assert.Equal(t, time.Hour, c.CachingElectricity, "default cache TTL (bill: caching.electricity 1h)")
 	assert.False(t, c.DebugMockTavanirEnable, "the mock is off by default")
 	assert.Equal(t, MockReturnSuccess, c.DebugMockTavanirReturnType)
 
-	c, err = Parse([]byte(base + `providers: {tavanir: {grpc_address: "t:8084", timeout: "3s"}}
+	c, err = Parse([]byte(base + `providers: {tavanir: {enabled: true, timeout: "3s"}}
 caching: {electricity: "0s"}
 debug: {mocks: {tavanir: {enable: true, return_type: error}}}
 `))
 	if assert.NoError(t, err) {
-		assert.Equal(t, "t:8084", c.TavanirGRPCAddress)
+		assert.True(t, c.TavanirEnabled)
 		assert.Equal(t, 3*time.Second, c.TavanirTimeout)
 		assert.Equal(t, time.Duration(0), c.CachingElectricity, "0 turns the cache off")
 		assert.True(t, c.DebugMockTavanirEnable)
