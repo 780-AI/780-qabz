@@ -1,7 +1,8 @@
-<!-- VERSION: 0.8 -->
+<!-- VERSION: 0.9 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v0.9 — 2026-11-10 — Task 030: item 26 for the direct Qabzino (Ayantech) adapter (status codes, TLS check).
 v0.8 — 2026-11-10 — Task 022: items 23 to 25 for POST /v1/electricity/inquiry (details saved in extra_data and returned from saved inquiries, an empty status of Tavanir, items 14-17 and 19-22 apply to electricity too).
 v0.7 — 2026-11-09 — Task 021: items 14-22 for POST /v1/water/inquiry (invalid request and no user, no provider, provider down, provider has no inquiry, adapter details, request rows, inquiry_step, tiebreak of the lookup, amount above uint32).
 v0.6 — 2026-11-08 — Task 020: item 13 for the provider pick (sorted order from memory, no Redis cache).
@@ -172,3 +173,9 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **bill / Qabz:** the flow and the error mapping are the same code as for water (`core/inquiry`, `answerInquiryError` in `src/entry/grpc/water.go`), so items 14 (invalid request, no user), 15 (no enabled provider), 16 (the provider call fails), 17 (the provider has no inquiry), 19 (one request row), 20 (`inquiry_step`: one provider call, whatever the column holds), 21 (order of saved rows) and 22 (an amount above the `uint32` price field) apply to electricity with the log prefix `electricity:`.
     - **Reason:** one flow for every bill type (task 022: "Do not copy the water flow").
     - **Code:** `Electricity.Inquiry` in `src/entry/grpc/electricity.go` (the `@todo` comments name items 14 and 22).
+
+26. **Direct Qabzino adapter: status codes and the TLS check.**
+    - **bill / qabzino service:** about 40 Ayantech codes each map to a failed answer with a Persian message for the user; the HTTP client skips the TLS certificate check (`InsecureSkipVerify`).
+    - **Qabz:** the adapter (`provider/qabzino`, task 030) calls Ayantech itself. It maps `G00000` (success), `GD2068` (paid: success, amount 0) and `GD2061`, `GD2062`, `GD2067` (failed, with the code and the text of bill); `GD2066` and every other code (token, IP, internal and update codes included), a bad HTTP status or an unreadable body are "provider down" (HTTP 503, one error line with the code). It checks the TLS certificate. The trace ID of the answer is the `TraceNumber` that Qabz sent (Ayantech has none).
+    - **Reason:** the unmapped codes are faults of the service or of the config, not of the user's input; the TLS check is a security default.
+    - **Code:** the `@todo` comment on `Adapter.Inquiry` in `src/provider/qabzino/qabzino.go`.

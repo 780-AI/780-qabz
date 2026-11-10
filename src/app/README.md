@@ -1,4 +1,4 @@
-<!-- VERSION: 0.22 -->
+<!-- VERSION: 0.23 -->
 # app
 
 `app` is the bootstrap of the Qabz service. The type `App` owns every long-lived dependency: the logger, the Postgres database, the Redis cache, the metrics endpoint and the optional tracer. Entry points (for example `cmd/start-app`) build an `App` and run it. They hold no wiring of their own.
@@ -47,3 +47,5 @@ if err != nil { return err }
 
 return a.Run(ctx)                   // blocks until ctx is cancelled, then stops
 ```
+
+Qabzino (task 030). `newProviderRegistry` registers the direct adapter `provider/qabzino` under the name `qabzino`: it calls Ayantech over HTTPS with `providers.qabzino.token`, `water_bill_endpoint` and `timeout`. `providers.qabzino.enabled` (default `false`) is the switch: `false` writes one warn line at start, every Qabzino inquiry fails as provider down with no call to Ayantech, and `debug.mocks.qabzino` does not apply (the switch wins; the mock needs `enabled: true`). The gRPC adapter is package `provider/qabzinoproxy` (QabzinoProxy); the App does not build it. No test or check sends a call to Ayantech (each call is charged): tests use a local `httptest` server.

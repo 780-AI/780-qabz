@@ -1,22 +1,27 @@
-// Package qabzino is the adapter of the Qabzino provider (part of Qabz, system.html). It calls
-// the Qabzino backend over gRPC (haf80.api.qabzino.Inquiry/BillInquiry, pb/proto/qabzino). Only
-// Inquiry of a water bill is implemented (task 021); every other method returns
-// provider.ErrNotSupported. The rules copy the old bill service (gateway/inquiry/water.go).
+// Package qabzino is the direct adapter of the Qabzino provider (task 030). It calls Ayantech over
+// HTTPS with the token and the endpoints of providers.qabzino, as the old qabzino service does
+// (client/qabzino, gateway/water.go), with no hop through that service. Only Inquiry of a water
+// bill is implemented; every other method and bill type returns provider.ErrNotSupported. The
+// former gRPC adapter is package qabzinoproxy (not used).
+//
+// Every call to Ayantech is charged: no test sends one. Tests use a local httptest server.
 package qabzino
 
 import (
+	"bytes"
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/valyala/fastjson"
 
-	pb "qabz/api/pb/qabzino"
 	"qabz/provider"
 )
 
@@ -29,27 +34,59 @@ const inquiryTypeRegular = "regular"
 // successMessage is the message of an answer with inquiries (bill: "the operation was done successfully").
 const successMessage = "عملیات با موفقیت انجام شد"
 
-// errNoAddress is the error of every call of a client made with no address.
-var errNoAddress = errors.New("qabzino: providers.qabzino.grpc_address is not set")
+// maxAnswerBytes limits the body that the adapter reads from Ayantech.
+const maxAnswerBytes = 1 << 20
 
-// Client is the part of the generated gRPC client (pb.InquiryClient) that the adapter uses. Tests
-// give a fake.
-type Client interface {
-	BillInquiry(ctx context.Context, in *pb.BillInquiryRequest, opts ...grpc.CallOption) (*pb.BillInquiryResponse, error)
+// The Ayantech status codes of a water inquiry (bill: gateway/translator.go).
+const (
+	codeSuccess     = "G00000"
+	codeWaterPaid   = "GD2068" // the bill is paid and no new bill is issued: success, no debt
+	codeWaterDown   = "GD2066" // the water company cannot be reached: provider down
+	codeWaterBadID  = "GD2061"
+	codeWaterNotOwn = "GD2062"
+	codeWaterNone   = "GD2067"
+)
+
+// refused are the codes that give a failed answer (no inquiry) with a message for the user
+// (bill: waterBillInquiryErrors).
+var refused = map[string]string{
+	codeWaterBadID:  "محتوای شناسه قبض وارد شده صحیح نیست",
+	codeWaterNotOwn: "شناسه ای قبض وارد شده، متعلق به شرکت آب فاضالب نیست",
+	codeWaterNone:   "شناسه قبض آب وارد شده در سیستم یافت نشد",
+}
+
+// paidMessage is the message of GD2068 (bill: waterBillInquiryErrors).
+const paidMessage = "این قبض قبال پرداخت شده و قبض جدیدی برای مشـتــرک صــادر نشــده است."
+
+// Doer is the part of *http.Client that the adapter uses. Tests give a fake or a client of an
+// httptest server.
+type Doer interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 // Options configure New.
 type Options struct {
-	// Client calls the backend. Required.
-	Client Client
+	// Enabled is providers.qabzino.enabled. False: no call is sent; every Inquiry fails as
+	// provider down.
+	Enabled bool
+	// Token is providers.qabzino.token (secret). Empty: every Inquiry fails as provider down.
+	Token string
+	// WaterEndpoint is providers.qabzino.water_bill_endpoint. Empty: the same.
+	WaterEndpoint string
 	// Timeout limits each call. Required, positive.
 	Timeout time.Duration
+	// HTTPClient sends the requests. Nil: a client with Timeout (the system TLS roots; bill skips
+	// the certificate check, this adapter does not).
+	HTTPClient Doer
 }
 
 // Adapter implements provider.ProviderInterface for Qabzino. It is safe for concurrent use.
 type Adapter struct {
-	client  Client
-	timeout time.Duration
+	enabled       bool
+	token         string
+	waterEndpoint string
+	timeout       time.Duration
+	client        Doer
 	// newTrace makes the trace number of a call (bill: a new UUID). Tests replace it.
 	newTrace func() string
 }
@@ -58,46 +95,78 @@ var _ provider.ProviderInterface = (*Adapter)(nil)
 
 // New returns the adapter.
 func New(opts Options) (*Adapter, error) {
-	if opts.Client == nil {
-		return nil, errors.New("qabzino: client is required")
-	}
 	if opts.Timeout <= 0 {
 		return nil, errors.New("qabzino: timeout must be positive")
 	}
-	return &Adapter{client: opts.Client, timeout: opts.Timeout, newTrace: func() string { return uuid.NewString() }}, nil
-}
-
-// Dial returns a client for the backend at addr (host:port, no TLS, as in bill). The connection is
-// lazy, so Dial does not need a running backend; it lives as long as the process. An empty addr
-// gives a client whose every call fails (so the app starts without the key and an inquiry then
-// answers "provider down").
-func Dial(addr string) (Client, error) {
-	if addr == "" {
-		return noClient{}, nil
+	client := opts.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: opts.Timeout}
 	}
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, fmt.Errorf("qabzino: grpc client for %s: %w", addr, err)
-	}
-	return pb.NewInquiryClient(conn), nil
-}
-
-type noClient struct{}
-
-func (noClient) BillInquiry(context.Context, *pb.BillInquiryRequest, ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
-	return nil, errNoAddress
+	return &Adapter{
+		enabled:       opts.Enabled,
+		token:         opts.Token,
+		waterEndpoint: opts.WaterEndpoint,
+		timeout:       opts.Timeout,
+		client:        client,
+		newTrace:      func() string { return uuid.NewString() },
+	}, nil
 }
 
 // Name returns Name.
 func (a *Adapter) Name() string { return Name }
 
-// Inquiry asks the backend for the inquiry of a water bill (bill: QabzinoWater.Execute). A call
-// that fails (a connection error, a timeout, a nil answer) returns an error that wraps
-// provider.ErrProviderDown. An answer with inquiries is ResponseSuccess; an answer with none
-// keeps the status, code and message of the backend (an empty status is ResponseFailed). A
-// "success" answer with no inquiry gives one inquiry with amount 0 (a paid bill: the backend
-// sends no pay ID).
-// @todo bill drops the trace ID of an answer with no inquiry. See docs/this_vs_bill.md, item 18.
+// Enabled reports providers.qabzino.enabled.
+func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
+
+type identity struct {
+	Token string `json:"Token"`
+}
+
+type waterParameters struct {
+	WaterBillID string `json:"WaterBillID"`
+	TraceNumber string `json:"TraceNumber"`
+}
+
+type request struct {
+	Identity   identity        `json:"Identity"`
+	Parameters waterParameters `json:"Parameters"`
+}
+
+// parsers holds the fastjson parsers of the answers. Reading the answer of Ayantech is on a hot
+// path (every inquiry that the database cannot answer), so it uses fastjson (conventions § 1); the
+// request is written with encoding/json/v2.
+var parsers fastjson.ParserPool
+
+// waterAnswer is the Parameters object of a G00000 answer.
+type waterAnswer struct {
+	Amount      uint64
+	BillID      string
+	PaymentID   string
+	PaymentDate string
+}
+
+// down returns an error that wraps provider.ErrProviderDown.
+func down(format string, args ...any) error {
+	return fmt.Errorf("qabzino: %w: %s", provider.ErrProviderDown, fmt.Sprintf(format, args...))
+}
+
+// downCause is down with the cause kept in the chain (so the flow sees context.Canceled).
+func downCause(what string, cause error) error {
+	return fmt.Errorf("qabzino: %w: %s: %w", provider.ErrProviderDown, what, cause)
+}
+
+// Inquiry asks Ayantech for the inquiry of a water bill (bill: Water.Execute of qabzino). The
+// answer rules:
+//   - G00000: success with one inquiry (the pay ID, the amount, the deadline).
+//   - GD2068 (already paid): success with one inquiry of amount 0 and no pay ID.
+//   - GD2061, GD2062, GD2067: a failed answer with no inquiry, the code and a message for the user.
+//   - GD2066, every other code, a transport error, a bad HTTP status or an unreadable body: an
+//     error that wraps provider.ErrProviderDown.
+//
+// The trace ID of the answer is the TraceNumber that the adapter sent (Ayantech has none).
+// @todo bill answers a failed status with a message for each of about 40 codes; this adapter
+// refuses only the three water codes and treats every other code as provider down. See
+// docs/this_vs_bill.md, item 26.
 func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*provider.InquiryResponse, error) {
 	if a == nil || a.client == nil {
 		return nil, errors.New("qabzino: adapter not created with New")
@@ -105,70 +174,113 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	if req.BillType != provider.BillTypeWater {
 		return nil, fmt.Errorf("qabzino: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
+	if !a.enabled {
+		return nil, down("providers.qabzino.enabled is false")
+	}
+	if a.token == "" || a.waterEndpoint == "" {
+		return nil, down("providers.qabzino.token and providers.qabzino.water_bill_endpoint are required")
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
-	resp, err := a.client.BillInquiry(ctx, &pb.BillInquiryRequest{
-		UserId:      req.UserID,
-		Dialer:      req.Dialer,
-		InquiryId:   req.InquiryID,
-		TraceNumber: a.newTrace(),
-		BillType:    req.BillType,
+
+	trace := a.newTrace()
+	body, err := json.Marshal(request{
+		Identity:   identity{Token: a.token},
+		Parameters: waterParameters{WaterBillID: req.InquiryID, TraceNumber: trace},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("qabzino: bill inquiry: %w: %w", provider.ErrProviderDown, err)
+		return nil, downCause("encode request", err)
 	}
-	if resp == nil {
-		return nil, fmt.Errorf("qabzino: bill inquiry: %w: empty answer", provider.ErrProviderDown)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.waterEndpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, downCause("build request", err) // the message has the endpoint, never the token
 	}
-	base := resp.GetBaseResponse()
-	if len(resp.GetInquiries()) > 0 {
-		items := make([]provider.InquiryItem, 0, len(resp.GetInquiries()))
-		for _, inq := range resp.GetInquiries() {
-			if inq == nil {
-				continue
-			}
-			amount := uint64(0)
-			// The backend sends an empty pay ID for a paid bill, but its amount can be above zero.
-			if inq.GetPayId() != "" {
-				var ok bool
-				if amount, ok = amountFromPayID(inq.GetPayId()); !ok {
-					amount = inq.GetAmount()
-				}
-			}
-			items = append(items, provider.InquiryItem{
-				PayID:           inq.GetPayId(),
-				Amount:          amount,
-				PaymentDeadline: inq.GetPaymentDeadline(),
-				InquiryType:     inquiryTypeRegular,
-			})
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := a.client.Do(httpReq)
+	if err != nil {
+		return nil, downCause("call", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxAnswerBytes))
+	if err != nil {
+		return nil, downCause("read answer", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, down("HTTP status %d", resp.StatusCode)
+	}
+	parser := parsers.Get()
+	defer parsers.Put(parser)
+	ans, err := parser.ParseBytes(raw)
+	if err != nil {
+		return nil, downCause("decode answer", err)
+	}
+	code := string(ans.GetStringBytes("Status", "Code"))
+	switch {
+	case code == codeSuccess:
+		params := ans.Get("Parameters")
+		if params == nil || params.Type() != fastjson.TypeObject {
+			return nil, down("parameters of %s are not an object", code)
 		}
-		if len(items) > 0 {
-			return &provider.InquiryResponse{
-				Status:          provider.ResponseSuccess,
-				Code:            200,
-				Message:         successMessage,
-				ProviderTraceID: base.GetTid(),
-				BillID:          base.GetBillId(),
-				Inquiries:       items,
-			}, nil
+		return successAnswer(req, trace, waterAnswer{
+			Amount:      params.GetUint64("Amount"),
+			BillID:      string(params.GetStringBytes("BillID")),
+			PaymentID:   string(params.GetStringBytes("PaymentID")),
+			PaymentDate: string(params.GetStringBytes("PaymentDate")),
+		}, string(ans.GetStringBytes("Status", "Description"))), nil
+	case code == codeWaterPaid:
+		return &provider.InquiryResponse{
+			Status:          provider.ResponseSuccess,
+			Code:            http.StatusOK,
+			Message:         paidMessage,
+			ProviderTraceID: trace,
+			Inquiries:       []provider.InquiryItem{{InquiryType: inquiryTypeRegular}},
+		}, nil
+	}
+	if msg, ok := refused[code]; ok {
+		n, _ := strconv.Atoi(code[2:]) // GD2061 -> 2061, as bill
+		return &provider.InquiryResponse{
+			Status:          provider.ResponseFailed,
+			Code:            int32(n),
+			Message:         msg,
+			ProviderTraceID: trace,
+		}, nil
+	}
+	return nil, down("status code %q", code)
+}
+
+// successAnswer builds the answer of G00000.
+func successAnswer(req provider.InquiryRequest, trace string, w waterAnswer, description string) *provider.InquiryResponse {
+	amount := uint64(0)
+	// An empty pay ID is a paid bill: amount 0 even when the amount above is not.
+	if w.PaymentID != "" {
+		var ok bool
+		if amount, ok = amountFromPayID(w.PaymentID); !ok {
+			amount = w.Amount
 		}
 	}
-	out := &provider.InquiryResponse{
-		Status:          base.GetStatus(),
-		Code:            base.GetCode(),
-		Message:         base.GetMessage(),
-		ProviderTraceID: base.GetTid(),
+	billID := w.BillID
+	if billID == "" {
+		billID = req.InquiryID
 	}
-	if out.Status == "" {
-		out.Status = provider.ResponseFailed
+	if description == "" {
+		description = successMessage
 	}
-	if out.Status == provider.ResponseSuccess { // no debt: the bill is paid
-		out.Inquiries = []provider.InquiryItem{{InquiryType: inquiryTypeRegular}}
+	return &provider.InquiryResponse{
+		Status:          provider.ResponseSuccess,
+		Code:            http.StatusOK,
+		Message:         description,
+		ProviderTraceID: trace,
+		BillID:          billID,
+		Inquiries: []provider.InquiryItem{{
+			PayID:           w.PaymentID,
+			Amount:          amount,
+			PaymentDeadline: w.PaymentDate,
+			InquiryType:     inquiryTypeRegular,
+		}},
 	}
-	return out, nil
 }
 
 // amountFromPayID reads the amount from a pay ID (bill: helper.GetFromPayIdPrice): the digits

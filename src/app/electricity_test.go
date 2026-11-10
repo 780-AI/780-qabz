@@ -39,7 +39,7 @@ func TestNewProviderRegistryTavanir(t *testing.T) {
 		{"dev, mock error", "mode: dev\ndebug: {mocks: {tavanir: {enable: true, return_type: error}}}", true, true, tavanirMockWarn},
 		{"dev, mock on, address set", "mode: dev\nproviders: {tavanir: {grpc_address: \"127.0.0.1:1\"}}\ndebug: {mocks: {tavanir: {enable: true}}}", true, false, tavanirMockWarn},
 		{"dev, mock off, no address", "mode: dev\ndebug: {mocks: {tavanir: {enable: false}}}", false, false, tavanirNoAddressWarn},
-		{"dev, only the Qabzino mock", "mode: dev\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, tavanirNoAddressWarn},
+		{"dev, only the Qabzino mock", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, tavanirNoAddressWarn},
 		{"stage, enable ignored", "mode: stage\ndebug: {mocks: {tavanir: {enable: true}}}", false, false, tavanirNoAddressWarn},
 		{"prod, enable ignored", "mode: prod\ndebug: {mocks: {tavanir: {enable: true, return_type: error}}}", false, false, tavanirNoAddressWarn},
 		{"prod, address set", "mode: prod\nproviders: {tavanir: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}}", false, false, ""},
@@ -106,11 +106,11 @@ func TestRegisterAdapterRules(t *testing.T) {
 		return
 	}
 	reg := provider.NewRegistry()
-	assert.Error(t, registerAdapter(nil, a, "Tavanir", true, provider.MockSettings{}, tavanir.MockFixtures(), nil))
-	assert.Error(t, registerAdapter(reg, nil, "Tavanir", true, provider.MockSettings{}, tavanir.MockFixtures(), nil))
-	assert.Error(t, registerAdapter(reg, a, "Tavanir", true, provider.MockSettings{Enable: true, ReturnType: "maybe"}, tavanir.MockFixtures(), nil))
-	assert.NoError(t, registerAdapter(reg, a, "Tavanir", true, provider.MockSettings{}, tavanir.MockFixtures(), nil))
-	assert.Error(t, registerAdapter(reg, a, "Tavanir", true, provider.MockSettings{}, tavanir.MockFixtures(), nil), "registered already")
+	assert.Error(t, registerAdapter(nil, a, "Tavanir", "notice", provider.MockSettings{}, tavanir.MockFixtures(), nil))
+	assert.Error(t, registerAdapter(reg, nil, "Tavanir", "notice", provider.MockSettings{}, tavanir.MockFixtures(), nil))
+	assert.Error(t, registerAdapter(reg, a, "Tavanir", "notice", provider.MockSettings{Enable: true, ReturnType: "maybe"}, tavanir.MockFixtures(), nil))
+	assert.NoError(t, registerAdapter(reg, a, "Tavanir", "notice", provider.MockSettings{}, tavanir.MockFixtures(), nil))
+	assert.Error(t, registerAdapter(reg, a, "Tavanir", "notice", provider.MockSettings{}, tavanir.MockFixtures(), nil), "registered already")
 }
 
 // TestDefaultBuilderServesElectricity: the composition root registers the Electricity service. With

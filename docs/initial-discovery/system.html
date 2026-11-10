@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.0 -->
+<!-- VERSION: 2.1 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.1 — 2026-11-10 — Task 030 direct Qabzino adapter: `providers.qabzino.enabled`; the Qabzino adapter calls Ayantech over HTTPS with the token and the water endpoint; the gRPC adapter is renamed QabzinoProxy (not used); the Providers table row and the config example are updated.
 v2.0 — 2026-11-10 — Task 029 Qabzino provider config: `providers.qabzino.token` and the three bill endpoint keys in the config example (config only; no code reads them yet).
 v1.9 — 2026-11-10 — Task 022 electricity inquiry: `providers.tavanir`, `caching.electricity` and `debug.mocks.tavanir` in the config examples and the Hot Reload table; the inquiry answer of ProviderInterface carries details (`InquiryResponse.Details`, saved in `bill_inquiries.extra_data` and returned the same from saved inquiries); the metrics qabz_inquiries_total, qabz_provider_calls_total and qabz_provider_call_duration_ms are implemented for electricity and Tavanir too.
 v1.8 — 2026-11-09 — Task 021 water inquiry: the config section is `providers` (not `provider`), with `providers.qabzino` and the `debug.mocks.<provider>` mocks; `caching.water`; ProviderInterface.Name returns string and the interface types are in provider/provider.go, the ProviderRegistry in provider/registry.go; metrics qabz_inquiries_total (bill_type, provider, result), qabz_provider_calls_total (provider, action, result), qabz_provider_call_duration_ms (provider, action); the Hot Reload table lists the water cache TTL, the provider settings and the mocks as startup-only.
@@ -172,7 +173,7 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/BillInquiry` | internal | Inquiry | MCI mobile |
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/PayBill` | internal | Order | MCI mobile |
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | MCI mobile |
-| `qabzino` | gRPC | `haf80.api.qabzino.Inquiry/BillInquiry` | internal | Inquiry | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
+| `qabzino` | HTTPS (Ayantech, direct since task 030; the gRPC adapter `haf80.api.qabzino.Inquiry/BillInquiry` is QabzinoProxy, not used) | `providers.qabzino.*_bill_endpoint` | Ayantech token | Inquiry (water so far) | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
 | `irancell` | gRPC | `pb.InternalService/BillInquiry` | internal | Inquiry | `Irancell` mobile |
 | `irancell` | gRPC | `pb.InternalService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | `Irancell` mobile (also called by `recharge`, so it has to stay) |
 | `irancell` | NATS | `irancell-bill` | internal | Order | `Irancell` mobile payment |
@@ -197,8 +198,9 @@ providers:
     url: parsian-v2:8081
     timeout: 30s
   qabzino:
-    grpc_address: qabzino:9000   # host:port, gRPC, no TLS; empty: every Qabzino call fails as "provider down"
-    timeout: 10s                 # limit of each call; positive
+    grpc_address: qabzino:9000   # host:port of the old qabzino service; read only by QabzinoProxy (not used since task 030)
+    timeout: 10s                 # limit of each call to Ayantech; positive
+    enabled: false               # false (default): Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply) (task 030)
     token: ""                    # Ayantech token (secret); the real value only in config.yml (task 029)
     electricity_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry
     gas_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry
@@ -225,7 +227,7 @@ debug:
       return_type: success   # success or error
 ```
 
-With `enable: true` the adapter does not call the backend. `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
+With `enable: true` the adapter does not call the backend (Qabzino: only when `providers.qabzino.enabled` is `true`; `enabled: false` wins over the mock, task 030). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
 
 Rules:
 - **Services that stay.** `parsian-v2`, `jiring-switch` and `irancell` keep their own config. `Parsian` and `Irancell` also have other clients (Issue #3).

@@ -1,7 +1,8 @@
-<!-- VERSION: 2.7 -->
+<!-- VERSION: 2.8 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v2.8 — 2026-11-10 — Added 030-qabzino-direct-provider entry.
 v2.7 — 2026-11-10 — Added 029-qabzino-provider-config entry.
 v2.6 — 2026-11-10 — Added 022-electricity-inquiry-endpoint entry.
 v2.5 — 2026-11-10 — Added 022-to-025-inquiry-tasks entry (tax, tax-organization and traffic-fine removed from the qabz proto).
@@ -113,6 +114,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-10] — Task 030: direct Qabzino (Ayantech) adapter, `providers.qabzino.enabled`, QabzinoProxy
+- **Type:** Major (new config key, provider adapter replaced, Critical File `system.html`)
+- **Files:** `src/provider/qabzino/qabzino.go` + `qabzino_test.go` (new: the direct HTTPS adapter for a water inquiry; token, `water_bill_endpoint`, timeout; `MockFixtures`); `src/provider/qabzinoproxy/` (the former gRPC adapter, renamed with its tests, not used); `src/config/config.go` (`QabzinoEnabled`, default `false`; the comment of `QabzinoGRPCAddress`) + `config_test.go`; `src/app/defaults.go` (registers the direct adapter; `registerAdapter` takes a warn text in place of a no-address flag; `enabled: false` wins over the mock) + `water_test.go`, `electricity_test.go`, `water_live_test.go`; `config.yml.example` (`enabled: false`); `config.yml` (git-ignored; `enabled: true`); `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (item 26), `docs/folder_structure.md`, `src/app/README.md`; task file `030_qabzino_direct_provider.md`; `task_counter.json` (next ID 031).
+- **Impact:** Yes, behavior changes. (1) Qabzino inquiries no longer go through the old qabzino service over gRPC: the App calls Ayantech over HTTPS (the TLS certificate is checked; bill skips it). (2) New key `providers.qabzino.enabled`, default `false`: with `false` every Qabzino inquiry is "provider down" (HTTP 503) and nothing is sent; the dev mock does not apply. A config that relied on `providers.qabzino.grpc_address` or on the mock alone needs `enabled: true`. (3) Water only; `electricity_bill_endpoint` and `gas_bill_endpoint` are still unused. No database change.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` -> Pending verification -> "Task 030": `make test` (every adapter test uses a local `httptest` server; no call reaches Ayantech) and a feature-ON check with the mock and with `enabled: false`.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-10] — Task 029: Qabzino provider config: token and bill endpoints
 - **Type:** Major (new config keys, Critical File `system.html`)

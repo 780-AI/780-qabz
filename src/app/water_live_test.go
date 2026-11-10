@@ -51,6 +51,7 @@ func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string
 		}
 	}
 	cfg := testConfig(t)
+	cfg.QabzinoEnabled = true
 	cfg.DebugMockQabzinoEnable = true
 	cfg.DebugMockQabzinoReturnType = returnType
 	cfg.DebugMockTavanirEnable = true

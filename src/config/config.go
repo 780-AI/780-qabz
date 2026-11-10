@@ -90,19 +90,23 @@ type Config struct {
 	// app_hot_configs): the reload routine reads the current value before each wait.
 	ProvidersLoadInterval time.Duration `path:"providers.general.load_interval" hot_reload:"true"`
 
-	// QabzinoGRPCAddress is the host:port of the Qabzino backend (gRPC, no TLS, as in bill:
-	// qabzino.grpcAddress). Empty: every call to Qabzino fails as "provider down" (task 021). Not
-	// hot-reloadable: the client is built at start.
+	// QabzinoEnabled is providers.qabzino.enabled (task 030). False (the default): Qabzino cannot be
+	// used: no call is sent to Ayantech, every Qabzino inquiry fails as "provider down", and the
+	// Qabzino mock does not bypass the switch. Not hot-reloadable: the adapter is built at start.
+	QabzinoEnabled bool `path:"providers.qabzino.enabled"`
+	// QabzinoGRPCAddress is the host:port of the old qabzino service (gRPC, no TLS, as in bill:
+	// qabzino.grpcAddress). Since task 030 only QabzinoProxy (package provider/qabzinoproxy, not
+	// used) reads it; the App does not.
 	QabzinoGRPCAddress string `path:"providers.qabzino.grpc_address"`
 	// QabzinoTimeout limits each call to the Qabzino backend. Positive. Not hot-reloadable.
 	QabzinoTimeout time.Duration `path:"providers.qabzino.timeout"`
 	// QabzinoToken is the Ayantech token of the Qabzino provider (bill: qabzino.token). A Secret:
-	// it never prints. Empty by default; the real value is only in config.yml (task 029). No code
-	// reads it yet.
+	// it never prints. Empty by default; the real value is only in config.yml (task 029). Read by
+	// the direct Qabzino adapter (task 030).
 	QabzinoToken Secret `path:"providers.qabzino.token"`
 	// QabzinoElectricityBillEndpoint, QabzinoGasBillEndpoint and QabzinoWaterBillEndpoint are the
-	// Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint and so on). Not checked: no code
-	// reads them yet (task 029).
+	// Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint and so on). Not checked. Only the
+	// water one is read (task 030); the electricity and gas ones are unused so far.
 	QabzinoElectricityBillEndpoint string `path:"providers.qabzino.electricity_bill_endpoint"`
 	QabzinoGasBillEndpoint         string `path:"providers.qabzino.gas_bill_endpoint"`
 	QabzinoWaterBillEndpoint       string `path:"providers.qabzino.water_bill_endpoint"`

@@ -47,6 +47,7 @@ providers:
   qabzino:
     grpc_address: ""         # host:port of the Qabzino backend (gRPC, no TLS); empty: every Qabzino call fails as "provider down"
     timeout: "10s"           # limit of each call to the Qabzino backend; positive
+    enabled: false           # false: Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply)
     token: ""                # Ayantech token (secret); the real value only in config.yml
     electricity_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry"
     gas_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry"

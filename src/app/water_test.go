@@ -36,6 +36,9 @@ func registryConfig(t *testing.T, yml string) config.Config {
 	return c
 }
 
+// qabzinoDisabledWarn is the start warn line of Qabzino with providers.qabzino.enabled false (task 030).
+const qabzinoDisabledWarn = "providers.qabzino.enabled is false: every inquiry to Qabzino fails as provider down; the Qabzino mock does not apply"
+
 // TestNewProviderRegistry: the registry has the Qabzino adapter; the mock wraps it only in dev mode
 // with debug.mocks.qabzino.enable (decision 4).
 func TestNewProviderRegistry(t *testing.T) {
@@ -47,11 +50,13 @@ func TestNewProviderRegistry(t *testing.T) {
 		wantErr  bool // a mock error answer
 		wantWarn string
 	}{
-		{"dev, mock success", "mode: dev\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}", true, false, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
-		{"dev, mock error", "mode: dev\ndebug: {mocks: {qabzino: {enable: true, return_type: error}}}", true, true, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
-		{"dev, mock off, no address", "mode: dev\ndebug: {mocks: {qabzino: {enable: false}}}", false, false, "providers.qabzino.grpc_address is empty: every inquiry to Qabzino fails as provider down"},
-		{"stage, enable ignored", "mode: stage\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, "providers.qabzino.grpc_address is empty: every inquiry to Qabzino fails as provider down"},
-		{"prod, address set", "mode: prod\nproviders: {qabzino: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}, tavanir: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}}", false, false, ""},
+		{"dev, mock success", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}", true, false, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
+		{"dev, mock error", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true, return_type: error}}}", true, true, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
+		{"dev, mock on, qabzino disabled", "mode: dev\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}", false, false, qabzinoDisabledWarn},
+		{"dev, mock off, qabzino disabled", "mode: dev\ndebug: {mocks: {qabzino: {enable: false}}}", false, false, qabzinoDisabledWarn},
+		{"stage, enable ignored, qabzino disabled", "mode: stage\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, qabzinoDisabledWarn},
+		{"prod, enabled, no token", "mode: prod\nproviders: {qabzino: {enabled: true, timeout: 300ms}, tavanir: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}}", false, false, ""},
+		{"prod, enabled, local endpoint (nothing listens)", "mode: prod\nproviders: {qabzino: {enabled: true, token: t, water_bill_endpoint: \"http://127.0.0.1:1/w\", timeout: 300ms}, tavanir: {grpc_address: \"127.0.0.1:1\", timeout: 300ms}}", false, false, ""},
 	}
 	for _, c := range cases {
 		log := &liveLogger{}
@@ -79,11 +84,11 @@ func TestNewProviderRegistry(t *testing.T) {
 		if c.wantWarn != "" {
 			assert.Equal(t, 1, log.count("warn", c.wantWarn), c.name)
 		} else {
-			assert.Equal(t, 0, len(log.lines)-log.count("info", "provider mock: inquiry answered with no call to the provider"), c.name+": no warn line (Qabzino and Tavanir have an address)")
+			assert.Equal(t, 0, len(log.lines)-log.count("info", "provider mock: inquiry answered with no call to the provider")-log.count("warn", tavanirNoAddressWarn), c.name+": no warn line of Qabzino")
 		}
 	}
 	// A nil logger writes nothing and does not panic.
-	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\ndebug: {mocks: {qabzino: {enable: true}}}"), nil)
+	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true}}}"), nil)
 	if assert.NoError(t, err) && assert.NotNil(t, reg) {
 		p, _ := reg.Get("qabzino")
 		_, err = p.Inquiry(context.Background(), req)

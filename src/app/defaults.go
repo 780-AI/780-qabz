@@ -304,9 +304,10 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 	})
 }
 
-// newProviderRegistry builds the provider adapters: Qabzino (task 021) and Tavanir (task 022). Each
-// has the client of providers.<provider>.grpc_address (lazy; empty: every call fails as "provider
-// down", one warn line) and providers.<provider>.timeout. The mock of a provider
+// newProviderRegistry builds the provider adapters: Qabzino (task 021; since task 030 the direct
+// HTTP adapter with providers.qabzino.enabled, token, water_bill_endpoint and timeout, not the gRPC
+// QabzinoProxy) and Tavanir (task 022: the client of providers.tavanir.grpc_address, lazy; empty:
+// every call fails as "provider down", one warn line; and providers.tavanir.timeout). The mock of a provider
 // (debug.mocks.<provider>) is applied only when Config.Mode is dev and its enable key is true (one
 // warn line); then Inquiry answers a fixed answer and never calls the backend. Every provider that
 // is added later follows the same pattern (registerAdapter) with its own debug.mocks.<provider>. A
@@ -315,17 +316,20 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	registry := provider.NewRegistry()
 	dev := cfg.Mode == config.ModeDev
 
-	qabzinoClient, err := qabzino.Dial(cfg.QabzinoGRPCAddress)
+	qabzinoAdapter, err := qabzino.New(qabzino.Options{
+		Enabled:       cfg.QabzinoEnabled,
+		Token:         cfg.QabzinoToken.Reveal(),
+		WaterEndpoint: cfg.QabzinoWaterBillEndpoint,
+		Timeout:       cfg.QabzinoTimeout,
+	})
 	if err != nil {
 		return nil, err
 	}
-	qabzinoAdapter, err := qabzino.New(qabzino.Options{Client: qabzinoClient, Timeout: cfg.QabzinoTimeout})
-	if err != nil {
-		return nil, err
-	}
-	if err := registerAdapter(registry, qabzinoAdapter, "Qabzino", cfg.QabzinoGRPCAddress == "",
-		provider.MockSettings{Enable: dev && cfg.DebugMockQabzinoEnable, ReturnType: cfg.DebugMockQabzinoReturnType},
-		qabzino.MockFixtures(), logger); err != nil {
+	// providers.qabzino.enabled: false wins over the mock. The adapter then fails every call as
+	// "provider down" and the mock must not answer instead of it (task 030).
+	qabzinoMock := provider.MockSettings{Enable: dev && cfg.DebugMockQabzinoEnable && cfg.QabzinoEnabled, ReturnType: cfg.DebugMockQabzinoReturnType}
+	if err := registerAdapter(registry, qabzinoAdapter, "Qabzino", qabzinoNotice(cfg.QabzinoEnabled),
+		qabzinoMock, qabzino.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
 
@@ -337,7 +341,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	if err != nil {
 		return nil, err
 	}
-	if err := registerAdapter(registry, tavanirAdapter, "Tavanir", cfg.TavanirGRPCAddress == "",
+	if err := registerAdapter(registry, tavanirAdapter, "Tavanir", noAddressNotice("tavanir", "Tavanir", cfg.TavanirGRPCAddress),
 		provider.MockSettings{Enable: dev && cfg.DebugMockTavanirEnable, ReturnType: cfg.DebugMockTavanirReturnType},
 		tavanir.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -348,8 +352,9 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 // registerAdapter wraps the adapter with its mock (provider.NewMock: off returns the adapter
 // itself) and adds it to the registry. title is the name of the provider in the warn lines (for
 // example "Qabzino"); the config keys use adapter.Name(). It writes one warn line when the mock is
-// on, else one when the provider has no address. A nil logger writes no line.
-func registerAdapter(registry *provider.Registry, adapter provider.ProviderInterface, title string, noAddress bool, mock provider.MockSettings, fixtures provider.MockFixtures, logger Logger) error {
+// on, else one with notice when notice is not empty (the provider cannot work as configured). A
+// nil logger writes no line.
+func registerAdapter(registry *provider.Registry, adapter provider.ProviderInterface, title string, notice string, mock provider.MockSettings, fixtures provider.MockFixtures, logger Logger) error {
 	if registry == nil || adapter == nil {
 		return errors.New("providers: registry and adapter are required")
 	}
@@ -360,8 +365,8 @@ func registerAdapter(registry *provider.Registry, adapter provider.ProviderInter
 		switch {
 		case mock.Enable:
 			logger.Warn("provider mock enabled (debug.mocks."+name+"): development only, no call to the "+title+" backend", "return_type", mock.ReturnType)
-		case noAddress:
-			logger.Warn("providers." + name + ".grpc_address is empty: every inquiry to " + title + " fails as provider down")
+		case notice != "":
+			logger.Warn(notice)
 		}
 	}
 	p, err := provider.NewMock(adapter, mock, fixtures, mockLog)
@@ -369,6 +374,23 @@ func registerAdapter(registry *provider.Registry, adapter provider.ProviderInter
 		return err
 	}
 	return registry.Register(p)
+}
+
+// noAddressNotice is the warn text of a provider with a gRPC address key and no address ("" when
+// the address is set).
+func noAddressNotice(name, title, addr string) string {
+	if addr != "" {
+		return ""
+	}
+	return "providers." + name + ".grpc_address is empty: every inquiry to " + title + " fails as provider down"
+}
+
+// qabzinoNotice is the warn text of Qabzino with providers.qabzino.enabled false ("" when enabled).
+func qabzinoNotice(enabled bool) string {
+	if enabled {
+		return ""
+	}
+	return "providers.qabzino.enabled is false: every inquiry to Qabzino fails as provider down; the Qabzino mock does not apply"
 }
 
 // newInquiryFlow builds the inquiry flow (inquiry.Service) that every inquiry endpoint uses (water:

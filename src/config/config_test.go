@@ -501,14 +501,16 @@ func TestParseQabzinoProviderKeys(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
+	assert.False(t, c.QabzinoEnabled, "Qabzino is disabled by default (task 030)")
 	assert.Equal(t, "", c.QabzinoToken.Reveal(), "default token is empty")
 	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry", c.QabzinoElectricityBillEndpoint)
 	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry", c.QabzinoGasBillEndpoint)
 	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry", c.QabzinoWaterBillEndpoint)
 
-	c, err = Parse([]byte(base + `providers: {qabzino: {token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", water_bill_endpoint: "http://w"}}
+	c, err = Parse([]byte(base + `providers: {qabzino: {enabled: true, token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", water_bill_endpoint: "http://w"}}
 `))
 	if assert.NoError(t, err) {
+		assert.True(t, c.QabzinoEnabled)
 		assert.Equal(t, "tok", c.QabzinoToken.Reveal())
 		assert.Equal(t, "http://e", c.QabzinoElectricityBillEndpoint)
 		assert.Equal(t, "http://g", c.QabzinoGasBillEndpoint)
