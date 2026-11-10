@@ -1,7 +1,8 @@
-<!-- VERSION: 2.4 -->
-<!-- Last Updated: 2026-11-09 -->
+<!-- VERSION: 2.5 -->
+<!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v2.5 — 2026-11-10 — Added 022-to-025-inquiry-tasks entry (tax, tax-organization and traffic-fine removed from the qabz proto).
 v2.4 — 2026-11-09 — Added 021-water-inquiry-endpoint entry.
 v2.3 — 2026-11-09 — Added 020c-debug-section-dev-only entry.
 v2.2 — 2026-11-09 — Added 020b-test-database-isolation entry.
@@ -110,6 +111,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-10] — Inquiry tasks 022 to 025; tax, tax-organization and traffic-fine removed from the qabz proto
+- **Type:** Major (public API change: `pb/proto/qabz/services.proto`)
+- **Files:** `docs/Plans/pending_tasks/022_electricity_inquiry_endpoint.md`, `023_gas_inquiry_endpoint.md`, `024_mobile_inquiry_endpoint.md`, `025_tel_inquiry_endpoint.md` (new tasks, same Definition of Done and Verification as task 021); `docs/Plans/pending_tasks/task_counter.json` (next ID 029; IDs 026 to 028 are not reused); `pb/proto/qabz/services.proto` (`pb` submodule: services `TrafficFine`, `Tax`, `TaxOrganization` and their nine messages removed; `RawOrderRequest.BillType` values `tax`, `taxOrganization`, `trafficFine` removed and numbers 5 to 7 and the three names reserved); `src/api/pb/qabz/` is regenerated (git-ignored). Tasks 026 to 028 were added and removed within the same day, so they have no entry.
+- **Impact:** Yes, the API changes. The six endpoints `POST /v1/tax/inquiry`, `/v1/tax/order`, `/v1/tax-organization/inquiry`, `/v1/tax-organization/order`, `/v1/traffic-fine/inquiry` and `/v1/traffic-fine/order` no longer exist in Qabz (the operator: these bill types are not part of the new service). No Go code and no Postman request used them. The new tasks add no runtime behavior.
+- **QA scenarios:** none needed for the tasks. For the proto: `make proto` and `cd src && go build ./... && go vet ./... && go test ./entry/...` pass; `services_grpc.pb.go` has no `TrafficFine`, `Tax` or `TaxOrganization`.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-09] — Task 021: POST /v1/water/inquiry, the first provider (Qabzino) and the provider mocks
 - **Type:** Major (new endpoint, new packages `core/inquiry` and `provider/qabzino`, domain logic, new config keys, new metrics, Critical File `system.html`)

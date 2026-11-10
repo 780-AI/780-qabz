@@ -1,4 +1,4 @@
-<!-- VERSION: 1.5 -->
+<!-- VERSION: 1.6 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v2.4 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v2.5 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v1.5 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v1.6 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.36 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -54,9 +54,10 @@
 
 ## Last Updated
 
-- **Date**: 2026-11-09
-- **Change**: Task 021 `water_inquiry_endpoint`: `POST /v1/water/inquiry` (`core/inquiry`), `ProviderInterface` + `ProviderRegistry` + provider mocks (`provider/`), the Qabzino adapter (`provider/qabzino/`), the inquiry repository, new config keys (`providers.qabzino.*`, `caching.water`, `debug.mocks.qabzino.*`), three new metrics; `config.yml.example`, `Makefile`, `qabz.postman_collection.json` (no VERSION header, no rows); Go files have no VERSION header, so no rows; task file in `in-progress_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v2.4, #5 manifest v1.5, #6 folder_structure v0.36, #21 system.html v1.8, #28 OPEN_TASKS v1.42, #30 conventions v0.18 (§ 15 provider mocks), #34 app README v0.21, #35 this_vs_bill v0.7 (items 14-22).
-- **Previous change**: 2026-11-09 — Task 020c `debug_section_dev_only` (task rewritten by the operator, v0.2): a mode other than `dev` fully removes the `debug` config section in `config.Parse` (every `debug.*` field keeps its default); `config.yml.example` comment (YAML, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v2.3, #5 manifest v1.4, #28 OPEN_TASKS v1.41, #34 app README v0.20.
+- **Date**: 2026-11-10
+- **Change**: New task files 022 to 025 (inquiry of electricity, gas, mobile, tel; `task_counter.json` stays 029: IDs 026 to 028 are not reused); tax, tax-organization and traffic-fine removed from `pb/proto/qabz/services.proto` (`pb` submodule pointer); task files are not manifest-tracked; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v2.5, #5 manifest v1.6.
+- **Previous change**: 2026-11-09 — Task 021 `water_inquiry_endpoint`: `POST /v1/water/inquiry` (`core/inquiry`), `ProviderInterface` + `ProviderRegistry` + provider mocks (`provider/`), the Qabzino adapter (`provider/qabzino/`), the inquiry repository, new config keys (`providers.qabzino.*`, `caching.water`, `debug.mocks.qabzino.*`), three new metrics; `config.yml.example`, `Makefile`, `qabz.postman_collection.json` (no VERSION header, no rows); Go files have no VERSION header, so no rows; task file in `in-progress_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v2.4, #5 manifest v1.5, #6 folder_structure v0.36, #21 system.html v1.8, #28 OPEN_TASKS v1.42, #30 conventions v0.18 (§ 15 provider mocks), #34 app README v0.21, #35 this_vs_bill v0.7 (items 14-22).
+- **Earlier change**: 2026-11-09 — Task 020c `debug_section_dev_only` (task rewritten by the operator, v0.2): a mode other than `dev` fully removes the `debug` config section in `config.Parse` (every `debug.*` field keeps its default); `config.yml.example` comment (YAML, no row); Go files have no VERSION header, so no rows; task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v2.3, #5 manifest v1.4, #28 OPEN_TASKS v1.41, #34 app README v0.20.
 - **Earlier change**: 2026-11-09 — Task 020b `test_database_isolation`: `make test` runs all Go tests in one throw-away database `qabz_test_<hex>` (dropped at the end, also on failure or Ctrl-C), `make test-db-clean` drops leftovers (the `qabz_test_%` databases, then the `qabz_test_` roles; a test login role has a random password, decision 7; decision 8: nothing inside a non-`qabz_test_` database is touched, so a role with objects or privileges there is kept and the target exits 1); the live tests read only `QABZ_TEST_RUN_DSN` through the guarded `postgrestest.RunDSN` (the guard checks the database the driver uses, `pgconn.ParseConfig`); no DSN or password on a command line, `config_generated.env` parsed by the tool (never sourced as shell); `GO_TEST_PKGS` operator-approved; `reset()` removed from the task 003 live tests; new test tool `src/system/postgres/postgrestest/testdb/` (Go, no VERSION header, no row); `Makefile` (no VERSION header, no row). Task file moved to `in-progress_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v2.2, #5 manifest v1.3, #6 folder_structure v0.35, #28 OPEN_TASKS v1.40, #30 conventions v0.17 (§ 14, § 11).
 - **Earlier change**: 2026-11-09 — New task files `020b_test_database_isolation.md` v0.1 and `020c_debug_section_dev_only.md` v0.1 (not manifest-tracked; letter suffixes on 020 so they sort before 021; task counter unchanged at 022). Bumped #3 CHANGELOG v2.1, #5 manifest v1.2.
 - **Earlier change**: 2026-11-09 — Task 020 `providers_sorted_list` fix round 4 (operator decision 9, "Apply at once"): a hot change of `providers.general.load_interval` applies at once (`config.Holder.Changed`, `provider.Options.Changed`; the next load at last load start + new interval); new test file `src/provider/interval_test.go` (Go, no VERSION header, no row); task file moved to `done_tasks/` in commit 43435a4 (not manifest-tracked). Bumped #3 CHANGELOG v2.0, #5 manifest v1.1, #21 system.html v1.7, #28 OPEN_TASKS v1.39, #34 app README v0.19.
