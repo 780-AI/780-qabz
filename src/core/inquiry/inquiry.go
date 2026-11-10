@@ -325,9 +325,6 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 	if err := s.repo.SaveInquiries(ctx, copies); err != nil && ctx.Err() == nil && s.log != nil {
 		s.log.Error("inquiry: save copies of saved inquiries failed", "bill_type", req.BillType, "provider", pro.Name, "error", err)
 	}
-	if s.log != nil {
-		s.log.Info("inquiry: answered from database, no provider call", "bill_type", req.BillType, "provider", pro.Name, "inquiry_id", req.InquiryID, "rows", len(rows))
-	}
 	return res, true
 }
 

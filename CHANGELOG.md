@@ -1,7 +1,8 @@
-<!-- VERSION: 2.8 -->
+<!-- VERSION: 2.9 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v2.9 — 2026-11-10 — Added inquiry-database-answer-log-removed entry.
 v2.8 — 2026-11-10 — Added 030-qabzino-direct-provider entry.
 v2.7 — 2026-11-10 — Added 029-qabzino-provider-config entry.
 v2.6 — 2026-11-10 — Added 022-electricity-inquiry-endpoint entry.
@@ -114,6 +115,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-10] — Inquiry answered from the database writes no log line
+- **Type:** Minor (a log line removed; the counter already existed). Not a task file: task 030 is the one active task.
+- **Files:** `src/core/inquiry/inquiry.go` (the `inquiry: answered from database, no provider call` info line removed from `fromDatabase`); `src/app/water_live_test.go`, `src/app/electricity_live_test.go` (the log assertion became "no such line"; the existing `qabz_inquiries_total{result="db_hit"}` assertions stay); `docs/Plans/OPEN_TASKS.md` (v1.46: QA steps 2 of tasks 021 and 022 check the counter).
+- **Impact:** Yes, a log line is gone. A database answer is now counted only by `qabz_inquiries_total{bill_type,provider,result="db_hit"}` (a Prometheus counter, with metrics on). No change to answers, rows or other metrics.
+- **QA scenarios:** `make test` (the two live tests check that the line is not written and that `db_hit` is counted); feature ON: call the same bill twice, then `curl localhost:9090/metrics`. Pass: the second call has no `answered from database` line and `qabz_inquiries_total{...result="db_hit"}` is 1.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-10] — Task 030: direct Qabzino (Ayantech) adapter, `providers.qabzino.enabled`, QabzinoProxy
 - **Type:** Major (new config key, provider adapter replaced, Critical File `system.html`)

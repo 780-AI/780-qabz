@@ -88,7 +88,7 @@ func TestLiveElectricityInquiryFlow(t *testing.T) {
 		}
 		assert.Equal(t, electricityAnswer(res), electricityAnswer(res2), "the same answer and the same details as the provider call")
 		assert.Equal(t, 1, s.log.count("info", "provider mock: inquiry answered with no call to the provider"), "no second provider call")
-		assert.Equal(t, i+1, s.log.count("info", "inquiry: answered from database, no provider call"))
+		assert.Equal(t, 0, s.log.count("info", "inquiry: answered from database, no provider call"), "a database answer writes no log line; the counter db_hit counts it")
 		assert.Equal(t, 1, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`), "no new request row")
 		assert.Equal(t, i+1, s.count(t, `SELECT count(*) FROM bill_inquiries c JOIN bill_inquiries o ON o.inquiry_id = c.inquiry_id AND NOT o.is_cached
 			WHERE c.is_cached AND c.inquiry_id = $1 AND c.extra_data = o.extra_data`, liveBillID), "each copy has the extra_data of the original")

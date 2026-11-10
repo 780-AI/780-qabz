@@ -138,7 +138,7 @@ func TestLiveWaterInquiryFlow(t *testing.T) {
 	assert.Equal(t, res.GetPaymentDeadline(), res2.GetPaymentDeadline())
 	assert.Equal(t, res.GetBillId(), res2.GetBillId())
 	assert.Equal(t, 1, s.log.count("info", "provider mock: inquiry answered with no call to the provider"), "no second provider call")
-	assert.Equal(t, 1, s.log.count("info", "inquiry: answered from database, no provider call"))
+	assert.Equal(t, 0, s.log.count("info", "inquiry: answered from database, no provider call"), "a database answer writes no log line; the counter db_hit (below) counts it")
 	assert.Equal(t, 1, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`), "no new request row")
 	assert.Equal(t, 1, s.count(t, `SELECT count(*) FROM bill_inquiries WHERE is_cached AND user_id = $1 AND inquiry_id = $2`, liveUserTwo, liveBillID), "a copy for the second user")
 	assert.Equal(t, 2, s.count(t, `SELECT count(*) FROM bill_inquiries`))
