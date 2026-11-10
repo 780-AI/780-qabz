@@ -1,7 +1,8 @@
-<!-- VERSION: 1.43 -->
+<!-- VERSION: 1.44 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v1.44 — 2026-11-10 — Task 029 Qabzino provider keys: QA scenario added.
 v1.43 — 2026-11-10 — Task 022 electricity inquiry: QA scenario and follow-ups added (feature-ON run done by the implementer, awaiting operator).
 v1.42 — 2026-11-09 — Task 021 water inquiry: QA scenario added (feature-ON run done by the implementer, awaiting operator).
 v1.41 — 2026-11-09 — Task 020c debug section dev only: QA scenario added (feature-ON run done by the implementer, awaiting operator).
@@ -226,6 +227,7 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Also: `{"billId":"12345"}` gives HTTP 400 `invalid parameter` and no log line; `POST /v1/electricity/inquiry/document` gives HTTP 501 (not in task 022). Delete the test rows when done (`bill_inquiries` with `provider_id = 2` and `bill_inquiry_requests` with `bill_type = 'electricity'` of the two bill IDs).
   Done 2026-11-10 by the implementer (steps 1-4 and the two "also" checks, ports 18080 / 18082 / 19090, the compose dev database; the test rows were deleted): all pass (awaiting operator confirmation). Evidence in `done_tasks/022_electricity_inquiry_endpoint.md`.
 - ⏸ Task 022 follow-ups: (a) operator confirmation of design decision 2: `bill_inquiries.extra_data` of an electricity row now holds the customer name, the service address and the post code (`this_vs_bill.md` item 23); (b) a real Tavanir backend call is not tested (no backend in development): check `providers.tavanir.grpc_address` against the real service before the stage deploy; (c) the Tavanir gRPC connection is never closed (process lifetime), as Qabzino (task 021 follow-up b); (d) `Electricity.InquiryDocument` (`POST /v1/electricity/inquiry/document`, Tavanir `BillDocument`) has no task yet; (e) the constants `inquiryTypeRegular` and `successMessage` are in both adapters (`qabzino`, `tavanir`): move them to `provider` when the third adapter lands.
+- ⏸ Task 029 Qabzino provider keys (2026-11-10). In `src/` run `go test -race -count=1 -run QabzinoProviderKeys ./config/`. Pass: the test passes (the defaults, the values from YAML, the token masked). Config only; no feature-ON check.
 - ⏸ Task 020c debug section dev only (2026-11-09). In `src/` run `go test -race -count=1 -run 'TestParseDebugSectionOnlyInDev|TestExample' -v ./config/`.
   Pass: all pass (stage and prod with a full, partial, empty, null or bad `debug` section give the same `Config` as without the section; dev reads the section and checks its values).
   Then (feature ON, Rule 15) copy `config.yml` with `debug.auth.disable: true` and `auth.secrets.hmac` set, three times, with `mode: "dev"`, `"stage"` and `"prod"`. Run the App with each copy and call `GET /v1/greeting` with no token.

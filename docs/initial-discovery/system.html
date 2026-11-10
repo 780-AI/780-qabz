@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 1.9 -->
+<!-- VERSION: 2.0 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.0 — 2026-11-10 — Task 029 Qabzino provider config: `providers.qabzino.token` and the three bill endpoint keys in the config example (config only; no code reads them yet).
 v1.9 — 2026-11-10 — Task 022 electricity inquiry: `providers.tavanir`, `caching.electricity` and `debug.mocks.tavanir` in the config examples and the Hot Reload table; the inquiry answer of ProviderInterface carries details (`InquiryResponse.Details`, saved in `bill_inquiries.extra_data` and returned the same from saved inquiries); the metrics qabz_inquiries_total, qabz_provider_calls_total and qabz_provider_call_duration_ms are implemented for electricity and Tavanir too.
 v1.8 — 2026-11-09 — Task 021 water inquiry: the config section is `providers` (not `provider`), with `providers.qabzino` and the `debug.mocks.<provider>` mocks; `caching.water`; ProviderInterface.Name returns string and the interface types are in provider/provider.go, the ProviderRegistry in provider/registry.go; metrics qabz_inquiries_total (bill_type, provider, result), qabz_provider_calls_total (provider, action, result), qabz_provider_call_duration_ms (provider, action); the Hot Reload table lists the water cache TTL, the provider settings and the mocks as startup-only.
 v1.7 — 2026-11-09 — Task 020 fix round 4 (operator decision 9): the providers row of the Hot Reload table states that a change of providers.general.load_interval applies at once (config.Holder.Changed wakes the reload routine).
@@ -198,6 +199,10 @@ providers:
   qabzino:
     grpc_address: qabzino:9000   # host:port, gRPC, no TLS; empty: every Qabzino call fails as "provider down"
     timeout: 10s                 # limit of each call; positive
+    token: ""                    # Ayantech token (secret); the real value only in config.yml (task 029)
+    electricity_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry
+    gas_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry
+    water_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry
   tavanir:
     grpc_address: tavanir:8084   # host:port, gRPC, no TLS; empty: every Tavanir call fails as "provider down"
     timeout: 10s                 # limit of each call; positive

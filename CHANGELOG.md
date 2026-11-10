@@ -1,7 +1,8 @@
-<!-- VERSION: 2.6 -->
+<!-- VERSION: 2.7 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v2.7 — 2026-11-10 — Added 029-qabzino-provider-config entry.
 v2.6 — 2026-11-10 — Added 022-electricity-inquiry-endpoint entry.
 v2.5 — 2026-11-10 — Added 022-to-025-inquiry-tasks entry (tax, tax-organization and traffic-fine removed from the qabz proto).
 v2.4 — 2026-11-09 — Added 021-water-inquiry-endpoint entry.
@@ -112,6 +113,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-10] — Task 029: Qabzino provider config: token and bill endpoints
+- **Type:** Major (new config keys, Critical File `system.html`)
+- **Files:** `src/config/config.go` (`QabzinoToken` as `Secret`, `QabzinoElectricityBillEndpoint`, `QabzinoGasBillEndpoint`, `QabzinoWaterBillEndpoint`, the defaults) + `config_test.go` (`TestParseQabzinoProviderKeys`); `config.yml.example` (the four keys with default values); `config.yml` (git-ignored; the real token and URLs); `docs/initial-discovery/system.html`; `docs/Plans/in-progress_tasks/029_qabzino_provider_config.md` (new); `docs/Plans/pending_tasks/task_counter.json` (next ID 030).
+- **Impact:** No runtime impact: four new keys under `providers.qabzino`; no code reads them yet. The token is a `Secret` and never prints.
+- **QA scenarios:** `go test -race -count=1 -run QabzinoProviderKeys ./config/` from `src/`. Pass: the test passes (defaults, values, token masked).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-10] — Task 022: POST /v1/electricity/inquiry, the Tavanir adapter and its mock
 - **Type:** Major (new endpoint, new package `provider/tavanir`, domain logic, new config keys, Critical File `system.html`)

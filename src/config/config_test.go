@@ -492,3 +492,28 @@ func TestTavanirMockSectionOnlyInDev(t *testing.T) {
 		assert.Equal(t, MockReturnError, c.DebugMockTavanirReturnType)
 	}
 }
+
+// TestParseQabzinoProviderKeys (task 029): the Qabzino token and bill endpoints have their
+// defaults, take their values, and the token never prints.
+func TestParseQabzinoProviderKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "", c.QabzinoToken.Reveal(), "default token is empty")
+	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry", c.QabzinoElectricityBillEndpoint)
+	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry", c.QabzinoGasBillEndpoint)
+	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry", c.QabzinoWaterBillEndpoint)
+
+	c, err = Parse([]byte(base + `providers: {qabzino: {token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", water_bill_endpoint: "http://w"}}
+`))
+	if assert.NoError(t, err) {
+		assert.Equal(t, "tok", c.QabzinoToken.Reveal())
+		assert.Equal(t, "http://e", c.QabzinoElectricityBillEndpoint)
+		assert.Equal(t, "http://g", c.QabzinoGasBillEndpoint)
+		assert.Equal(t, "http://w", c.QabzinoWaterBillEndpoint)
+		assert.NotContains(t, fmt.Sprintf("%v %+v %#v", c.QabzinoToken, c.QabzinoToken, c.QabzinoToken), "tok")
+		assert.Equal(t, 10*time.Second, c.QabzinoTimeout, "the older Qabzino keys keep their defaults")
+	}
+}

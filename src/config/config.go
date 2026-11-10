@@ -96,6 +96,17 @@ type Config struct {
 	QabzinoGRPCAddress string `path:"providers.qabzino.grpc_address"`
 	// QabzinoTimeout limits each call to the Qabzino backend. Positive. Not hot-reloadable.
 	QabzinoTimeout time.Duration `path:"providers.qabzino.timeout"`
+	// QabzinoToken is the Ayantech token of the Qabzino provider (bill: qabzino.token). A Secret:
+	// it never prints. Empty by default; the real value is only in config.yml (task 029). No code
+	// reads it yet.
+	QabzinoToken Secret `path:"providers.qabzino.token"`
+	// QabzinoElectricityBillEndpoint, QabzinoGasBillEndpoint and QabzinoWaterBillEndpoint are the
+	// Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint and so on). Not checked: no code
+	// reads them yet (task 029).
+	QabzinoElectricityBillEndpoint string `path:"providers.qabzino.electricity_bill_endpoint"`
+	QabzinoGasBillEndpoint         string `path:"providers.qabzino.gas_bill_endpoint"`
+	QabzinoWaterBillEndpoint       string `path:"providers.qabzino.water_bill_endpoint"`
+
 	// TavanirGRPCAddress is the host:port of the Tavanir backend (gRPC, no TLS, as in bill:
 	// tavanir.grpcAddress). Empty: every call to Tavanir fails as "provider down" (task 022). Not
 	// hot-reloadable: the client is built at start.
@@ -148,12 +159,15 @@ func defaults() Config {
 
 		ProvidersLoadInterval: time.Minute,
 
-		QabzinoTimeout:             10 * time.Second,
-		TavanirTimeout:             10 * time.Second,
-		CachingWater:               time.Hour,
-		CachingElectricity:         time.Hour,
-		DebugMockQabzinoReturnType: MockReturnSuccess,
-		DebugMockTavanirReturnType: MockReturnSuccess,
+		QabzinoTimeout:                 10 * time.Second,
+		QabzinoElectricityBillEndpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry",
+		QabzinoGasBillEndpoint:         "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry",
+		QabzinoWaterBillEndpoint:       "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry",
+		TavanirTimeout:                 10 * time.Second,
+		CachingWater:                   time.Hour,
+		CachingElectricity:             time.Hour,
+		DebugMockQabzinoReturnType:     MockReturnSuccess,
+		DebugMockTavanirReturnType:     MockReturnSuccess,
 	}
 }
 

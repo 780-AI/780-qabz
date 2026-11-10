@@ -47,6 +47,10 @@ providers:
   qabzino:
     grpc_address: ""         # host:port of the Qabzino backend (gRPC, no TLS); empty: every Qabzino call fails as "provider down"
     timeout: "10s"           # limit of each call to the Qabzino backend; positive
+    token: ""                # Ayantech token (secret); the real value only in config.yml
+    electricity_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry"
+    gas_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry"
+    water_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry"
   tavanir:
     grpc_address: ""         # host:port of the Tavanir backend (gRPC, no TLS); empty: every Tavanir call fails as "provider down"
     timeout: "10s"           # limit of each call to the Tavanir backend; positive
