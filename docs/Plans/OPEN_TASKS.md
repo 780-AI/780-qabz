@@ -1,7 +1,8 @@
-<!-- VERSION: 1.48 -->
+<!-- VERSION: 1.49 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v1.49 — 2026-11-10 — Session wrap-up (tasks 033 and 034 session): 1 lesson candidate added (submodule pointer pushed before the submodule), 1 candidate gets more evidence; push of 27b69a0..52e71cd done (pb first).
 v1.48 — 2026-11-10 — Task 034 direct Tavanir adapter: QA scenario and follow-ups added; the task 033 follow-up and the task 022 follow-ups (b) and (c) are done and removed.
 v1.47 — 2026-11-10 — Task 033 Tavanir provider config: QA scenario added; follow-up for the direct Tavanir adapter; task 030 closed.
 v1.46 — 2026-11-10 — Inquiry database answers write no log line: the task 021 and 022 QA steps 2 check the counter db_hit.
@@ -290,3 +291,8 @@ Found in the 2026-11-08 session wrap-up (tasks 015 and 018 session):
 - **One writer per working tree.** In the 2026-11-08 agents session, the task 019b executor ran in the same working tree while this session edited `CHANGELOG.md` and `documents_manifest.md` for conventions § 12. Both changes ended up in the same two files, so a separate commit per task needed hand-built partial staging; the operator chose one commit for both (d5ad23d). Candidate: a session that runs a task (`task-master`) works in its own git worktree, or a session checks `git status` for another active task before it edits a shared doc (CHANGELOG, manifest, OPEN_TASKS). Recommendation: queue (decide if it happens again).
 - **Test each command in an agent file.** A Python one-liner written into the new `artifacts_agent` file failed on this machine (Python 3.9: no backslash in an f-string expression). Running each command once before saving the agent file found it. Candidate: an agent file (local, `.claude/agents/`) gets each of its commands run once on this machine before it is used; same idea as suite lessons L082/L083 (positive controls, tools on the extracted text). Recommendation: queue.
 - More evidence for **Run the `code-reviewer` agent before the task commit** (above): task 019b was committed (d5ad23d) on the in-chat Rule 10 review only; neither `code-reviewer` nor `artifacts_agent` ran on it, because it was committed from a session that did not run the task.
+
+Found in the 2026-11-10 session wrap-up (tasks 033 and 034 session):
+
+- **A submodule pointer must be pushed after its submodule.** Commit 27b69a0 recorded the `pb` pointer `ac2e2ea`, but that commit was only local in `pb` (one ahead of `origin/qabz_service`). Pushing `main` alone would have made every fresh `git clone --recurse-submodules` fail on that commit. It was found by one extra check before the push: `git -C pb branch -r --contains "$(git rev-parse HEAD:pb)"` printed nothing. The pb push (to `qabz_service`) then ran first, and `main` second. Candidate: add this check to the pre-push step of `CLAUDE.md` Rule 2 (or to the push cadence in § 11) for every push that has a `pb` pointer change. Recommendation: codify as a STANDARDS_LOG E0NN entry (suite file), queue until the operator confirms.
+- More evidence for **Run the `code-reviewer` agent before the task commit** (above): tasks 033 and 034 were committed on the in-chat Rule 10 review only; the `code-reviewer` agent did not run before either commit. Recommendation: unchanged, queue; this is now the third session with the same gap.

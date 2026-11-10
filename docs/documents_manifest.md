@@ -1,4 +1,4 @@
-<!-- VERSION: 2.2 -->
+<!-- VERSION: 2.3 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.1 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.2 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.2 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.3 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.39 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.48 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.49 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.18 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-10
-- **Change**: 2026-11-10 — Task 034 `tavanir_direct_provider`: `provider/tavanir/` is a direct HTTPS client of the Tavanir (SAAPA) endpoints (login, token in memory, inquiry with details), `providers.tavanir.enabled` (default `false`) replaces `providers.tavanir.grpc_address`; no rename, no circuit breaker, no call to the `tavanir` microservice (operator decisions); `Makefile` and `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task 034 moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.1, #5 manifest v2.2, #6 folder_structure v0.39, #21 system.html v2.3, #28 OPEN_TASKS v1.48, #34 app README v0.24, #35 this_vs_bill v0.10.
-- **Previous change**: 2026-11-10 — Task 033 `tavanir_provider_config`: eleven new config keys under `providers.tavanir` (four endpoints, `username`, `password` as a `Secret`, a `circuit_breaker` block; config only, no code reads them yet); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; tasks 033 and 030 moved to `done_tasks/`, new pending tasks 031 and 034 (not manifest-tracked). Bumped #3 CHANGELOG v3.0, #5 manifest v2.1 (its row said v1.7, the header 2.0: fixed), #21 system.html v2.2, #28 OPEN_TASKS v1.47.
+- **Change**: 2026-11-10 — Session wrap-up (tasks 033 and 034 session): one lesson candidate and more evidence for another in the register; no code, no new files. Bumped #3 CHANGELOG v3.2, #5 manifest v2.3, #28 OPEN_TASKS v1.49.
+- **Previous change**: 2026-11-10 — Task 034 `tavanir_direct_provider`: `provider/tavanir/` is a direct HTTPS client of the Tavanir (SAAPA) endpoints (login, token in memory, inquiry with details), `providers.tavanir.enabled` (default `false`) replaces `providers.tavanir.grpc_address`; no rename, no circuit breaker, no call to the `tavanir` microservice (operator decisions); `Makefile` and `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task 034 moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.1, #5 manifest v2.2, #6 folder_structure v0.39, #21 system.html v2.3, #28 OPEN_TASKS v1.48, #34 app README v0.24, #35 this_vs_bill v0.10.
+- **Earlier change**: 2026-11-10 — Task 033 `tavanir_provider_config`: eleven new config keys under `providers.tavanir` (four endpoints, `username`, `password` as a `Secret`, a `circuit_breaker` block; config only, no code reads them yet); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; tasks 033 and 030 moved to `done_tasks/`, new pending tasks 031 and 034 (not manifest-tracked). Bumped #3 CHANGELOG v3.0, #5 manifest v2.1 (its row said v1.7, the header 2.0: fixed), #21 system.html v2.2, #28 OPEN_TASKS v1.47.
 - **Earlier change**: 2026-11-10 — The inquiry answered from the database writes no log line (`core/inquiry`); the counter `qabz_inquiries_total{result="db_hit"}` already counts it; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v2.9, #5 manifest v2.0, #28 OPEN_TASKS v1.46.
 - **Earlier change**: 2026-11-10 — Task 030 `qabzino_direct_provider`: the direct Qabzino adapter (`provider/qabzino/`, HTTPS to Ayantech with `providers.qabzino.token` and `water_bill_endpoint`), `providers.qabzino.enabled` (default `false`), the gRPC adapter renamed `provider/qabzinoproxy/` (QabzinoProxy, not used); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task file in `in-progress_tasks/` (not manifest-tracked); task 029 moved to `done_tasks/`. Bumped #3 CHANGELOG v2.8, #5 manifest v1.9, #6 folder_structure v0.38, #21 system.html v2.1, #28 OPEN_TASKS v1.45, #34 app README v0.23, #35 this_vs_bill v0.9.
 - **Earlier change**: 2026-11-10 — Task 029 `qabzino_provider_config`: four new config keys under `providers.qabzino` (`token` as a `Secret`, `electricity_bill_endpoint`, `gas_bill_endpoint`, `water_bill_endpoint`; config only, no code reads them yet); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task file in `in-progress_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v2.7, #5 manifest v1.8, #21 system.html v2.0, #28 OPEN_TASKS v1.44.

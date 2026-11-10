@@ -1,7 +1,8 @@
-<!-- VERSION: 3.1 -->
+<!-- VERSION: 3.2 -->
 <!-- Last Updated: 2026-11-10 -->
 <!--
 CHANGE LOG
+v3.2 — 2026-11-10 — Added session-wrap-up (tasks 033 and 034 session) entry.
 v3.1 — 2026-11-10 — Added 034-tavanir-direct-provider entry.
 v3.0 — 2026-11-10 — Added 033-tavanir-provider-config entry.
 v2.9 — 2026-11-10 — Added inquiry-database-answer-log-removed entry.
@@ -123,6 +124,13 @@ v1.0 — 2026-10-28 — Initial.
 - **Files:** `src/core/inquiry/inquiry.go` (the `inquiry: answered from database, no provider call` info line removed from `fromDatabase`); `src/app/water_live_test.go`, `src/app/electricity_live_test.go` (the log assertion became "no such line"; the existing `qabz_inquiries_total{result="db_hit"}` assertions stay); `docs/Plans/OPEN_TASKS.md` (v1.46: QA steps 2 of tasks 021 and 022 check the counter).
 - **Impact:** Yes, a log line is gone. A database answer is now counted only by `qabz_inquiries_total{bill_type,provider,result="db_hit"}` (a Prometheus counter, with metrics on). No change to answers, rows or other metrics.
 - **QA scenarios:** `make test` (the two live tests check that the line is not written and that `db_hit` is counted); feature ON: call the same bill twice, then `curl localhost:9090/metrics`. Pass: the second call has no `answered from database` line and `qabz_inquiries_total{...result="db_hit"}` is 1.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
+
+## [2026-11-10] — Session wrap-up (tasks 033 and 034 session)
+- **Type:** Minor (docs only)
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.49), `docs/documents_manifest.md` (v2.3), `CHANGELOG.md` (this entry).
+- **Impact:** No runtime impact. One lesson candidate added (a submodule pointer must be pushed after its submodule) and more evidence for "Run the `code-reviewer` agent before the task commit". The push of `27b69a0..52e71cd` is done: `pb` (`ac2e2eac`) to `qabz_service` first, then `main`.
+- **QA scenarios:** None needed (Rule 11 exempts pure docs).
 - **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-10] — Task 034: direct Tavanir (SAAPA) adapter, `providers.tavanir.enabled`; the gRPC client is removed
