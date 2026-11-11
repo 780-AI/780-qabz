@@ -1,7 +1,8 @@
-<!-- VERSION: 3.5 -->
+<!-- VERSION: 3.6 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.6 — 2026-11-11 — Added 036-jiring-not-available-meaning entry.
 v3.5 — 2026-11-11 — Added 024-split-into-035-036-037 entry.
 v3.4 — 2026-11-11 — Added session-wrap-up (task 023 session) entry.
 v3.3 — 2026-11-11 — Added 023-gas-inquiry-endpoint entry.
@@ -121,6 +122,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Task 036 (MCI inquiry): meaning of "Jiring Switch is not available"
+- **Type:** Minor (task file; no code).
+- **Files:** `docs/Plans/pending_tasks/036_mobile_mci_inquiry.md` (v0.2); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The task records the operator decision: "not available" means that Jiring Switch does not respond (the future circuit breaker, a failed call, a timeout). Parsian is then called in the same request. A business answer of Jiring Switch is a response, so Parsian is not called. The design points, the tests and the Verification steps follow this meaning; the case of a disabled Jiring Switch row is a point to confirm with the operator.
+- **QA scenarios:** none (task file only; the task has its own Verification section).
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-11] — Task 024 (mobile inquiry) split into tasks 035 (Irancell), 036 (MCI) and 037 (Rightel)
 - **Type:** Minor (task files; no code).
