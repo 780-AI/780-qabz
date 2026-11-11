@@ -1,4 +1,4 @@
-<!-- VERSION: 2.7 -->
+<!-- VERSION: 2.8 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.6 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.7 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.7 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.8 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.40 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-11
-- **Change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.2: the operator meaning of "Jiring Switch is not available" (it does not respond: circuit breaker, failed call, timeout; Parsian is called in the same request); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.6, #5 manifest v2.7.
-- **Previous change**: 2026-11-11 — Task 024 `mobile_inquiry_endpoint` split by operator into the new pending tasks 035 (Irancell), 036 (MCI) and 037 (Rightel); the file of task 024 removed, `task_counter.json` is 038, task 025 v0.2 names the new tasks; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.5, #5 manifest v2.6, #28 OPEN_TASKS v1.52.
+- **Change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.3: the operator rule "the next provider in the list takes the job" (a disabled row, an open circuit breaker or no response; Jiring Switch first, Parsian next); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.7, #5 manifest v2.8.
+- **Previous change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.2: the operator meaning of "Jiring Switch is not available" (it does not respond: circuit breaker, failed call, timeout; Parsian is called in the same request); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.6, #5 manifest v2.7.
+- **Earlier change**: 2026-11-11 — Task 024 `mobile_inquiry_endpoint` split by operator into the new pending tasks 035 (Irancell), 036 (MCI) and 037 (Rightel); the file of task 024 removed, `task_counter.json` is 038, task 025 v0.2 names the new tasks; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.5, #5 manifest v2.6, #28 OPEN_TASKS v1.52.
 - **Earlier change**: 2026-11-11 — Session wrap-up (task 023 session): 3 lesson candidates and more evidence for one in the register; the operator report for task 023; no code, no new files. Bumped #3 CHANGELOG v3.4, #5 manifest v2.5, #28 OPEN_TASKS v1.51.
 - **Earlier change**: 2026-11-11 — Task 023 `gas_inquiry_endpoint`: `POST /v1/gas/inquiry` on the shared inquiry flow (`core/inquiry`: one table of bill types; the inquiry ID of gas is the participate code), the raw inquiry (`billId` + `payId`: `inquiry.Service.RawInquiry`, `common/helpers/payid.go`), the Qabzino adapter inquires gas (`providers.qabzino.gas_bill_endpoint`) and has a gas mock answer, `caching.gas` (default `1h`), gas details in `bill_inquiries.extra_data`; requests and responses of every endpoint unchanged; Postman has Gas / Inquiry; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.3, #5 manifest v2.4, #6 folder_structure v0.40, #21 system.html v2.4, #28 OPEN_TASKS v1.50, #34 app README v0.25, #35 this_vs_bill v0.11.
 - **Earlier change**: 2026-11-10 — Session wrap-up (tasks 033 and 034 session): one lesson candidate and more evidence for another in the register; no code, no new files. Bumped #3 CHANGELOG v3.2, #5 manifest v2.3, #28 OPEN_TASKS v1.49.

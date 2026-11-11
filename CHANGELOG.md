@@ -1,7 +1,8 @@
-<!-- VERSION: 3.6 -->
+<!-- VERSION: 3.7 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.7 — 2026-11-11 — Added 036-next-provider-rule entry.
 v3.6 — 2026-11-11 — Added 036-jiring-not-available-meaning entry.
 v3.5 — 2026-11-11 — Added 024-split-into-035-036-037 entry.
 v3.4 — 2026-11-11 — Added session-wrap-up (task 023 session) entry.
@@ -122,6 +123,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Task 036 (MCI inquiry): the next provider in the list takes the job
+- **Type:** Minor (task file; no code).
+- **Files:** `docs/Plans/pending_tasks/036_mobile_mci_inquiry.md` (v0.3); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The task records the operator rule "when provider 1 does not answer, the next provider in the row takes the job": the order is the sorted provider list of (`mobile`, `inquiry`), Jiring Switch first and Parsian next; a disabled row, an open circuit breaker or a call with no response gives the job to the next provider. The open point of the disabled Jiring Switch row is closed (Parsian answers). The task applies the rule to MCI only; a wider scope is a point for the operator.
+- **QA scenarios:** none (task file only; the task has its own Verification section, now six steps).
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-11] — Task 036 (MCI inquiry): meaning of "Jiring Switch is not available"
 - **Type:** Minor (task file; no code).
