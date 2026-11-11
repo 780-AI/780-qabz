@@ -1,4 +1,4 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 0.2 -->
 # 025_tel_inquiry_endpoint — POST /v1/tel/inquiry and the Qabzino telephone adapter
 
 Status: pending
@@ -10,7 +10,7 @@ Implement `Tel.Inquiry` (`POST /v1/tel/inquiry`, `pb/proto/qabz/services.proto`)
 **The flow is the same as water (task 021) and electricity (task 022):** pick the provider for (`tel`, `inquiry`) with `ProvidersService.PickProvider` (conventions § 13); look in `bill_inquiries` first (same `inquiry_id`, same `provider_id`, newer than the cache TTL, `is_cached = false`, `is_paid = false`); only on a miss call the provider, write the `bill_inquiry_requests` row, and save the inquiries so the next request within the TTL is answered from the database. Use `core/inquiry` (`Service`), `provider.Registry` and the error mapping of task 021. Do not copy the water flow: extend it for one more bill type. A picked provider with no adapter answers `Unavailable`, as in task 021.
 
 **What is special to this bill type:**
-- **Two inquiries per request:** a mid-term (`telmidterm`) and a full-term (`tel`) inquiry, saved as separate rows and returned in `midTerm` and `fullTerm`, as in task 024. Decide in the design step how the flow handles the two provider types; share the mechanism with task 024 if that task is done first, with no copy of code.
+- **Two inquiries per request:** a mid-term (`telmidterm`) and a full-term (`tel`) inquiry, saved as separate rows and returned in `midTerm` and `fullTerm`, as in the mobile inquiry (tasks 035 to 037; task 024 was split into them). Decide in the design step how the flow handles the two provider types; share the mechanism with the mobile inquiry if one of those tasks is done first, with no copy of code.
 - **The inquiry ID is the phone number** (`bill`: `controller/telephone/inquiry.go`, validation, area code).
 - **Details** (`bill`: `KarashopTelephone.setDetails`) belong to the Karashop provider and are not in this task.
 - **Providers.** This task adds only the Qabzino telephone adapter (seed ids 52 and 53, `qabzino-tel-inquiry`, `qabzino-telmidterm-inquiry`). The Parsian and Karashop adapters are NOT in this task: a picked provider with no adapter answers `Unavailable` (task 021 decision 2).

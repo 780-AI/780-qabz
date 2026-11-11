@@ -1,7 +1,8 @@
-<!-- VERSION: 3.4 -->
+<!-- VERSION: 3.5 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.5 — 2026-11-11 — Added 024-split-into-035-036-037 entry.
 v3.4 — 2026-11-11 — Added session-wrap-up (task 023 session) entry.
 v3.3 — 2026-11-11 — Added 023-gas-inquiry-endpoint entry.
 v3.2 — 2026-11-10 — Added session-wrap-up (tasks 033 and 034 session) entry.
@@ -120,6 +121,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Task 024 (mobile inquiry) split into tasks 035 (Irancell), 036 (MCI) and 037 (Rightel)
+- **Type:** Minor (task files; no code).
+- **Files:** `docs/Plans/pending_tasks/035_mobile_irancell_inquiry.md`, `036_mobile_mci_inquiry.md`, `037_mobile_rightel_inquiry.md` (new tasks, v0.1); `docs/Plans/pending_tasks/024_mobile_inquiry_endpoint.md` (removed: replaced by the three tasks; the ID 024 is not reused); `docs/Plans/pending_tasks/task_counter.json` (next ID 038); `docs/Plans/pending_tasks/025_tel_inquiry_endpoint.md` (v0.2: names the new tasks in place of 024); `docs/Plans/OPEN_TASKS.md` (v1.52: the task 023 follow-up (a) names the new tasks); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. One endpoint (`POST /v1/mobile/inquiry`), one task per operator; the first of the three that starts builds the shared part (handler, request check, operator table, the two inquiries of an answer). The new tasks correct task 024 from the `bill` code: Irancell uses the bill type `irancell` and the provider `irancell` (seed id 38), not the Qabzino rows 31 and 33; MCI uses `mobile` (Parsian id 39, Jiring Switch id 28); Rightel uses `mobilemidtermRightel` and Qabzino (id 34). Each task states the provider constraint of the operator (2026-11-11): Irancell only the Irancell provider; MCI Jiring Switch first and Parsian when Jiring Switch is not available; Rightel only Qabzino. Task files are not manifest-tracked.
+- **QA scenarios:** none (task files only; each task has its own Verification section).
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-11] — Session wrap-up (task 023 session)
 - **Type:** Minor (documentation; no code, no new files).
