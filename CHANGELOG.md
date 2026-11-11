@@ -1,7 +1,8 @@
-<!-- VERSION: 3.8 -->
+<!-- VERSION: 3.9 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.9 — 2026-11-11 — Added postman-bill-type-variables entry.
 v3.8 — 2026-11-11 — Added 035-mobile-irancell-inquiry entry.
 v3.7 — 2026-11-11 — Added 036-next-provider-rule entry.
 v3.6 — 2026-11-11 — Added 036-jiring-not-available-meaning entry.
@@ -124,6 +125,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Postman: collection variables for the request IDs of each bill type
+- **Type:** Minor (Postman collection; no code).
+- **Files:** `qabz.postman_collection.json` (new collection variables `water_billId`, `water_payId`, `electricity_billId`, `electricity_payId`, `gas_billId`, `gas_payId`, `gas_participateCode`, `irancell_mobile_billId`, `irancell_mobile_payId`, `irancell_mobile_phone`; the bodies of Water, Electricity, Gas and Phone Inquiry and of MyBills Insert use them; the file is written again, so three older requests change format only); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior and none on the API (operator request). The default values are those that the bodies had before; MyBills Insert now sends `{{water_billId}}` (default `1234567890125`, a valid bill ID) in place of `123455`. With both `gas_billId` and `gas_payId` set, a gas request is the raw inquiry (the variable description says so).
+- **QA scenarios:** none (Postman only). Check: `python3 -m json.tool qabz.postman_collection.json` passes.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Task 035: `POST /v1/mobile/inquiry` for the Irancell operator, the Irancell adapter (the irancell service)
 - **Type:** Major (new endpoint, new package `provider/irancellproxy`, domain logic, new config keys, Critical File `system.html`)

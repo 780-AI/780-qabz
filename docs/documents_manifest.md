@@ -1,4 +1,4 @@
-<!-- VERSION: 2.9 -->
+<!-- VERSION: 2.10 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.8 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.9 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.9 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.10 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.41 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-11
-- **Change**: 2026-11-11 — Task 035 `mobile_irancell_inquiry`: `POST /v1/mobile/inquiry` for the Irancell operator on the shared inquiry flow (the inquiry ID is the phone; a mid-term and a final-term inquiry; only the Irancell provider may answer), the Irancell adapter `provider/irancellproxy` (a gRPC client of the irancell service), `providers.irancell.*`, `caching.irancell` (default 0) and `debug.mocks.irancell`; MCI and Rightel answer HTTP 501 until tasks 036 and 037; Postman has Phone / Inquiry; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.8, #5 manifest v2.9, #6 folder_structure v0.41, #21 system.html v2.5, #28 OPEN_TASKS v1.53, #34 app README v0.26, #35 this_vs_bill v0.12.
-- **Previous change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.3: the operator rule "the next provider in the list takes the job" (a disabled row, an open circuit breaker or no response; Jiring Switch first, Parsian next); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.7, #5 manifest v2.8.
+- **Change**: 2026-11-11 — Postman collection variables for the request IDs of each bill type (`water_billId`, `water_payId`, `electricity_billId`, `electricity_payId`, `gas_billId`, `gas_payId`, `gas_participateCode`, `irancell_mobile_billId`, `irancell_mobile_payId`, `irancell_mobile_phone`), used by the request bodies; JSON, no row; no code. Bumped #3 CHANGELOG v3.9, #5 manifest v2.10.
+- **Previous change**: 2026-11-11 — Task 035 `mobile_irancell_inquiry`: `POST /v1/mobile/inquiry` for the Irancell operator on the shared inquiry flow (the inquiry ID is the phone; a mid-term and a final-term inquiry; only the Irancell provider may answer), the Irancell adapter `provider/irancellproxy` (a gRPC client of the irancell service), `providers.irancell.*`, `caching.irancell` (default 0) and `debug.mocks.irancell`; MCI and Rightel answer HTTP 501 until tasks 036 and 037; Postman has Phone / Inquiry; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.8, #5 manifest v2.9, #6 folder_structure v0.41, #21 system.html v2.5, #28 OPEN_TASKS v1.53, #34 app README v0.26, #35 this_vs_bill v0.12.
+- **Earlier change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.3: the operator rule "the next provider in the list takes the job" (a disabled row, an open circuit breaker or no response; Jiring Switch first, Parsian next); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.7, #5 manifest v2.8.
 - **Earlier change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.2: the operator meaning of "Jiring Switch is not available" (it does not respond: circuit breaker, failed call, timeout; Parsian is called in the same request); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.6, #5 manifest v2.7.
 - **Earlier change**: 2026-11-11 — Task 024 `mobile_inquiry_endpoint` split by operator into the new pending tasks 035 (Irancell), 036 (MCI) and 037 (Rightel); the file of task 024 removed, `task_counter.json` is 038, task 025 v0.2 names the new tasks; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.5, #5 manifest v2.6, #28 OPEN_TASKS v1.52.
 - **Earlier change**: 2026-11-11 — Session wrap-up (task 023 session): 3 lesson candidates and more evidence for one in the register; the operator report for task 023; no code, no new files. Bumped #3 CHANGELOG v3.4, #5 manifest v2.5, #28 OPEN_TASKS v1.51.

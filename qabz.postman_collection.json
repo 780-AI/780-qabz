@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Qabz",
-    "description": "HTTP API of the Qabz service (grpc-gateway). Kept up to date with every API change: docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md section 7.",
+    "description": "HTTP API of the Qabz service (grpc-gateway). Kept up to date with every API change: docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md section 7. The request IDs of each bill type are collection variables (<billType>_billId, <billType>_payId, gas_participateCode, irancell_mobile_phone): set them in the collection Variables tab (or an environment of the same names) and every request body uses them.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -14,6 +14,66 @@
       "key": "token",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "water_billId",
+      "value": "1234567890125",
+      "type": "string",
+      "description": "Water/Inquiry body billId (a valid bill ID); also MyBills/Insert billId"
+    },
+    {
+      "key": "water_payId",
+      "value": "",
+      "type": "string",
+      "description": "Water/Inquiry body payId (bill ignores it for water)"
+    },
+    {
+      "key": "electricity_billId",
+      "value": "1234567890125",
+      "type": "string",
+      "description": "Electricity/Inquiry body billId (a valid bill ID)"
+    },
+    {
+      "key": "electricity_payId",
+      "value": "",
+      "type": "string",
+      "description": "Electricity/Inquiry body payId (bill ignores it for electricity)"
+    },
+    {
+      "key": "gas_billId",
+      "value": "",
+      "type": "string",
+      "description": "Gas/Inquiry body billId; with gas_payId also set, the request is the raw inquiry (no provider)"
+    },
+    {
+      "key": "gas_payId",
+      "value": "",
+      "type": "string",
+      "description": "Gas/Inquiry body payId; with gas_billId also set, the request is the raw inquiry (no provider)"
+    },
+    {
+      "key": "gas_participateCode",
+      "value": "0012345678",
+      "type": "string",
+      "description": "Gas/Inquiry body participateCode (the inquiry ID of a gas bill)"
+    },
+    {
+      "key": "irancell_mobile_billId",
+      "value": "",
+      "type": "string",
+      "description": "Phone/Inquiry body billId (optional; a valid bill ID when set)"
+    },
+    {
+      "key": "irancell_mobile_payId",
+      "value": "",
+      "type": "string",
+      "description": "Phone/Inquiry body payId (not checked)"
+    },
+    {
+      "key": "irancell_mobile_phone",
+      "value": "989351234567",
+      "type": "string",
+      "description": "Phone/Inquiry body phone (a mobile number in the 98 form; the inquiry ID)"
     }
   ],
   "auth": {
@@ -37,8 +97,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/v1/greeting",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "greeting"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "greeting"
+              ]
             },
             "description": "haf80.api.bill.Service/Greeting. Pings the service. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true. Expected: HTTP 200 and {\"message\":\"Hello\"}; without a valid token HTTP 403."
           },
@@ -70,8 +135,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/v1/services",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "services"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "services"
+              ]
             },
             "description": "haf80.api.bill.Service/Get. Returns the service list (bill types) of the Accept-Language language from the services table, by order, cached in memory for 60s. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true. Expected: HTTP 200 and {\"serviceId\":<service.id>,\"services\":[{\"name\",\"isActive\",\"tag\",\"type\",\"inquiry\",\"icon\"}]}; inquiry is the stored value (bill always sends true). Without a valid token HTTP 403; a database error HTTP 500."
           },
@@ -101,8 +171,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/v1/mybill",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "mybill"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mybill"
+              ]
             },
             "description": "haf80.api.bill.MyBills/GetAll. Returns the saved bills (My Bills) of the user of the JWT from the bills table: enabled rows only, newest first, with the bill mapping: tel/mobile give billId and phone = the stored phone (a second bill with the same phone is left out); gas gives billId and participateCode; operator and isPined come from json_data. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"serviceId\":<service.id>,\"data\":[{\"id\",\"name\",\"type\",\"lastOrderDate\",\"billId\",\"operator\",\"isPined\",\"phone\",\"participateCode\"}]}; a user with no bills gets \"data\":[]. Without a valid token HTTP 403; a database error HTTP 500."
           },
@@ -133,7 +208,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"billId\": \"123455\",\n  \"name\": \"خانه\",\n  \"type\": \"water\",\n  \"operator\": \"\",\n  \"isPined\": false,\n  \"phone\": \"\",\n  \"participateCode\": \"\"\n}",
+              "raw": "{\n  \"billId\": \"{{water_billId}}\",\n  \"name\": \"خانه\",\n  \"type\": \"water\",\n  \"operator\": \"\",\n  \"isPined\": false,\n  \"phone\": \"\",\n  \"participateCode\": \"\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -222,7 +297,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"billId\": \"1234567890125\",\n  \"payId\": \"\",\n  \"participateCode\": \"\"\n}",
+              "raw": "{\n  \"billId\": \"{{water_billId}}\",\n  \"payId\": \"{{water_payId}}\",\n  \"participateCode\": \"\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -273,7 +348,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"billId\": \"1234567890125\",\n  \"payId\": \"\",\n  \"participateCode\": \"\"\n}",
+              "raw": "{\n  \"billId\": \"{{electricity_billId}}\",\n  \"payId\": \"{{electricity_payId}}\",\n  \"participateCode\": \"\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -325,7 +400,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"billId\": \"\",\n  \"payId\": \"\",\n  \"participateCode\": \"0012345678\"\n}",
+              "raw": "{\n  \"billId\": \"{{gas_billId}}\",\n  \"payId\": \"{{gas_payId}}\",\n  \"participateCode\": \"{{gas_participateCode}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -376,7 +451,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"989351234567\",\n  \"operator\": \"irancell\",\n  \"billId\": \"\",\n  \"payId\": \"\"\n}",
+              "raw": "{\n  \"phone\": \"{{irancell_mobile_phone}}\",\n  \"operator\": \"irancell\",\n  \"billId\": \"{{irancell_mobile_billId}}\",\n  \"payId\": \"{{irancell_mobile_payId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
