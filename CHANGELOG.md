@@ -1,7 +1,8 @@
-<!-- VERSION: 3.9 -->
+<!-- VERSION: 3.10 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.10 — 2026-11-11 — Added 038-task entry.
 v3.9 — 2026-11-11 — Added postman-bill-type-variables entry.
 v3.8 — 2026-11-11 — Added 035-mobile-irancell-inquiry entry.
 v3.7 — 2026-11-11 — Added 036-next-provider-rule entry.
@@ -125,6 +126,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — New task 038: normalize the incoming mobile number
+- **Type:** Minor (task file; no code).
+- **Files:** `docs/Plans/pending_tasks/038_mobile_phone_normalization.md` (new task, v0.1); `docs/Plans/pending_tasks/task_counter.json` (next ID 039); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The task (operator request after the report that `09373969041` gets HTTP 400 on `POST /v1/mobile/inquiry`) normalizes every incoming mobile number to the 98 form before the request check: a leading `0`, no prefix, `+98`, `0098`, separators, Persian and Arabic digits. Task files are not manifest-tracked.
+- **QA scenarios:** none (task file only; the task has its own Verification section).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Postman: collection variables for the request IDs of each bill type
 - **Type:** Minor (Postman collection; no code).
