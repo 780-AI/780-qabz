@@ -1,7 +1,8 @@
-<!-- VERSION: 3.12 -->
+<!-- VERSION: 3.13 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.13 — 2026-11-11 — Added session-wrap-up (task 036 session) entry.
 v3.12 — 2026-11-11 — Added 036-mobile-mci-inquiry entry.
 v3.11 — 2026-11-11 — Added session-wrap-up (task 024 split, tasks 035 and 038 session) entry.
 v3.10 — 2026-11-11 — Added 038-task entry.
@@ -128,6 +129,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Session wrap-up (task 036 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.56: 4 lesson candidates, more evidence for 2); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The push of d5f748f (task 036) is held for the operator.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Task 036: `POST /v1/mobile/inquiry` for the MCI operator, the Jiring Switch and Parsian adapters
 - **Type:** Major (endpoint behavior, new packages `provider/jiring` and `provider/parsianproxy`, domain logic, new config keys, a lasting rule in the conventions doc, Critical File `system.html`)
