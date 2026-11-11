@@ -104,13 +104,15 @@ type Config struct {
 	// it never prints. Empty by default; the real value is only in config.yml (task 029). Read by
 	// the direct Qabzino adapter (task 030).
 	QabzinoToken Secret `path:"providers.qabzino.token"`
-	// QabzinoElectricityBillEndpoint, QabzinoGasBillEndpoint and QabzinoWaterBillEndpoint are the
-	// Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint and so on). Not checked. The
-	// water one (task 030) and the gas one (task 023) are read; the electricity one is unused so far.
+	// QabzinoElectricityBillEndpoint, QabzinoGasBillEndpoint, QabzinoRightelBillEndpoint and
+	// QabzinoWaterBillEndpoint are the Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint
+	// and so on; the qabzino service: rightelBillEndpoint). Not checked. The water one (task 030),
+	// the gas one (task 023) and the Rightel one (task 037) are read; the electricity one is unused so far.
 	// No default (task 036, operator): the real URLs are only in config.yml; an empty URL makes
 	// every call fail as "provider down".
 	QabzinoElectricityBillEndpoint string `path:"providers.qabzino.electricity_bill_endpoint"`
 	QabzinoGasBillEndpoint         string `path:"providers.qabzino.gas_bill_endpoint"`
+	QabzinoRightelBillEndpoint     string `path:"providers.qabzino.rightel_bill_endpoint"`
 	QabzinoWaterBillEndpoint       string `path:"providers.qabzino.water_bill_endpoint"`
 
 	// TavanirEnabled turns the Tavanir provider on (task 034). False (the default): every call to
@@ -247,9 +249,10 @@ type Config struct {
 	// so every request asks Irancell (task 035, decision A). A negative value is rejected. Not
 	// hot-reloadable (as caching.water): read at start.
 	CachingIrancell time.Duration `path:"caching.irancell"`
-	// CachingMobile is how long a saved MCI mobile inquiry (the bill type mobile) answers the same
-	// phone again with no provider call (bill: caching.mobile, 5h). 0 turns the cache off; a
-	// negative value is rejected. Not hot-reloadable (task 036, as caching.water): read at start.
+	// CachingMobile is how long a saved MCI mobile inquiry (the bill type mobile) or Rightel mobile
+	// inquiry (the bill type mobilemidtermRightel, task 037; operator decision: the same key, as bill)
+	// answers the same phone again with no provider call (bill: caching.mobile, 5h). 0 turns the
+	// cache off; a negative value is rejected. Not hot-reloadable (task 036, as caching.water): read at start.
 	CachingMobile time.Duration `path:"caching.mobile"`
 
 	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to

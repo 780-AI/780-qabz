@@ -310,7 +310,7 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 
 // newProviderRegistry builds the provider adapters: Qabzino (task 021; since task 030 the direct
 // HTTP adapter with providers.qabzino.enabled, token, water_bill_endpoint, gas_bill_endpoint (task
-// 023) and timeout, not the gRPC QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
+// 023), rightel_bill_endpoint (task 037) and timeout, not the gRPC QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
 // endpoints with providers.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
 // and timeout; it calls no other service) and Irancell (task 035: a gRPC client of the irancell
 // service with providers.irancell.enabled, grpc_address and timeout), and Jiring Switch and Parsian
@@ -325,11 +325,12 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	dev := cfg.Mode == config.ModeDev
 
 	qabzinoAdapter, err := qabzino.New(qabzino.Options{
-		Enabled:       cfg.QabzinoEnabled,
-		Token:         cfg.QabzinoToken.Reveal(),
-		WaterEndpoint: cfg.QabzinoWaterBillEndpoint,
-		GasEndpoint:   cfg.QabzinoGasBillEndpoint,
-		Timeout:       cfg.QabzinoTimeout,
+		Enabled:         cfg.QabzinoEnabled,
+		Token:           cfg.QabzinoToken.Reveal(),
+		WaterEndpoint:   cfg.QabzinoWaterBillEndpoint,
+		GasEndpoint:     cfg.QabzinoGasBillEndpoint,
+		RightelEndpoint: cfg.QabzinoRightelBillEndpoint,
+		Timeout:         cfg.QabzinoTimeout,
 	})
 	if err != nil {
 		return nil, err
@@ -512,6 +513,8 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 		provider.BillTypeGas:         cfg.CachingGas,
 		provider.BillTypeIrancell:    cfg.CachingIrancell,
 		provider.BillTypeMobile:      cfg.CachingMobile,
+		// Rightel (task 037): the key of MCI, as bill (operator decision).
+		provider.BillTypeMobileMidTermRightel: cfg.CachingMobile,
 	}
 	return inquiry.NewService(inquiry.Options{
 		Repository:     postgres.NewInquiryRepository(db),

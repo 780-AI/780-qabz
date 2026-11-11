@@ -14,6 +14,9 @@ const (
 	BillTypeIrancell = "irancell"
 	// BillTypeMobile is the bill type of an MCI mobile bill (bill: entity.MOBILE; task 036).
 	BillTypeMobile = "mobile"
+	// BillTypeMobileMidTermRightel is the bill type of a Rightel mobile bill (bill:
+	// entity.MOBILEMIDTERMRIGHTEL; task 037).
+	BillTypeMobileMidTermRightel = "mobilemidtermRightel"
 
 	ActionInquiry = "inquiry"
 

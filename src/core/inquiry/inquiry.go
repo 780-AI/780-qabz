@@ -5,7 +5,8 @@
 // same for every bill type: task 021 implements water, task 022 adds electricity and the details of
 // an answer (provider.Details), task 023 adds gas (the inquiry ID is the participate code), task 035
 // adds the Irancell mobile bill (the inquiry ID is the phone; only the Irancell provider answers),
-// task 036 adds the MCI mobile bill (the bill type "mobile"; the inquiry ID is the phone).
+// task 036 adds the MCI mobile bill (the bill type "mobile"; the inquiry ID is the phone), task 037
+// adds the Rightel mobile bill (the bill type "mobilemidtermRightel"; only Qabzino answers).
 //
 // One request calls one provider: the first enabled provider of the sorted list (PickProvider).
 // What that provider returns is the answer, also when it is an error or an answer that cannot be
@@ -92,17 +93,26 @@ type billType struct {
 //   - mobile (task 036, the MCI operator): the inquiry ID is the phone, as irancell. Every provider
 //     of the sorted list of (mobile, inquiry) may answer (the seed has Jiring Switch and Parsian);
 //     the flow has no rule that is special to this bill type but the cache skip of bill.
+//   - mobilemidtermRightel (task 037, the Rightel operator): the inquiry ID is the phone, as
+//     irancell. Only the Qabzino provider may answer (operator rule of task 037). bill has no cache
+//     skip for this bill type (shouldSkipCache: only mobile and tel).
 var billTypes = map[string]billType{
 	provider.BillTypeWater:       {tidPrefix: 1, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeElectricity: {tidPrefix: 2, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeGas:         {tidPrefix: 3, validInquiryID: notEmpty, invalid: "participate code"},
 	provider.BillTypeIrancell:    {tidPrefix: 8, validInquiryID: helpers.ValidMobile, invalid: "phone", onlyProvider: irancellProvider},
 	provider.BillTypeMobile:      {tidPrefix: 5, validInquiryID: helpers.ValidMobile, invalid: "phone", skipSameTypePair: true},
+	// bill: pkg/reference RightelMobileReference (6).
+	provider.BillTypeMobileMidTermRightel: {tidPrefix: 6, validInquiryID: helpers.ValidMobile, invalid: "phone", onlyProvider: qabzinoProvider},
 }
 
 // irancellProvider is the providers.name of the Irancell provider (the adapter
 // provider/irancellproxy has the same name).
 const irancellProvider = "irancell"
+
+// qabzinoProvider is the providers.name of the Qabzino provider (the adapter provider/qabzino has
+// the same name). The package does not import the adapter: the flow knows only provider names.
+const qabzinoProvider = "qabzino"
 
 // notEmpty is the rule of an inquiry ID that only has to be there.
 func notEmpty(id string) bool { return id != "" }
@@ -126,7 +136,7 @@ func (e *RefusedError) Error() string { return "inquiry: the provider has no inq
 // Request is one inquiry.
 type Request struct {
 	BillType  string // for example provider.BillTypeWater
-	InquiryID string // the bill ID; for gas the participate code; for irancell and mobile the phone (billTypes)
+	InquiryID string // the bill ID; for gas the participate code; for the mobile bill types the phone (billTypes)
 	UserID    string // a UUID
 	Dialer    string // the mobile of the user (bill_inquiry_requests.dialer)
 }

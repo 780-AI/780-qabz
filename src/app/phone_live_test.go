@@ -127,7 +127,7 @@ func TestLiveIrancellMockError(t *testing.T) {
 
 // TestLiveIrancellOnlyIrancell (operator rule): when the Irancell row is disabled and another
 // provider is enabled for the bill type irancell, nobody is called: provider-down. With no enabled
-// provider: the same answer. Rightel is not available yet.
+// provider: the same answer.
 func TestLiveIrancellOnlyIrancell(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -147,14 +147,13 @@ func TestLiveIrancellOnlyIrancell(t *testing.T) {
 	assert.Equal(t, codes.Unavailable, status.Code(err))
 	assert.Equal(t, 1, s.log.count("error", "irancell: no enabled provider for inquiry"))
 
-	// rightel: not available yet; invalid requests: InvalidArgument. No line, no row. (mci and no
-	// operator run the MCI inquiry since task 036: TestLiveMCI*.)
+	// Invalid requests: InvalidArgument. No line, no row. (mci and no operator run the MCI inquiry
+	// since task 036: TestLiveMCI*; rightel the Rightel inquiry since task 037: TestLiveRightel*.)
 	lines := len(s.log.lines)
 	for name, c := range map[string]struct {
 		req  *pb.InquiryPhoneRequest
 		want codes.Code
 	}{
-		"rightel":     {&pb.InquiryPhoneRequest{Phone: livePhone, Operator: pb.InquiryPhoneRequest_rightel}, codes.Unimplemented},
 		"no phone":    {&pb.InquiryPhoneRequest{Operator: pb.InquiryPhoneRequest_irancell}, codes.InvalidArgument},
 		"a bad phone": {&pb.InquiryPhoneRequest{Phone: "09351234567", Operator: pb.InquiryPhoneRequest_irancell}, codes.InvalidArgument},
 		"unknown":     {&pb.InquiryPhoneRequest{Phone: livePhone, Operator: pb.InquiryPhoneRequest_unknown}, codes.InvalidArgument},

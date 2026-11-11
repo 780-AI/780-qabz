@@ -92,6 +92,24 @@
       "value": "989121112233",
       "type": "string",
       "description": "Phone/Inquiry MCI body phone (a mobile number in the 98 form; the inquiry ID)"
+    },
+    {
+      "key": "rightel_mobile_billId",
+      "value": "",
+      "type": "string",
+      "description": "Phone/Inquiry Rightel body billId (optional; a valid bill ID when set)"
+    },
+    {
+      "key": "rightel_mobile_payId",
+      "value": "",
+      "type": "string",
+      "description": "Phone/Inquiry Rightel body payId (not checked)"
+    },
+    {
+      "key": "rightel_mobile_phone",
+      "value": "989201234567",
+      "type": "string",
+      "description": "Phone/Inquiry Rightel body phone (a mobile number in the 98 form; the inquiry ID)"
     }
   ],
   "auth": {
@@ -487,7 +505,7 @@
                 "inquiry"
               ]
             },
-            "description": "haf80.api.bill.Phone/Inquiry (task 035: the Irancell operator). Inquires a mobile bill by phone. The request and the answer are those of bill (InquiryPhoneRequest, InquiryPhoneResponse), unchanged. Request rules, as in bill: phone is required and is a mobile number in the 98 form (989 and nine digits; 0935... or 935... is invalid); a billId that is sent must be a valid bill ID; operator and service must be values of the enum (mci, irancell, rightel, unknown); payId is not checked. Only operator is read (service is never used, as in bill), and a request with no operator is mci. Operators: irancell and mci (task 036, the item Inquiry MCI) are answered; rightel is not available yet (HTTP 501; task 037); unknown is HTTP 400. Note: the gateway reads an operator name that is not in the enum as mci. The inquiry ID is the phone: it is the cache key and what the provider gets. Irancell: the provider of (irancell, inquiry) is picked with ProvidersService and ONLY the Irancell provider (providers row 38, enabled in the dev seed) may answer: when the pick is another provider, nobody is called and the answer is HTTP 503. The Irancell adapter calls the irancell service (our own service, gRPC pb.InternalService/BillInquiry at providers.irancell.grpc_address); providers.irancell.enabled false fails every call as provider down. caching.irancell is 0 by default (no cache, as bill): every request asks Irancell; with a TTL, the saved inquiries of the same phone younger than the TTL answer with no provider call. With debug.mocks.irancell.enable true (dev mode only, providers.irancell.enabled true) the adapter answers a fixed answer: midTerm price 150000, fullTerm price 450000, no billId, no payId, no paymentDeadline (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"midTerm\":{\"billId\":\"\",\"payId\":\"\",\"price\":<rials>,\"paymentDeadline\":\"\",\"providerId\":0},\"fullTerm\":{...}} (Irancell gives no billId, payId or paymentDeadline; providerId is always 0, as in bill; no debt: price 0 in both). An invalid request HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a provider other than Irancell, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the phone HTTP 400 with the provider message; any other failure HTTP 500. POST /v1/mobile/order, /v2/mobile/order and /v1/mobile/complete-order are not implemented yet (HTTP 501)."
+            "description": "haf80.api.bill.Phone/Inquiry (task 035: the Irancell operator). Inquires a mobile bill by phone. The request and the answer are those of bill (InquiryPhoneRequest, InquiryPhoneResponse), unchanged. Request rules, as in bill: phone is required and is a mobile number in the 98 form (989 and nine digits; 0935... or 935... is invalid); a billId that is sent must be a valid bill ID; operator and service must be values of the enum (mci, irancell, rightel, unknown); payId is not checked. Only operator is read (service is never used, as in bill), and a request with no operator is mci. Operators: irancell, mci (task 036, the item Inquiry MCI) and rightel (task 037, the item Inquiry Rightel) are answered; unknown is HTTP 400. Note: the gateway reads an operator name that is not in the enum as mci. The inquiry ID is the phone: it is the cache key and what the provider gets. Irancell: the provider of (irancell, inquiry) is picked with ProvidersService and ONLY the Irancell provider (providers row 38, enabled in the dev seed) may answer: when the pick is another provider, nobody is called and the answer is HTTP 503. The Irancell adapter calls the irancell service (our own service, gRPC pb.InternalService/BillInquiry at providers.irancell.grpc_address); providers.irancell.enabled false fails every call as provider down. caching.irancell is 0 by default (no cache, as bill): every request asks Irancell; with a TTL, the saved inquiries of the same phone younger than the TTL answer with no provider call. With debug.mocks.irancell.enable true (dev mode only, providers.irancell.enabled true) the adapter answers a fixed answer: midTerm price 150000, fullTerm price 450000, no billId, no payId, no paymentDeadline (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"midTerm\":{\"billId\":\"\",\"payId\":\"\",\"price\":<rials>,\"paymentDeadline\":\"\",\"providerId\":0},\"fullTerm\":{...}} (Irancell gives no billId, payId or paymentDeadline; providerId is always 0, as in bill; no debt: price 0 in both). An invalid request HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a provider other than Irancell, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the phone HTTP 400 with the provider message; any other failure HTTP 500. POST /v1/mobile/order, /v2/mobile/order and /v1/mobile/complete-order are not implemented yet (HTTP 501)."
           },
           "event": [
             {
@@ -533,6 +551,51 @@
               ]
             },
             "description": "haf80.api.bill.Phone/Inquiry (task 036: the MCI operator). The same endpoint, request rules and answer as the item Inquiry (Irancell); operator mci, or no operator. The bill type is mobile and the inquiry ID is the phone (the cache key). The provider is the first enabled row of (mobile, inquiry) in the sorted provider list (ProvidersService, priority ascending): Jiring Switch (providers row 28; the jiring-switch service, providers.jiring_switch.*) and Parsian (row 39; the parsian-v2 service, providers.parsian.*). The wanted order is Jiring Switch first, Parsian next, set only with the row priority; in the dev seed row 28 is disabled with priority 10, so Parsian answers until row 28 is enabled with priority 1. One request calls one provider: its answer is the answer, also an error (HTTP 503); the request never calls the other provider. A switch to the next provider is the job of the Provider Switcher, only when the circuit breaker of the provider opens (not built yet). caching.mobile is 5h by default: saved inquiries of the same phone (and the same provider) younger than the TTL answer with no provider call; two saved rows of the same inquiry type do not answer (as bill). Mocks (dev mode only, with the provider enabled): debug.mocks.jiring_switch answers billId 9120000036, midTerm payId 21003611 price 210000, fullTerm payId 61003622 price 610000, no paymentDeadline; debug.mocks.parsian answers billId 9120000039, midTerm payId 22003911 price 220000, fullTerm payId 62003922 price 620000, paymentDeadline 2026-12-20; return_type error gives the provider-down error. Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true. Expected: HTTP 200 and {\"midTerm\":{\"billId\":...,\"payId\":...,\"price\":<rials>,\"paymentDeadline\":...,\"providerId\":0},\"fullTerm\":{...}} (no debt: price 0 in both). An invalid request HTTP 400; no valid token HTTP 403; no enabled provider, a failed provider call or a provider with no adapter HTTP 503; a provider that has no inquiry for the phone HTTP 400 with the provider message; any other failure HTTP 500."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has midTerm and fullTerm with a price\", function () { const b = pm.response.json(); [\"midTerm\", \"fullTerm\"].forEach(function (k) { pm.expect(b).to.have.property(k); pm.expect(b[k].price).to.be.a(\"number\"); pm.expect(b[k]).to.have.property(\"billId\"); pm.expect(b[k]).to.have.property(\"payId\"); pm.expect(b[k]).to.have.property(\"paymentDeadline\"); }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inquiry Rightel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{rightel_mobile_phone}}\",\n  \"operator\": \"rightel\",\n  \"billId\": \"{{rightel_mobile_billId}}\",\n  \"payId\": \"{{rightel_mobile_payId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/mobile/inquiry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mobile",
+                "inquiry"
+              ]
+            },
+            "description": "haf80.api.bill.Phone/Inquiry (task 037: the Rightel operator). The same endpoint, request rules and answer as the item Inquiry (Irancell); operator rightel. The bill type is mobilemidtermRightel and the inquiry ID is the phone (the cache key). ONLY the Qabzino provider may answer (operator rule): the provider of (mobilemidtermRightel, inquiry) is picked with ProvidersService (providers row 34, enabled in the dev seed); when the pick is another provider, or no row is enabled, nobody is called and the answer is HTTP 503 (no fallback). The Qabzino adapter calls Ayantech RightelMobileBillInquiry at providers.qabzino.rightel_bill_endpoint with the phone in the 0 form (0 and the ten digits); every call is charged. providers.qabzino.enabled false fails every call as provider down. Ayantech codes: G00000 success (billId of the mid-term part, a pay ID and a price for each part, no paymentDeadline); GD2268 no debt (price 0 in both); GD2261 and GD2267 HTTP 400 with the user text; GD2266 and every other code HTTP 503. caching.mobile is 5h by default (the key of MCI, as bill): saved inquiries of the same phone (and provider) younger than the TTL answer with no provider call. With debug.mocks.qabzino.enable true (dev mode only, providers.qabzino.enabled true) the adapter answers a fixed answer: billId 9200000034, midTerm payId 23000341 price 230000, fullTerm payId 63000342 price 630000, no paymentDeadline (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true. Expected: HTTP 200 and {\"midTerm\":{\"billId\":...,\"payId\":...,\"price\":<rials>,\"paymentDeadline\":\"\",\"providerId\":0},\"fullTerm\":{...}}. An invalid request HTTP 400; no valid token HTTP 403; no enabled provider, a provider other than Qabzino, a failed provider call HTTP 503; a refused phone HTTP 400 with the provider message; any other failure HTTP 500."
           },
           "event": [
             {

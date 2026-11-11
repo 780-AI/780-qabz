@@ -1,7 +1,8 @@
-<!-- VERSION: 3.13 -->
+<!-- VERSION: 3.14 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.14 — 2026-11-11 — Added 037-mobile-rightel-inquiry entry.
 v3.13 — 2026-11-11 — Added session-wrap-up (task 036 session) entry.
 v3.12 — 2026-11-11 — Added 036-mobile-mci-inquiry entry.
 v3.11 — 2026-11-11 — Added session-wrap-up (task 024 split, tasks 035 and 038 session) entry.
@@ -129,6 +130,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Task 037: `POST /v1/mobile/inquiry` for the Rightel operator, the Qabzino Rightel inquiry
+- **Type:** Major (endpoint behavior, domain logic, a new config key, Critical File `system.html`)
+- **Files:** `src/provider/provider.go` (`BillTypeMobileMidTermRightel`); `src/provider/qabzino/qabzino.go` (the `mobilemidtermRightel` kind: `RightelEndpoint`, `rightelParameters`, `zeroFormPhone`, `rightelSuccessAnswer`, the Rightel codes; `kind.noDebt`; the Rightel mock fixture and the `MockRightel...` constants) + `rightel_test.go` (new), `qabzino_test.go`; `src/core/inquiry/inquiry.go` (the `mobilemidtermRightel` entry of `billTypes`: `tid` prefix 6, the phone rule, `onlyProvider: qabzino`) + `rightel_test.go` (new), `gas_test.go`; `src/entry/grpc/phone.go` (`phoneOperators[rightel] = mobilemidtermRightel`) + `phone_test.go`; `src/entry/http/phone_test.go`; `src/app/defaults.go` (`RightelEndpoint`, `caching.mobile` for the new bill type) + `rightel_live_test.go` (new), `phone_live_test.go`; `src/config/config.go` (`providers.qabzino.rightel_bill_endpoint`) + `config_test.go`; `config.yml.example` (and the local `config.yml`, with the real URL); `qabz.postman_collection.json` (request Phone / Inquiry Rightel, variables `rightel_mobile_phone`, `rightel_mobile_billId`, `rightel_mobile_payId`; the Irancell item no longer names Rightel as HTTP 501); `docs/initial-discovery/system.html` (v2.7); `docs/this_vs_bill.md` (v0.14, item 33; item 31 updated); `docs/folder_structure.md` (v0.43); `src/app/README.md` (v0.28); `docs/documents_manifest.md`; `docs/Plans/OPEN_TASKS.md` (v1.57); the task file v0.2 (implementation and verification record; moved to `done_tasks/`).
+- **Impact:** Yes, behavior changes. (1) `POST /v1/mobile/inquiry` with `"operator":"rightel"` no longer answers HTTP 501: it runs the shared inquiry flow with the bill type `mobilemidtermRightel` (the inquiry ID is the phone, `tid` prefix 6); a mid-term and a final-term inquiry are saved as two `bill_inquiries` rows and returned in `midTerm` and `fullTerm`. (2) Only Qabzino may answer (operator rule): when the pick of (`mobilemidtermRightel`, `inquiry`) is another provider, or no row is enabled, nobody is called and the answer is HTTP 503 (the mechanism of Irancell, `onlyProvider`). (3) The Qabzino adapter sends Ayantech `RightelMobileBillInquiry` with the phone in the 0 form; `G00000` gives the mid-term bill ID and the two inquiries (no deadline); `GD2268` is no debt; `GD2261` and `GD2267` are refused (HTTP 400); `GD2266` and every other code are provider down (HTTP 503). (4) New config key `providers.qabzino.rightel_bill_endpoint` (no default; empty: every Rightel call fails as provider down). The cache TTL is `caching.mobile` (the key of MCI, as bill; operator decision); no new key for it. (5) The Qabzino mock answers a Rightel inquiry with bill ID `9200000034`, 230 000 and 630 000 rials. (6) No new metric: the three inquiry metrics count `bill_type="mobilemidtermRightel"`. Water, gas, electricity, Irancell and MCI are unchanged (their tests pass with no change of an expected value). No operator answers HTTP 501 now.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → Pending verification → "Task 037 `POST /v1/mobile/inquiry` for the Rightel operator": unit and live tests (`make test`); feature ON against the compose dev database with the Qabzino mock (steps 1-5 of the task Verification). Run by the implementer on 2026-11-11: all pass (evidence in the task file).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Session wrap-up (task 036 session)
 - **Type:** Minor (documentation; no code, no new files).

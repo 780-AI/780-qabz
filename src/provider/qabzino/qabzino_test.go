@@ -340,9 +340,12 @@ func TestSupportsInquiry(t *testing.T) {
 		provider.BillTypeGas:         true,
 		provider.BillTypeIrancell:    false,
 		provider.BillTypeMobile:      false,
-		"tel":                        false,
-		"mobilemidterm":              false,
-		"":                           false,
+		// task 037
+		provider.BillTypeMobileMidTermRightel: true,
+		"mobileRightel":                       false, // the seed row 32: not used by Qabz
+		"tel":                                 false,
+		"mobilemidterm":                       false,
+		"":                                    false,
 	}
 	var nilAdapter *Adapter
 	for billType, ok := range want {

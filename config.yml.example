@@ -51,6 +51,7 @@ providers:
     token: ""                # Ayantech token (secret); the real value only in config.yml
     electricity_bill_endpoint: "" # the real URL only in config.yml
     gas_bill_endpoint: ""    # the real URL only in config.yml
+    rightel_bill_endpoint: "" # Rightel mobile inquiry (task 037); the real URL only in config.yml
     water_bill_endpoint: ""  # the real URL only in config.yml
   tavanir:
     enabled: false           # false: every Tavanir call fails as "provider down", nothing is sent to Tavanir, the mock does not apply
@@ -135,7 +136,7 @@ caching:
   electricity: "1h"          # how long a saved electricity inquiry answers the same bill with no provider call; 0: cache off
   gas: "1h"                  # how long a saved gas inquiry answers the same participate code with no provider call; 0: cache off
   irancell: "0s"             # how long a saved Irancell mobile inquiry answers the same phone with no provider call; 0: cache off (as bill)
-  mobile: "5h"               # how long a saved MCI mobile inquiry (bill type mobile) answers the same phone with no provider call; 0: cache off
+  mobile: "5h"               # how long a saved MCI or Rightel mobile inquiry (bill types mobile, mobilemidtermRightel) answers the same phone with no provider call; 0: cache off
 
 auth:
   secrets:

@@ -505,15 +505,17 @@ func TestParseQabzinoProviderKeys(t *testing.T) {
 	assert.Equal(t, "", c.QabzinoToken.Reveal(), "default token is empty")
 	assert.Empty(t, c.QabzinoElectricityBillEndpoint)
 	assert.Empty(t, c.QabzinoGasBillEndpoint)
+	assert.Empty(t, c.QabzinoRightelBillEndpoint, "no default (task 037, as the other endpoints)")
 	assert.Empty(t, c.QabzinoWaterBillEndpoint)
 
-	c, err = Parse([]byte(base + `providers: {qabzino: {enabled: true, token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", water_bill_endpoint: "http://w"}}
+	c, err = Parse([]byte(base + `providers: {qabzino: {enabled: true, token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", rightel_bill_endpoint: "http://r", water_bill_endpoint: "http://w"}}
 `))
 	if assert.NoError(t, err) {
 		assert.True(t, c.QabzinoEnabled)
 		assert.Equal(t, "tok", c.QabzinoToken.Reveal())
 		assert.Equal(t, "http://e", c.QabzinoElectricityBillEndpoint)
 		assert.Equal(t, "http://g", c.QabzinoGasBillEndpoint)
+		assert.Equal(t, "http://r", c.QabzinoRightelBillEndpoint)
 		assert.Equal(t, "http://w", c.QabzinoWaterBillEndpoint)
 		assert.NotContains(t, fmt.Sprintf("%v %+v %#v", c.QabzinoToken, c.QabzinoToken, c.QabzinoToken), "tok")
 		assert.Equal(t, 10*time.Second, c.QabzinoTimeout, "the older Qabzino keys keep their defaults")

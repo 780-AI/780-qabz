@@ -1,8 +1,9 @@
 // Package qabzino is the direct adapter of the Qabzino provider (task 030). It calls Ayantech over
 // HTTPS with the token and the endpoints of providers.qabzino, as the old qabzino service does
-// (client/qabzino, gateway/water.go, gateway/gas.go), with no hop through that service. Inquiry of
-// a water bill (task 030) and of a gas bill (task 023) is implemented; every other method and bill
-// type returns provider.ErrNotSupported. The former gRPC adapter is package qabzinoproxy (not used).
+// (client/qabzino, gateway/water.go, gateway/gas.go, gateway/rightel_mobile.go), with no hop through
+// that service. Inquiry of a water bill (task 030), of a gas bill (task 023) and of a Rightel mobile
+// bill (task 037) is implemented; every other method and bill type returns provider.ErrNotSupported.
+// The former gRPC adapter is package qabzinoproxy (not used).
 //
 // Every call to Ayantech is charged: no test sends one. Tests use a local httptest server.
 package qabzino
@@ -52,6 +53,11 @@ const (
 	codeGasBadCode2    = "GD2032"
 	codeGasBadBillID   = "GD2033"
 	codeGasCodeUnknown = "GD2037"
+
+	codeRightelNoBill   = "GD2268" // no bill to pay for the phone: success, no debt
+	codeRightelBadPhone = "GD2261"
+	codeRightelNotOwn   = "GD2267" // the phone is not a Rightel line, or not a postpaid line
+	// GD2266 (the Rightel server cannot be reached) and every other code: provider down.
 )
 
 // refused are the codes of a water inquiry that give a failed answer (no inquiry) with a message
@@ -77,6 +83,16 @@ var gasRefused = map[string]string{
 // gasNoBillMessage is the message of GD2038 (bill: gasBillInquiryErrors).
 const gasNoBillMessage = "هیچ قبض قابل پرداختی برای اشتراک گاز استعلام شده ثبت نشده است"
 
+// rightelRefused are the codes of a Rightel inquiry that give a failed answer (no inquiry) with a
+// message for the user (the qabzino service: rightelBillInquiryErrors).
+var rightelRefused = map[string]string{
+	codeRightelBadPhone: "محتوای شماره تلفن همراه وارد شده صحیح نیست",
+	codeRightelNotOwn:   "شماره تلفن همراه وارد شده متعلق به اپراتور رایتل نیست و یا جزء خطوط دائمی این اپراتور نیست.",
+}
+
+// rightelNoBillMessage is the message of GD2268 (the qabzino service: rightelBillInquiryErrors).
+const rightelNoBillMessage = "هیچ قبض قابل پرداختی برای تلفن همراه استعلام شده ثبت نشده است"
+
 // kind is what the adapter knows of the inquiry of one bill type: where to send it, the Parameters
 // of the request, and how to read the answer. The rest of Inquiry is the same for every bill type.
 type kind struct {
@@ -86,8 +102,12 @@ type kind struct {
 	endpoint func(a *Adapter) string
 	// parameters returns the Parameters object of the request.
 	parameters func(inquiryID, trace string) any
-	// noDebtCode is the code of "no bill to pay": success with one inquiry of amount 0 and no pay ID.
+	// noDebtCode is the code of "no bill to pay": success with the inquiries of noDebt (amount 0, no
+	// pay ID).
 	noDebtCode, noDebtMessage string
+	// noDebt returns the inquiries of a no-debt answer. Nil: one inquiry of the type
+	// inquiryTypeRegular (water, gas).
+	noDebt func() []provider.InquiryItem
 	// refused are the codes of a failed answer (no inquiry) with a message for the user.
 	refused map[string]string
 	// success builds the answer of G00000 from its Parameters object.
@@ -123,6 +143,19 @@ var kinds = map[string]kind{
 		refused: gasRefused,
 		success: gasSuccessAnswer,
 	},
+	// @todo the qabzino service answers GD2266 and the general Qabzino codes with a text or the
+	// pending status; this kind answers them as provider down. See docs/this_vs_bill.md, item 33.
+	provider.BillTypeMobileMidTermRightel: {
+		endpointKey: "rightel_bill_endpoint",
+		endpoint:    func(a *Adapter) string { return a.rightelEndpoint },
+		parameters: func(inquiryID, trace string) any {
+			return rightelParameters{MobileNumber: zeroFormPhone(inquiryID), TraceNumber: trace}
+		},
+		noDebtCode: codeRightelNoBill, noDebtMessage: rightelNoBillMessage,
+		noDebt:  provider.NoDebtMobileInquiries,
+		refused: rightelRefused,
+		success: rightelSuccessAnswer,
+	},
 }
 
 // Doer is the part of *http.Client that the adapter uses. Tests give a fake or a client of an
@@ -144,6 +177,9 @@ type Options struct {
 	// GasEndpoint is providers.qabzino.gas_bill_endpoint. Empty: every gas Inquiry fails as provider
 	// down.
 	GasEndpoint string
+	// RightelEndpoint is providers.qabzino.rightel_bill_endpoint (task 037). Empty: every Rightel
+	// Inquiry fails as provider down.
+	RightelEndpoint string
 	// Timeout limits each call. Required, positive.
 	Timeout time.Duration
 	// HTTPClient sends the requests. Nil: a client with Timeout (the system TLS roots; bill skips
@@ -153,12 +189,13 @@ type Options struct {
 
 // Adapter implements provider.ProviderInterface for Qabzino. It is safe for concurrent use.
 type Adapter struct {
-	enabled       bool
-	token         string
-	waterEndpoint string
-	gasEndpoint   string
-	timeout       time.Duration
-	client        Doer
+	enabled         bool
+	token           string
+	waterEndpoint   string
+	gasEndpoint     string
+	rightelEndpoint string
+	timeout         time.Duration
+	client          Doer
 	// newTrace makes the trace number of a call (bill: a new UUID). Tests replace it.
 	newTrace func() string
 }
@@ -175,13 +212,14 @@ func New(opts Options) (*Adapter, error) {
 		client = &http.Client{Timeout: opts.Timeout}
 	}
 	return &Adapter{
-		enabled:       opts.Enabled,
-		token:         opts.Token,
-		waterEndpoint: opts.WaterEndpoint,
-		gasEndpoint:   opts.GasEndpoint,
-		timeout:       opts.Timeout,
-		client:        client,
-		newTrace:      func() string { return uuid.NewString() },
+		enabled:         opts.Enabled,
+		token:           opts.Token,
+		waterEndpoint:   opts.WaterEndpoint,
+		gasEndpoint:     opts.GasEndpoint,
+		rightelEndpoint: opts.RightelEndpoint,
+		timeout:         opts.Timeout,
+		client:          client,
+		newTrace:        func() string { return uuid.NewString() },
 	}, nil
 }
 
@@ -189,7 +227,7 @@ func New(opts Options) (*Adapter, error) {
 func (a *Adapter) Name() string { return Name }
 
 // SupportsInquiry reports whether Inquiry answers the bill type: a bill type of kinds with all
-// its parts (water and gas; task 036).
+// its parts (water, gas and, since task 037, mobilemidtermRightel; task 036).
 func (a *Adapter) SupportsInquiry(billType string) bool {
 	k, ok := kinds[billType]
 	return ok && k.endpoint != nil && k.parameters != nil && k.success != nil
@@ -216,9 +254,30 @@ type gasParameters struct {
 	TraceNumber     string `json:"TraceNumber"`
 }
 
+// rightelParameters are the Parameters of a Rightel inquiry (the qabzino service:
+// RightelBillRequestParameters).
+type rightelParameters struct {
+	MobileNumber string `json:"MobileNumber"`
+	TraceNumber  string `json:"TraceNumber"`
+}
+
+// zeroFormPhone gives the phone in the form that Ayantech reads: "0" and the ten digits (the qabzino
+// service: preparePhoneRequest). A phone of ten digits gets a "0"; a phone that starts with "98"
+// gets "0" in place of "98"; any other phone gives "", as in the qabzino service (the flow sends
+// only the 98 form: helpers.ValidMobile).
+func zeroFormPhone(phone string) string {
+	if len(phone) == 10 {
+		return "0" + phone
+	}
+	if len(phone) > 2 && phone[:2] == "98" {
+		return "0" + phone[2:]
+	}
+	return ""
+}
+
 type request struct {
 	Identity   identity `json:"Identity"`
-	Parameters any      `json:"Parameters"` // waterParameters or gasParameters (kind.parameters)
+	Parameters any      `json:"Parameters"` // waterParameters, gasParameters or rightelParameters (kind.parameters)
 }
 
 // parsers holds the fastjson parsers of the answers. Reading the answer of Ayantech is on a hot
@@ -244,18 +303,19 @@ func downCause(what string, cause error) error {
 	return fmt.Errorf("qabzino: %w: %s: %w", provider.ErrProviderDown, what, cause)
 }
 
-// Inquiry asks Ayantech for the inquiry of a water bill or a gas bill (bill: Water.Execute and
-// Gas.Execute of qabzino). The bill type of the request selects the endpoint, the Parameters and
-// the codes (kinds). The answer rules:
-//   - G00000: success with one inquiry (the pay ID, the amount, the deadline). Water: the amount
-//     comes from the pay ID (successAnswer). Gas: the amount of the answer, and the details
-//     (gasSuccessAnswer).
-//   - GD2068 (water, already paid) and GD2038 (gas, no bill to pay): success with one inquiry of
-//     amount 0 and no pay ID.
-//   - Water GD2061, GD2062, GD2067 and gas GD2031, GD2032, GD2033, GD2037: a failed answer with no
-//     inquiry, the code and a message for the user.
-//   - Every other code (GD2066 and GD2036: the company cannot be reached), a transport error, a bad
-//     HTTP status or an unreadable body: an error that wraps provider.ErrProviderDown.
+// Inquiry asks Ayantech for the inquiry of a water bill, a gas bill or a Rightel mobile bill (bill:
+// Water.Execute, Gas.Execute and RightelMobile.Execute of qabzino). The bill type of the request
+// selects the endpoint, the Parameters and the codes (kinds). The answer rules:
+//   - G00000: success. Water and gas: one inquiry (the pay ID, the amount, the deadline); water
+//     reads the amount from the pay ID (successAnswer); gas has the amount of the answer and the
+//     details (gasSuccessAnswer). Rightel: a mid-term and a final-term inquiry (rightelSuccessAnswer).
+//   - GD2068 (water, already paid), GD2038 (gas, no bill to pay) and GD2268 (Rightel, no bill to
+//     pay): success with no debt: one inquiry of amount 0 and no pay ID (water, gas), or a mid-term
+//     and a final-term inquiry of amount 0 (Rightel: provider.NoDebtMobileInquiries).
+//   - Water GD2061, GD2062, GD2067, gas GD2031, GD2032, GD2033, GD2037 and Rightel GD2261, GD2267: a
+//     failed answer with no inquiry, the code and a message for the user.
+//   - Every other code (GD2066, GD2036 and GD2266: the company cannot be reached), a transport
+//     error, a bad HTTP status or an unreadable body: an error that wraps provider.ErrProviderDown.
 //
 // The trace ID of the answer is the TraceNumber that the adapter sent (Ayantech has none).
 // @todo bill answers a failed status with a message for each of about 40 codes; this adapter
@@ -322,12 +382,16 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 		}
 		return k.success(req, trace, params, string(ans.GetStringBytes("Status", "Description"))), nil
 	case code != "" && code == k.noDebtCode:
+		inquiries := []provider.InquiryItem{{InquiryType: inquiryTypeRegular}}
+		if k.noDebt != nil {
+			inquiries = k.noDebt()
+		}
 		return &provider.InquiryResponse{
 			Status:          provider.ResponseSuccess,
 			Code:            http.StatusOK,
 			Message:         k.noDebtMessage,
 			ProviderTraceID: trace,
-			Inquiries:       []provider.InquiryItem{{InquiryType: inquiryTypeRegular}},
+			Inquiries:       inquiries,
 		}, nil
 	}
 	if msg, ok := k.refused[code]; ok {
@@ -372,6 +436,35 @@ func gasSuccessAnswer(_ provider.InquiryRequest, trace string, params *fastjson.
 			City: string(params.GetStringBytes("Address")),
 			Kind: string(params.GetStringBytes("ConsumptionType")),
 		}},
+	}
+}
+
+// rightelSuccessAnswer builds the answer of G00000 of a Rightel inquiry (the qabzino service:
+// prepareRightelMobileInquiry): the bill ID of the mid-term part; a mid-term inquiry and a
+// final-term inquiry, each with the pay ID and the amount of its part as they are (no pay ID rule,
+// no deadline, as in the qabzino service). The returned strings are copies.
+func rightelSuccessAnswer(_ provider.InquiryRequest, trace string, params *fastjson.Value, description string) *provider.InquiryResponse {
+	if description == "" {
+		description = successMessage
+	}
+	return &provider.InquiryResponse{
+		Status:          provider.ResponseSuccess,
+		Code:            http.StatusOK,
+		Message:         description,
+		ProviderTraceID: trace,
+		BillID:          string(params.GetStringBytes("MidTerm", "BillID")),
+		Inquiries: []provider.InquiryItem{
+			{
+				PayID:       string(params.GetStringBytes("MidTerm", "PaymentID")),
+				Amount:      params.GetUint64("MidTerm", "Amount"),
+				InquiryType: provider.InquiryTypeMidterm,
+			},
+			{
+				PayID:       string(params.GetStringBytes("FinalTerm", "PaymentID")),
+				Amount:      params.GetUint64("FinalTerm", "Amount"),
+				InquiryType: provider.InquiryTypeFinalTerm,
+			},
+		},
 	}
 }
 
@@ -441,10 +534,10 @@ func (*Adapter) Settle(context.Context, provider.SettleRequest) (*provider.Settl
 	return nil, provider.ErrNotSupported
 }
 
-// Mock fixtures (task 021: water; task 023: gas). The values are fixed: a valid inquiry. The water
-// pay ID follows the rule of amountFromPayID (the digits before the last 5 are the amount in
-// thousands of rials): "25000" gives 25 000 000 rials. The gas pay ID follows the same rule
-// ("32000": 32 000 000 rials), so the amount and the pay ID agree.
+// Mock fixtures (task 021: water; task 023: gas; task 037: Rightel). The values are fixed: a valid
+// inquiry. The water pay ID follows the rule of amountFromPayID (the digits before the last 5 are
+// the amount in thousands of rials): "25000" gives 25 000 000 rials. The gas pay ID follows the
+// same rule ("32000": 32 000 000 rials), so the amount and the pay ID agree.
 const (
 	mockPayID    = "2500012345"
 	mockAmount   = 25_000_000
@@ -458,16 +551,39 @@ const (
 	mockGasAmount = 32_000_000
 	mockGasCity   = "تهران، خیابان آزادی، پلاک ۱"
 	mockGasKind   = "خانگی"
+
+	// The Rightel mock answer (task 037): a mid-term and a final-term inquiry, no deadline (as the
+	// real answer). The values are fixed, not read from the phone.
+	MockRightelBillID          = "9200000034"
+	MockRightelMidTermPayID    = "23000341"
+	MockRightelMidTermAmount   = 230_000
+	MockRightelFinalTermPayID  = "63000342"
+	MockRightelFinalTermAmount = 630_000
 )
 
 // MockFixtures returns the fixed answers of the Qabzino mock (debug.mocks.qabzino). Inquiry answers
 // by the bill type of the request:
 //   - gas: the bill ID MockGasBillID with one inquiry of 32 000 000 rials (pay ID 3200012345,
 //     deadline 2030-01-01) and the details (city, kind).
+//   - mobilemidtermRightel: the bill ID MockRightelBillID with a mid-term inquiry of 230 000 rials
+//     (pay ID 23000341) and a final-term inquiry of 630 000 rials (pay ID 63000342), no deadline.
 //   - every other bill type (water): the bill of the request with one inquiry of 25 000 000 rials
 //     (pay ID 2500012345, deadline 2030-01-01).
 func MockFixtures() provider.MockFixtures {
 	return provider.MockFixtures{Inquiry: func(req provider.InquiryRequest) *provider.InquiryResponse {
+		if req.BillType == provider.BillTypeMobileMidTermRightel {
+			return &provider.InquiryResponse{
+				Status:          provider.ResponseSuccess,
+				Code:            200,
+				Message:         successMessage,
+				ProviderTraceID: mockTrace,
+				BillID:          MockRightelBillID,
+				Inquiries: []provider.InquiryItem{
+					{PayID: MockRightelMidTermPayID, Amount: MockRightelMidTermAmount, InquiryType: provider.InquiryTypeMidterm},
+					{PayID: MockRightelFinalTermPayID, Amount: MockRightelFinalTermAmount, InquiryType: provider.InquiryTypeFinalTerm},
+				},
+			}
+		}
 		if req.BillType == provider.BillTypeGas {
 			return &provider.InquiryResponse{
 				Status:          provider.ResponseSuccess,

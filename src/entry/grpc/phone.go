@@ -16,15 +16,16 @@ import (
 )
 
 // phoneOperators gives the bill type of each operator of a mobile inquiry (bill: controller/phone
-// operatorBillType). It is the one table of the endpoint: task 036 filled the entry of MCI, task 037
-// (Rightel) fills its entry. An operator with an empty bill type is known but not available yet (Unimplemented);
-// an operator that is not in the table is invalid (InvalidArgument).
+// operatorBillType). It is the one table of the endpoint: task 035 filled the entry of Irancell, task
+// 036 the entry of MCI, task 037 the entry of Rightel. An operator with an empty bill type is known but
+// not available yet (Unimplemented; no operator has one since task 037); an operator that is not in
+// the table is invalid (InvalidArgument).
 //
 //	bill: mci -> "mobile", rightel -> "mobilemidtermRightel", irancell -> "irancell".
 var phoneOperators = map[pb.InquiryPhoneRequest_OperatorEnum]string{
 	pb.InquiryPhoneRequest_irancell: provider.BillTypeIrancell,
 	pb.InquiryPhoneRequest_mci:      provider.BillTypeMobile,
-	pb.InquiryPhoneRequest_rightel:  "", // task 037
+	pb.InquiryPhoneRequest_rightel:  provider.BillTypeMobileMidTermRightel,
 }
 
 // PhoneDeps are the dependencies of Phone. A zero value is valid: Inquiry then answers
@@ -82,7 +83,7 @@ func validPhoneInquiry(req *pb.InquiryPhoneRequest) bool {
 // saved inquiries of the phone when they are still valid, else the provider of the operator
 // (inquiry.Service). The flow and the answers of every failure are those of Water.Inquiry
 // (answerInquiryError; the log lines start with the bill type, for example "irancell:" or, for the
-// MCI operator, "mobile:").
+// MCI operator, "mobile:", for the Rightel operator "mobilemidtermRightel:").
 //
 // What is special to the mobile bill, as in bill:
 //   - The request check is validPhoneInquiry (InvalidArgument, no log line).
@@ -96,8 +97,9 @@ func validPhoneInquiry(req *pb.InquiryPhoneRequest) bool {
 //     provider.InquiryTypeMidterm goes to midTerm, every other one to fullTerm (the last one of
 //     each wins); a part with no inquiry is an empty object. providerId is not set, as in bill.
 //
-// An operator whose task is not done (rightel) is Unimplemented (no log line): task 035,
-// decision B. The operator "unknown" has no bill type: InvalidArgument.
+// An operator with an empty bill type in phoneOperators is Unimplemented (no log line): task 035,
+// decision B; since task 037 no operator has one. The operator "unknown" has no bill type:
+// InvalidArgument.
 // @todo bill answers the operator "unknown" with the raw error of the provider lookup (gRPC
 // Unknown, HTTP 500). See docs/this_vs_bill.md, item 31.
 func (p *Phone) Inquiry(ctx context.Context, req *pb.InquiryPhoneRequest) (*pb.InquiryPhoneResponse, error) {

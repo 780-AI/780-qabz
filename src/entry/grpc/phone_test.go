@@ -39,6 +39,17 @@ func mciResult() inquiry.Result {
 	}}
 }
 
+const rightelPhone = "989201234567"
+
+// rightelResult is an answer of the Rightel inquiry (the Qabzino mock values): one bill ID, a pay ID
+// for each inquiry, no deadline.
+func rightelResult() inquiry.Result {
+	return inquiry.Result{BillID: "9200000034", Inquiries: []inquiry.Inquiry{
+		{BillID: "9200000034", PayID: "23000341", Amount: 230000, InquiryType: provider.InquiryTypeMidterm},
+		{BillID: "9200000034", PayID: "63000342", Amount: 630000, InquiryType: provider.InquiryTypeFinalTerm},
+	}}
+}
+
 func irancellResult() inquiry.Result {
 	return inquiry.Result{Inquiries: []inquiry.Inquiry{
 		{Amount: 150000, InquiryType: provider.InquiryTypeMidterm},
@@ -145,14 +156,14 @@ func TestValidPhoneInquiry(t *testing.T) {
 	assert.False(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Phone: irPhone, Operator: -1}))
 }
 
-// TestPhoneInquiryOperators: the operator table. Irancell and mci (task 036; also a request with no
-// operator: the enum value 0) run the flow with their bill type; rightel is not available yet
-// (task 037).
+// TestPhoneInquiryOperators: the operator table. Irancell, mci (task 036; also a request with no
+// operator: the enum value 0) and rightel (task 037) run the flow with their bill type.
 func TestPhoneInquiryOperators(t *testing.T) {
 	assert.Len(t, phoneOperators, 3, "mci, irancell, rightel; unknown has no bill type")
 	assert.Equal(t, provider.BillTypeIrancell, phoneOperators[pb.InquiryPhoneRequest_irancell])
 	assert.Equal(t, provider.BillTypeMobile, phoneOperators[pb.InquiryPhoneRequest_mci])
-	assert.Equal(t, "", phoneOperators[pb.InquiryPhoneRequest_rightel])
+	assert.Equal(t, provider.BillTypeMobileMidTermRightel, phoneOperators[pb.InquiryPhoneRequest_rightel])
+	assert.Equal(t, "mobilemidtermRightel", provider.BillTypeMobileMidTermRightel, "bill: entity.MOBILEMIDTERMRIGHTEL")
 
 	// mci: the bill type "mobile" (bill: operatorBillType), the inquiry ID is the phone.
 	for name, req := range map[string]*pb.InquiryPhoneRequest{
@@ -200,18 +211,62 @@ func TestPhoneInquiryOperators(t *testing.T) {
 		}
 	}
 
-	for name, req := range map[string]*pb.InquiryPhoneRequest{
-		"rightel": {Phone: irPhone, Operator: pb.InquiryPhoneRequest_rightel},
+	// rightel (task 037): the bill type "mobilemidtermRightel" (bill: operatorBillType), the inquiry
+	// ID is the phone; the mid-term and the final-term inquiry go to midTerm and fullTerm.
+	{
+		log := &errLog{}
+		f := &fakeInquirer{res: rightelResult()}
+		res, err := NewPhone(PhoneDeps{Inquiry: f, Logger: log}).Inquiry(waterCtx(),
+			&pb.InquiryPhoneRequest{Phone: rightelPhone, Operator: pb.InquiryPhoneRequest_rightel})
+		if assert.NoError(t, err) && assert.NotNil(t, res) && assert.Len(t, f.reqs, 1) {
+			assert.Equal(t, inquiry.Request{BillType: "mobilemidtermRightel", InquiryID: rightelPhone, UserID: billsUser, Dialer: "989121234567"}, f.reqs[0])
+			assert.Equal(t, []string{"9200000034", "23000341", ""},
+				[]string{res.GetMidTerm().GetBillId(), res.GetMidTerm().GetPayId(), res.GetMidTerm().GetPaymentDeadline()})
+			assert.Equal(t, uint32(230000), res.GetMidTerm().GetPrice())
+			assert.Equal(t, []string{"9200000034", "63000342", ""},
+				[]string{res.GetFullTerm().GetBillId(), res.GetFullTerm().GetPayId(), res.GetFullTerm().GetPaymentDeadline()})
+			assert.Equal(t, uint32(630000), res.GetFullTerm().GetPrice())
+		}
+		assert.Empty(t, log.lines, "rightel: no log line")
+	}
+	for name, c := range map[string]struct {
+		err  error
+		code codes.Code
+		line string
+	}{
+		"rightel provider down": {fmt.Errorf("x: %w", provider.ErrProviderDown), codes.Unavailable, "mobilemidtermRightel: provider inquiry failed"},
+		"rightel no provider":   {fmt.Errorf("x: %w", provider.ErrNoProvider), codes.Unavailable, "mobilemidtermRightel: no enabled provider for inquiry"},
+		"rightel refused":       {&inquiry.RefusedError{Message: "not a Rightel number"}, codes.FailedPrecondition, ""},
 	} {
 		log := &errLog{}
-		f := &fakeInquirer{res: irancellResult()}
-		res, err := NewPhone(PhoneDeps{Inquiry: f, Logger: log}).Inquiry(waterCtx(), req)
-		assert.Nil(t, res, name)
-		assert.Equal(t, codes.Unimplemented, status.Code(err), name)
-		assert.Contains(t, status.Convert(err).Message(), "is not available yet", name)
-		assert.Equal(t, 0, f.calls(), name+": the flow is not called, so no other provider answers")
-		assert.Empty(t, log.lines, name+": no log line")
+		_, err := NewPhone(PhoneDeps{Inquiry: &fakeInquirer{err: c.err}, Logger: log}).Inquiry(waterCtx(),
+			&pb.InquiryPhoneRequest{Phone: rightelPhone, Operator: pb.InquiryPhoneRequest_rightel})
+		assert.Equal(t, c.code, status.Code(err), name)
+		if c.line == "" {
+			assert.Empty(t, log.lines, name+": a business answer writes no log line")
+		} else if assert.Len(t, log.lines, 1, name) {
+			assert.Contains(t, log.lines[0], c.line, name)
+		}
 	}
+}
+
+// TestPhoneInquiryOperatorNotAvailable: an operator with an empty bill type in the table is
+// Unimplemented and the flow is not called (task 035, decision B). No operator has one since task
+// 037, so the test empties the entry of rightel for its run.
+func TestPhoneInquiryOperatorNotAvailable(t *testing.T) {
+	saved := phoneOperators[pb.InquiryPhoneRequest_rightel]
+	phoneOperators[pb.InquiryPhoneRequest_rightel] = ""
+	t.Cleanup(func() { phoneOperators[pb.InquiryPhoneRequest_rightel] = saved })
+
+	log := &errLog{}
+	f := &fakeInquirer{res: rightelResult()}
+	res, err := NewPhone(PhoneDeps{Inquiry: f, Logger: log}).Inquiry(waterCtx(),
+		&pb.InquiryPhoneRequest{Phone: rightelPhone, Operator: pb.InquiryPhoneRequest_rightel})
+	assert.Nil(t, res)
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "is not available yet")
+	assert.Equal(t, 0, f.calls(), "the flow is not called")
+	assert.Empty(t, log.lines, "no log line")
 }
 
 func TestPhoneInquiryNotAvailableAndNoUser(t *testing.T) {
