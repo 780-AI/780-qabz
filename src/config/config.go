@@ -136,6 +136,42 @@ type Config struct {
 	TavanirCircuitBreakerTimeout      time.Duration `path:"providers.tavanir.circuit_breaker.timeout"`
 	TavanirCircuitBreakerFailureRatio uint8         `path:"providers.tavanir.circuit_breaker.failure_ratio"`
 
+	// The config of the Irancell provider (task 035): the keys that bill has for its irancell
+	// service client (bill: irancell.name, irancell.grpcAddress, irancell.natsSubject and the
+	// irancell.getStatus block), in the layout of this project, and the switch and the timeout of the
+	// adapter. The bill keys have no default: the real values are only in config.yml. Not
+	// hot-reloadable.
+	//   - IrancellGRPCAddress is the host:port of the internal gRPC server of the irancell service
+	//     (pb.InternalService, no TLS, as in bill). The Irancell adapter (provider/irancellproxy)
+	//     reads it. Empty: every Irancell call fails as "provider down".
+	//   - IrancellName and IrancellNATSSubject (the subject of the bill payment) are not read yet:
+	//     they belong to the order flow.
+	//   - The get_status keys are the settings of bill's cron that asks the status of pending Irancell
+	//     orders. Not read yet: Qabz has no order flow and no such cron. The three sync_operations
+	//     keys are bill's list getStatus.syncOperations (one single-key map for each item) as three
+	//     keys, because a Config field maps one path.
+	//   - IrancellEnabled turns the Irancell provider on. False (the default): every call fails as
+	//     "provider down", nothing is sent to the irancell service and the mock
+	//     (debug.mocks.irancell) does not apply, as for Qabzino and Tavanir.
+	//   - IrancellTimeout limits each call to the irancell service. Positive.
+	IrancellEnabled                  bool          `path:"providers.irancell.enabled"`
+	IrancellTimeout                  time.Duration `path:"providers.irancell.timeout"`
+	IrancellName                     string        `path:"providers.irancell.name"`
+	IrancellGRPCAddress              string        `path:"providers.irancell.grpc_address"`
+	IrancellNATSSubject              string        `path:"providers.irancell.nats_subject"`
+	IrancellGetStatusCronTime        time.Duration `path:"providers.irancell.get_status.cron_time"`
+	IrancellGetStatusName            string        `path:"providers.irancell.get_status.name"`
+	IrancellGetStatusStart           time.Duration `path:"providers.irancell.get_status.start"`
+	IrancellGetStatusEnd             time.Duration `path:"providers.irancell.get_status.end"`
+	IrancellGetStatusChunk           int           `path:"providers.irancell.get_status.chunk"`
+	IrancellGetStatusEvery           time.Duration `path:"providers.irancell.get_status.every"`
+	IrancellGetStatusLockTime        time.Duration `path:"providers.irancell.get_status.lock_time"`
+	IrancellGetStatusIsLockable      bool          `path:"providers.irancell.get_status.is_lockable"`
+	IrancellGetStatusReverseDeadline time.Duration `path:"providers.irancell.get_status.reverse_deadline"`
+	IrancellGetStatusSyncAPICall     time.Duration `path:"providers.irancell.get_status.sync_operations.api_call_get_status"`
+	IrancellGetStatusSyncGetOrder    time.Duration `path:"providers.irancell.get_status.sync_operations.get_order_query"`
+	IrancellGetStatusSyncInsertOrder time.Duration `path:"providers.irancell.get_status.sync_operations.insert_order_query"`
+
 	// CachingWater is how long a saved water inquiry answers the same bill again with no provider
 	// call (bill: caching.water, 1h). 0 turns the cache off; a negative value is rejected. Not
 	// hot-reloadable (task 021, decision 1): read at start.
@@ -148,6 +184,11 @@ type Config struct {
 	// provider call (bill: caching.gas, 1h). 0 turns the cache off; a negative value is rejected.
 	// Not hot-reloadable (task 023, as caching.water): read at start.
 	CachingGas time.Duration `path:"caching.gas"`
+	// CachingIrancell is how long a saved Irancell mobile inquiry answers the same phone again with
+	// no provider call. The default is 0 (cache off): bill has no cache for the bill type irancell,
+	// so every request asks Irancell (task 035, decision A). A negative value is rejected. Not
+	// hot-reloadable (as caching.water): read at start.
+	CachingIrancell time.Duration `path:"caching.irancell"`
 
 	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -163,6 +204,13 @@ type Config struct {
 	// DebugMockTavanirReturnType is the answer of the Tavanir mock: MockReturnSuccess or
 	// MockReturnError. It has no effect while the mock is off. Development only.
 	DebugMockTavanirReturnType string `path:"debug.mocks.tavanir.return_type"`
+
+	// DebugMockIrancellEnable makes the Irancell adapter answer with a fixed answer, with no call to
+	// the irancell service (task 035). Development only, as DebugMockQabzinoEnable. Not hot-reloadable.
+	DebugMockIrancellEnable bool `path:"debug.mocks.irancell.enable"`
+	// DebugMockIrancellReturnType is the answer of the Irancell mock: MockReturnSuccess or
+	// MockReturnError. It has no effect while the mock is off. Development only.
+	DebugMockIrancellReturnType string `path:"debug.mocks.irancell.return_type"`
 }
 
 func defaults() Config {
@@ -190,6 +238,7 @@ func defaults() Config {
 		QabzinoGasBillEndpoint:         "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry",
 		QabzinoWaterBillEndpoint:       "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry",
 		TavanirTimeout:                 10 * time.Second,
+		IrancellTimeout:                10 * time.Second,
 		TavanirAuthEndpoint:            "https://esrv.saapa.ir/api/Users/authenticate",
 		TavanirBasicBranchEndpoint:     "https://esrv.saapa.ir/api/ebills/getbranchdata",
 		TavanirBillDocumentEndpoint:    "https://esrv.saapa.ir/api/ebills/GetLastBillDocument",
@@ -205,6 +254,7 @@ func defaults() Config {
 		CachingGas:                        time.Hour,
 		DebugMockQabzinoReturnType:        MockReturnSuccess,
 		DebugMockTavanirReturnType:        MockReturnSuccess,
+		DebugMockIrancellReturnType:       MockReturnSuccess,
 	}
 }
 
@@ -289,6 +339,15 @@ func (c Config) validate() error {
 	}
 	if c.TavanirTimeout <= 0 {
 		errs = append(errs, errors.New("providers.tavanir.timeout must be a positive duration (for example 10s)"))
+	}
+	if c.IrancellTimeout <= 0 {
+		errs = append(errs, errors.New("providers.irancell.timeout must be a positive duration (for example 10s)"))
+	}
+	if c.CachingIrancell < 0 {
+		errs = append(errs, errors.New("caching.irancell must not be negative (0 turns the cache off)"))
+	}
+	if !ValidMockReturnType(c.DebugMockIrancellReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.irancell.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if c.CachingWater < 0 {
 		errs = append(errs, errors.New("caching.water must not be negative (0 turns the cache off)"))

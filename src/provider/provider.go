@@ -10,11 +10,18 @@ const (
 	BillTypeWater       = "water"
 	BillTypeElectricity = "electricity"
 	BillTypeGas         = "gas"
+	// BillTypeIrancell is the bill type of an Irancell mobile bill (bill: entity.Irancell; task 035).
+	BillTypeIrancell = "irancell"
 
 	ActionInquiry = "inquiry"
 
 	ResponseSuccess = "success" // InquiryResponse.Status of a call that the provider answered
 	ResponseFailed  = "failed"  // InquiryResponse.Status of a call that failed
+
+	// The inquiry types of a mobile bill (bill: entity.MidtermInquiryType, FinalTermInquiryType):
+	// one answer has a mid-term and a final-term (full-term) inquiry.
+	InquiryTypeMidterm   = "midterm"
+	InquiryTypeFinalTerm = "final_term"
 )
 
 var (
@@ -33,7 +40,7 @@ type InquiryRequest struct {
 	UserID   string // the user, a UUID
 	Dialer   string // the mobile number of the user
 	// InquiryID is the ID that the provider inquires: the bill ID of a water or an electricity bill,
-	// the participate code (کد اشتراک) of a gas bill.
+	// the participate code (کد اشتراک) of a gas bill, the phone (or the bill ID) of a mobile bill.
 	InquiryID string
 }
 
@@ -42,7 +49,7 @@ type InquiryItem struct {
 	PayID           string
 	Amount          uint64 // rials
 	PaymentDeadline string // as the provider sends it
-	InquiryType     string // "regular" for a water, an electricity and a gas bill
+	InquiryType     string // "regular" for a water, an electricity and a gas bill; InquiryTypeMidterm or InquiryTypeFinalTerm for a mobile bill
 }
 
 // ElectricityDetails are the details of an electricity inquiry (bill: gateway/inquiry

@@ -67,11 +67,32 @@ providers:
       interval: "1s"
       timeout: "10s"
       failure_ratio: 99      # percent, 0 to 100
+  irancell:                  # the irancell service (our own service); the real values only in config.yml
+    enabled: false           # false: every Irancell call fails as "provider down", nothing is sent to the irancell service, the mock does not apply
+    timeout: "10s"           # limit of each call to the irancell service; positive
+    name: ""                 # name of the provider (bill: irancell.name); not read yet
+    grpc_address: ""         # host:port of the internal gRPC server of the irancell service (no TLS); empty: every Irancell call fails as "provider down"
+    nats_subject: ""         # NATS subject of the Irancell bill payment; not read yet (order flow)
+    get_status:              # cron that asks the status of pending Irancell orders; not read yet (order flow)
+      cron_time: "0s"
+      name: ""
+      start: "0s"
+      end: "0s"
+      chunk: 0
+      every: "0s"
+      lock_time: "0s"
+      is_lockable: false
+      reverse_deadline: "0s"
+      sync_operations:
+        api_call_get_status: "0s"
+        get_order_query: "0s"
+        insert_order_query: "0s"
 
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
   electricity: "1h"          # how long a saved electricity inquiry answers the same bill with no provider call; 0: cache off
   gas: "1h"                  # how long a saved gas inquiry answers the same participate code with no provider call; 0: cache off
+  irancell: "0s"             # how long a saved Irancell mobile inquiry answers the same phone with no provider call; 0: cache off (as bill)
 
 auth:
   secrets:
@@ -87,5 +108,8 @@ debug:
       enable: false
       return_type: "success" # "success" or "error"
     tavanir:
+      enable: false
+      return_type: "success" # "success" or "error"
+    irancell:                # the Irancell mock: a fixed answer, no call to the irancell service
       enable: false
       return_type: "success" # "success" or "error"

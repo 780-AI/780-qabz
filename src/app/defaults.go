@@ -22,6 +22,7 @@ import (
 	httpserver "qabz/entry/http"
 	"qabz/migrations"
 	"qabz/provider"
+	"qabz/provider/irancellproxy"
 	"qabz/provider/qabzino"
 	"qabz/provider/tavanir"
 	"qabz/system/postgres"
@@ -96,7 +97,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	water, electricity, gas := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger)
+	water, electricity, gas, phone := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger), newPhone(flow, logger)
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
 	opts, err := newRequestMetrics(metrics)
 	if err != nil {
@@ -104,7 +105,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		return nil, err
 	}
 	opts = append(opts, authCheck.ServerOptions()...)
-	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity), grpcserver.RegisterGas(gas))
+	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity), grpcserver.RegisterGas(gas), grpcserver.RegisterPhone(phone))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
 	}
@@ -112,7 +113,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler, pb.RegisterMyBillsHandler, pb.RegisterWaterHandler, pb.RegisterElectricityHandler, pb.RegisterGasHandler)
+	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler, pb.RegisterMyBillsHandler, pb.RegisterWaterHandler, pb.RegisterElectricityHandler, pb.RegisterGasHandler, pb.RegisterPhoneHandler)
 	if err == nil && gw == nil {
 		err = errors.New("http gateway: New returned nil")
 	}
@@ -308,7 +309,8 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 // HTTP adapter with providers.qabzino.enabled, token, water_bill_endpoint, gas_bill_endpoint (task
 // 023) and timeout, not the gRPC QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
 // endpoints with providers.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
-// and timeout; it calls no other service). The mock of a provider
+// and timeout; it calls no other service) and Irancell (task 035: a gRPC client of the irancell
+// service with providers.irancell.enabled, grpc_address and timeout). The mock of a provider
 // (debug.mocks.<provider>) is applied only when Config.Mode is dev and its enable key is true (one
 // warn line); then Inquiry answers a fixed answer and never calls the backend. Every provider that
 // is added later follows the same pattern (registerAdapter) with its own debug.mocks.<provider>. A
@@ -352,6 +354,27 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		tavanirMock, tavanir.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
+
+	// Irancell (task 035): a gRPC client of the irancell service (our own service). The connection
+	// is lazy: the start does not need the service.
+	irancellClient, err := irancellproxy.Dial(cfg.IrancellGRPCAddress)
+	if err != nil {
+		return nil, err
+	}
+	irancellAdapter, err := irancellproxy.New(irancellproxy.Options{
+		Enabled: cfg.IrancellEnabled,
+		Client:  irancellClient,
+		Timeout: cfg.IrancellTimeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	// providers.irancell.enabled: false wins over the mock, as for Qabzino and Tavanir.
+	irancellMock := provider.MockSettings{Enable: dev && cfg.DebugMockIrancellEnable && cfg.IrancellEnabled, ReturnType: cfg.DebugMockIrancellReturnType}
+	if err := registerAdapter(registry, irancellAdapter, "Irancell", disabledNotice("irancell", "Irancell", cfg.IrancellEnabled),
+		irancellMock, irancellproxy.MockFixtures(), logger); err != nil {
+		return nil, err
+	}
 	return registry, nil
 }
 
@@ -392,7 +415,7 @@ func disabledNotice(name, title string, enabled bool) string {
 }
 
 // newInquiryFlow builds the inquiry flow (inquiry.Service) that every inquiry endpoint uses (water:
-// task 021; electricity: task 022; gas: task 023). It picks the provider with ProvidersService, answers from the
+// task 021; electricity: task 022; gas: task 023; the Irancell mobile bill: task 035, caching.irancell). It picks the provider with ProvidersService, answers from the
 // saved inquiries of bill_inquiries when they are younger than the cache TTL of the bill type
 // (caching.water, caching.electricity, caching.gas; read at start), else calls the adapter of the provider and
 // saves the answer. With metrics on, each inquiry adds 1 to
@@ -408,7 +431,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 	if reg := metrics.Registry(); reg != nil {
 		inquiries := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_inquiries_total",
-			Help: "Bill inquiries by bill type (water, electricity, gas), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas request with billId and payId, answered from the two IDs with no provider).",
+			Help: "Bill inquiries by bill type (water, electricity, gas, irancell), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas request with billId and payId, answered from the two IDs with no provider).",
 		}, []string{"bill_type", "provider", "result"})
 		calls := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_provider_calls_total",
@@ -440,6 +463,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 		provider.BillTypeWater:       cfg.CachingWater,
 		provider.BillTypeElectricity: cfg.CachingElectricity,
 		provider.BillTypeGas:         cfg.CachingGas,
+		provider.BillTypeIrancell:    cfg.CachingIrancell,
 	}
 	return inquiry.NewService(inquiry.Options{
 		Repository:     postgres.NewInquiryRepository(db),
@@ -493,6 +517,20 @@ func newGas(flow *inquiry.Service, logger Logger) *grpcserver.Gas {
 		deps.Logger = logger
 	}
 	return grpcserver.NewGas(deps)
+}
+
+// newPhone builds the gRPC Phone service: POST /v1/mobile/inquiry (task 035: the Irancell operator)
+// on the same inquiry flow as Water. A server fault writes one error log line (grpcserver.Phone).
+// A nil flow gives a service whose Inquiry answers Unimplemented.
+func newPhone(flow *inquiry.Service, logger Logger) *grpcserver.Phone {
+	deps := grpcserver.PhoneDeps{}
+	if flow != nil {
+		deps.Inquiry = flow
+	}
+	if logger != nil {
+		deps.Logger = logger
+	}
+	return grpcserver.NewPhone(deps)
 }
 
 // newRequestMetrics returns the gRPC server options that measure every call (and so every gateway

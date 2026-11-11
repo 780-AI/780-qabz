@@ -1,4 +1,4 @@
-<!-- VERSION: 2.8 -->
+<!-- VERSION: 2.9 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.7 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.8 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.8 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.40 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v2.9 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.41 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -36,27 +36,28 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v2.4 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v2.5 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.52 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.53 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.18 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.25 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.11 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.26 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.12 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-11
-- **Change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.3: the operator rule "the next provider in the list takes the job" (a disabled row, an open circuit breaker or no response; Jiring Switch first, Parsian next); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.7, #5 manifest v2.8.
-- **Previous change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.2: the operator meaning of "Jiring Switch is not available" (it does not respond: circuit breaker, failed call, timeout; Parsian is called in the same request); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.6, #5 manifest v2.7.
+- **Change**: 2026-11-11 — Task 035 `mobile_irancell_inquiry`: `POST /v1/mobile/inquiry` for the Irancell operator on the shared inquiry flow (the inquiry ID is the phone; a mid-term and a final-term inquiry; only the Irancell provider may answer), the Irancell adapter `provider/irancellproxy` (a gRPC client of the irancell service), `providers.irancell.*`, `caching.irancell` (default 0) and `debug.mocks.irancell`; MCI and Rightel answer HTTP 501 until tasks 036 and 037; Postman has Phone / Inquiry; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.8, #5 manifest v2.9, #6 folder_structure v0.41, #21 system.html v2.5, #28 OPEN_TASKS v1.53, #34 app README v0.26, #35 this_vs_bill v0.12.
+- **Previous change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.3: the operator rule "the next provider in the list takes the job" (a disabled row, an open circuit breaker or no response; Jiring Switch first, Parsian next); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.7, #5 manifest v2.8.
+- **Earlier change**: 2026-11-11 — Task 036 `mobile_mci_inquiry` v0.2: the operator meaning of "Jiring Switch is not available" (it does not respond: circuit breaker, failed call, timeout; Parsian is called in the same request); no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.6, #5 manifest v2.7.
 - **Earlier change**: 2026-11-11 — Task 024 `mobile_inquiry_endpoint` split by operator into the new pending tasks 035 (Irancell), 036 (MCI) and 037 (Rightel); the file of task 024 removed, `task_counter.json` is 038, task 025 v0.2 names the new tasks; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.5, #5 manifest v2.6, #28 OPEN_TASKS v1.52.
 - **Earlier change**: 2026-11-11 — Session wrap-up (task 023 session): 3 lesson candidates and more evidence for one in the register; the operator report for task 023; no code, no new files. Bumped #3 CHANGELOG v3.4, #5 manifest v2.5, #28 OPEN_TASKS v1.51.
 - **Earlier change**: 2026-11-11 — Task 023 `gas_inquiry_endpoint`: `POST /v1/gas/inquiry` on the shared inquiry flow (`core/inquiry`: one table of bill types; the inquiry ID of gas is the participate code), the raw inquiry (`billId` + `payId`: `inquiry.Service.RawInquiry`, `common/helpers/payid.go`), the Qabzino adapter inquires gas (`providers.qabzino.gas_bill_endpoint`) and has a gas mock answer, `caching.gas` (default `1h`), gas details in `bill_inquiries.extra_data`; requests and responses of every endpoint unchanged; Postman has Gas / Inquiry; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.3, #5 manifest v2.4, #6 folder_structure v0.40, #21 system.html v2.4, #28 OPEN_TASKS v1.50, #34 app README v0.25, #35 this_vs_bill v0.11.

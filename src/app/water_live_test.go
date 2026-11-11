@@ -34,11 +34,18 @@ type liveWaterStack struct {
 	water       *grpcserver.Water
 	electricity *grpcserver.Electricity
 	gas         *grpcserver.Gas
+	phone       *grpcserver.Phone
 	metrics     *prometheus.Server
 	log         *liveLogger
 }
 
 func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string) *liveWaterStack {
+	t.Helper()
+	return newLiveWaterCfg(t, ctx, returnType, setupSQL, nil)
+}
+
+// newLiveWaterCfg is newLiveWater with a change of the config (nil: none) before the App parts are built.
+func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL string, change func(*config.Config)) *liveWaterStack {
 	t.Helper()
 	schemaDSN := postgrestest.SeededSchema(t, ctx, postgrestest.RunDSN(t))
 	db, err := postgres.New(ctx, schemaDSN)
@@ -61,6 +68,13 @@ func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string
 	cfg.CachingWater = time.Hour
 	cfg.CachingElectricity = time.Hour
 	cfg.CachingGas = time.Hour
+	cfg.IrancellEnabled = true
+	cfg.DebugMockIrancellEnable = true
+	cfg.DebugMockIrancellReturnType = returnType
+	cfg.CachingIrancell = time.Hour
+	if change != nil {
+		change(&cfg)
+	}
 	log := &liveLogger{}
 	providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), prometheus.New("127.0.0.1:0", false), log)
 	if !assert.NoError(t, err) || !assert.NotNil(t, providers) || !assert.NoError(t, providers.Start(ctx)) {
@@ -76,7 +90,7 @@ func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string
 	if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 		t.FailNow()
 	}
-	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log), metrics: metrics, log: log}
+	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log), phone: newPhone(flow, log), metrics: metrics, log: log}
 }
 
 func (s *liveWaterStack) ask(user, bill string) (*pb.InquiryBillPayResponse, error) {

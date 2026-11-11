@@ -360,6 +360,56 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Phone",
+      "item": [
+        {
+          "name": "Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"989351234567\",\n  \"operator\": \"irancell\",\n  \"billId\": \"\",\n  \"payId\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/mobile/inquiry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mobile",
+                "inquiry"
+              ]
+            },
+            "description": "haf80.api.bill.Phone/Inquiry (task 035: the Irancell operator). Inquires a mobile bill by phone. The request and the answer are those of bill (InquiryPhoneRequest, InquiryPhoneResponse), unchanged. Request rules, as in bill: phone is required and is a mobile number in the 98 form (989 and nine digits; 0935... or 935... is invalid); a billId that is sent must be a valid bill ID; operator and service must be values of the enum (mci, irancell, rightel, unknown); payId is not checked. Only operator is read (service is never used, as in bill), and a request with no operator is mci. Operators: irancell is answered; mci and rightel are not available yet (HTTP 501; tasks 036 and 037); unknown is HTTP 400. Note: the gateway reads an operator name that is not in the enum as mci (HTTP 501). The inquiry ID is the phone: it is the cache key and what the provider gets. Irancell: the provider of (irancell, inquiry) is picked with ProvidersService and ONLY the Irancell provider (providers row 38, enabled in the dev seed) may answer: when the pick is another provider, nobody is called and the answer is HTTP 503. The Irancell adapter calls the irancell service (our own service, gRPC pb.InternalService/BillInquiry at providers.irancell.grpc_address); providers.irancell.enabled false fails every call as provider down. caching.irancell is 0 by default (no cache, as bill): every request asks Irancell; with a TTL, the saved inquiries of the same phone younger than the TTL answer with no provider call. With debug.mocks.irancell.enable true (dev mode only, providers.irancell.enabled true) the adapter answers a fixed answer: midTerm price 150000, fullTerm price 450000, no billId, no payId, no paymentDeadline (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"midTerm\":{\"billId\":\"\",\"payId\":\"\",\"price\":<rials>,\"paymentDeadline\":\"\",\"providerId\":0},\"fullTerm\":{...}} (Irancell gives no billId, payId or paymentDeadline; providerId is always 0, as in bill; no debt: price 0 in both). An invalid request HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a provider other than Irancell, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the phone HTTP 400 with the provider message; any other failure HTTP 500. POST /v1/mobile/order, /v2/mobile/order and /v1/mobile/complete-order are not implemented yet (HTTP 501)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has midTerm and fullTerm with a price\", function () { const b = pm.response.json(); [\"midTerm\", \"fullTerm\"].forEach(function (k) { pm.expect(b).to.have.property(k); pm.expect(b[k].price).to.be.a(\"number\"); pm.expect(b[k]).to.have.property(\"billId\"); pm.expect(b[k]).to.have.property(\"payId\"); pm.expect(b[k]).to.have.property(\"paymentDeadline\"); }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

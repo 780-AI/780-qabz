@@ -3,7 +3,8 @@
 // saved inquiries when they are still valid, else call the provider and save the answer. The rows
 // are in the bill_inquiries and bill_inquiry_requests tables of the bill database. The flow is the
 // same for every bill type: task 021 implements water, task 022 adds electricity and the details of
-// an answer (provider.Details), task 023 adds gas (the inquiry ID is the participate code).
+// an answer (provider.Details), task 023 adds gas (the inquiry ID is the participate code), task 035
+// adds the Irancell mobile bill (the inquiry ID is the phone; only the Irancell provider answers).
 package inquiry
 
 import (
@@ -54,12 +55,16 @@ const finishTimeout = 5 * time.Second
 // billType is what the flow knows of one bill type.
 type billType struct {
 	// tidPrefix is the first digit of the tid of a request row (bill: pkg/reference WaterReference,
-	// ElectricityReference, GasReference).
+	// ElectricityReference, GasReference, IrancellReference).
 	tidPrefix int
 	// validInquiryID is the rule of Request.InquiryID. Never nil.
 	validInquiryID func(id string) bool
 	// invalid names the inquiry ID in the text of the ErrInvalid error.
 	invalid string
+	// onlyProvider is the providers.name of the one provider that may answer the bill type, or ""
+	// when every provider of the sorted list may. When the pick gives another provider, the flow
+	// answers as "no enabled provider" and calls nobody.
+	onlyProvider string
 }
 
 // billTypes are the bill types that the flow supports, by the bill type that the handler gives
@@ -69,11 +74,19 @@ type billType struct {
 //   - gas (task 023): the inquiry ID is the participate code. Its only rule is "not empty", as in
 //     bill (controller/gas validateInquiryRequest). A code longer than the inquiry_id columns
 //     (VARCHAR(15)) fails at the request row, as in bill (a database error, Internal).
+//   - irancell (task 035): the inquiry ID is the phone of the request, a mobile number in the 98 form
+//     (bill: controller/phone validateInquiryRequest needs a valid phone, so SetInquiryID always
+//     gives the phone). Only the Irancell provider may answer (operator rule of task 035).
 var billTypes = map[string]billType{
 	provider.BillTypeWater:       {tidPrefix: 1, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeElectricity: {tidPrefix: 2, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeGas:         {tidPrefix: 3, validInquiryID: notEmpty, invalid: "participate code"},
+	provider.BillTypeIrancell:    {tidPrefix: 8, validInquiryID: helpers.ValidMobile, invalid: "phone", onlyProvider: irancellProvider},
 }
+
+// irancellProvider is the providers.name of the Irancell provider (the adapter
+// provider/irancellproxy has the same name).
+const irancellProvider = "irancell"
 
 // notEmpty is the rule of an inquiry ID that only has to be there.
 func notEmpty(id string) bool { return id != "" }
@@ -97,7 +110,7 @@ func (e *RefusedError) Error() string { return "inquiry: the provider has no inq
 // Request is one inquiry.
 type Request struct {
 	BillType  string // for example provider.BillTypeWater
-	InquiryID string // the bill ID; for gas the participate code (billTypes)
+	InquiryID string // the bill ID; for gas the participate code; for irancell the phone (billTypes)
 	UserID    string // a UUID
 	Dialer    string // the mobile of the user (bill_inquiry_requests.dialer)
 }
@@ -250,7 +263,8 @@ func generateTID(billType string) (string, error) {
 // Inquire answers the inquiry of a bill:
 //  1. A request that breaks a rule (the inquiry ID of the bill type, user) gives an error that wraps ErrInvalid.
 //  2. It picks the provider of the bill type (an error that wraps provider.ErrNoProvider when none
-//     is enabled) and its adapter (ErrNoAdapter).
+//     is enabled, or when the bill type has one provider that may answer and the pick is another
+//     one) and its adapter (ErrNoAdapter).
 //  3. Saved inquiries of the same bill and provider that are valid answer the call with no
 //     provider call, with the details that were saved with them; copies for the user are saved
 //     (is_cached true). A failed read or a failed copy write is logged and does not fail the call.
@@ -286,6 +300,13 @@ func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 		}
 		s.countInquiry(req.BillType, label, result)
 		return Result{}, fmt.Errorf("pick provider for %s %s: %w", req.BillType, provider.ActionInquiry, err)
+	}
+	if bt.onlyProvider != "" && pro.Name != bt.onlyProvider {
+		// The bill type has one provider that may answer. Another provider is never called: the
+		// answer is the one of "no enabled provider".
+		s.countInquiry(req.BillType, NoProviderLabel, ResultNoProvider)
+		return Result{}, fmt.Errorf("pick provider for %s %s: %w: only %q may answer, the pick is %q",
+			req.BillType, provider.ActionInquiry, provider.ErrNoProvider, bt.onlyProvider, pro.Name)
 	}
 	adapter, ok := s.adapters.Get(pro.Name)
 	if !ok || adapter == nil {

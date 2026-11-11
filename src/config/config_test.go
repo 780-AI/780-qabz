@@ -560,6 +560,48 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 	assert.NoError(t, err, "100 is valid")
 }
 
+// TestParseIrancellProviderKeys (task 035): the keys of the Irancell provider have no default, take
+// their values, and a bad value names its key.
+func TestParseIrancellProviderKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, []string{"", "", "", ""},
+		[]string{c.IrancellName, c.IrancellGRPCAddress, c.IrancellNATSSubject, c.IrancellGetStatusName})
+	assert.Equal(t, make([]time.Duration, 9), []time.Duration{
+		c.IrancellGetStatusCronTime, c.IrancellGetStatusStart, c.IrancellGetStatusEnd, c.IrancellGetStatusEvery,
+		c.IrancellGetStatusLockTime, c.IrancellGetStatusReverseDeadline,
+		c.IrancellGetStatusSyncAPICall, c.IrancellGetStatusSyncGetOrder, c.IrancellGetStatusSyncInsertOrder,
+	})
+	assert.Equal(t, 0, c.IrancellGetStatusChunk)
+	assert.False(t, c.IrancellGetStatusIsLockable)
+
+	c, err = Parse([]byte(base + `providers: {irancell: {name: "irancell", grpc_address: "irancell:8084", nats_subject: "irancell-bill", get_status: {cron_time: "15m", name: "irancell-get-status", start: "30m", end: "48h", chunk: 100, every: "16m", lock_time: "31m", is_lockable: true, reverse_deadline: "10h", sync_operations: {api_call_get_status: "30s", get_order_query: "3ms", insert_order_query: "4ms"}}}}
+`))
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{"irancell", "irancell:8084", "irancell-bill", "irancell-get-status"},
+			[]string{c.IrancellName, c.IrancellGRPCAddress, c.IrancellNATSSubject, c.IrancellGetStatusName})
+		assert.Equal(t, []time.Duration{
+			15 * time.Minute, 30 * time.Minute, 48 * time.Hour, 16 * time.Minute, 31 * time.Minute, 10 * time.Hour,
+			30 * time.Second, 3 * time.Millisecond, 4 * time.Millisecond,
+		}, []time.Duration{
+			c.IrancellGetStatusCronTime, c.IrancellGetStatusStart, c.IrancellGetStatusEnd, c.IrancellGetStatusEvery,
+			c.IrancellGetStatusLockTime, c.IrancellGetStatusReverseDeadline,
+			c.IrancellGetStatusSyncAPICall, c.IrancellGetStatusSyncGetOrder, c.IrancellGetStatusSyncInsertOrder,
+		})
+		assert.Equal(t, 100, c.IrancellGetStatusChunk)
+		assert.True(t, c.IrancellGetStatusIsLockable)
+		assert.Equal(t, 10*time.Second, c.QabzinoTimeout, "the keys of the other providers keep their defaults")
+	}
+
+	_, err = Parse([]byte(base + "providers: {irancell: {get_status: {every: \"soon\"}}}\n"))
+	assert.ErrorContains(t, err, "providers.irancell.get_status.every")
+	_, err = Parse([]byte(base + "providers: {irancell: {get_status: {chunk: \"many\"}}}\n"))
+	assert.ErrorContains(t, err, "providers.irancell.get_status.chunk")
+}
+
 // TestParseGasInquiryKeys (task 023): caching.gas has its default, takes its value and is checked;
 // it does not depend on the water and electricity keys. The gas endpoint of Qabzino is read.
 func TestParseGasInquiryKeys(t *testing.T) {

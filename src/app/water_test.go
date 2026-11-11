@@ -84,7 +84,7 @@ func TestNewProviderRegistry(t *testing.T) {
 		if c.wantWarn != "" {
 			assert.Equal(t, 1, log.count("warn", c.wantWarn), c.name)
 		} else {
-			assert.Equal(t, 0, len(log.lines)-log.count("info", "provider mock: inquiry answered with no call to the provider")-log.count("warn", tavanirDisabledWarn), c.name+": no warn line of Qabzino")
+			assert.Equal(t, 0, len(log.lines)-log.count("info", "provider mock: inquiry answered with no call to the provider")-log.count("warn", tavanirDisabledWarn)-log.count("warn", irancellDisabledWarn), c.name+": no warn line of Qabzino")
 		}
 	}
 	// A nil logger writes nothing and does not panic.

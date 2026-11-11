@@ -274,7 +274,7 @@ func TestGenerateTIDGas(t *testing.T) {
 
 // TestBillTypesTable: every supported bill type has a prefix of its own and a rule.
 func TestBillTypesTable(t *testing.T) {
-	assert.Len(t, billTypes, 3)
+	assert.Len(t, billTypes, 4)
 	prefixes := map[int]string{}
 	for name, bt := range billTypes {
 		assert.NotNil(t, bt.validInquiryID, name)
@@ -282,5 +282,5 @@ func TestBillTypesTable(t *testing.T) {
 		assert.Empty(t, prefixes[bt.tidPrefix], "prefix %d is used twice", bt.tidPrefix)
 		prefixes[bt.tidPrefix] = name
 	}
-	assert.Equal(t, map[int]string{1: "water", 2: "electricity", 3: "gas"}, prefixes)
+	assert.Equal(t, map[int]string{1: "water", 2: "electricity", 3: "gas", 8: "irancell"}, prefixes)
 }

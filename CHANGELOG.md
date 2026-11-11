@@ -1,7 +1,8 @@
-<!-- VERSION: 3.7 -->
+<!-- VERSION: 3.8 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.8 — 2026-11-11 — Added 035-mobile-irancell-inquiry entry.
 v3.7 — 2026-11-11 — Added 036-next-provider-rule entry.
 v3.6 — 2026-11-11 — Added 036-jiring-not-available-meaning entry.
 v3.5 — 2026-11-11 — Added 024-split-into-035-036-037 entry.
@@ -123,6 +124,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Task 035: `POST /v1/mobile/inquiry` for the Irancell operator, the Irancell adapter (the irancell service)
+- **Type:** Major (new endpoint, new package `provider/irancellproxy`, domain logic, new config keys, Critical File `system.html`)
+- **Files:** `src/provider/irancellproxy/irancellproxy.go` (new: the adapter, `Dial`, `MockFixtures`, the `Mock...` constants; the `.gitkeep` is removed) + tests; `src/provider/provider.go` (`BillTypeIrancell`, `InquiryTypeMidterm`, `InquiryTypeFinalTerm`); `src/core/inquiry/inquiry.go` (the `irancell` entry of `billTypes`: `tid` prefix 8, the phone rule, `onlyProvider`) + `irancell_test.go`, `gas_test.go`; `src/entry/grpc/phone.go` (new: `Phone.Inquiry`, `phoneOperators`, `validPhoneInquiry`) + tests; `src/entry/http/phone_test.go`; `src/app/defaults.go` (the Irancell adapter in `newProviderRegistry`, `caching.irancell`, `newPhone`, the Phone service and gateway handler) + `phone_test.go`, `phone_live_test.go`, `water_live_test.go`, `water_test.go`; `src/config/config.go` + tests; `Makefile` (`proto` also generates the irancell service client into `src/api/pb/irancell`); `config.yml.example` (and the local `config.yml`); `qabz.postman_collection.json` (new folder Phone, request Inquiry); `docs/initial-discovery/system.html` (v2.5); `docs/this_vs_bill.md` (v0.12, items 30 and 31); `docs/folder_structure.md` (v0.41); `src/app/README.md` (v0.26); `docs/documents_manifest.md`; `docs/Plans/OPEN_TASKS.md` (v1.53); the task file v0.2 (design decisions, verification record; moved to `done_tasks/`).
+- **Impact:** Yes, behavior changes. (1) New endpoint `POST /v1/mobile/inquiry` (`Phone.Inquiry`, bill's request and answer unchanged): the operator `irancell` runs the shared inquiry flow with the bill type `irancell` (the inquiry ID is the phone, `tid` prefix 8); one answer has a mid-term and a final-term inquiry, saved as two `bill_inquiries` rows and returned in `midTerm` and `fullTerm`; `providerId` is 0, as bill. The operators `mci` and `rightel` (and a request with no operator) answer HTTP 501 until tasks 036 and 037; `unknown` and an invalid request answer HTTP 400. (2) Only the Irancell provider (providers row 38) may answer: when the provider pick gives another provider, nobody is called and the answer is HTTP 503 (operator rule). (3) The Irancell adapter calls the irancell service (our own service) over gRPC (`pb.InternalService/BillInquiry`); a failed call is HTTP 503 and writes `failed` on the request row (bill writes `pending`: `this_vs_bill.md` item 30). (4) New config keys (both config files): `providers.irancell.enabled` (`false`), `providers.irancell.timeout` (`10s`), `providers.irancell.grpc_address`, `name`, `nats_subject` and the `get_status` block (bill's keys; no default; only `grpc_address` is read), `caching.irancell` (`0s`: no cache, as bill), `debug.mocks.irancell.enable` (`false`) and `return_type` (`success`). (5) No new metric: the three inquiry metrics count `bill_type="irancell"`. Water, electricity and gas are unchanged (their tests pass with no change of an expected value).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → Pending verification → "Task 035 `POST /v1/mobile/inquiry` for the Irancell operator": unit and live tests (`make test`); feature ON against the compose dev database with `debug.mocks.irancell.enable: true` (steps 1-5 of the task Verification: success answer and rows, second call from the database, `return_type: error`, the saved answer still served while the mock errors, row 38 disabled). Run by the implementer on 2026-11-11: all pass (evidence in the task file).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Task 036 (MCI inquiry): the next provider in the list takes the job
 - **Type:** Minor (task file; no code).
