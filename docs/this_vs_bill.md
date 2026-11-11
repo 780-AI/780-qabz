@@ -1,7 +1,8 @@
-<!-- VERSION: 0.12 -->
+<!-- VERSION: 0.13 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v0.13 — 2026-11-11 — Task 036: item 32 (POST /v1/mobile/inquiry for the MCI operator: the provider order, one provider per request, Parsian for other bill types, the differences of the water inquiry apply); item 31 no longer names MCI as not available; item 15 covers an adapter that does not inquire the bill type.
 v0.12 — 2026-11-11 — Task 035: item 30 (the Irancell adapter: a failed call writes `failed`, not `pending`) and item 31 (POST /v1/mobile/inquiry for the Irancell operator: the operator answers, only the Irancell provider, the differences of the water inquiry apply).
 v0.11 — 2026-11-11 — Task 023: item 28 (a gas inquiry with billId and payId, the raw inquiry: error answers) and item 29 (POST /v1/gas/inquiry: the differences of the water inquiry apply; a long participate code); item 26 names the gas codes.
 v0.10 — 2026-11-10 — Task 034: item 27 for the direct Tavanir adapter (status codes, login, token, TLS check, no circuit breaker, field formats); item 24 updated (the direct adapter gives no empty status).
@@ -113,7 +114,7 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
 
 15. **`POST /v1/water/inquiry`: no enabled provider.**
     - **bill:** `GetProviderByBillTypeAndAction` returns the raw database error (`pg: no rows in result set`), so the client gets gRPC `Unknown` (HTTP 500) with that text.
-    - **Qabz:** answers gRPC `Unavailable` (HTTP 503) with the provider-down text of item 16 and writes one error log line (`water: no enabled provider for inquiry`). The same answer is given when the picked provider has no adapter in the registry (bill: `invalid_parameter_error`, `Unknown`).
+    - **Qabz:** answers gRPC `Unavailable` (HTTP 503) with the provider-down text of item 16 and writes one error log line (`water: no enabled provider for inquiry`). The same answer is given when the picked provider has no adapter in the registry, or its adapter does not inquire the bill type (task 036: `ProviderInterface.SupportsInquiry`; bill: `invalid_parameter_error`, `Unknown`).
     - **Reason:** a missing provider is an operations fault, not a server bug; no internal text reaches the client. Task 021 design decision 5.
     - **Code:** the `@todo` comment on `errProviderDown` in `src/entry/grpc/water.go`.
 
@@ -210,8 +211,18 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
 31. **`POST /v1/mobile/inquiry` (the Irancell operator): operators, the one provider, and the differences of the water inquiry.**
     - **bill / Qabz, the same:** the request fields (`phone`, `operator`, `payId`, `billId`, `service`), the response fields (`midTerm` and `fullTerm`, each with `billId`, `payId`, `price`, `paymentDeadline`, `providerId`), the request check (a mobile number in the 98 form, a valid `billId` when it is sent, enum values), only `operator` is read (`service` is never used, because the text of an enum value is never empty), the bill type `irancell`, the inquiry ID (the phone), the `tid` prefix 8, no cache by default (bill has no cache for the bill type `irancell`; Qabz has `caching.irancell`, default `0`), `providerId` always 0.
     - **The operator `unknown`:** bill looks up a provider for the empty bill type and answers the raw error (gRPC `Unknown`, HTTP 500). Qabz answers `InvalidArgument` (HTTP 400, `invalid parameter`, no log line).
-    - **MCI and Rightel (until tasks 036 and 037):** bill answers them with their providers. Qabz answers `Unimplemented` (HTTP 501, no log line, no provider call); a request with no operator is MCI, as in bill (operator decision of task 035, decision B).
+    - **Rightel (until task 037):** bill answers it with its providers. Qabz answers `Unimplemented` (HTTP 501, no log line, no provider call) (operator decision of task 035, decision B). MCI (also a request with no operator, as in bill) is answered since task 036 (item 32).
     - **Only the Irancell provider:** bill takes any enabled row of (`irancell`, `inquiry`); a row of a provider that has no gateway for the bill type gives `invalid parameter` (HTTP 500). Qabz calls only the Irancell provider: when the pick is another provider, nobody is called, its saved inquiries are not read, and the answer is HTTP 503 with one error line `irancell: no enabled provider for inquiry` (operator rule of task 035).
     - **The differences of the water inquiry apply:** items 14 (invalid request, no user), 15, 16, 17, 19, 20, 21 and 22, through the same flow and error mapping.
     - **Reason:** one flow for every bill type; a wrong input is a client error (HTTP 400), as in items 14 and 28.
     - **Code:** `Phone.Inquiry` in `src/entry/grpc/phone.go` (the `@todo` comments name items 14, 22 and 31); `onlyProvider` in `billTypes` of `src/core/inquiry/inquiry.go`.
+
+32. **`POST /v1/mobile/inquiry` (the MCI operator): the provider order, one provider per request, and the differences of the water inquiry.**
+    - **bill / Qabz, the same:** the bill type `mobile`, the inquiry ID (the phone), the providers Jiring Switch (`jiring-switch` service, `BillInquiry` with the user, the dialer and the phone; no payment deadline, no `tid`) and Parsian (`parsian-v2` service, `TopBill/Inquiry` with the bill type `mobile_mci` and a new tracking and reference ID), the mapping of each answer (an answer with no inquiry and the status `success` is a mid-term and a final-term inquiry of amount 0, `handlePhoneResponseWithoutInquiry`), the cache TTL `caching.mobile` (default `5h`), two saved rows of the same inquiry type are not used (`shouldSkipCache`), one provider call per request (bill also calls no second provider), `providerId` always 0.
+    - **The provider order:** bill takes any enabled row of (`mobile`, `inquiry`) (item 13). Qabz takes the first enabled row by priority, ascending. The operator wants Jiring Switch first and Parsian next; that order is set only with the priority of the rows (in the dev seed Jiring Switch is disabled and has priority 10, after the priority 2 of Parsian, so Parsian answers).
+    - **A failed call:** in both, the answer of the picked provider is the answer (no fallback to the other provider in the same request). Qabz writes `failed` on the request row and answers HTTP 503 with one error line `mobile: provider inquiry failed` (items 15 and 16). A later automatic switch to the next provider is the Provider Switcher, only when the circuit breaker of the provider opens (`system.html`; not built yet).
+    - **An answer with no inquiry and an empty status:** gets the status `failed`, as the other adapters do (item 24).
+    - **Parsian for other bill types:** bill's Parsian gateways also inquire water and gas. The Qabz Parsian adapter inquires only the MCI mobile bill (`SupportsInquiry`), so a water or gas row of `parsian` that is the pick (the dev seed: rows 44 and 43) gets the answer of item 15 (HTTP 503, no request row), as before task 036.
+    - **The differences of the water inquiry apply:** items 14, 15, 16, 17, 19, 20, 21 and 22, through the same flow and error mapping; the operator differences of item 31 apply too.
+    - **Reason:** one flow for every bill type; a deterministic order by the stored priority (operator, task 020); one provider per request and a switch only by the circuit breaker (operator, task 036, 2026-11-11; conventions § 13).
+    - **Code:** `provider.BillTypeMobile` in `billTypes` of `src/core/inquiry/inquiry.go`; `src/provider/jiring/jiring.go` and `src/provider/parsianproxy/parsianproxy.go` (the `@todo` comments name item 32); `Phone.Inquiry` in `src/entry/grpc/phone.go`.

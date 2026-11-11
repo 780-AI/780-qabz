@@ -188,6 +188,13 @@ func New(opts Options) (*Adapter, error) {
 // Name returns Name.
 func (a *Adapter) Name() string { return Name }
 
+// SupportsInquiry reports whether Inquiry answers the bill type: a bill type of kinds with all
+// its parts (water and gas; task 036).
+func (a *Adapter) SupportsInquiry(billType string) bool {
+	k, ok := kinds[billType]
+	return ok && k.endpoint != nil && k.parameters != nil && k.success != nil
+}
+
 // Enabled reports providers.qabzino.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
@@ -258,8 +265,8 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	if a == nil || a.client == nil {
 		return nil, errors.New("qabzino: adapter not created with New")
 	}
-	k, ok := kinds[req.BillType]
-	if !ok || k.endpoint == nil || k.parameters == nil || k.success == nil {
+	k := kinds[req.BillType]
+	if !a.SupportsInquiry(req.BillType) {
 		return nil, fmt.Errorf("qabzino: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
 	if !a.enabled {

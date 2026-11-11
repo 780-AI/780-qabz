@@ -28,6 +28,17 @@ func irancellReq() *pb.InquiryPhoneRequest {
 	return &pb.InquiryPhoneRequest{Phone: irPhone, Operator: pb.InquiryPhoneRequest_irancell}
 }
 
+const mciPhone = "989121234568"
+
+// mciResult is an answer of the MCI inquiry: one bill ID, a pay ID for each inquiry, a payment
+// deadline on the mid-term inquiry only.
+func mciResult() inquiry.Result {
+	return inquiry.Result{BillID: "9120000036", Inquiries: []inquiry.Inquiry{
+		{BillID: "9120000036", PayID: "21003611", Amount: 210000, PaymentDeadline: "2026-12-20", InquiryType: provider.InquiryTypeMidterm},
+		{BillID: "9120000036", PayID: "61003622", Amount: 610000, InquiryType: provider.InquiryTypeFinalTerm},
+	}}
+}
+
 func irancellResult() inquiry.Result {
 	return inquiry.Result{Inquiries: []inquiry.Inquiry{
 		{Amount: 150000, InquiryType: provider.InquiryTypeMidterm},
@@ -134,16 +145,63 @@ func TestValidPhoneInquiry(t *testing.T) {
 	assert.False(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Phone: irPhone, Operator: -1}))
 }
 
-// TestPhoneInquiryOperators: the operator table. Irancell runs the flow; mci (also a request with
-// no operator: the enum value 0) and rightel are not available yet (tasks 036 and 037).
+// TestPhoneInquiryOperators: the operator table. Irancell and mci (task 036; also a request with no
+// operator: the enum value 0) run the flow with their bill type; rightel is not available yet
+// (task 037).
 func TestPhoneInquiryOperators(t *testing.T) {
 	assert.Len(t, phoneOperators, 3, "mci, irancell, rightel; unknown has no bill type")
 	assert.Equal(t, provider.BillTypeIrancell, phoneOperators[pb.InquiryPhoneRequest_irancell])
+	assert.Equal(t, provider.BillTypeMobile, phoneOperators[pb.InquiryPhoneRequest_mci])
+	assert.Equal(t, "", phoneOperators[pb.InquiryPhoneRequest_rightel])
+
+	// mci: the bill type "mobile" (bill: operatorBillType), the inquiry ID is the phone.
 	for name, req := range map[string]*pb.InquiryPhoneRequest{
-		"mci":                           {Phone: irPhone, Operator: pb.InquiryPhoneRequest_mci},
-		"no operator":                   {Phone: irPhone},
-		"no operator, service irancell": {Phone: irPhone, Service: pb.InquiryPhoneRequest_irancell},
-		"rightel":                       {Phone: irPhone, Operator: pb.InquiryPhoneRequest_rightel},
+		"mci":                           {Phone: mciPhone, Operator: pb.InquiryPhoneRequest_mci},
+		"no operator":                   {Phone: mciPhone},
+		"no operator, service irancell": {Phone: mciPhone, Service: pb.InquiryPhoneRequest_irancell},
+	} {
+		log := &errLog{}
+		f := &fakeInquirer{res: mciResult()}
+		res, err := NewPhone(PhoneDeps{Inquiry: f, Logger: log}).Inquiry(waterCtx(), req)
+		if !assert.NoError(t, err, name) || !assert.NotNil(t, res, name) || !assert.Len(t, f.reqs, 1, name) {
+			continue
+		}
+		assert.Equal(t, inquiry.Request{BillType: "mobile", InquiryID: mciPhone, UserID: billsUser, Dialer: "989121234567"}, f.reqs[0], name)
+		if assert.NotNil(t, res.GetMidTerm(), name) && assert.NotNil(t, res.GetFullTerm(), name) {
+			assert.Equal(t, []string{"9120000036", "21003611", "2026-12-20"},
+				[]string{res.GetMidTerm().GetBillId(), res.GetMidTerm().GetPayId(), res.GetMidTerm().GetPaymentDeadline()}, name)
+			assert.Equal(t, uint32(210000), res.GetMidTerm().GetPrice(), name)
+			assert.Equal(t, []string{"9120000036", "61003622", ""},
+				[]string{res.GetFullTerm().GetBillId(), res.GetFullTerm().GetPayId(), res.GetFullTerm().GetPaymentDeadline()}, name)
+			assert.Equal(t, uint32(610000), res.GetFullTerm().GetPrice(), name)
+			assert.EqualValues(t, 0, res.GetMidTerm().GetProviderId(), name+": providerId is not set, as in bill")
+		}
+		assert.Empty(t, log.lines, name+": no log line")
+	}
+
+	// The failures of the flow have the answers of every other inquiry; the log lines name the bill type.
+	for name, c := range map[string]struct {
+		err  error
+		code codes.Code
+		line string
+	}{
+		"provider down": {fmt.Errorf("x: %w", provider.ErrProviderDown), codes.Unavailable, "mobile: provider inquiry failed"},
+		"no provider":   {fmt.Errorf("x: %w", provider.ErrNoProvider), codes.Unavailable, "mobile: no enabled provider for inquiry"},
+		"refused":       {&inquiry.RefusedError{Message: "not an MCI number"}, codes.FailedPrecondition, ""},
+	} {
+		log := &errLog{}
+		_, err := NewPhone(PhoneDeps{Inquiry: &fakeInquirer{err: c.err}, Logger: log}).Inquiry(waterCtx(),
+			&pb.InquiryPhoneRequest{Phone: mciPhone, Operator: pb.InquiryPhoneRequest_mci})
+		assert.Equal(t, c.code, status.Code(err), name)
+		if c.line == "" {
+			assert.Empty(t, log.lines, name+": a business answer writes no log line")
+		} else if assert.Len(t, log.lines, 1, name) {
+			assert.Contains(t, log.lines[0], c.line, name)
+		}
+	}
+
+	for name, req := range map[string]*pb.InquiryPhoneRequest{
+		"rightel": {Phone: irPhone, Operator: pb.InquiryPhoneRequest_rightel},
 	} {
 		log := &errLog{}
 		f := &fakeInquirer{res: irancellResult()}

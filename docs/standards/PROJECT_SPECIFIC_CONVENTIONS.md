@@ -1,7 +1,8 @@
-<!-- VERSION: 0.18 -->
-<!-- Last Updated: 2026-11-09 -->
+<!-- VERSION: 0.19 -->
+<!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v0.19 — 2026-11-11 — Section 13: one request calls one provider; what it returns (also an error or an answer that cannot be used) is the answer; only the circuit breaker of a provider starts a switch (the Provider Switcher), the same for every bill type, with no rule special to a bill type or a provider (operator, task 036).
 v0.18 — 2026-11-09 — Section 15: every provider adapter has a development mock (`debug.mocks.<provider>`, `provider.NewMock`), applied in dev mode only (task 021).
 v0.17 — 2026-11-09 — Section 14: tests never touch the development database; one throw-away run database per `make test` (`QABZ_TEST_RUN_DSN`), the `postgrestest` guard, `make test-db-clean` (task 020b); the guard checks the database the driver uses (`pgconn.ParseConfig`), no DSN or password on a command line, `config_generated.env` parsed (never sourced as shell), trap before create, `GO_TEST_PKGS` operator-approved, `make test-db-clean` also drops the `qabz_test_` roles and a test login role has a random password (decision 7); nothing outside the `qabz_test_` databases is touched, a role with objects or privileges outside them is kept and the command exits 1, no `REASSIGN OWNED` / `DROP OWNED` (decision 8); the kept line labels each place (`(not a test database)` only next to a non-`qabz_test_` database, a shared object by its catalog) and a 2BP01 with no `pg_shdepend` row has its own line (fix round 4). Section 11: measured with `make test` (the run database), not `QABZ_TEST_POSTGRES_DSN`.
 v0.16 — 2026-11-08 — Section 13: providers only through `ProvidersService` (task 020). No other code reads the `providers` table or `postgres.ProviderRepository`.
@@ -320,9 +321,11 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 
 **Changes at runtime** (order, status) go through the service too (`MoveUp`, `MoveDown`, `Enable`, `Disable`), so every reader sees the same list. A load replaces the list with the database rows (the database wins, operator decision of task 020).
 
+**One request, one provider (operator, 2026-11-11, task 036).** A flow that calls a provider calls the pick of `PickProvider` once per request. What that provider returns is the answer of the request: a success, a business answer, an error, a timeout or an answer that cannot be used. The flow never calls the next provider of the list in the same request (no fallback loop in a flow, an adapter or a handler). A provider is switched only by the Provider Switcher (`system.html`, Provider Switcher), and only when the circuit breaker of that provider detects the condition. The switch is one generic mechanism: no rule for one bill type, one operator or one provider name; the order is the priority of the rows. A wanted order ("provider A first, B next") is set with the priority of the rows, not in code.
+
 **Why.** Operator decision, 2026-11-08 (task 020). One sorted, concurrent-safe list gives every caller the same deterministic pick, without a database read on the hot path. A second read path would pick a different provider (`bill` picks any enabled row, with no order) or bypass the runtime changes.
 
-**Review.** The `code-reviewer` agent searches each change for `providers` in SQL text and for uses of `ProviderRepository` and `ListProviders`. A use outside the places above is a defect. The verdict is NOT READY.
+**Review.** The `code-reviewer` agent searches each change for `providers` in SQL text and for uses of `ProviderRepository` and `ListProviders`. A use outside the places above is a defect. A second provider call in one request, or a provider name in a switch or order rule, is a defect too. The verdict is NOT READY.
 
 ## 14. Tests never touch the development database
 

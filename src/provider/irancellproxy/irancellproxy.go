@@ -93,6 +93,9 @@ func (noClient) BillInquiry(context.Context, *pb.BillInquiryRequest, ...grpc.Cal
 // Name returns Name.
 func (a *Adapter) Name() string { return Name }
 
+// SupportsInquiry reports whether Inquiry answers the bill type: only the Irancell mobile bill (task 036).
+func (a *Adapter) SupportsInquiry(billType string) bool { return billType == provider.BillTypeIrancell }
+
 // Enabled reports providers.irancell.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
@@ -114,7 +117,7 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	if a == nil || a.client == nil {
 		return nil, errors.New("irancellproxy: adapter not created with New")
 	}
-	if req.BillType != provider.BillTypeIrancell {
+	if !a.SupportsInquiry(req.BillType) {
 		return nil, fmt.Errorf("irancellproxy: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
 	if !a.enabled {

@@ -16,14 +16,14 @@ import (
 )
 
 // phoneOperators gives the bill type of each operator of a mobile inquiry (bill: controller/phone
-// operatorBillType). It is the one table of the endpoint: tasks 036 (MCI) and 037 (Rightel) fill
-// their entry. An operator with an empty bill type is known but not available yet (Unimplemented);
+// operatorBillType). It is the one table of the endpoint: task 036 filled the entry of MCI, task 037
+// (Rightel) fills its entry. An operator with an empty bill type is known but not available yet (Unimplemented);
 // an operator that is not in the table is invalid (InvalidArgument).
 //
 //	bill: mci -> "mobile", rightel -> "mobilemidtermRightel", irancell -> "irancell".
 var phoneOperators = map[pb.InquiryPhoneRequest_OperatorEnum]string{
 	pb.InquiryPhoneRequest_irancell: provider.BillTypeIrancell,
-	pb.InquiryPhoneRequest_mci:      "", // task 036
+	pb.InquiryPhoneRequest_mci:      provider.BillTypeMobile,
 	pb.InquiryPhoneRequest_rightel:  "", // task 037
 }
 
@@ -81,21 +81,22 @@ func validPhoneInquiry(req *pb.InquiryPhoneRequest) bool {
 // Inquiry answers the inquiry of a mobile bill (POST /v1/mobile/inquiry; tasks 035 to 037): the
 // saved inquiries of the phone when they are still valid, else the provider of the operator
 // (inquiry.Service). The flow and the answers of every failure are those of Water.Inquiry
-// (answerInquiryError; the log lines start with the bill type, for example "irancell:").
+// (answerInquiryError; the log lines start with the bill type, for example "irancell:" or, for the
+// MCI operator, "mobile:").
 //
 // What is special to the mobile bill, as in bill:
 //   - The request check is validPhoneInquiry (InvalidArgument, no log line).
 //   - The operator of the request gives the bill type (phoneOperators). As in bill, only operator
 //     is read: service is never used (the text of an enum value is never empty, so bill's
 //     "operator, or service when the operator is empty" always takes operator), and a request with
-//     no operator is mci (the enum value 0).
+//     no operator is mci (the enum value 0), so it runs the MCI inquiry (task 036).
 //   - The inquiry ID is the phone (bill: controller.SetInquiryID(billId, phone); the phone is never
 //     empty after the request check).
 //   - The answer has a mid-term and a full-term inquiry: the inquiry of the type
 //     provider.InquiryTypeMidterm goes to midTerm, every other one to fullTerm (the last one of
 //     each wins); a part with no inquiry is an empty object. providerId is not set, as in bill.
 //
-// An operator whose task is not done (mci, rightel) is Unimplemented (no log line): task 035,
+// An operator whose task is not done (rightel) is Unimplemented (no log line): task 035,
 // decision B. The operator "unknown" has no bill type: InvalidArgument.
 // @todo bill answers the operator "unknown" with the raw error of the provider lookup (gRPC
 // Unknown, HTTP 500). See docs/this_vs_bill.md, item 31.

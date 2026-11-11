@@ -615,3 +615,23 @@ func TestMockFixtures(t *testing.T) {
 		SerialNumber: MockSerialNumber, ServiceAddress: MockServiceAddress, ServicePostCode: MockServicePostCode, CustomerName: MockCustomerName,
 		City: MockCompanyName, Region: MockRegion}, *resp.Details.Electricity)
 }
+
+// SupportsInquiry gives true only for the bill types that Inquiry answers (task 036); Inquiry of
+// any other bill type is ErrNotSupported. A nil adapter answers the same.
+func TestSupportsInquiry(t *testing.T) {
+	want := map[string]bool{
+		provider.BillTypeWater:       false,
+		provider.BillTypeElectricity: true,
+		provider.BillTypeGas:         false,
+		provider.BillTypeIrancell:    false,
+		provider.BillTypeMobile:      false,
+		"tel":                        false,
+		"mobilemidterm":              false,
+		"":                           false,
+	}
+	var nilAdapter *Adapter
+	for billType, ok := range want {
+		assert.Equal(t, ok, (&Adapter{}).SupportsInquiry(billType), billType)
+		assert.Equal(t, ok, nilAdapter.SupportsInquiry(billType), billType)
+	}
+}

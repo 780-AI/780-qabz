@@ -4,7 +4,15 @@
 // are in the bill_inquiries and bill_inquiry_requests tables of the bill database. The flow is the
 // same for every bill type: task 021 implements water, task 022 adds electricity and the details of
 // an answer (provider.Details), task 023 adds gas (the inquiry ID is the participate code), task 035
-// adds the Irancell mobile bill (the inquiry ID is the phone; only the Irancell provider answers).
+// adds the Irancell mobile bill (the inquiry ID is the phone; only the Irancell provider answers),
+// task 036 adds the MCI mobile bill (the bill type "mobile"; the inquiry ID is the phone).
+//
+// One request calls one provider: the first enabled provider of the sorted list (PickProvider).
+// What that provider returns is the answer, also when it is an error or an answer that cannot be
+// used. The flow never calls a second provider in the same request: moving a bill type to the next
+// provider is the job of the Provider Switcher, only when the circuit breaker of the provider
+// detects the condition, for every bill type in the same way (system.html, Provider Switcher;
+// conventions § 13).
 package inquiry
 
 import (
@@ -65,6 +73,10 @@ type billType struct {
 	// when every provider of the sorted list may. When the pick gives another provider, the flow
 	// answers as "no enabled provider" and calls nobody.
 	onlyProvider string
+	// skipSameTypePair makes two saved rows of the same inquiry type (two mid-term or two
+	// final-term rows) a miss: the pair is not one answer of a provider, so the provider is asked
+	// again (bill: shouldSkipCache, for the bill types mobile and tel).
+	skipSameTypePair bool
 }
 
 // billTypes are the bill types that the flow supports, by the bill type that the handler gives
@@ -77,11 +89,15 @@ type billType struct {
 //   - irancell (task 035): the inquiry ID is the phone of the request, a mobile number in the 98 form
 //     (bill: controller/phone validateInquiryRequest needs a valid phone, so SetInquiryID always
 //     gives the phone). Only the Irancell provider may answer (operator rule of task 035).
+//   - mobile (task 036, the MCI operator): the inquiry ID is the phone, as irancell. Every provider
+//     of the sorted list of (mobile, inquiry) may answer (the seed has Jiring Switch and Parsian);
+//     the flow has no rule that is special to this bill type but the cache skip of bill.
 var billTypes = map[string]billType{
 	provider.BillTypeWater:       {tidPrefix: 1, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeElectricity: {tidPrefix: 2, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeGas:         {tidPrefix: 3, validInquiryID: notEmpty, invalid: "participate code"},
 	provider.BillTypeIrancell:    {tidPrefix: 8, validInquiryID: helpers.ValidMobile, invalid: "phone", onlyProvider: irancellProvider},
+	provider.BillTypeMobile:      {tidPrefix: 5, validInquiryID: helpers.ValidMobile, invalid: "phone", skipSameTypePair: true},
 }
 
 // irancellProvider is the providers.name of the Irancell provider (the adapter
@@ -110,7 +126,7 @@ func (e *RefusedError) Error() string { return "inquiry: the provider has no inq
 // Request is one inquiry.
 type Request struct {
 	BillType  string // for example provider.BillTypeWater
-	InquiryID string // the bill ID; for gas the participate code; for irancell the phone (billTypes)
+	InquiryID string // the bill ID; for gas the participate code; for irancell and mobile the phone (billTypes)
 	UserID    string // a UUID
 	Dialer    string // the mobile of the user (bill_inquiry_requests.dialer)
 }
@@ -264,10 +280,12 @@ func generateTID(billType string) (string, error) {
 //  1. A request that breaks a rule (the inquiry ID of the bill type, user) gives an error that wraps ErrInvalid.
 //  2. It picks the provider of the bill type (an error that wraps provider.ErrNoProvider when none
 //     is enabled, or when the bill type has one provider that may answer and the pick is another
-//     one) and its adapter (ErrNoAdapter).
+//     one) and its adapter (ErrNoAdapter, also when the adapter does not support the bill type:
+//     ProviderInterface.SupportsInquiry).
 //  3. Saved inquiries of the same bill and provider that are valid answer the call with no
 //     provider call, with the details that were saved with them; copies for the user are saved
-//     (is_cached true). A failed read or a failed copy write is logged and does not fail the call.
+//     (is_cached true). For the bill type mobile, two saved rows of the same inquiry type do not
+//     answer (bill: shouldSkipCache). A failed read or a failed copy write is logged and does not fail the call.
 //  4. Else it writes the request row (RequestInitial), calls the provider, writes the final status
 //     and the provider trace ID, and saves each inquiry of the answer with the details. A call
 //     that fails gives an error that wraps provider.ErrProviderDown; an answer with no inquiry
@@ -313,8 +331,14 @@ func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 		s.countInquiry(req.BillType, pro.Name, ResultError)
 		return Result{}, fmt.Errorf("%w %q", ErrNoAdapter, pro.Name)
 	}
+	if !adapter.SupportsInquiry(req.BillType) {
+		// The adapter does not inquire this bill type: the same answer as no adapter (no saved
+		// inquiry read, no request row, no call), as before the adapter existed (task 036).
+		s.countInquiry(req.BillType, pro.Name, ResultError)
+		return Result{}, fmt.Errorf("%w %q for the bill type %q", ErrNoAdapter, pro.Name, req.BillType)
+	}
 
-	if res, ok := s.fromDatabase(ctx, req, pro); ok {
+	if res, ok := s.fromDatabase(ctx, req, pro, bt.skipSameTypePair); ok {
 		s.countInquiry(req.BillType, pro.Name, ResultDBHit)
 		return res, nil
 	}
@@ -330,8 +354,9 @@ func (s *Service) countInquiry(billType, providerName, result string) {
 }
 
 // fromDatabase answers from valid saved inquiries (bill: getFromCache). ok is false when there is
-// no valid row, the cache is off, or the read failed (logged).
-func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Provider) (Result, bool) {
+// no valid row, the cache is off, the read failed (logged), or skipSameTypePair is set and the two
+// rows have the same mobile inquiry type (bill: shouldSkipCache).
+func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Provider, skipSameTypePair bool) (Result, bool) {
 	var ttl time.Duration
 	if s.cacheTTL != nil {
 		ttl = s.cacheTTL(req.BillType)
@@ -348,6 +373,10 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 		return Result{}, false
 	}
 	if len(rows) == 0 {
+		return Result{}, false
+	}
+	if skipSameTypePair && len(rows) == 2 && rows[0].InquiryType == rows[1].InquiryType &&
+		(rows[0].InquiryType == provider.InquiryTypeMidterm || rows[0].InquiryType == provider.InquiryTypeFinalTerm) {
 		return Result{}, false
 	}
 	res := Result{FromDatabase: true, Inquiries: make([]Inquiry, 0, len(rows))}

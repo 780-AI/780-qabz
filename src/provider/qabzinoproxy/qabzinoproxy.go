@@ -94,6 +94,9 @@ func (noClient) BillInquiry(context.Context, *pb.BillInquiryRequest, ...grpc.Cal
 // Name returns Name.
 func (a *Adapter) Name() string { return Name }
 
+// SupportsInquiry reports whether Inquiry answers the bill type: only the water bill (task 036).
+func (a *Adapter) SupportsInquiry(billType string) bool { return billType == provider.BillTypeWater }
+
 // Inquiry asks the backend for the inquiry of a water bill (bill: QabzinoWater.Execute). A call
 // that fails (a connection error, a timeout, a nil answer) returns an error that wraps
 // provider.ErrProviderDown. An answer with inquiries is ResponseSuccess; an answer with none
@@ -105,7 +108,7 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	if a == nil || a.client == nil {
 		return nil, errors.New("qabzinoproxy: adapter not created with New")
 	}
-	if req.BillType != provider.BillTypeWater {
+	if !a.SupportsInquiry(req.BillType) {
 		return nil, fmt.Errorf("qabzinoproxy: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
 	if ctx == nil {

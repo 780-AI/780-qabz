@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	promclient "github.com/prometheus/client_golang/prometheus"
@@ -23,6 +24,8 @@ import (
 	"qabz/migrations"
 	"qabz/provider"
 	"qabz/provider/irancellproxy"
+	"qabz/provider/jiring"
+	"qabz/provider/parsianproxy"
 	"qabz/provider/qabzino"
 	"qabz/provider/tavanir"
 	"qabz/system/postgres"
@@ -310,7 +313,9 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 // 023) and timeout, not the gRPC QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
 // endpoints with providers.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
 // and timeout; it calls no other service) and Irancell (task 035: a gRPC client of the irancell
-// service with providers.irancell.enabled, grpc_address and timeout). The mock of a provider
+// service with providers.irancell.enabled, grpc_address and timeout), and Jiring Switch and Parsian
+// (task 036, the MCI mobile bill: gRPC clients of the jiring-switch and the parsian-v2 service with
+// providers.jiring_switch.* and providers.parsian.*). The mock of a provider
 // (debug.mocks.<provider>) is applied only when Config.Mode is dev and its enable key is true (one
 // warn line); then Inquiry answers a fixed answer and never calls the backend. Every provider that
 // is added later follows the same pattern (registerAdapter) with its own debug.mocks.<provider>. A
@@ -375,12 +380,54 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		irancellMock, irancellproxy.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
+
+	// Jiring Switch (task 036): a gRPC client of the jiring-switch service (our own service). The
+	// connection is lazy: the start does not need the service.
+	jiringClient, err := jiring.Dial(cfg.JiringSwitchGRPCAddress)
+	if err != nil {
+		return nil, err
+	}
+	jiringAdapter, err := jiring.New(jiring.Options{
+		Enabled: cfg.JiringSwitchEnabled,
+		Client:  jiringClient,
+		Timeout: cfg.JiringSwitchTimeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	// providers.jiring_switch.enabled: false wins over the mock, as for the other providers.
+	jiringMock := provider.MockSettings{Enable: dev && cfg.DebugMockJiringSwitchEnable && cfg.JiringSwitchEnabled, ReturnType: cfg.DebugMockJiringSwitchReturnType}
+	if err := registerAdapter(registry, jiringAdapter, "Jiring Switch", disabledNotice("jiring_switch", "Jiring Switch", cfg.JiringSwitchEnabled),
+		jiringMock, jiring.MockFixtures(), logger); err != nil {
+		return nil, err
+	}
+
+	// Parsian (task 036): a gRPC client of the parsian-v2 service (our own service), lazy too.
+	parsianClient, err := parsianproxy.Dial(cfg.ParsianGRPCAddress)
+	if err != nil {
+		return nil, err
+	}
+	parsianAdapter, err := parsianproxy.New(parsianproxy.Options{
+		Enabled: cfg.ParsianEnabled,
+		Client:  parsianClient,
+		Timeout: cfg.ParsianTimeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	// providers.parsian.enabled: false wins over the mock, as for the other providers.
+	parsianMock := provider.MockSettings{Enable: dev && cfg.DebugMockParsianEnable && cfg.ParsianEnabled, ReturnType: cfg.DebugMockParsianReturnType}
+	if err := registerAdapter(registry, parsianAdapter, "Parsian", disabledNotice("parsian", "Parsian", cfg.ParsianEnabled),
+		parsianMock, parsianproxy.MockFixtures(), logger); err != nil {
+		return nil, err
+	}
 	return registry, nil
 }
 
 // registerAdapter wraps the adapter with its mock (provider.NewMock: off returns the adapter
 // itself) and adds it to the registry. title is the name of the provider in the warn lines (for
-// example "Qabzino"); the config keys use adapter.Name(). It writes one warn line when the mock is
+// example "Qabzino"); the config keys use adapter.Name() with "_" for "-" (the provider
+// "jiring-switch" has the key jiring_switch). It writes one warn line when the mock is
 // on, else one with notice when notice is not empty (the provider cannot work as configured). A
 // nil logger writes no line.
 func registerAdapter(registry *provider.Registry, adapter provider.ProviderInterface, title string, notice string, mock provider.MockSettings, fixtures provider.MockFixtures, logger Logger) error {
@@ -390,7 +437,7 @@ func registerAdapter(registry *provider.Registry, adapter provider.ProviderInter
 	var mockLog provider.MockLogger // nil: no line
 	if logger != nil {
 		mockLog = logger
-		name := adapter.Name()
+		name := strings.ReplaceAll(adapter.Name(), "-", "_")
 		switch {
 		case mock.Enable:
 			logger.Warn("provider mock enabled (debug.mocks."+name+"): development only, no call to the "+title+" backend", "return_type", mock.ReturnType)
@@ -415,7 +462,7 @@ func disabledNotice(name, title string, enabled bool) string {
 }
 
 // newInquiryFlow builds the inquiry flow (inquiry.Service) that every inquiry endpoint uses (water:
-// task 021; electricity: task 022; gas: task 023; the Irancell mobile bill: task 035, caching.irancell). It picks the provider with ProvidersService, answers from the
+// task 021; electricity: task 022; gas: task 023; the Irancell mobile bill: task 035, caching.irancell; the MCI mobile bill: task 036, caching.mobile). It picks the provider with ProvidersService, answers from the
 // saved inquiries of bill_inquiries when they are younger than the cache TTL of the bill type
 // (caching.water, caching.electricity, caching.gas; read at start), else calls the adapter of the provider and
 // saves the answer. With metrics on, each inquiry adds 1 to
@@ -431,7 +478,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 	if reg := metrics.Registry(); reg != nil {
 		inquiries := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_inquiries_total",
-			Help: "Bill inquiries by bill type (water, electricity, gas, irancell), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas request with billId and payId, answered from the two IDs with no provider).",
+			Help: "Bill inquiries by bill type (water, electricity, gas, irancell, mobile), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas request with billId and payId, answered from the two IDs with no provider).",
 		}, []string{"bill_type", "provider", "result"})
 		calls := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_provider_calls_total",
@@ -464,6 +511,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 		provider.BillTypeElectricity: cfg.CachingElectricity,
 		provider.BillTypeGas:         cfg.CachingGas,
 		provider.BillTypeIrancell:    cfg.CachingIrancell,
+		provider.BillTypeMobile:      cfg.CachingMobile,
 	}
 	return inquiry.NewService(inquiry.Options{
 		Repository:     postgres.NewInquiryRepository(db),
@@ -519,7 +567,7 @@ func newGas(flow *inquiry.Service, logger Logger) *grpcserver.Gas {
 	return grpcserver.NewGas(deps)
 }
 
-// newPhone builds the gRPC Phone service: POST /v1/mobile/inquiry (task 035: the Irancell operator)
+// newPhone builds the gRPC Phone service: POST /v1/mobile/inquiry (task 035: the Irancell operator; task 036: the MCI operator)
 // on the same inquiry flow as Water. A server fault writes one error log line (grpcserver.Phone).
 // A nil flow gives a service whose Inquiry answers Unimplemented.
 func newPhone(flow *inquiry.Service, logger Logger) *grpcserver.Phone {

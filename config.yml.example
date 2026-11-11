@@ -49,16 +49,16 @@ providers:
     timeout: "10s"           # limit of each call to the Qabzino backend; positive
     enabled: false           # false: Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply)
     token: ""                # Ayantech token (secret); the real value only in config.yml
-    electricity_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry"
-    gas_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry"
-    water_bill_endpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry"
+    electricity_bill_endpoint: "" # the real URL only in config.yml
+    gas_bill_endpoint: ""    # the real URL only in config.yml
+    water_bill_endpoint: ""  # the real URL only in config.yml
   tavanir:
     enabled: false           # false: every Tavanir call fails as "provider down", nothing is sent to Tavanir, the mock does not apply
     timeout: "10s"           # limit of each HTTP call to Tavanir (the login and the inquiry each); positive
-    auth_endpoint: "https://esrv.saapa.ir/api/Users/authenticate"
-    basic_branch_endpoint: "https://esrv.saapa.ir/api/ebills/getbranchdata"
-    bill_document_endpoint: "https://esrv.saapa.ir/api/ebills/GetLastBillDocument"
-    branch_debit_endpoint: "https://esrv.saapa.ir/api/ebills/getbranchdebit"
+    auth_endpoint: ""        # the real URL only in config.yml
+    basic_branch_endpoint: "" # the real URL only in config.yml
+    bill_document_endpoint: "" # the real URL only in config.yml
+    branch_debit_endpoint: "" # the real URL only in config.yml
     username: ""             # Tavanir (SAAPA) user name; the real value only in config.yml
     password: ""             # Tavanir (SAAPA) password (secret); the real value only in config.yml
     circuit_breaker:         # not used yet: no provider has a circuit breaker
@@ -87,12 +87,55 @@ providers:
         api_call_get_status: "0s"
         get_order_query: "0s"
         insert_order_query: "0s"
+  jiring_switch:             # the jiring-switch service (our own service); answers the MCI mobile bill (bill type mobile)
+    enabled: false           # false: every Jiring Switch call fails as "provider down", nothing is sent to the jiring-switch service, the mock does not apply
+    timeout: "10s"           # limit of each call to the jiring-switch service; positive
+    grpc_address: ""         # host:port of the internal gRPC server of the jiring-switch service (no TLS); empty: every call fails as "provider down"
+    name: ""                 # name of the provider (bill: jiringSwitch.name); not read yet
+    get_status:              # cron that asks the status of pending orders; not read yet (order flow)
+      name: ""
+      chunk: 0
+      start: "0s"
+      end: "0s"
+      cron_time: "0s"
+      lock_time: "0s"
+      is_lockable: false
+      reverse_deadline: "0s"
+      sync_operations:
+        api_call_get_status: "0s"
+        get_order_query: "0s"
+        insert_order_query: "0s"
+  parsian:                   # the parsian-v2 service (our own service); answers the MCI mobile bill (bill type mobile)
+    enabled: false           # false: every Parsian call fails as "provider down", nothing is sent to the parsian-v2 service, the mock does not apply
+    timeout: "10s"           # limit of each call to the parsian-v2 service; positive
+    grpc_address: ""         # host:port of the internal gRPC server of the parsian-v2 service (no TLS); empty: every call fails as "provider down"
+    name: ""                 # name of the provider (bill: parsian.name); not read yet
+    get_status:              # cron that asks the status of pending orders; not read yet (order flow)
+      name: ""
+      chunk: 0
+      start: "0s"
+      end: "0s"
+      cron_time: "0s"
+      lock_time: "0s"
+      is_lockable: false
+      reverse_deadline: "0s"
+      sync_operations:
+        api_call_get_status: "0s"
+        get_order_query: "0s"
+        insert_order_query: "0s"
+    settlement_inquiry_water: "0s"       # not read yet (settlement)
+    settlement_inquiry_electricity: "0s"
+    settlement_inquiry_gas: "0s"
+    settlement_inquiry_telephone: "0s"
+    settlement_inquiry_mci_mobile: "0s"
+    settlement_inquiry_rightel_mobile: "0s"
 
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
   electricity: "1h"          # how long a saved electricity inquiry answers the same bill with no provider call; 0: cache off
   gas: "1h"                  # how long a saved gas inquiry answers the same participate code with no provider call; 0: cache off
   irancell: "0s"             # how long a saved Irancell mobile inquiry answers the same phone with no provider call; 0: cache off (as bill)
+  mobile: "5h"               # how long a saved MCI mobile inquiry (bill type mobile) answers the same phone with no provider call; 0: cache off
 
 auth:
   secrets:
@@ -111,5 +154,11 @@ debug:
       enable: false
       return_type: "success" # "success" or "error"
     irancell:                # the Irancell mock: a fixed answer, no call to the irancell service
+      enable: false
+      return_type: "success" # "success" or "error"
+    jiring_switch:           # the Jiring Switch mock: a fixed answer, no call to the jiring-switch service
+      enable: false
+      return_type: "success" # "success" or "error"
+    parsian:                 # the Parsian mock: a fixed answer, no call to the parsian-v2 service
       enable: false
       return_type: "success" # "success" or "error"

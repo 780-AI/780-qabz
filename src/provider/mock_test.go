@@ -16,7 +16,8 @@ type stubAdapter struct {
 	calls int
 }
 
-func (s *stubAdapter) Name() string { return s.name }
+func (s *stubAdapter) Name() string                { return s.name }
+func (s *stubAdapter) SupportsInquiry(string) bool { return true }
 func (s *stubAdapter) Inquiry(context.Context, InquiryRequest) (*InquiryResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

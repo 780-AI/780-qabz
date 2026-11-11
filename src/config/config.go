@@ -107,6 +107,8 @@ type Config struct {
 	// QabzinoElectricityBillEndpoint, QabzinoGasBillEndpoint and QabzinoWaterBillEndpoint are the
 	// Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint and so on). Not checked. The
 	// water one (task 030) and the gas one (task 023) are read; the electricity one is unused so far.
+	// No default (task 036, operator): the real URLs are only in config.yml; an empty URL makes
+	// every call fail as "provider down".
 	QabzinoElectricityBillEndpoint string `path:"providers.qabzino.electricity_bill_endpoint"`
 	QabzinoGasBillEndpoint         string `path:"providers.qabzino.gas_bill_endpoint"`
 	QabzinoWaterBillEndpoint       string `path:"providers.qabzino.water_bill_endpoint"`
@@ -120,7 +122,8 @@ type Config struct {
 	// The config of the Tavanir adapter (task 033; the tavanir service: tavanir.authEndpoint and so
 	// on). The adapter (task 034) uses auth_endpoint, basic_branch_endpoint, username and password;
 	// bill_document_endpoint and branch_debit_endpoint are not used yet. The password is a Secret
-	// (never printed).
+	// (never printed). The endpoints have no default (task 036, operator): the real URLs are only in
+	// config.yml; an empty auth or basic branch URL makes every call fail as "provider down".
 	TavanirAuthEndpoint         string `path:"providers.tavanir.auth_endpoint"`
 	TavanirBasicBranchEndpoint  string `path:"providers.tavanir.basic_branch_endpoint"`
 	TavanirBillDocumentEndpoint string `path:"providers.tavanir.bill_document_endpoint"`
@@ -172,6 +175,61 @@ type Config struct {
 	IrancellGetStatusSyncGetOrder    time.Duration `path:"providers.irancell.get_status.sync_operations.get_order_query"`
 	IrancellGetStatusSyncInsertOrder time.Duration `path:"providers.irancell.get_status.sync_operations.insert_order_query"`
 
+	// The config of the Jiring Switch and the Parsian provider (task 036, the MCI mobile bill): each
+	// adapter (provider/jiring, provider/parsianproxy) is a gRPC client of our own service
+	// (jiring-switch, parsian-v2), as bill.
+	//   - <Provider>Enabled turns the provider on. False (the default): every call fails as "provider
+	//     down", nothing is sent to the service and the mock (debug.mocks.<provider>) does not apply.
+	//   - <Provider>Timeout limits each call to the service. Positive.
+	//   - <Provider>GRPCAddress is the host:port of the internal gRPC server of the service (no TLS,
+	//     as in bill). Empty: every call fails as "provider down".
+	// The config key of Jiring Switch is jiring_switch (the providers.name is "jiring-switch": the
+	// env generator scripts/yml_to_env rejects a key with a hyphen).
+	// The other keys are bill's keys of the two service clients (bill: jiringSwitch.* and
+	// parsian.*: name, the getStatus block, and for Parsian the settlementInquiry* durations), in the
+	// layout of this project, as for Irancell. They have no default (the real values are only in
+	// config.yml) and are not read yet: they belong to the order flow and its status cron. The three
+	// sync_operations keys are bill's list getStatus.syncOperations as three keys, as for Irancell.
+	// Not hot-reloadable.
+	JiringSwitchEnabled     bool          `path:"providers.jiring_switch.enabled"`
+	JiringSwitchTimeout     time.Duration `path:"providers.jiring_switch.timeout"`
+	JiringSwitchGRPCAddress string        `path:"providers.jiring_switch.grpc_address"`
+	ParsianEnabled          bool          `path:"providers.parsian.enabled"`
+	ParsianTimeout          time.Duration `path:"providers.parsian.timeout"`
+	ParsianGRPCAddress      string        `path:"providers.parsian.grpc_address"`
+
+	JiringSwitchName                     string        `path:"providers.jiring_switch.name"`
+	JiringSwitchGetStatusName            string        `path:"providers.jiring_switch.get_status.name"`
+	JiringSwitchGetStatusChunk           int           `path:"providers.jiring_switch.get_status.chunk"`
+	JiringSwitchGetStatusStart           time.Duration `path:"providers.jiring_switch.get_status.start"`
+	JiringSwitchGetStatusEnd             time.Duration `path:"providers.jiring_switch.get_status.end"`
+	JiringSwitchGetStatusCronTime        time.Duration `path:"providers.jiring_switch.get_status.cron_time"`
+	JiringSwitchGetStatusLockTime        time.Duration `path:"providers.jiring_switch.get_status.lock_time"`
+	JiringSwitchGetStatusIsLockable      bool          `path:"providers.jiring_switch.get_status.is_lockable"`
+	JiringSwitchGetStatusReverseDeadline time.Duration `path:"providers.jiring_switch.get_status.reverse_deadline"`
+	JiringSwitchGetStatusSyncAPICall     time.Duration `path:"providers.jiring_switch.get_status.sync_operations.api_call_get_status"`
+	JiringSwitchGetStatusSyncGetOrder    time.Duration `path:"providers.jiring_switch.get_status.sync_operations.get_order_query"`
+	JiringSwitchGetStatusSyncInsertOrder time.Duration `path:"providers.jiring_switch.get_status.sync_operations.insert_order_query"`
+
+	ParsianName                           string        `path:"providers.parsian.name"`
+	ParsianGetStatusName                  string        `path:"providers.parsian.get_status.name"`
+	ParsianGetStatusChunk                 int           `path:"providers.parsian.get_status.chunk"`
+	ParsianGetStatusStart                 time.Duration `path:"providers.parsian.get_status.start"`
+	ParsianGetStatusEnd                   time.Duration `path:"providers.parsian.get_status.end"`
+	ParsianGetStatusCronTime              time.Duration `path:"providers.parsian.get_status.cron_time"`
+	ParsianGetStatusLockTime              time.Duration `path:"providers.parsian.get_status.lock_time"`
+	ParsianGetStatusIsLockable            bool          `path:"providers.parsian.get_status.is_lockable"`
+	ParsianGetStatusReverseDeadline       time.Duration `path:"providers.parsian.get_status.reverse_deadline"`
+	ParsianGetStatusSyncAPICall           time.Duration `path:"providers.parsian.get_status.sync_operations.api_call_get_status"`
+	ParsianGetStatusSyncGetOrder          time.Duration `path:"providers.parsian.get_status.sync_operations.get_order_query"`
+	ParsianGetStatusSyncInsertOrder       time.Duration `path:"providers.parsian.get_status.sync_operations.insert_order_query"`
+	ParsianSettlementInquiryWater         time.Duration `path:"providers.parsian.settlement_inquiry_water"`
+	ParsianSettlementInquiryElectricity   time.Duration `path:"providers.parsian.settlement_inquiry_electricity"`
+	ParsianSettlementInquiryGas           time.Duration `path:"providers.parsian.settlement_inquiry_gas"`
+	ParsianSettlementInquiryTelephone     time.Duration `path:"providers.parsian.settlement_inquiry_telephone"`
+	ParsianSettlementInquiryMCIMobile     time.Duration `path:"providers.parsian.settlement_inquiry_mci_mobile"`
+	ParsianSettlementInquiryRightelMobile time.Duration `path:"providers.parsian.settlement_inquiry_rightel_mobile"`
+
 	// CachingWater is how long a saved water inquiry answers the same bill again with no provider
 	// call (bill: caching.water, 1h). 0 turns the cache off; a negative value is rejected. Not
 	// hot-reloadable (task 021, decision 1): read at start.
@@ -189,6 +247,10 @@ type Config struct {
 	// so every request asks Irancell (task 035, decision A). A negative value is rejected. Not
 	// hot-reloadable (as caching.water): read at start.
 	CachingIrancell time.Duration `path:"caching.irancell"`
+	// CachingMobile is how long a saved MCI mobile inquiry (the bill type mobile) answers the same
+	// phone again with no provider call (bill: caching.mobile, 5h). 0 turns the cache off; a
+	// negative value is rejected. Not hot-reloadable (task 036, as caching.water): read at start.
+	CachingMobile time.Duration `path:"caching.mobile"`
 
 	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -211,6 +273,15 @@ type Config struct {
 	// DebugMockIrancellReturnType is the answer of the Irancell mock: MockReturnSuccess or
 	// MockReturnError. It has no effect while the mock is off. Development only.
 	DebugMockIrancellReturnType string `path:"debug.mocks.irancell.return_type"`
+
+	// DebugMockJiringSwitchEnable and DebugMockParsianEnable make the Jiring Switch and the Parsian
+	// adapter answer with a fixed answer, with no call to the jiring-switch or the parsian-v2
+	// service (task 036). Development only, as DebugMockQabzinoEnable. Not hot-reloadable. The
+	// return types are MockReturnSuccess or MockReturnError; no effect while the mock is off.
+	DebugMockJiringSwitchEnable     bool   `path:"debug.mocks.jiring_switch.enable"`
+	DebugMockJiringSwitchReturnType string `path:"debug.mocks.jiring_switch.return_type"`
+	DebugMockParsianEnable          bool   `path:"debug.mocks.parsian.enable"`
+	DebugMockParsianReturnType      string `path:"debug.mocks.parsian.return_type"`
 }
 
 func defaults() Config {
@@ -233,16 +304,11 @@ func defaults() Config {
 
 		ProvidersLoadInterval: time.Minute,
 
-		QabzinoTimeout:                 10 * time.Second,
-		QabzinoElectricityBillEndpoint: "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry",
-		QabzinoGasBillEndpoint:         "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry",
-		QabzinoWaterBillEndpoint:       "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry",
-		TavanirTimeout:                 10 * time.Second,
-		IrancellTimeout:                10 * time.Second,
-		TavanirAuthEndpoint:            "https://esrv.saapa.ir/api/Users/authenticate",
-		TavanirBasicBranchEndpoint:     "https://esrv.saapa.ir/api/ebills/getbranchdata",
-		TavanirBillDocumentEndpoint:    "https://esrv.saapa.ir/api/ebills/GetLastBillDocument",
-		TavanirBranchDebitEndpoint:     "https://esrv.saapa.ir/api/ebills/getbranchdebit",
+		QabzinoTimeout:      10 * time.Second,
+		TavanirTimeout:      10 * time.Second,
+		IrancellTimeout:     10 * time.Second,
+		JiringSwitchTimeout: 10 * time.Second,
+		ParsianTimeout:      10 * time.Second,
 
 		TavanirCircuitBreakerName:         "tavanir",
 		TavanirCircuitBreakerMaxRequests:  100000,
@@ -252,9 +318,12 @@ func defaults() Config {
 		CachingWater:                      time.Hour,
 		CachingElectricity:                time.Hour,
 		CachingGas:                        time.Hour,
+		CachingMobile:                     5 * time.Hour,
 		DebugMockQabzinoReturnType:        MockReturnSuccess,
 		DebugMockTavanirReturnType:        MockReturnSuccess,
 		DebugMockIrancellReturnType:       MockReturnSuccess,
+		DebugMockJiringSwitchReturnType:   MockReturnSuccess,
+		DebugMockParsianReturnType:        MockReturnSuccess,
 	}
 }
 
@@ -348,6 +417,21 @@ func (c Config) validate() error {
 	}
 	if !ValidMockReturnType(c.DebugMockIrancellReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.irancell.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
+	}
+	if c.JiringSwitchTimeout <= 0 {
+		errs = append(errs, errors.New("providers.jiring_switch.timeout must be a positive duration (for example 10s)"))
+	}
+	if c.ParsianTimeout <= 0 {
+		errs = append(errs, errors.New("providers.parsian.timeout must be a positive duration (for example 10s)"))
+	}
+	if c.CachingMobile < 0 {
+		errs = append(errs, errors.New("caching.mobile must not be negative (0 turns the cache off)"))
+	}
+	if !ValidMockReturnType(c.DebugMockJiringSwitchReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.jiring_switch.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
+	}
+	if !ValidMockReturnType(c.DebugMockParsianReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.parsian.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if c.CachingWater < 0 {
 		errs = append(errs, errors.New("caching.water must not be negative (0 turns the cache off)"))

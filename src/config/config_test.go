@@ -493,8 +493,8 @@ func TestTavanirMockSectionOnlyInDev(t *testing.T) {
 	}
 }
 
-// TestParseQabzinoProviderKeys (task 029): the Qabzino token and bill endpoints have their
-// defaults, take their values, and the token never prints.
+// TestParseQabzinoProviderKeys (task 029): the Qabzino token and bill endpoints have no default
+// (task 036: the real URLs are only in config.yml), take their values, and the token never prints.
 func TestParseQabzinoProviderKeys(t *testing.T) {
 	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
 	c, err := Parse([]byte(base))
@@ -503,9 +503,9 @@ func TestParseQabzinoProviderKeys(t *testing.T) {
 	}
 	assert.False(t, c.QabzinoEnabled, "Qabzino is disabled by default (task 030)")
 	assert.Equal(t, "", c.QabzinoToken.Reveal(), "default token is empty")
-	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry", c.QabzinoElectricityBillEndpoint)
-	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry", c.QabzinoGasBillEndpoint)
-	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry", c.QabzinoWaterBillEndpoint)
+	assert.Empty(t, c.QabzinoElectricityBillEndpoint)
+	assert.Empty(t, c.QabzinoGasBillEndpoint)
+	assert.Empty(t, c.QabzinoWaterBillEndpoint)
 
 	c, err = Parse([]byte(base + `providers: {qabzino: {enabled: true, token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", water_bill_endpoint: "http://w"}}
 `))
@@ -520,18 +520,18 @@ func TestParseQabzinoProviderKeys(t *testing.T) {
 	}
 }
 
-// TestParseTavanirProviderKeys (task 033): the Tavanir endpoints, credentials and circuit breaker
-// have their defaults, take their values, and the password never prints.
+// TestParseTavanirProviderKeys (task 033): the Tavanir endpoints (no default since task 036),
+// credentials and circuit breaker have their defaults, take their values, and the password never prints.
 func TestParseTavanirProviderKeys(t *testing.T) {
 	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
 	c, err := Parse([]byte(base))
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Equal(t, "https://esrv.saapa.ir/api/Users/authenticate", c.TavanirAuthEndpoint)
-	assert.Equal(t, "https://esrv.saapa.ir/api/ebills/getbranchdata", c.TavanirBasicBranchEndpoint)
-	assert.Equal(t, "https://esrv.saapa.ir/api/ebills/GetLastBillDocument", c.TavanirBillDocumentEndpoint)
-	assert.Equal(t, "https://esrv.saapa.ir/api/ebills/getbranchdebit", c.TavanirBranchDebitEndpoint)
+	assert.Empty(t, c.TavanirAuthEndpoint)
+	assert.Empty(t, c.TavanirBasicBranchEndpoint)
+	assert.Empty(t, c.TavanirBillDocumentEndpoint)
+	assert.Empty(t, c.TavanirBranchDebitEndpoint)
 	assert.Equal(t, "", c.TavanirUsername)
 	assert.Equal(t, "", c.TavanirPassword.Reveal(), "default password is empty")
 	assert.Equal(t, "tavanir", c.TavanirCircuitBreakerName)
@@ -611,7 +611,7 @@ func TestParseGasInquiryKeys(t *testing.T) {
 		return
 	}
 	assert.Equal(t, time.Hour, c.CachingGas, "default cache TTL (bill: caching.gas 1h)")
-	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry", c.QabzinoGasBillEndpoint)
+	assert.Empty(t, c.QabzinoGasBillEndpoint)
 
 	c, err = Parse([]byte(base + "caching: {gas: \"0s\"}\nproviders: {qabzino: {gas_bill_endpoint: \"http://127.0.0.1:1/gas\"}}\n"))
 	if assert.NoError(t, err) {
@@ -628,4 +628,102 @@ func TestParseGasInquiryKeys(t *testing.T) {
 	assert.ErrorContains(t, err, "caching.gas must not be negative")
 	_, err = Parse([]byte(base + "caching: {gas: \"soon\"}\n"))
 	assert.Error(t, err)
+}
+
+// TestParseMCIProviderKeys (task 036): the Jiring Switch and the Parsian keys, caching.mobile and
+// the two mocks have their defaults, take their values, and a bad value names its key.
+func TestParseMCIProviderKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.False(t, c.JiringSwitchEnabled, "default: off")
+	assert.False(t, c.ParsianEnabled, "default: off")
+	assert.Equal(t, []time.Duration{10 * time.Second, 10 * time.Second, 5 * time.Hour},
+		[]time.Duration{c.JiringSwitchTimeout, c.ParsianTimeout, c.CachingMobile}, "defaults (bill: caching.mobile 5h)")
+	assert.Equal(t, []string{"", ""}, []string{c.JiringSwitchGRPCAddress, c.ParsianGRPCAddress})
+	assert.False(t, c.DebugMockJiringSwitchEnable)
+	assert.False(t, c.DebugMockParsianEnable)
+	assert.Equal(t, []string{MockReturnSuccess, MockReturnSuccess}, []string{c.DebugMockJiringSwitchReturnType, c.DebugMockParsianReturnType})
+
+	c, err = Parse([]byte(base + `providers: {jiring_switch: {enabled: true, timeout: "3s", grpc_address: "jiring-switch:8082"}, parsian: {enabled: true, timeout: "4s", grpc_address: "parsian-v2:8083"}}
+caching: {mobile: "0s"}
+debug: {mocks: {jiring_switch: {enable: true, return_type: error}, parsian: {enable: true, return_type: success}}}
+`))
+	if assert.NoError(t, err) {
+		assert.True(t, c.JiringSwitchEnabled)
+		assert.True(t, c.ParsianEnabled)
+		assert.Equal(t, []time.Duration{3 * time.Second, 4 * time.Second, 0},
+			[]time.Duration{c.JiringSwitchTimeout, c.ParsianTimeout, c.CachingMobile}, "0 turns the cache off")
+		assert.Equal(t, []string{"jiring-switch:8082", "parsian-v2:8083"}, []string{c.JiringSwitchGRPCAddress, c.ParsianGRPCAddress})
+		assert.True(t, c.DebugMockJiringSwitchEnable)
+		assert.True(t, c.DebugMockParsianEnable)
+		assert.Equal(t, []string{MockReturnError, MockReturnSuccess}, []string{c.DebugMockJiringSwitchReturnType, c.DebugMockParsianReturnType})
+		assert.Equal(t, time.Hour, c.CachingWater, "the other cache keys keep their defaults")
+	}
+
+	for yml, want := range map[string]string{
+		"providers: {jiring_switch: {timeout: \"0s\"}}\n":         "providers.jiring_switch.timeout",
+		"providers: {parsian: {timeout: \"-1s\"}}\n":              "providers.parsian.timeout",
+		"caching: {mobile: \"-1s\"}\n":                            "caching.mobile must not be negative",
+		"debug: {mocks: {jiring_switch: {return_type: maybe}}}\n": "debug.mocks.jiring_switch.return_type",
+		"debug: {mocks: {parsian: {return_type: maybe}}}\n":       "debug.mocks.parsian.return_type",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+}
+
+// TestParseJiringSwitchAndParsianBillKeys (task 036): bill's keys of the jiring-switch and the
+// parsian-v2 service clients have no default, take their values, and a wrong type names the key.
+func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, []string{"", "", "", ""}, []string{c.JiringSwitchName, c.JiringSwitchGetStatusName, c.ParsianName, c.ParsianGetStatusName})
+	for _, d := range []time.Duration{
+		c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
+		c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder,
+		c.ParsianGetStatusStart, c.ParsianGetStatusEnd, c.ParsianGetStatusCronTime, c.ParsianGetStatusLockTime,
+		c.ParsianGetStatusReverseDeadline, c.ParsianGetStatusSyncAPICall, c.ParsianGetStatusSyncGetOrder, c.ParsianGetStatusSyncInsertOrder,
+		c.ParsianSettlementInquiryWater, c.ParsianSettlementInquiryElectricity, c.ParsianSettlementInquiryGas,
+		c.ParsianSettlementInquiryTelephone, c.ParsianSettlementInquiryMCIMobile, c.ParsianSettlementInquiryRightelMobile,
+	} {
+		assert.Zero(t, d)
+	}
+	assert.Zero(t, c.JiringSwitchGetStatusChunk)
+	assert.Zero(t, c.ParsianGetStatusChunk)
+	assert.False(t, c.JiringSwitchGetStatusIsLockable)
+	assert.False(t, c.ParsianGetStatusIsLockable)
+
+	status := `get_status: {name: "%s-getstatus", chunk: 100, start: "30m", end: "10h", cron_time: "15m", lock_time: "30m", is_lockable: true, reverse_deadline: "10h", sync_operations: {api_call_get_status: "30s", get_order_query: "3ms", insert_order_query: "4ms"}}`
+	yml := base + "providers:\n" +
+		"  jiring_switch: {name: \"jiring-switch\", grpc_address: \"jiring-switch:8084\", " + fmt.Sprintf(status, "jiring-switch") + "}\n" +
+		"  parsian: {name: \"parsian\", grpc_address: \"parsian-v2:8084\", " + fmt.Sprintf(status, "parsian") +
+		", settlement_inquiry_water: \"360h\", settlement_inquiry_electricity: \"361h\", settlement_inquiry_gas: \"362h\", settlement_inquiry_telephone: \"363h\", settlement_inquiry_mci_mobile: \"0s\", settlement_inquiry_rightel_mobile: \"364h\"}\n"
+	c, err = Parse([]byte(yml))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, []string{"jiring-switch", "jiring-switch:8084", "jiring-switch-getstatus", "parsian", "parsian-v2:8084", "parsian-getstatus"},
+		[]string{c.JiringSwitchName, c.JiringSwitchGRPCAddress, c.JiringSwitchGetStatusName, c.ParsianName, c.ParsianGRPCAddress, c.ParsianGetStatusName})
+	want := []time.Duration{30 * time.Minute, 10 * time.Hour, 15 * time.Minute, 30 * time.Minute, 10 * time.Hour, 30 * time.Second, 3 * time.Millisecond, 4 * time.Millisecond}
+	assert.Equal(t, want, []time.Duration{c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
+		c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder})
+	assert.Equal(t, want, []time.Duration{c.ParsianGetStatusStart, c.ParsianGetStatusEnd, c.ParsianGetStatusCronTime, c.ParsianGetStatusLockTime,
+		c.ParsianGetStatusReverseDeadline, c.ParsianGetStatusSyncAPICall, c.ParsianGetStatusSyncGetOrder, c.ParsianGetStatusSyncInsertOrder})
+	assert.Equal(t, []time.Duration{360 * time.Hour, 361 * time.Hour, 362 * time.Hour, 363 * time.Hour, 0, 364 * time.Hour},
+		[]time.Duration{c.ParsianSettlementInquiryWater, c.ParsianSettlementInquiryElectricity, c.ParsianSettlementInquiryGas,
+			c.ParsianSettlementInquiryTelephone, c.ParsianSettlementInquiryMCIMobile, c.ParsianSettlementInquiryRightelMobile})
+	assert.Equal(t, []int{100, 100}, []int{c.JiringSwitchGetStatusChunk, c.ParsianGetStatusChunk})
+	assert.True(t, c.JiringSwitchGetStatusIsLockable)
+	assert.True(t, c.ParsianGetStatusIsLockable)
+
+	_, err = Parse([]byte(base + "providers: {parsian: {settlement_inquiry_gas: \"soon\"}}\n"))
+	assert.ErrorContains(t, err, "providers.parsian.settlement_inquiry_gas")
+	_, err = Parse([]byte(base + "providers: {jiring_switch: {get_status: {chunk: \"many\"}}}\n"))
+	assert.ErrorContains(t, err, "providers.jiring_switch.get_status.chunk")
 }

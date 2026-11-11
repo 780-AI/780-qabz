@@ -150,6 +150,11 @@ func New(opts Options) (*Adapter, error) {
 // Name returns Name.
 func (a *Adapter) Name() string { return Name }
 
+// SupportsInquiry reports whether Inquiry answers the bill type: only the electricity bill (task 036).
+func (a *Adapter) SupportsInquiry(billType string) bool {
+	return billType == provider.BillTypeElectricity
+}
+
 // Enabled reports providers.tavanir.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
@@ -202,7 +207,7 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	if a == nil || a.client == nil || a.login == nil {
 		return nil, errors.New("tavanir: adapter not created with New")
 	}
-	if req.BillType != provider.BillTypeElectricity {
+	if !a.SupportsInquiry(req.BillType) {
 		return nil, fmt.Errorf("tavanir: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
 	if !a.enabled {

@@ -12,6 +12,8 @@ const (
 	BillTypeGas         = "gas"
 	// BillTypeIrancell is the bill type of an Irancell mobile bill (bill: entity.Irancell; task 035).
 	BillTypeIrancell = "irancell"
+	// BillTypeMobile is the bill type of an MCI mobile bill (bill: entity.MOBILE; task 036).
+	BillTypeMobile = "mobile"
 
 	ActionInquiry = "inquiry"
 
@@ -50,6 +52,13 @@ type InquiryItem struct {
 	Amount          uint64 // rials
 	PaymentDeadline string // as the provider sends it
 	InquiryType     string // "regular" for a water, an electricity and a gas bill; InquiryTypeMidterm or InquiryTypeFinalTerm for a mobile bill
+}
+
+// NoDebtMobileInquiries returns the inquiries of a mobile bill with no debt (bill:
+// handlePhoneResponseWithoutInquiry): a mid-term and a final-term inquiry of amount 0. The slice is
+// new on each call.
+func NoDebtMobileInquiries() []InquiryItem {
+	return []InquiryItem{{InquiryType: InquiryTypeMidterm}, {InquiryType: InquiryTypeFinalTerm}}
 }
 
 // ElectricityDetails are the details of an electricity inquiry (bill: gateway/inquiry
@@ -119,6 +128,11 @@ type (
 type ProviderInterface interface {
 	// Name is the providers.name of the provider (for example "qabzino").
 	Name() string
+	// SupportsInquiry reports whether Inquiry answers the bill type (for example "water"). A
+	// providers row can name the provider for a bill type that its adapter does not inquire (the
+	// seed has parsian for water and gas, its adapter answers only "mobile"): the inquiry flow then
+	// does not call Inquiry and answers as for a provider with no adapter (task 036).
+	SupportsInquiry(billType string) bool
 	Inquiry(ctx context.Context, req InquiryRequest) (*InquiryResponse, error)
 	Pay(ctx context.Context, req PaymentRequest) (*PaymentResponse, error)
 	Status(ctx context.Context, req StatusRequest) (*StatusResponse, error)

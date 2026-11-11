@@ -129,9 +129,14 @@ type stubProvider struct {
 	calls int
 	reqs  []provider.InquiryRequest
 	run   func(ctx context.Context)
+	// unsupported is a bill type that SupportsInquiry refuses ("": every bill type is supported).
+	unsupported string
 }
 
 func (s *stubProvider) Name() string { return s.name }
+func (s *stubProvider) SupportsInquiry(billType string) bool {
+	return s.unsupported == "" || billType != s.unsupported
+}
 func (s *stubProvider) Inquiry(ctx context.Context, req provider.InquiryRequest) (*provider.InquiryResponse, error) {
 	s.calls++
 	s.reqs = append(s.reqs, req)
@@ -429,6 +434,22 @@ func TestNoAdapter(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoAdapter, "a nil adapter")
 }
 
+// An adapter that does not inquire the bill type (task 036: the seed picks parsian for water, its
+// adapter answers only mobile) gives the answer of no adapter: no call, no row, and a valid saved
+// row of the provider does not answer.
+func TestAdapterDoesNotSupportBillType(t *testing.T) {
+	r := newRig(t, time.Hour)
+	r.prov.unsupported = provider.BillTypeWater
+	r.repo.seed(Row{ID: "x", InquiryID: validBill, ProviderID: 36, BillID: validBill, PayID: "p"}, time.Second, false)
+	_, err := r.ask(userA)
+	assert.ErrorIs(t, err, ErrNoAdapter)
+	assert.ErrorContains(t, err, `"qabzino" for the bill type "water"`)
+	assert.Equal(t, []string{"water/qabzino/error"}, r.inquiry)
+	assert.Equal(t, 0, r.prov.calls, "Inquiry is not called")
+	assert.Empty(t, r.repo.order, "no request row, no saved inquiry")
+	assert.Empty(t, r.calls, "no provider call is counted")
+}
+
 func TestProviderDown(t *testing.T) {
 	r := newRig(t, time.Hour)
 	r.prov.resp, r.prov.err = nil, errors.Join(provider.ErrProviderDown, errors.New("connection refused"))
@@ -613,7 +634,7 @@ func TestGenerateTID(t *testing.T) {
 		seen[tid] = true
 	}
 	assert.Greater(t, len(seen), 40, "random")
-	_, err := generateTID("mobile")
+	_, err := generateTID("tel")
 	assert.Error(t, err)
 }
 
@@ -647,7 +668,8 @@ type safeProvider struct {
 	calls int
 }
 
-func (*safeProvider) Name() string { return "qabzino" }
+func (*safeProvider) Name() string                { return "qabzino" }
+func (*safeProvider) SupportsInquiry(string) bool { return true }
 func (s *safeProvider) Inquiry(context.Context, provider.InquiryRequest) (*provider.InquiryResponse, error) {
 	s.mu.Lock()
 	s.calls++
