@@ -559,3 +559,31 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 	_, err = Parse([]byte(base + "providers: {tavanir: {circuit_breaker: {failure_ratio: 100}}}\n"))
 	assert.NoError(t, err, "100 is valid")
 }
+
+// TestParseGasInquiryKeys (task 023): caching.gas has its default, takes its value and is checked;
+// it does not depend on the water and electricity keys. The gas endpoint of Qabzino is read.
+func TestParseGasInquiryKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, time.Hour, c.CachingGas, "default cache TTL (bill: caching.gas 1h)")
+	assert.Equal(t, "https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry", c.QabzinoGasBillEndpoint)
+
+	c, err = Parse([]byte(base + "caching: {gas: \"0s\"}\nproviders: {qabzino: {gas_bill_endpoint: \"http://127.0.0.1:1/gas\"}}\n"))
+	if assert.NoError(t, err) {
+		assert.Equal(t, time.Duration(0), c.CachingGas, "0 turns the cache off")
+		assert.Equal(t, "http://127.0.0.1:1/gas", c.QabzinoGasBillEndpoint)
+		assert.Equal(t, time.Hour, c.CachingWater, "the other TTLs keep their defaults")
+		assert.Equal(t, time.Hour, c.CachingElectricity)
+	}
+	c, err = Parse([]byte(base + "caching: {gas: \"90m\", water: \"5m\", electricity: \"7m\"}\n"))
+	if assert.NoError(t, err) {
+		assert.Equal(t, []time.Duration{90 * time.Minute, 5 * time.Minute, 7 * time.Minute}, []time.Duration{c.CachingGas, c.CachingWater, c.CachingElectricity})
+	}
+	_, err = Parse([]byte(base + "caching: {gas: \"-1s\"}\n"))
+	assert.ErrorContains(t, err, "caching.gas must not be negative")
+	_, err = Parse([]byte(base + "caching: {gas: \"soon\"}\n"))
+	assert.Error(t, err)
+}

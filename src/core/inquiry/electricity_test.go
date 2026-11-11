@@ -218,8 +218,8 @@ func TestTwoBillTypesOneService(t *testing.T) {
 	if assert.NotEmpty(t, r.inquiry) {
 		assert.Equal(t, "electricity/none/no_provider", r.inquiry[len(r.inquiry)-1])
 	}
-	_, err = r.ask("gas", userA)
-	assert.ErrorContains(t, err, `unsupported bill type "gas"`)
+	_, err = r.ask("mobile", userA)
+	assert.ErrorContains(t, err, `unsupported bill type "mobile"`)
 }
 
 func TestGenerateTIDElectricity(t *testing.T) {

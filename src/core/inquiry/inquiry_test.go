@@ -613,7 +613,7 @@ func TestGenerateTID(t *testing.T) {
 		seen[tid] = true
 	}
 	assert.Greater(t, len(seen), 40, "random")
-	_, err := generateTID("gas")
+	_, err := generateTID("mobile")
 	assert.Error(t, err)
 }
 

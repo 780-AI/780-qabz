@@ -105,8 +105,8 @@ type Config struct {
 	// the direct Qabzino adapter (task 030).
 	QabzinoToken Secret `path:"providers.qabzino.token"`
 	// QabzinoElectricityBillEndpoint, QabzinoGasBillEndpoint and QabzinoWaterBillEndpoint are the
-	// Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint and so on). Not checked. Only the
-	// water one is read (task 030); the electricity and gas ones are unused so far.
+	// Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint and so on). Not checked. The
+	// water one (task 030) and the gas one (task 023) are read; the electricity one is unused so far.
 	QabzinoElectricityBillEndpoint string `path:"providers.qabzino.electricity_bill_endpoint"`
 	QabzinoGasBillEndpoint         string `path:"providers.qabzino.gas_bill_endpoint"`
 	QabzinoWaterBillEndpoint       string `path:"providers.qabzino.water_bill_endpoint"`
@@ -144,6 +144,10 @@ type Config struct {
 	// no provider call (bill: caching.electricity, 1h). 0 turns the cache off; a negative value is
 	// rejected. Not hot-reloadable (task 022, as caching.water): read at start.
 	CachingElectricity time.Duration `path:"caching.electricity"`
+	// CachingGas is how long a saved gas inquiry answers the same participate code again with no
+	// provider call (bill: caching.gas, 1h). 0 turns the cache off; a negative value is rejected.
+	// Not hot-reloadable (task 023, as caching.water): read at start.
+	CachingGas time.Duration `path:"caching.gas"`
 
 	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -198,6 +202,7 @@ func defaults() Config {
 		TavanirCircuitBreakerFailureRatio: 99,
 		CachingWater:                      time.Hour,
 		CachingElectricity:                time.Hour,
+		CachingGas:                        time.Hour,
 		DebugMockQabzinoReturnType:        MockReturnSuccess,
 		DebugMockTavanirReturnType:        MockReturnSuccess,
 	}
@@ -290,6 +295,9 @@ func (c Config) validate() error {
 	}
 	if c.CachingElectricity < 0 {
 		errs = append(errs, errors.New("caching.electricity must not be negative (0 turns the cache off)"))
+	}
+	if c.CachingGas < 0 {
+		errs = append(errs, errors.New("caching.gas must not be negative (0 turns the cache off)"))
 	}
 	if !ValidMockReturnType(c.DebugMockQabzinoReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.qabzino.return_type must be %q or %q", MockReturnSuccess, MockReturnError))

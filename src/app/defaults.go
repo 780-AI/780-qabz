@@ -96,7 +96,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	water, electricity := newWater(flow, logger), newElectricity(flow, logger)
+	water, electricity, gas := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger)
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
 	opts, err := newRequestMetrics(metrics)
 	if err != nil {
@@ -104,7 +104,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		return nil, err
 	}
 	opts = append(opts, authCheck.ServerOptions()...)
-	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity))
+	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity), grpcserver.RegisterGas(gas))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
 	}
@@ -112,7 +112,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler, pb.RegisterMyBillsHandler, pb.RegisterWaterHandler, pb.RegisterElectricityHandler)
+	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler, pb.RegisterMyBillsHandler, pb.RegisterWaterHandler, pb.RegisterElectricityHandler, pb.RegisterGasHandler)
 	if err == nil && gw == nil {
 		err = errors.New("http gateway: New returned nil")
 	}
@@ -305,8 +305,8 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 }
 
 // newProviderRegistry builds the provider adapters: Qabzino (task 021; since task 030 the direct
-// HTTP adapter with providers.qabzino.enabled, token, water_bill_endpoint and timeout, not the gRPC
-// QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
+// HTTP adapter with providers.qabzino.enabled, token, water_bill_endpoint, gas_bill_endpoint (task
+// 023) and timeout, not the gRPC QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
 // endpoints with providers.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
 // and timeout; it calls no other service). The mock of a provider
 // (debug.mocks.<provider>) is applied only when Config.Mode is dev and its enable key is true (one
@@ -321,6 +321,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		Enabled:       cfg.QabzinoEnabled,
 		Token:         cfg.QabzinoToken.Reveal(),
 		WaterEndpoint: cfg.QabzinoWaterBillEndpoint,
+		GasEndpoint:   cfg.QabzinoGasBillEndpoint,
 		Timeout:       cfg.QabzinoTimeout,
 	})
 	if err != nil {
@@ -391,12 +392,12 @@ func disabledNotice(name, title string, enabled bool) string {
 }
 
 // newInquiryFlow builds the inquiry flow (inquiry.Service) that every inquiry endpoint uses (water:
-// task 021; electricity: task 022). It picks the provider with ProvidersService, answers from the
+// task 021; electricity: task 022; gas: task 023). It picks the provider with ProvidersService, answers from the
 // saved inquiries of bill_inquiries when they are younger than the cache TTL of the bill type
-// (caching.water, caching.electricity; read at start), else calls the adapter of the provider and
+// (caching.water, caching.electricity, caching.gas; read at start), else calls the adapter of the provider and
 // saves the answer. With metrics on, each inquiry adds 1 to
 // qabz_inquiries_total{bill_type,provider,result} (result: db_hit, provider_ok, provider_refused,
-// provider_down, no_provider, canceled, error; provider "none" when no provider was picked); each
+// provider_down, no_provider, canceled, error, raw; provider "none" when no provider was picked); each
 // provider call adds 1 to qabz_provider_calls_total{provider,action,result} (ok, refused, down,
 // canceled, error) and observes qabz_provider_call_duration_ms{provider,action}. Rejected calls are
 // in the code label of qabz_request_duration_ms. A failed lookup or copy or save of inquiries
@@ -407,7 +408,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 	if reg := metrics.Registry(); reg != nil {
 		inquiries := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_inquiries_total",
-			Help: "Bill inquiries by bill type (water, electricity), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error).",
+			Help: "Bill inquiries by bill type (water, electricity, gas), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas request with billId and payId, answered from the two IDs with no provider).",
 		}, []string{"bill_type", "provider", "result"})
 		calls := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_provider_calls_total",
@@ -438,6 +439,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 	ttl := map[string]time.Duration{
 		provider.BillTypeWater:       cfg.CachingWater,
 		provider.BillTypeElectricity: cfg.CachingElectricity,
+		provider.BillTypeGas:         cfg.CachingGas,
 	}
 	return inquiry.NewService(inquiry.Options{
 		Repository:     postgres.NewInquiryRepository(db),
@@ -476,6 +478,21 @@ func newElectricity(flow *inquiry.Service, logger Logger) *grpcserver.Electricit
 		deps.Logger = logger
 	}
 	return grpcserver.NewElectricity(deps)
+}
+
+// newGas builds the gRPC Gas service: POST /v1/gas/inquiry (task 023) on the same inquiry flow as
+// Water; the flow also answers the raw inquiry (a request with billId and payId). A server fault writes one error log line (grpcserver.Gas). A nil flow gives a service
+// whose Inquiry answers Unimplemented.
+func newGas(flow *inquiry.Service, logger Logger) *grpcserver.Gas {
+	deps := grpcserver.GasDeps{}
+	if flow != nil {
+		deps.Inquiry = flow
+		deps.Raw = flow
+	}
+	if logger != nil {
+		deps.Logger = logger
+	}
+	return grpcserver.NewGas(deps)
 }
 
 // newRequestMetrics returns the gRPC server options that measure every call (and so every gateway

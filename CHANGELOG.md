@@ -1,7 +1,8 @@
-<!-- VERSION: 3.2 -->
-<!-- Last Updated: 2026-11-10 -->
+<!-- VERSION: 3.3 -->
+<!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.3 — 2026-11-11 — Added 023-gas-inquiry-endpoint entry.
 v3.2 — 2026-11-10 — Added session-wrap-up (tasks 033 and 034 session) entry.
 v3.1 — 2026-11-10 — Added 034-tavanir-direct-provider entry.
 v3.0 — 2026-11-10 — Added 033-tavanir-provider-config entry.
@@ -118,6 +119,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Task 023: `POST /v1/gas/inquiry`, the Qabzino adapter inquires gas
+- **Type:** Major (new endpoint, domain logic, config key, Critical File `system.html`)
+- **Files:** `src/entry/grpc/gas.go` (new: `Gas.Inquiry`, bill's request check, the participate code as the inquiry ID, the raw inquiry) + `gas_test.go`; `src/core/inquiry/raw.go` + `raw_test.go` (new: `RawInquiry`, `ResultRaw`); `src/common/helpers/payid.go` + `payid_test.go` (new: `ValidPayID`, `PayIDAmount`, `BillTypeOfBillID`, the rules of bill's `pkg/helper/bill_type.go`); `src/entry/http/gas_test.go`; `src/core/inquiry/inquiry.go` (`billTypes`: the `tid` prefix and the inquiry ID rule of each bill type; gas: prefix 3, not empty) + `gas_test.go`, `inquiry_test.go`, `electricity_test.go` (the "unsupported bill type" example is `mobile`, not `gas`); `src/provider/provider.go` (`BillTypeGas`, `GasDetails`, `Details.Gas`); `src/provider/qabzino/qabzino.go` (`kinds`: one table for water and gas; `GasEndpoint`; the gas codes; the gas mock fixture) + `gas_test.go`; `src/system/postgres/inquiry_details.go` (gas `extra_data`: `city`, `kind`) + `inquiry_details_test.go`; `src/config/config.go` (`CachingGas`, `caching.gas`, default `1h`) + `config_test.go`; `src/app/defaults.go` (`newGas`, the Gas service and gateway handler, `GasEndpoint`, the gas TTL) + `gas_test.go`, `gas_live_test.go`, `water_live_test.go` (the live stack has the Gas service); `config.yml.example`; `config.yml` (git-ignored; `caching.gas`); `qabz.postman_collection.json` (Gas / Inquiry); `docs/initial-discovery/system.html` (v2.4), `docs/this_vs_bill.md` (items 28 and 29, item 26), `docs/folder_structure.md`, `src/app/README.md`; `docs/Plans/OPEN_TASKS.md`; task file `023_gas_inquiry_endpoint.md` (in `done_tasks/`).
+- **Impact:** Behavior changes: `POST /v1/gas/inquiry` answered HTTP 501 before; it now runs the shared inquiry flow (database first, provider on a miss, the answer saved; the participate code is the cache key). The request and the response are bill's `InquiryBillPayRequest` and `InquiryBillPayResponse`, unchanged; no proto file is changed. **No change to the water and electricity endpoints:** the same requests, answers, error texts, rows and log lines (their tests pass with no change of an expected value). A water inquiry of Qabzino goes to the water endpoint as before. The seed is not changed: parsian is the enabled gas provider and has no adapter, so a gas inquiry is HTTP 503 until the Qabzino gas row (id 35) is enabled. A gas request with both `billId` and `payId` is bill's raw inquiry: HTTP 200 `{price, payId, billId}` read from the two IDs (no provider, no row, no log line, no `paymentDeadline`); an invalid pay ID is HTTP 400 `شناسه پرداخت نامعتبر است` (bill: HTTP 500 with the same text, `this_vs_bill.md` item 28). **Config:** new key `caching.gas` (default `1h`); `providers.qabzino.gas_bill_endpoint` is now read. No new metric: the three inquiry metrics get `bill_type="gas"`; `qabz_inquiries_total` has a new `result` value, `raw` (provider `none`).
+- **QA scenarios:** `make test GO_TEST_ARGS="-race -count=1 -cover -v"` (869 pass): 0 skipped, the five gas live tests pass; one failure that this task does not cause (`TestLocalConfigInSync`: the local `config.yml` has the Tavanir `circuit_breaker` block commented out). Feature ON, dev mode, the Qabzino mock on, providers row 35 enabled: the first call gives the mock answer and saves the rows under the participate code; the second call comes from the database; another code is another key; `return_type: error` gives HTTP 503 for a new code and the saved answer for the first code; a request with only `billId` gives HTTP 400; a request with `billId` and `payId` gives the price from the pay ID with no provider call (also with the mock on `error`) and a wrong pay ID gives HTTP 400. The pay ID, amount and bill type rules were checked against the `bill` code on 400 000 random inputs (no difference). All pass (2026-11-11). No call to Ayantech. Details in `docs/Plans/OPEN_TASKS.md` and the task file.
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-10] — Inquiry answered from the database writes no log line
 - **Type:** Minor (a log line removed; the counter already existed). Not a task file: task 030 is the one active task.

@@ -71,6 +71,7 @@ providers:
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
   electricity: "1h"          # how long a saved electricity inquiry answers the same bill with no provider call; 0: cache off
+  gas: "1h"                  # how long a saved gas inquiry answers the same participate code with no provider call; 0: cache off
 
 auth:
   secrets:

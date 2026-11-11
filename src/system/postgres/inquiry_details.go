@@ -29,18 +29,36 @@ type electricityExtra struct {
 	CustomerName    string `json:"customer_name,omitzero"`
 }
 
+// gasExtra is the extra_data of a gas inquiry (task 023): the keys that bill writes for a Qabzino
+// answer (gateway/inquiry GasDetails: city and kind; its first_name and last_name are only set by
+// the gas-company provider, which Qabz does not have). An empty value is not written, as in bill
+// (omitempty), so details with no value are the object {}.
+type gasExtra struct {
+	City string `json:"city,omitzero"`
+	Kind string `json:"kind,omitzero"`
+}
+
 // inquiryExtraData returns the JSON text of the extra_data column for the details of an inquiry,
-// or "" (NULL) when there are none. Writing JSON is not covered by conventions § 1.
+// or "" (NULL) when there are none. Details have the field of one bill type; with more than one,
+// electricity wins. Writing JSON is not covered by conventions § 1.
 func inquiryExtraData(d *provider.Details) (string, error) {
-	if d == nil || d.Electricity == nil {
+	var extra any
+	switch {
+	case d == nil:
+		return "", nil
+	case d.Electricity != nil:
+		e := d.Electricity
+		extra = electricityExtra{
+			City: e.City, Region: e.Region, Phase: e.Phase, CompanyName: e.CompanyName, TariffType: e.TariffType,
+			CustomerType: e.CustomerType, SerialNumber: e.SerialNumber, ServiceAddress: e.ServiceAddress,
+			ServicePostCode: e.ServicePostCode, CustomerName: e.CustomerName,
+		}
+	case d.Gas != nil:
+		extra = gasExtra{City: d.Gas.City, Kind: d.Gas.Kind}
+	default:
 		return "", nil
 	}
-	e := d.Electricity
-	b, err := json.Marshal(electricityExtra{
-		City: e.City, Region: e.Region, Phase: e.Phase, CompanyName: e.CompanyName, TariffType: e.TariffType,
-		CustomerType: e.CustomerType, SerialNumber: e.SerialNumber, ServiceAddress: e.ServiceAddress,
-		ServicePostCode: e.ServicePostCode, CustomerName: e.CustomerName,
-	})
+	b, err := json.Marshal(extra)
 	if err != nil {
 		return "", fmt.Errorf("extra_data: %w", err)
 	}
@@ -50,13 +68,14 @@ func inquiryExtraData(d *provider.Details) (string, error) {
 // inquiryDetails reads the extra_data of a saved inquiry (raw, its JSON text; "" for NULL) into
 // the details of its bill type. It is a hot path (each inquiry that is answered from the database),
 // so it reads with fastjson (conventions § 1). A bill type with no details, a NULL and a JSON null
-// give nil. For electricity an object gives details: a missing key and a null value keep the zero
-// value (a row that bill wrote has only city and region), other keys are ignored. A value of the
+// give nil. For electricity and gas an object gives details: a missing key and a null value keep
+// the zero value (an electricity row that bill wrote has only city and region), other keys are
+// ignored (a gas row of bill's gas-company provider has first_name and last_name). A value of the
 // wrong JSON type, or an extra_data that is not an object or null, is an error.
 //
 // The returned strings are copies: nothing refers to the parser after it goes back to the pool.
 func inquiryDetails(p *fastjson.Parser, billType, raw string) (*provider.Details, error) {
-	if billType != provider.BillTypeElectricity || raw == "" {
+	if (billType != provider.BillTypeElectricity && billType != provider.BillTypeGas) || raw == "" {
 		return nil, nil
 	}
 	if p == nil {
@@ -82,6 +101,32 @@ func inquiryDetails(p *fastjson.Parser, billType, raw string) (*provider.Details
 	}
 	if o == nil {
 		return nil, errors.New("extra_data: no object")
+	}
+	if billType == provider.BillTypeGas {
+		g := &provider.GasDetails{}
+		o.Visit(func(key []byte, val *fastjson.Value) {
+			if err != nil || val == nil {
+				return
+			}
+			var dst *string
+			switch string(key) {
+			case "city":
+				dst = &g.City
+			case "kind":
+				dst = &g.Kind
+			default:
+				return
+			}
+			if s, ok, e2 := jsonString(val); e2 != nil {
+				err = fmt.Errorf("extra_data %s: %w", key, e2)
+			} else if ok {
+				*dst = s
+			}
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &provider.Details{Gas: g}, nil
 	}
 	e := &provider.ElectricityDetails{}
 	o.Visit(func(key []byte, val *fastjson.Value) {

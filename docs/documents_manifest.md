@@ -1,4 +1,4 @@
-<!-- VERSION: 2.3 -->
+<!-- VERSION: 2.4 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.2 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.3 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.3 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.39 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v2.4 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.40 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -36,27 +36,28 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v2.3 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v2.4 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.49 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.50 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.18 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.24 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.10 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.25 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.11 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
-- **Date**: 2026-11-10
-- **Change**: 2026-11-10 — Session wrap-up (tasks 033 and 034 session): one lesson candidate and more evidence for another in the register; no code, no new files. Bumped #3 CHANGELOG v3.2, #5 manifest v2.3, #28 OPEN_TASKS v1.49.
-- **Previous change**: 2026-11-10 — Task 034 `tavanir_direct_provider`: `provider/tavanir/` is a direct HTTPS client of the Tavanir (SAAPA) endpoints (login, token in memory, inquiry with details), `providers.tavanir.enabled` (default `false`) replaces `providers.tavanir.grpc_address`; no rename, no circuit breaker, no call to the `tavanir` microservice (operator decisions); `Makefile` and `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task 034 moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.1, #5 manifest v2.2, #6 folder_structure v0.39, #21 system.html v2.3, #28 OPEN_TASKS v1.48, #34 app README v0.24, #35 this_vs_bill v0.10.
+- **Date**: 2026-11-11
+- **Change**: 2026-11-11 — Task 023 `gas_inquiry_endpoint`: `POST /v1/gas/inquiry` on the shared inquiry flow (`core/inquiry`: one table of bill types; the inquiry ID of gas is the participate code), the raw inquiry (`billId` + `payId`: `inquiry.Service.RawInquiry`, `common/helpers/payid.go`), the Qabzino adapter inquires gas (`providers.qabzino.gas_bill_endpoint`) and has a gas mock answer, `caching.gas` (default `1h`), gas details in `bill_inquiries.extra_data`; requests and responses of every endpoint unchanged; Postman has Gas / Inquiry; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.3, #5 manifest v2.4, #6 folder_structure v0.40, #21 system.html v2.4, #28 OPEN_TASKS v1.50, #34 app README v0.25, #35 this_vs_bill v0.11.
+- **Previous change**: 2026-11-10 — Session wrap-up (tasks 033 and 034 session): one lesson candidate and more evidence for another in the register; no code, no new files. Bumped #3 CHANGELOG v3.2, #5 manifest v2.3, #28 OPEN_TASKS v1.49.
+- **Earlier change**: 2026-11-10 — Task 034 `tavanir_direct_provider`: `provider/tavanir/` is a direct HTTPS client of the Tavanir (SAAPA) endpoints (login, token in memory, inquiry with details), `providers.tavanir.enabled` (default `false`) replaces `providers.tavanir.grpc_address`; no rename, no circuit breaker, no call to the `tavanir` microservice (operator decisions); `Makefile` and `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task 034 moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.1, #5 manifest v2.2, #6 folder_structure v0.39, #21 system.html v2.3, #28 OPEN_TASKS v1.48, #34 app README v0.24, #35 this_vs_bill v0.10.
 - **Earlier change**: 2026-11-10 — Task 033 `tavanir_provider_config`: eleven new config keys under `providers.tavanir` (four endpoints, `username`, `password` as a `Secret`, a `circuit_breaker` block; config only, no code reads them yet); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; tasks 033 and 030 moved to `done_tasks/`, new pending tasks 031 and 034 (not manifest-tracked). Bumped #3 CHANGELOG v3.0, #5 manifest v2.1 (its row said v1.7, the header 2.0: fixed), #21 system.html v2.2, #28 OPEN_TASKS v1.47.
 - **Earlier change**: 2026-11-10 — The inquiry answered from the database writes no log line (`core/inquiry`); the counter `qabz_inquiries_total{result="db_hit"}` already counts it; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v2.9, #5 manifest v2.0, #28 OPEN_TASKS v1.46.
 - **Earlier change**: 2026-11-10 — Task 030 `qabzino_direct_provider`: the direct Qabzino adapter (`provider/qabzino/`, HTTPS to Ayantech with `providers.qabzino.token` and `water_bill_endpoint`), `providers.qabzino.enabled` (default `false`), the gRPC adapter renamed `provider/qabzinoproxy/` (QabzinoProxy, not used); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; task file in `in-progress_tasks/` (not manifest-tracked); task 029 moved to `done_tasks/`. Bumped #3 CHANGELOG v2.8, #5 manifest v1.9, #6 folder_structure v0.38, #21 system.html v2.1, #28 OPEN_TASKS v1.45, #34 app README v0.23, #35 this_vs_bill v0.9.

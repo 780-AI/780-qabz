@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.3 -->
-<!-- Last Updated: 2026-11-10 -->
+<!-- VERSION: 2.4 -->
+<!-- Last Updated: 2026-11-11 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.4 — 2026-11-11 — Task 023 gas inquiry: the Qabzino adapter also inquires a gas bill (Ayantech `GasBillInquiry`, `providers.qabzino.gas_bill_endpoint`, the participate code); `caching.gas` in the config example and the Hot Reload table; `Details.Gas` (city, kind) saved in `bill_inquiries.extra_data`; the gas mock answer; the inquiry metrics are implemented for gas too; the raw inquiry (`billId` + `payId`) is answered with no provider and is counted as `result="raw"`.
 v2.3 — 2026-11-10 — Task 034 direct Tavanir adapter: `providers.tavanir.enabled` (replaces `grpc_address`); the Tavanir adapter is an HTTPS client of the Tavanir (SAAPA) endpoints (login, token in memory, basic branch data) and calls no other service; no circuit breaker yet (the `circuit_breaker` keys are not used); the Providers table rows and the config example are updated.
 v2.2 — 2026-11-10 — Task 033 Tavanir provider config: the endpoint, credential and circuit breaker keys under `providers.tavanir` in the config example (config only; no code reads them yet; qabz implements the Tavanir provider itself, it does not call the tavanir service).
 v2.1 — 2026-11-10 — Task 030 direct Qabzino adapter: `providers.qabzino.enabled`; the Qabzino adapter calls Ayantech over HTTPS with the token and the water endpoint; the gRPC adapter is renamed QabzinoProxy (not used); the Providers table row and the config example are updated.
@@ -175,7 +176,7 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/BillInquiry` | internal | Inquiry | MCI mobile |
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/PayBill` | internal | Order | MCI mobile |
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | MCI mobile |
-| `qabzino` | HTTPS (Ayantech, direct since task 030; the gRPC adapter `haf80.api.qabzino.Inquiry/BillInquiry` is QabzinoProxy, not used) | `providers.qabzino.*_bill_endpoint` | Ayantech token | Inquiry (water so far) | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
+| `qabzino` | HTTPS (Ayantech, direct since task 030; the gRPC adapter `haf80.api.qabzino.Inquiry/BillInquiry` is QabzinoProxy, not used) | `providers.qabzino.*_bill_endpoint` | Ayantech token | Inquiry (water: task 030; gas: task 023, with the participate code) | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
 | `irancell` | gRPC | `pb.InternalService/BillInquiry` | internal | Inquiry | `Irancell` mobile |
 | `irancell` | gRPC | `pb.InternalService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | `Irancell` mobile (also called by `recharge`, so it has to stay) |
 | `irancell` | NATS | `irancell-bill` | internal | Order | `Irancell` mobile payment |
@@ -205,7 +206,7 @@ providers:
     enabled: false               # false (default): Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply) (task 030)
     token: ""                    # Ayantech token (secret); the real value only in config.yml (task 029)
     electricity_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/ElectricityBillInquiry
-    gas_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry
+    gas_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/GasBillInquiry   # read since task 023
     water_bill_endpoint: https://core.inquiry.ayantech.ir/webservices/core.svc/WaterBillInquiry
   tavanir:
     enabled: false               # false (default): every Tavanir call fails as "provider down", nothing is sent, the mock does not apply (task 034)
@@ -221,6 +222,7 @@ providers:
 caching:
   water: 1h                      # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
   electricity: 1h                # the same for an electricity inquiry (task 022)
+  gas: 1h                        # the same for a gas inquiry; the key of a saved gas inquiry is the participate code (task 023)
 ```
 
 Provider mocks (task 021). Development only: the `debug` section is removed in every mode but `dev` (task 020c). One block per provider, `debug.mocks.<provider>`; the mechanism is generic (`provider.NewMock`, `src/provider/mock.go`) and every later provider follows it:
@@ -236,7 +238,7 @@ debug:
       return_type: success   # success or error
 ```
 
-With `enable: true` the adapter does not call the backend (only when `providers.qabzino.enabled` / `providers.tavanir.enabled` is `true`; `enabled: false` wins over the mock, tasks 030 and 034). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
+With `enable: true` the adapter does not call the backend (only when `providers.qabzino.enabled` / `providers.tavanir.enabled` is `true`; `enabled: false` wins over the mock, tasks 030 and 034). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Qabzino gas: bill ID `1234567890125`, pay ID `3200012345`, 32 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
 
 Rules:
 - **Services that stay.** `parsian-v2`, `jiring-switch` and `irancell` keep their own config. `Parsian` and `Irancell` also have other clients (Issue #3).
@@ -259,7 +261,7 @@ Only certain configs are hot reloadable. The new system must say which, and trea
 | Fee rules (the `fees` table) | Yes | It is read from the database |
 | JWT public keys | Yes | Already reloaded through etcd |
 | Provider URLs and timeouts (`providers.qabzino.*`, `providers.tavanir.*`) | No | Held by the client built at startup |
-| Inquiry cache TTL of a bill type (`caching.water`, `caching.electricity`) | No | Read at startup (tasks 021 and 022); hot reload would need an `app_hot_configs` key and a migration |
+| Inquiry cache TTL of a bill type (`caching.water`, `caching.electricity`, `caching.gas`) | No | Read at startup (tasks 021, 022 and 023); hot reload would need an `app_hot_configs` key and a migration |
 | Provider mocks (`debug.mocks.<provider>`) | No | Applied when the adapters are built, in dev mode only |
 | Credentials and tokens | No | Held by the client built at startup |
 | Database, Redis, Kafka and NATS connections | No | The connections are made once, at startup |
@@ -289,7 +291,9 @@ type ProviderRegistry interface {
 }
 ```
 
-**Details of an inquiry (task 022).** The interface has no separate method for details. `InquiryResponse` has the field `Details *Details`, with one field for each bill type that has details (`Details.Electricity`: phase, company name, tariff type, customer type, serial number, service address, service post code, customer name, and the `city` and `region` that the order flow of `bill` reads). An adapter with no details (Qabzino water) leaves it nil. The inquiry flow (`core/inquiry`) saves the details with each inquiry in `bill_inquiries.extra_data` (one JSON object; `bill` writes only `city` and `region` there) and reads them back when saved inquiries answer the call, so the answer from the database has the same details as the answer of the provider.
+**Details of an inquiry (task 022).** The interface has no separate method for details. `InquiryResponse` has the field `Details *Details`, with one field for each bill type that has details (`Details.Electricity`: phase, company name, tariff type, customer type, serial number, service address, service post code, customer name, and the `city` and `region` that the order flow of `bill` reads; `Details.Gas` (task 023): `city` and `kind`, the two keys that `bill` saves for a Qabzino gas answer; the client does not get them). An adapter with no details (Qabzino water) leaves it nil. The inquiry flow (`core/inquiry`) saves the details with each inquiry in `bill_inquiries.extra_data` (one JSON object; `bill` writes only `city` and `region` there) and reads them back when saved inquiries answer the call, so the answer from the database has the same details as the answer of the provider.
+
+**Inquiry ID of a bill type (task 023).** `InquiryRequest.InquiryID` is the bill ID for water and electricity, and the participate code for gas (`bill`: `SetInquiryID`). The handler of each endpoint gives the bill type; the inquiry flow has one table of bill types (`billTypes` in `core/inquiry`: the `tid` prefix and the rule of the inquiry ID) and does not read the type from the ID. The inquiry ID is the key of the saved inquiries (`bill_inquiries.inquiry_id`), so two participate codes are two keys. A gas request with both `billId` and `payId` is the raw inquiry of `bill`: no provider and no saved inquiry; the price is read from the pay ID and the answer has `price`, `payId` and `billId` (`inquiry.Service.RawInquiry`, `docs/this_vs_bill.md` item 28).
 
 ### Provider Switcher
 
@@ -441,7 +445,7 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | Metric | Type | What it tells you |
 |---|---|---|
 | `qabz_request_duration_ms` | histogram | Duration of every incoming request (gRPC and HTTP gateway) in milliseconds, by `path` (the gRPC method, for example `/haf80.api.bill.Service/Get`) and `code` (the gRPC code); buckets 5 ms to 10 000 ms. Its `_count` series is the request counter. A call that the auth check rejects is counted. An unknown HTTP route is not counted |
-| `qabz_inquiries_total` | counter | Inquiries by `bill_type`, `provider` (`none` when no provider was picked) and `result`: `db_hit` (answered from saved inquiries, no provider call), `provider_ok`, `provider_refused` (the provider has no inquiry), `provider_down` (the call failed), `no_provider`, `canceled` (the client left during the provider call), `error`. Implemented for water (task 021) and electricity (task 022) |
+| `qabz_inquiries_total` | counter | Inquiries by `bill_type`, `provider` (`none` when no provider was picked) and `result`: `db_hit` (answered from saved inquiries, no provider call), `provider_ok`, `provider_refused` (the provider has no inquiry), `provider_down` (the call failed), `no_provider`, `canceled` (the client left during the provider call), `error`, `raw` (a gas request with `billId` and `payId`, answered from the two IDs, provider `none`). Implemented for water (task 021), electricity (task 022) and gas (task 023) |
 | `qabz_orders_total` | counter | Every order status change (the state machine) |
 | `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |
 | `qabz_order_complete_duration_ms` | histogram | How long `OrderComplete` takes |

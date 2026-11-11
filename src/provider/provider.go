@@ -9,6 +9,7 @@ import (
 const (
 	BillTypeWater       = "water"
 	BillTypeElectricity = "electricity"
+	BillTypeGas         = "gas"
 
 	ActionInquiry = "inquiry"
 
@@ -28,10 +29,12 @@ var (
 
 // InquiryRequest is the input of ProviderInterface.Inquiry.
 type InquiryRequest struct {
-	BillType  string // bill type, for example BillTypeWater
-	UserID    string // the user, a UUID
-	Dialer    string // the mobile number of the user
-	InquiryID string // the ID that the provider inquires: the bill ID of a water or an electricity bill
+	BillType string // bill type, for example BillTypeWater
+	UserID   string // the user, a UUID
+	Dialer   string // the mobile number of the user
+	// InquiryID is the ID that the provider inquires: the bill ID of a water or an electricity bill,
+	// the participate code (کد اشتراک) of a gas bill.
+	InquiryID string
 }
 
 // InquiryItem is one inquiry of an answer (one amount to pay).
@@ -39,7 +42,7 @@ type InquiryItem struct {
 	PayID           string
 	Amount          uint64 // rials
 	PaymentDeadline string // as the provider sends it
-	InquiryType     string // "regular" for a water and an electricity bill
+	InquiryType     string // "regular" for a water, an electricity and a gas bill
 }
 
 // ElectricityDetails are the details of an electricity inquiry (bill: gateway/inquiry
@@ -60,11 +63,20 @@ type ElectricityDetails struct {
 	Region string
 }
 
+// GasDetails are the details of a gas inquiry (bill: gateway/inquiry GasDetails). The client does
+// not see them (InquiryBillPayResponse has no field for them); the flow saves them with the inquiry
+// (bill_inquiries.extra_data), as bill does (task 023).
+type GasDetails struct {
+	City string // Qabzino: the address of the answer (bill maps it so)
+	Kind string // Qabzino: the consumption type of the answer
+}
+
 // Details are the details of an inquiry answer, one field for each bill type that has details. A
 // nil *Details and a Details with no field set mean "no details". The flow and the repository treat
 // a Details value as read-only after the adapter returned it.
 type Details struct {
 	Electricity *ElectricityDetails
+	Gas         *GasDetails
 }
 
 // InquiryResponse is the answer of ProviderInterface.Inquiry. A provider that answers "no

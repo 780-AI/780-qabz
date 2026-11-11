@@ -3,7 +3,7 @@
 // saved inquiries when they are still valid, else call the provider and save the answer. The rows
 // are in the bill_inquiries and bill_inquiry_requests tables of the bill database. The flow is the
 // same for every bill type: task 021 implements water, task 022 adds electricity and the details of
-// an answer (provider.Details).
+// an answer (provider.Details), task 023 adds gas (the inquiry ID is the participate code).
 package inquiry
 
 import (
@@ -51,10 +51,32 @@ const NoProviderLabel = "none"
 // row at RequestInitial. It is fixed (not a config key).
 const finishTimeout = 5 * time.Second
 
-// tidPrefixes are the first digit of the tid of a request row for each bill type (bill:
-// pkg/reference WaterReference, ElectricityReference). A bill type is supported by the flow when it
-// has a prefix here.
-var tidPrefixes = map[string]int{provider.BillTypeWater: 1, provider.BillTypeElectricity: 2}
+// billType is what the flow knows of one bill type.
+type billType struct {
+	// tidPrefix is the first digit of the tid of a request row (bill: pkg/reference WaterReference,
+	// ElectricityReference, GasReference).
+	tidPrefix int
+	// validInquiryID is the rule of Request.InquiryID. Never nil.
+	validInquiryID func(id string) bool
+	// invalid names the inquiry ID in the text of the ErrInvalid error.
+	invalid string
+}
+
+// billTypes are the bill types that the flow supports, by the bill type that the handler gives
+// (Request.BillType). The flow does not read the bill type from the inquiry ID. To add a bill type,
+// add an entry.
+//   - water, electricity: the inquiry ID is the bill ID (helpers.ValidBillID).
+//   - gas (task 023): the inquiry ID is the participate code. Its only rule is "not empty", as in
+//     bill (controller/gas validateInquiryRequest). A code longer than the inquiry_id columns
+//     (VARCHAR(15)) fails at the request row, as in bill (a database error, Internal).
+var billTypes = map[string]billType{
+	provider.BillTypeWater:       {tidPrefix: 1, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
+	provider.BillTypeElectricity: {tidPrefix: 2, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
+	provider.BillTypeGas:         {tidPrefix: 3, validInquiryID: notEmpty, invalid: "participate code"},
+}
+
+// notEmpty is the rule of an inquiry ID that only has to be there.
+func notEmpty(id string) bool { return id != "" }
 
 var (
 	// ErrInvalid is the error of a request that breaks a rule. Test it with errors.Is.
@@ -75,7 +97,7 @@ func (e *RefusedError) Error() string { return "inquiry: the provider has no inq
 // Request is one inquiry.
 type Request struct {
 	BillType  string // for example provider.BillTypeWater
-	InquiryID string // the bill ID
+	InquiryID string // the bill ID; for gas the participate code (billTypes)
 	UserID    string // a UUID
 	Dialer    string // the mobile of the user (bill_inquiry_requests.dialer)
 }
@@ -218,15 +240,15 @@ func NewService(o Options) (*Service, error) {
 // generateTID makes the tid of a request row (bill: GenerateBillInquiryTidIDByBillType): the type
 // prefix, a random number from 100 to 90000000099 and the day of the year.
 func generateTID(billType string) (string, error) {
-	prefix, ok := tidPrefixes[billType]
+	bt, ok := billTypes[billType]
 	if !ok {
 		return "", fmt.Errorf("inquiry: no tid prefix for bill type %q", billType)
 	}
-	return fmt.Sprintf("%d%d%d", prefix, rand.Int64N(90000000000)+100, time.Now().YearDay()), nil
+	return fmt.Sprintf("%d%d%d", bt.tidPrefix, rand.Int64N(90000000000)+100, time.Now().YearDay()), nil
 }
 
 // Inquire answers the inquiry of a bill:
-//  1. A request that breaks a rule (bill ID, user) gives an error that wraps ErrInvalid.
+//  1. A request that breaks a rule (the inquiry ID of the bill type, user) gives an error that wraps ErrInvalid.
 //  2. It picks the provider of the bill type (an error that wraps provider.ErrNoProvider when none
 //     is enabled) and its adapter (ErrNoAdapter).
 //  3. Saved inquiries of the same bill and provider that are valid answer the call with no
@@ -245,11 +267,12 @@ func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if _, ok := tidPrefixes[req.BillType]; !ok {
+	bt, ok := billTypes[req.BillType]
+	if !ok || bt.validInquiryID == nil {
 		return Result{}, fmt.Errorf("inquiry: unsupported bill type %q", req.BillType)
 	}
-	if !helpers.ValidBillID(req.InquiryID) {
-		return Result{}, fmt.Errorf("%w: bill id", ErrInvalid)
+	if !bt.validInquiryID(req.InquiryID) {
+		return Result{}, fmt.Errorf("%w: %s", ErrInvalid, bt.invalid)
 	}
 	if u, err := uuid.Parse(req.UserID); err != nil || u.String() != req.UserID {
 		return Result{}, fmt.Errorf("%w: user", ErrInvalid)

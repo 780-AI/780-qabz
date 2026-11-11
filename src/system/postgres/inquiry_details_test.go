@@ -68,7 +68,10 @@ func TestInquiryDetailsReads(t *testing.T) {
 		"JSON null":              {provider.BillTypeElectricity, "null"},
 		"water":                  {provider.BillTypeWater, `{"city":"c"}`},
 		"water, broken JSON":     {provider.BillTypeWater, `{`},
-		"an unknown bill type":   {"gas", `{"city":"c"}`},
+		"an unknown bill type":   {"mobile", `{"city":"c"}`},
+		"gas, NULL":              {provider.BillTypeGas, ""},
+		"gas, JSON null":         {provider.BillTypeGas, "null"},
+		"gas, uppercase":         {"Gas", `{"city":"c"}`},
 		"an empty bill type":     {"", `{"city":"c"}`},
 		"electricity, uppercase": {"Electricity", `{"city":"c"}`},
 	} {
@@ -115,4 +118,68 @@ func TestInquiryDetailsErrors(t *testing.T) {
 	}
 	_, err := inquiryDetails(nil, provider.BillTypeElectricity, `{}`)
 	assert.ErrorContains(t, err, "no parser")
+}
+
+// TestGasExtraData (task 023): gas details are the JSON object that bill writes (city, kind); an
+// empty value is not written; inquiryDetails reads back what inquiryExtraData wrote.
+func TestGasExtraData(t *testing.T) {
+	var p fastjson.Parser
+	s, err := inquiryExtraData(&provider.Details{Gas: &provider.GasDetails{City: "c", Kind: "k"}})
+	assert.NoError(t, err)
+	assert.Equal(t, `{"city":"c","kind":"k"}`, s, "what bill writes")
+	s, err = inquiryExtraData(&provider.Details{Gas: &provider.GasDetails{}})
+	assert.NoError(t, err)
+	assert.Equal(t, "{}", s, "details with no value are an object, not NULL")
+	s, err = inquiryExtraData(&provider.Details{Gas: &provider.GasDetails{Kind: "k"}})
+	assert.NoError(t, err)
+	assert.Equal(t, `{"kind":"k"}`, s)
+
+	for name, g := range map[string]*provider.GasDetails{
+		"full":      {City: "تهران \"q\"", Kind: "خانگی\nline"},
+		"empty":     {},
+		"only city": {City: "c"},
+		"only kind": {Kind: "k"},
+	} {
+		s, err := inquiryExtraData(&provider.Details{Gas: g})
+		if !assert.NoError(t, err, name) {
+			continue
+		}
+		got, err := inquiryDetails(&p, provider.BillTypeGas, s)
+		if assert.NoError(t, err, name) && assert.NotNil(t, got, name) {
+			assert.Equal(t, g, got.Gas, name)
+			assert.Nil(t, got.Electricity, name)
+		}
+	}
+	// A row of bill's gas-company provider has first_name and last_name: ignored. Null keeps "".
+	got, err := inquiryDetails(&p, provider.BillTypeGas, `{"first_name":"f","last_name":"l","city":null,"kind":"k","region":"r"}`)
+	if assert.NoError(t, err) && assert.NotNil(t, got) {
+		assert.Equal(t, &provider.GasDetails{Kind: "k"}, got.Gas)
+	}
+	// The same JSON read as electricity gives electricity details: the bill type of the row decides.
+	got, err = inquiryDetails(&p, provider.BillTypeElectricity, `{"city":"c","kind":"k"}`)
+	if assert.NoError(t, err) && assert.NotNil(t, got) {
+		assert.Nil(t, got.Gas)
+		assert.Equal(t, &provider.ElectricityDetails{City: "c"}, got.Electricity)
+	}
+	// The strings are copies.
+	first, err := inquiryDetails(&p, provider.BillTypeGas, `{"city":"first-city"}`)
+	if assert.NoError(t, err) && assert.NotNil(t, first) && assert.NotNil(t, first.Gas) {
+		_, err = inquiryDetails(&p, provider.BillTypeGas, `{"city":"other-text"}`)
+		assert.NoError(t, err)
+		assert.Equal(t, "first-city", first.Gas.City)
+	}
+	for raw, want := range map[string]string{
+		`{`:            "extra_data:",
+		`[]`:           "extra_data is a JSON array, not an object",
+		`{"city": 5}`:  "extra_data city:",
+		`{"kind": {}}`: "extra_data kind:",
+	} {
+		got, err := inquiryDetails(&p, provider.BillTypeGas, raw)
+		assert.Nil(t, got, raw)
+		assert.ErrorContains(t, err, want, raw)
+	}
+	// Electricity wins when details have both (an adapter sets one).
+	s, err = inquiryExtraData(&provider.Details{Electricity: &provider.ElectricityDetails{City: "e"}, Gas: &provider.GasDetails{Kind: "g"}})
+	assert.NoError(t, err)
+	assert.Equal(t, `{"city":"e"}`, s)
 }

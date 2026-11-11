@@ -309,6 +309,57 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Gas",
+      "item": [
+        {
+          "name": "Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": \"\",\n  \"payId\": \"\",\n  \"participateCode\": \"0012345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/gas/inquiry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "gas",
+                "inquiry"
+              ]
+            },
+            "description": "haf80.api.bill.Gas/Inquiry (task 023). Inquires a gas bill by participateCode (the gas subscription code). The request and the answer are those of bill (InquiryBillPayRequest, InquiryBillPayResponse), unchanged. Request rules, as in bill: participateCode or billId is required, and participateCode or payId is required; a billId that is sent must be a valid bill ID (6 to 13 digits with a valid check digit). So a request with only billId is invalid. A request with both billId and payId is the raw inquiry of bill: no provider, no saved inquiry; the price is read from the pay ID (the digits before the last 5, in thousands of rials) and the answer is HTTP 200 {\"price\":<rials>,\"payId\":\"...\",\"billId\":\"...\"} with paymentDeadline empty; a billId that is not valid, a payId that is not valid or a billId of an unknown bill type is HTTP 400 with the text of bill (شناسه قبض نامعتبر است, شناسه پرداخت نامعتبر است, نوع قبض نامعتبر است). The inquiry ID is the participateCode: it is the cache key and what the provider gets (two participate codes are two cache keys). The provider of (gas, inquiry) is picked with ProvidersService; the saved inquiries of the same participateCode and provider that are younger than caching.gas (default 1h; any user's rows count) answer with NO provider call, else the provider is called (Qabzino: Ayantech GasBillInquiry at providers.qabzino.gas_bill_endpoint) and the answer is saved. In the dev seed the enabled gas provider is parsian (no adapter yet: HTTP 503); to use Qabzino enable providers row 35 and disable row 43. With debug.mocks.qabzino.enable true (dev mode only, providers.qabzino.enabled true) the Qabzino adapter answers a fixed answer: price 32000000, payId 3200012345, paymentDeadline 2030-01-01, billId 1234567890125 (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"price\":<rials>,\"paymentDeadline\":\"yyyy-mm-dd\",\"payId\":\"...\",\"billId\":\"<the bill ID of the provider>\"} (no bill to pay: price 0 and an empty payId). An invalid request HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the code HTTP 400 with the provider message; any other failure HTTP 500. POST /v1/gas/order, /v2/gas/order and /v1/gas/complete-order are not implemented yet (HTTP 501)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has price, payId, billId and paymentDeadline\", function () { const b = pm.response.json(); pm.expect(b).to.have.property(\"price\"); pm.expect(b.price).to.be.a(\"number\"); pm.expect(b).to.have.property(\"payId\"); pm.expect(b).to.have.property(\"billId\"); pm.expect(b).to.have.property(\"paymentDeadline\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     }
   ]
 }
