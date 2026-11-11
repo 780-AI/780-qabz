@@ -1,7 +1,8 @@
-<!-- VERSION: 3.3 -->
+<!-- VERSION: 3.4 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.4 — 2026-11-11 — Added session-wrap-up (task 023 session) entry.
 v3.3 — 2026-11-11 — Added 023-gas-inquiry-endpoint entry.
 v3.2 — 2026-11-10 — Added session-wrap-up (tasks 033 and 034 session) entry.
 v3.1 — 2026-11-10 — Added 034-tavanir-direct-provider entry.
@@ -119,6 +120,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Session wrap-up (task 023 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.51: 3 lesson candidates, more evidence for one, the operator report for task 023, follow-up (e) updated); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The commit `67ca1d3` (task 023) and this commit are pushed.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-11] — Task 023: `POST /v1/gas/inquiry`, the Qabzino adapter inquires gas
 - **Type:** Major (new endpoint, domain logic, config key, Critical File `system.html`)
