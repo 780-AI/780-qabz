@@ -1,7 +1,8 @@
-<!-- VERSION: 3.14 -->
+<!-- VERSION: 3.15 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.15 — 2026-11-11 — Added session-wrap-up (task 037 session) entry.
 v3.14 — 2026-11-11 — Added 037-mobile-rightel-inquiry entry.
 v3.13 — 2026-11-11 — Added session-wrap-up (task 036 session) entry.
 v3.12 — 2026-11-11 — Added 036-mobile-mci-inquiry entry.
@@ -130,6 +131,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Session wrap-up (task 037 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.58: 2 lesson candidates, more evidence for 3; the operator report of the first real Rightel call, `GD2266`); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The push of bc27f56..359f2c9 (tasks 036 and 037, the task 036 wrap-up) is done.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Task 037: `POST /v1/mobile/inquiry` for the Rightel operator, the Qabzino Rightel inquiry
 - **Type:** Major (endpoint behavior, domain logic, a new config key, Critical File `system.html`)
