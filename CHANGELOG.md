@@ -1,7 +1,8 @@
-<!-- VERSION: 3.10 -->
+<!-- VERSION: 3.11 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.11 — 2026-11-11 — Added session-wrap-up (task 024 split, tasks 035 and 038 session) entry.
 v3.10 — 2026-11-11 — Added 038-task entry.
 v3.9 — 2026-11-11 — Added postman-bill-type-variables entry.
 v3.8 — 2026-11-11 — Added 035-mobile-irancell-inquiry entry.
@@ -126,6 +127,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Session wrap-up (task 024 split, tasks 035 and 038 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.54: 4 lesson candidates, more evidence for 2, task 035 follow-up (c) updated); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The session commits 736dffb..6cbfc45 are pushed; this commit is pushed with the wrap-up.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — New task 038: normalize the incoming mobile number
 - **Type:** Minor (task file; no code).
