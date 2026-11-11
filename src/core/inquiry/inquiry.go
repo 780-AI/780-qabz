@@ -242,6 +242,11 @@ type Options struct {
 	// OnProviderCall is called once per provider call with the provider name, the action, one of
 	// the Call values and the duration of the call. Nil: no call.
 	OnProviderCall func(providerName, action, result string, d time.Duration)
+	// NoStore turns off every use of the Repository (task 031, debug.cache_inquiries: false):
+	// no read of saved inquiries (CacheTTL does not apply), no request row, no saved answer. Every
+	// call goes to the provider. False (the zero value): the flow as before. The Repository is
+	// still required.
+	NoStore bool
 }
 
 // Service is the inquiry flow. It is safe for concurrent use.
@@ -253,6 +258,7 @@ type Service struct {
 	log            Logger
 	onInquiry      func(billType, providerName, result string)
 	onProviderCall func(providerName, action, result string, d time.Duration)
+	noStore        bool
 
 	// newID and newTID are replaced by tests.
 	newID  func() string
@@ -271,7 +277,7 @@ func NewService(o Options) (*Service, error) {
 	}
 	return &Service{
 		repo: o.Repository, providers: o.Providers, adapters: o.Adapters, cacheTTL: o.CacheTTL,
-		log: o.Logger, onInquiry: o.OnInquiry, onProviderCall: o.OnProviderCall,
+		log: o.Logger, onInquiry: o.OnInquiry, onProviderCall: o.OnProviderCall, noStore: o.NoStore,
 		newID: uuid.NewString, newTID: generateTID,
 	}, nil
 }
@@ -300,6 +306,9 @@ func generateTID(billType string) (string, error) {
 //     and the provider trace ID, and saves each inquiry of the answer with the details. A call
 //     that fails gives an error that wraps provider.ErrProviderDown; an answer with no inquiry
 //     gives *RefusedError.
+//
+// With Options.NoStore, steps 3 and 4 do not use the Repository: no saved inquiry answers, and no
+// request row, status or inquiry is written. The provider call and the errors are the same.
 //
 // Every other error is a failure of the database or of the code, with the stage in its text.
 func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
@@ -348,9 +357,13 @@ func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("%w %q for the bill type %q", ErrNoAdapter, pro.Name, req.BillType)
 	}
 
-	if res, ok := s.fromDatabase(ctx, req, pro, bt.skipSameTypePair); ok {
-		s.countInquiry(req.BillType, pro.Name, ResultDBHit)
-		return res, nil
+	// @todo this_vs_bill item 34: bill has no switch that turns off the inquiry tables (task 031,
+	// Options.NoStore).
+	if !s.noStore {
+		if res, ok := s.fromDatabase(ctx, req, pro, bt.skipSameTypePair); ok {
+			s.countInquiry(req.BillType, pro.Name, ResultDBHit)
+			return res, nil
+		}
 	}
 	res, result, err := s.fromProvider(ctx, req, pro, adapter)
 	s.countInquiry(req.BillType, pro.Name, result)
@@ -412,18 +425,23 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 }
 
 // fromProvider calls the provider and saves the answer (bill: the step loop with one step). The
-// second value is the Result of the call, for the metric.
+// second value is the Result of the call, for the metric. With noStore it writes no request row,
+// no status and no inquiry, and makes no tid (only the request row has it; the adapters do not get
+// it).
 func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Provider, adapter provider.ProviderInterface) (Result, string, error) {
-	tid, err := s.newTID(req.BillType)
-	if err != nil {
-		return Result{}, ResultError, fmt.Errorf("make tid: %w", err)
-	}
-	row := RequestRow{
-		ID: s.newID(), UserID: req.UserID, Dialer: req.Dialer, InquiryID: req.InquiryID,
-		BillType: req.BillType, TID: tid, ProviderName: pro.Name, Status: RequestInitial,
-	}
-	if err := s.repo.CreateRequest(ctx, row); err != nil {
-		return Result{}, ResultError, fmt.Errorf("save request row: %w", err)
+	var row RequestRow
+	if !s.noStore {
+		tid, err := s.newTID(req.BillType)
+		if err != nil {
+			return Result{}, ResultError, fmt.Errorf("make tid: %w", err)
+		}
+		row = RequestRow{
+			ID: s.newID(), UserID: req.UserID, Dialer: req.Dialer, InquiryID: req.InquiryID,
+			BillType: req.BillType, TID: tid, ProviderName: pro.Name, Status: RequestInitial,
+		}
+		if err := s.repo.CreateRequest(ctx, row); err != nil {
+			return Result{}, ResultError, fmt.Errorf("save request row: %w", err)
+		}
 	}
 
 	start := time.Now()
@@ -455,9 +473,11 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 		s.log.Info("inquiry: provider call", "bill_type", req.BillType, "provider", pro.Name, "inquiry_id", req.InquiryID,
 			"status", resp.Status, "inquiries", len(resp.Inquiries), "duration_ms", float64(d)/float64(time.Millisecond))
 	}
-	if err := s.finishErr(row.ID, resp.Status, resp.ProviderTraceID); err != nil {
-		s.callDone(pro.Name, CallError, d)
-		return Result{}, ResultError, fmt.Errorf("save request status: %w", err)
+	if !s.noStore {
+		if err := s.finishErr(row.ID, resp.Status, resp.ProviderTraceID); err != nil {
+			s.callDone(pro.Name, CallError, d)
+			return Result{}, ResultError, fmt.Errorf("save request status: %w", err)
+		}
 	}
 	if resp.Status != provider.ResponseSuccess || len(resp.Inquiries) == 0 {
 		s.callDone(pro.Name, CallRefused, d)
@@ -478,6 +498,9 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 		res.Inquiries = append(res.Inquiries, Inquiry{
 			ID: r.ID, BillID: r.BillID, PayID: r.PayID, Amount: r.Amount, PaymentDeadline: r.PaymentDeadline, InquiryType: r.InquiryType,
 		})
+	}
+	if s.noStore {
+		return res, ResultProviderOK, nil
 	}
 	// bill ignores the result of this write: the answer does not depend on it (a failed write only
 	// means that the next call asks the provider again). Qabz logs it.
@@ -500,8 +523,12 @@ func (s *Service) finishErr(id, status, traceID string) error {
 	return s.repo.FinishRequest(ctx, id, status, traceID)
 }
 
-// finish is finishErr for a failed call: the answer is already an error, so a failed write is only logged.
+// finish is finishErr for a failed call: the answer is already an error, so a failed write is only
+// logged. With noStore it writes nothing (there is no request row).
 func (s *Service) finish(id, status, traceID string) {
+	if s.noStore {
+		return
+	}
 	if err := s.finishErr(id, status, traceID); err != nil && s.log != nil {
 		s.log.Error("inquiry: save request status failed", "request_id", id, "status", status, "error", err)
 	}

@@ -207,11 +207,17 @@ func successResp() *provider.InquiryResponse {
 
 func newRig(t *testing.T, ttl time.Duration) *rig {
 	t.Helper()
+	return newRigStore(t, ttl, false)
+}
+
+// newRigStore is newRig with Options.NoStore (task 031).
+func newRigStore(t *testing.T, ttl time.Duration, noStore bool) *rig {
+	t.Helper()
 	r := &rig{repo: newMemRepo(), log: &recLog{}, selector: fakeSelector{p: qabzino}}
 	r.prov = &stubProvider{name: "qabzino", resp: successResp()}
 	svc, err := NewService(Options{
 		Repository: r.repo, Providers: r.selector, Adapters: fakeAdapters{"qabzino": r.prov},
-		CacheTTL: func(string) time.Duration { return ttl }, Logger: r.log,
+		CacheTTL: func(string) time.Duration { return ttl }, Logger: r.log, NoStore: noStore,
 		OnInquiry: func(b, p, res string) { r.inquiry = append(r.inquiry, b+"/"+p+"/"+res) },
 		OnProviderCall: func(p, a, res string, d time.Duration) {
 			r.calls = append(r.calls, call{p, a, res, d})

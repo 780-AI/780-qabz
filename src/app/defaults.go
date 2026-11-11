@@ -472,7 +472,9 @@ func disabledNotice(name, title string, enabled bool) string {
 // provider call adds 1 to qabz_provider_calls_total{provider,action,result} (ok, refused, down,
 // canceled, error) and observes qabz_provider_call_duration_ms{provider,action}. Rejected calls are
 // in the code label of qabz_request_duration_ms. A failed lookup or copy or save of inquiries
-// writes one error log line.
+// writes one error log line. With debug.cache_inquiries false (task 031, development only) the flow
+// does not read or write the inquiry tables (inquiry.Options.NoStore): every inquiry calls the
+// provider; one warn line at start names the key.
 func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Selector, adapters inquiry.Adapters, metrics *prometheus.Server, logger Logger) (*inquiry.Service, error) {
 	var onInquiry func(billType, providerName, result string)             // nil: metrics are off, nothing is recorded
 	var onCall func(providerName, action, result string, d time.Duration) // nil: metrics are off, nothing is recorded
@@ -516,7 +518,11 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 		// Rightel (task 037): the key of MCI, as bill (operator decision).
 		provider.BillTypeMobileMidTermRightel: cfg.CachingMobile,
 	}
+	if !cfg.DebugCacheInquiries && logger != nil {
+		logger.Warn("inquiry store disabled (debug.cache_inquiries: false): development only, every inquiry calls the provider and nothing is saved")
+	}
 	return inquiry.NewService(inquiry.Options{
+		NoStore:        !cfg.DebugCacheInquiries,
 		Repository:     postgres.NewInquiryRepository(db),
 		Providers:      providers,
 		Adapters:       adapters,

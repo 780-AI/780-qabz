@@ -1,7 +1,8 @@
-<!-- VERSION: 3.15 -->
+<!-- VERSION: 3.16 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.16 — 2026-11-11 — Added 031-debug-cache-inquiries entry.
 v3.15 — 2026-11-11 — Added session-wrap-up (task 037 session) entry.
 v3.14 — 2026-11-11 — Added 037-mobile-rightel-inquiry entry.
 v3.13 — 2026-11-11 — Added session-wrap-up (task 036 session) entry.
@@ -131,6 +132,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Task 031: `debug.cache_inquiries`, a development switch of the inquiry tables
+- **Type:** Major (a new config key, domain logic of the inquiry flow, Critical File `system.html`)
+- **Files:** `src/config/config.go` (`DebugCacheInquiries`, path `debug.cache_inquiries`, default `true`) + `config_test.go`; `src/core/inquiry/inquiry.go` (`Options.NoStore`: no `FindValid`, no request row, no status, no saved inquiry or copy, no tid) + `nostore_test.go` (new), `inquiry_test.go` (`newRigStore`); `src/app/defaults.go` (`newInquiryFlow` sets `NoStore` and writes one warn line) + `cacheinquiries_test.go` (new), `cacheinquiries_live_test.go` (new); `config.yml.example` (and the local `config.yml`); `docs/initial-discovery/system.html` (v2.8); `docs/this_vs_bill.md` (v0.15, item 34); `src/app/README.md` (v0.29); `docs/documents_manifest.md`; `docs/Plans/OPEN_TASKS.md` (v1.59); the task file v0.2 (design, implementation and verification record; moved to `done_tasks/`).
+- **Impact:** Yes, behavior changes only with the new key set to `false` in dev mode. (1) New key `debug.cache_inquiries` (default `true`; development only: a mode other than `dev` removes the debug section, so stage and prod always have `true`; read at start). (2) `true`, or no key: the inquiry flow is unchanged for every bill type. (3) `false`: the flow of every bill type does not read or write `bill_inquiries` and `bill_inquiry_requests`: no saved inquiry answers (the `caching.*` TTLs do not apply), and no request row, no inquiry and no copy is written, also for a provider error or a refused answer; every inquiry calls the provider; the answers, the error mapping, the log lines and the metrics are the same (never `db_hit`); one warn line at start names the key. `bill` has no such key (`this_vs_bill.md` item 34).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → Pending verification → "Task 031 `debug.cache_inquiries`": unit and live tests (`make test`); feature ON against the compose dev database with the Qabzino mock (steps 2a to 2d). Run by the implementer on 2026-11-11: all pass (evidence in the task file).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Session wrap-up (task 037 session)
 - **Type:** Minor (documentation; no code, no new files).

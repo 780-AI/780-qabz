@@ -1,7 +1,7 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 0.2 -->
 # 031_debug_cache_inquiries — `debug.cache_inquiries`: a development switch for saving and reading inquiries in the database
 
-Status: pending
+Status: done
 
 ## Description
 
@@ -38,3 +38,31 @@ Feature ON (Rule 15), in dev mode against the compose dev database, with a mock 
 2. Same flag, `return_type: error`, a new `billId`. Pass: the error answer; both row counts are still unchanged.
 3. `debug.cache_inquiries: true` (or the key removed). Call a new `billId` twice. Pass: one request row, one `bill_inquiries` row, then one copy row with `is_cached = true`; the second call writes no mock log line and `qabz_inquiries_total{result="db_hit"}` is 1.
 4. `mode: "stage"` with `debug.cache_inquiries: false` in the file. Pass: the App starts with no warn line and the flow behaves as step 3 (the debug section is removed).
+
+## Design decisions (2026-11-11, operator approved "Cool")
+
+1. **Key:** `debug.cache_inquiries` (`config.Config.DebugCacheInquiries`, bool, default `true`). A mode other than `dev` removes the debug section (task 020c), so the value is `true` there.
+2. **Where:** in `core/inquiry` only, `Options.NoStore bool`. The zero value is the flow as before, so every existing `Options{}` (and test) is unchanged. The App sets `NoStore: !cfg.DebugCacheInquiries` in `newInquiryFlow`. Every bill type follows it with no handler change.
+3. **Not hot-reloadable:** read when the flow is built at start, as the `caching.*` keys and the other `debug.*` keys.
+4. **With the flag off:** no `FindValid`, no copy `SaveInquiries`, no `CreateRequest`, no `FinishRequest`, no answer `SaveInquiries`. No `tid` is made: `provider.InquiryRequest` has no TID field, so no adapter uses it. The provider trace ID is not kept (only the request row had it). The answer, the error mapping, the `inquiry: provider call` line and the metrics are unchanged; the result is never `db_hit`. The `id` of an inquiry in the answer is a new UUID that is not a row.
+5. **Start warn line:** `inquiry store disabled (debug.cache_inquiries: false): development only, every inquiry calls the provider and nothing is saved`.
+6. **Docs:** `config.yml.example` and the local `config.yml` (debug section), `system.html`, `this_vs_bill.md` item 34 with a `@todo` at the code, `src/app/README.md`.
+
+## Implementation record (2026-11-11)
+
+- `src/config/config.go`: `DebugCacheInquiries` (path `debug.cache_inquiries`, default `true`) + `config_test.go` `TestParseCacheInquiries` (default in each mode, `false` in dev, ignored in stage and prod, not a bool rejected).
+- `src/core/inquiry/inquiry.go`: `Options.NoStore`, `Service.noStore`; `Inquire` skips `fromDatabase`; `fromProvider` skips the tid, the request row, the status and the saved answer; `finish` writes nothing. The `@todo` names item 34. Tests: `nostore_test.go` (new; success twice with a valid saved row, provider down, refused, other error, empty answer, client leaves: zero Repository calls, no tid, no error line; the same rig with the store on answers from the saved row); `inquiry_test.go` (`newRigStore`).
+- `src/app/defaults.go`: `newInquiryFlow` sets `NoStore` and writes the warn line. Tests: `cacheinquiries_test.go` (new; the key reaches the flow: with `false` a call succeeds with no database (port 1) and one warn line; with `true` it fails at the request row and no warn line), `cacheinquiries_live_test.go` (new; real Postgres).
+- `config.yml.example`, `config.yml`: `debug.cache_inquiries: true`.
+
+## Verification record (2026-11-11, implementer)
+
+- Build, vet, `gofmt`: clean. `make test GO_TEST_ARGS="-race -count=1"`: every package passes but `qabz/config` `TestLocalConfigInSync`, the old task 023 follow-up (c) (the five `providers.tavanir.circuit_breaker` keys are commented out in the local `config.yml`); the new key is in both files.
+- Live: `TestLiveNoCacheInquiries` (two calls, two provider calls, zero rows in both tables; a valid saved row does not answer; a mock error gives HTTP 503 and zero rows) and `TestLiveWaterInquiryFlow` (the flag on, unchanged) pass, no skip.
+- Positive control (`go test -overlay`, scratch copies only): with `NoStore` not set in `newInquiryFlow`, `TestLiveNoCacheInquiries` and `TestNewInquiryFlowCacheInquiries` fail; with `NewService` ignoring `Options.NoStore`, `TestNoStoreOptionIsKept`, `TestNoStoreSuccessCallsProviderEveryTime` and `TestNoStoreFailedCalls` fail. The real files pass.
+- Feature ON (Rule 15): an App copy on ports 18080 / 18082 / 19090 (the operator debug App on 8080 stayed up), config copies in the scratchpad with no real token and no real endpoint, `providers.qabzino.enabled: true`, `debug.mocks.qabzino.enable: true`, `debug.auth.disable: true`; the dev database has Qabzino (row 36) as the first enabled water provider. No call to Ayantech. Row counts before: `bill_inquiries` 13, `bill_inquiry_requests` 22.
+  1. `cache_inquiries: false`, mock `success`, bill `3131000000017` twice: both HTTP 200 with the mock answer (25 000 000, pay ID `2500012345`, `2030-01-01`); two mock lines; counts 13 / 22 (unchanged); the start log has the warn line; `qabz_inquiries_total{bill_type="water",provider="qabzino",result="provider_ok"} 2`, no `db_hit`. Pass.
+  2. `false`, mock `error`, bill `3131000000025`: HTTP 503 with the provider-down text; one line `water: provider inquiry failed`; counts 13 / 22. Pass.
+  3. `true`, mock `success`, bill `3131000000033` twice: no warn line; one mock line; one request row `success`, one `bill_inquiries` row and one copy (`is_cached = true`); `db_hit` 1, `provider_ok` 1. Pass.
+  4. `mode: stage`, the file has `cache_inquiries: false` (and the mock on; a scratch HMAC secret and a local test token, the auth check is on in stage): no warn line, no mock line (the debug section is removed). Bill `3131000000041` twice: two request rows `failed` (the store is used, so the key is ignored); HTTP 503 because the real adapter has an empty endpoint and sends nothing. Pass (the flow is the store-on flow; the mock answer of step 3 cannot show outside dev).
+- After the run: the test rows of the bills `313100000___` were deleted (2 inquiry rows, 3 request rows); counts are 13 / 22 again.

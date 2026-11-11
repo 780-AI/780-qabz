@@ -163,3 +163,4 @@ debug:
     parsian:                 # the Parsian mock: a fixed answer, no call to the parsian-v2 service
       enable: false
       return_type: "success" # "success" or "error"
+  cache_inquiries: true      # development only: false = the inquiry flow does not read or write bill_inquiries / bill_inquiry_requests (every inquiry calls the provider)

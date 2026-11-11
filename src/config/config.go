@@ -285,6 +285,14 @@ type Config struct {
 	DebugMockJiringSwitchReturnType string `path:"debug.mocks.jiring_switch.return_type"`
 	DebugMockParsianEnable          bool   `path:"debug.mocks.parsian.enable"`
 	DebugMockParsianReturnType      string `path:"debug.mocks.parsian.return_type"`
+
+	// DebugCacheInquiries is the switch of every use of the inquiry tables (bill_inquiries,
+	// bill_inquiry_requests) by the inquiry flow (task 031). True (the default): the flow reads the
+	// saved inquiries first and saves the request row and the answer, as before. False: the flow
+	// does not read or write these tables; every inquiry calls the provider. Development only: a
+	// mode other than dev removes the debug section, so the key is true there. Not hot-reloadable:
+	// read at start (as the caching.* keys).
+	DebugCacheInquiries bool `path:"debug.cache_inquiries"`
 }
 
 func defaults() Config {
@@ -327,6 +335,7 @@ func defaults() Config {
 		DebugMockIrancellReturnType:       MockReturnSuccess,
 		DebugMockJiringSwitchReturnType:   MockReturnSuccess,
 		DebugMockParsianReturnType:        MockReturnSuccess,
+		DebugCacheInquiries:               true,
 	}
 }
 

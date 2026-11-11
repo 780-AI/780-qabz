@@ -729,3 +729,32 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	_, err = Parse([]byte(base + "providers: {jiring_switch: {get_status: {chunk: \"many\"}}}\n"))
 	assert.ErrorContains(t, err, "providers.jiring_switch.get_status.chunk")
 }
+
+// TestParseCacheInquiries (task 031): debug.cache_inquiries is true by default, takes false in dev,
+// and is ignored (true) in a mode other than dev (task 020c removes the debug section).
+func TestParseCacheInquiries(t *testing.T) {
+	const base = "database: {postgres: {password: pw}}\n"
+	for _, mode := range []string{ModeDev, ModeStage, ModeProd} {
+		c, err := Parse([]byte("mode: " + mode + "\n" + base))
+		if assert.NoError(t, err, mode) {
+			assert.True(t, c.DebugCacheInquiries, "default, %s", mode)
+		}
+	}
+	const off = "debug: {cache_inquiries: false}\n"
+	c, err := Parse([]byte("mode: dev\n" + base + off))
+	if assert.NoError(t, err) {
+		assert.False(t, c.DebugCacheInquiries, "false in dev")
+	}
+	c, err = Parse([]byte("mode: dev\n" + base + "debug: {cache_inquiries: true}\n"))
+	if assert.NoError(t, err) {
+		assert.True(t, c.DebugCacheInquiries)
+	}
+	for _, mode := range []string{ModeStage, ModeProd} {
+		c, err := Parse([]byte("mode: " + mode + "\n" + base + off))
+		if assert.NoError(t, err, mode) {
+			assert.True(t, c.DebugCacheInquiries, "ignored outside dev, %s", mode)
+		}
+	}
+	_, err = Parse([]byte("mode: dev\n" + base + "debug: {cache_inquiries: \"no\"}\n"))
+	assert.Error(t, err, "not a bool")
+}

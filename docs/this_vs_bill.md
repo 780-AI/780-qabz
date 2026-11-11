@@ -1,7 +1,8 @@
-<!-- VERSION: 0.14 -->
+<!-- VERSION: 0.15 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v0.15 — 2026-11-11 — Task 031: item 34 (`debug.cache_inquiries`: a development switch that turns off the inquiry tables; bill has none).
 v0.14 — 2026-11-11 — Task 037: item 33 (POST /v1/mobile/inquiry for the Rightel operator: only Qabzino, the direct Ayantech call, the status codes, the differences of the water inquiry apply); item 31 no longer names Rightel as not available.
 v0.13 — 2026-11-11 — Task 036: item 32 (POST /v1/mobile/inquiry for the MCI operator: the provider order, one provider per request, Parsian for other bill types, the differences of the water inquiry apply); item 31 no longer names MCI as not available; item 15 covers an adapter that does not inquire the bill type.
 v0.12 — 2026-11-11 — Task 035: item 30 (the Irancell adapter: a failed call writes `failed`, not `pending`) and item 31 (POST /v1/mobile/inquiry for the Irancell operator: the operator answers, only the Irancell provider, the differences of the water inquiry apply).
@@ -236,3 +237,9 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **The differences of the water inquiry apply:** items 14, 15, 16, 17, 19, 20, 21 and 22, through the same flow and error mapping; the operator differences of item 31 apply too.
     - **Reason:** one flow for every bill type; one status mapping for every Qabzino kind (item 26); the operator rule "a Rightel inquiry MUST use Qabzino and nothing else" (2026-11-11).
     - **Code:** `provider.BillTypeMobileMidTermRightel` in `billTypes` of `src/core/inquiry/inquiry.go`; the `mobilemidtermRightel` kind in `src/provider/qabzino/qabzino.go` (the `@todo` comment names item 33).
+
+34. **`debug.cache_inquiries`: a development switch of the inquiry tables.**
+    - **bill:** has no such key. Every inquiry reads `bill_inquiries` first and writes the `bill_inquiry_requests` row and the answer; only the TTL of `caching.<bill type>` changes the read.
+    - **Qabz:** `debug.cache_inquiries` (default `true`) in the `debug` section. `true` is the flow of bill. `false`, in dev mode only (a mode other than dev removes the section), turns off every use of the two tables by the inquiry flow: no saved inquiry answers, and no request row, no inquiry and no copy for the user is written. Every inquiry calls the provider. The `id` of an inquiry in the answer is then not the id of a row.
+    - **Reason:** the operator wants to test the providers in development with no saved state ("nothing stored regarding inquiries", task 031).
+    - **Code:** `Options.NoStore` in `src/core/inquiry/inquiry.go` (the `@todo` comment names item 34); `newInquiryFlow` in `src/app/defaults.go`.
