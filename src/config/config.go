@@ -90,51 +90,51 @@ type Config struct {
 	// app_hot_configs): the reload routine reads the current value before each wait.
 	ProvidersLoadInterval time.Duration `path:"providers.general.load_interval" hot_reload:"true"`
 
-	// QabzinoEnabled is providers.qabzino.enabled (task 030). False (the default): Qabzino cannot be
+	// QabzinoEnabled is providers.external.qabzino.enabled (task 030). False (the default): Qabzino cannot be
 	// used: no call is sent to Ayantech, every Qabzino inquiry fails as "provider down", and the
 	// Qabzino mock does not bypass the switch. Not hot-reloadable: the adapter is built at start.
-	QabzinoEnabled bool `path:"providers.qabzino.enabled"`
+	QabzinoEnabled bool `path:"providers.external.qabzino.enabled"`
 	// QabzinoGRPCAddress is the host:port of the old qabzino service (gRPC, no TLS, as in bill:
 	// qabzino.grpcAddress). Since task 030 only QabzinoProxy (package provider/qabzinoproxy, not
 	// used) reads it; the App does not.
-	QabzinoGRPCAddress string `path:"providers.qabzino.grpc_address"`
+	QabzinoGRPCAddress string `path:"providers.external.qabzino.grpc_address"`
 	// QabzinoTimeout limits each call to the Qabzino backend. Positive. Not hot-reloadable.
-	QabzinoTimeout time.Duration `path:"providers.qabzino.timeout"`
+	QabzinoTimeout time.Duration `path:"providers.external.qabzino.timeout"`
 	// QabzinoToken is the Ayantech token of the Qabzino provider (bill: qabzino.token). A Secret:
 	// it never prints. Empty by default; the real value is only in config.yml (task 029). Read by
 	// the direct Qabzino adapter (task 030).
-	QabzinoToken Secret `path:"providers.qabzino.token"`
+	QabzinoToken Secret `path:"providers.external.qabzino.token"`
 	// QabzinoElectricityBillEndpoint, QabzinoGasBillEndpoint, QabzinoRightelBillEndpoint and
 	// QabzinoWaterBillEndpoint are the Ayantech inquiry URLs (bill: qabzino.electricityBillEndpoint
 	// and so on; the qabzino service: rightelBillEndpoint). Not checked. The water one (task 030),
 	// the gas one (task 023) and the Rightel one (task 037) are read; the electricity one is unused so far.
 	// No default (task 036, operator): the real URLs are only in config.yml; an empty URL makes
 	// every call fail as "provider down".
-	QabzinoElectricityBillEndpoint string `path:"providers.qabzino.electricity_bill_endpoint"`
-	QabzinoGasBillEndpoint         string `path:"providers.qabzino.gas_bill_endpoint"`
-	QabzinoRightelBillEndpoint     string `path:"providers.qabzino.rightel_bill_endpoint"`
-	QabzinoWaterBillEndpoint       string `path:"providers.qabzino.water_bill_endpoint"`
+	QabzinoElectricityBillEndpoint string `path:"providers.external.qabzino.electricity_bill_endpoint"`
+	QabzinoGasBillEndpoint         string `path:"providers.external.qabzino.gas_bill_endpoint"`
+	QabzinoRightelBillEndpoint     string `path:"providers.external.qabzino.rightel_bill_endpoint"`
+	QabzinoWaterBillEndpoint       string `path:"providers.external.qabzino.water_bill_endpoint"`
 
 	// TavanirEnabled turns the Tavanir provider on (task 034). False (the default): every call to
 	// Tavanir fails as "provider down", nothing is sent to Tavanir and the mock
 	// (debug.mocks.tavanir) does not apply. Not hot-reloadable.
-	TavanirEnabled bool `path:"providers.tavanir.enabled"`
+	TavanirEnabled bool `path:"providers.external.tavanir.enabled"`
 	// TavanirTimeout limits each HTTP call to Tavanir (the login and the inquiry each). Positive. Not hot-reloadable.
-	TavanirTimeout time.Duration `path:"providers.tavanir.timeout"`
+	TavanirTimeout time.Duration `path:"providers.external.tavanir.timeout"`
 	// The config of the Tavanir adapter (task 033; the tavanir service: tavanir.authEndpoint and so
 	// on). The adapter (task 034) uses auth_endpoint, basic_branch_endpoint, username and password;
 	// bill_document_endpoint and branch_debit_endpoint are not used yet. The password is a Secret
 	// (never printed). The endpoints have no default (task 036, operator): the real URLs are only in
 	// config.yml; an empty auth or basic branch URL makes every call fail as "provider down".
-	TavanirAuthEndpoint         string `path:"providers.tavanir.auth_endpoint"`
-	TavanirBasicBranchEndpoint  string `path:"providers.tavanir.basic_branch_endpoint"`
-	TavanirBillDocumentEndpoint string `path:"providers.tavanir.bill_document_endpoint"`
-	TavanirBranchDebitEndpoint  string `path:"providers.tavanir.branch_debit_endpoint"`
-	TavanirUsername             string `path:"providers.tavanir.username"`
-	TavanirPassword             Secret `path:"providers.tavanir.password"`
+	TavanirAuthEndpoint         string `path:"providers.external.tavanir.auth_endpoint"`
+	TavanirBasicBranchEndpoint  string `path:"providers.external.tavanir.basic_branch_endpoint"`
+	TavanirBillDocumentEndpoint string `path:"providers.external.tavanir.bill_document_endpoint"`
+	TavanirBranchDebitEndpoint  string `path:"providers.external.tavanir.branch_debit_endpoint"`
+	TavanirUsername             string `path:"providers.external.tavanir.username"`
+	TavanirPassword             Secret `path:"providers.external.tavanir.password"`
 	// @todo circuit breaker: no provider has one yet (operator decision of task 034: every provider
 	// gets one at the end of the project). Task 040 removed the unused keys
-	// providers.tavanir.circuit_breaker.* (name "tavanir", max_requests 100000, interval 1s, timeout
+	// providers.external.tavanir.circuit_breaker.* (name "tavanir", max_requests 100000, interval 1s, timeout
 	// 10s, failure_ratio 99 percent, as the tavanir service). When the circuit breaker feature lands,
 	// add its keys for every provider (in config.yml and config.yml.example, conventions § 8) and the
 	// metrics qabz_circuit_breaker_state and qabz_circuit_breaker_transitions_total (system.html,
@@ -158,23 +158,23 @@ type Config struct {
 	//     "provider down", nothing is sent to the irancell service and the mock
 	//     (debug.mocks.irancell) does not apply, as for Qabzino and Tavanir.
 	//   - IrancellTimeout limits each call to the irancell service. Positive.
-	IrancellEnabled                  bool          `path:"providers.irancell.enabled"`
-	IrancellTimeout                  time.Duration `path:"providers.irancell.timeout"`
-	IrancellName                     string        `path:"providers.irancell.name"`
-	IrancellGRPCAddress              string        `path:"providers.irancell.grpc_address"`
-	IrancellNATSSubject              string        `path:"providers.irancell.nats_subject"`
-	IrancellGetStatusCronTime        time.Duration `path:"providers.irancell.get_status.cron_time"`
-	IrancellGetStatusName            string        `path:"providers.irancell.get_status.name"`
-	IrancellGetStatusStart           time.Duration `path:"providers.irancell.get_status.start"`
-	IrancellGetStatusEnd             time.Duration `path:"providers.irancell.get_status.end"`
-	IrancellGetStatusChunk           int           `path:"providers.irancell.get_status.chunk"`
-	IrancellGetStatusEvery           time.Duration `path:"providers.irancell.get_status.every"`
-	IrancellGetStatusLockTime        time.Duration `path:"providers.irancell.get_status.lock_time"`
-	IrancellGetStatusIsLockable      bool          `path:"providers.irancell.get_status.is_lockable"`
-	IrancellGetStatusReverseDeadline time.Duration `path:"providers.irancell.get_status.reverse_deadline"`
-	IrancellGetStatusSyncAPICall     time.Duration `path:"providers.irancell.get_status.sync_operations.api_call_get_status"`
-	IrancellGetStatusSyncGetOrder    time.Duration `path:"providers.irancell.get_status.sync_operations.get_order_query"`
-	IrancellGetStatusSyncInsertOrder time.Duration `path:"providers.irancell.get_status.sync_operations.insert_order_query"`
+	IrancellEnabled                  bool          `path:"providers.internal.irancell.enabled"`
+	IrancellTimeout                  time.Duration `path:"providers.internal.irancell.timeout"`
+	IrancellName                     string        `path:"providers.internal.irancell.name"`
+	IrancellGRPCAddress              string        `path:"providers.internal.irancell.grpc_address"`
+	IrancellNATSSubject              string        `path:"providers.internal.irancell.nats_subject"`
+	IrancellGetStatusCronTime        time.Duration `path:"providers.internal.irancell.get_status.cron_time"`
+	IrancellGetStatusName            string        `path:"providers.internal.irancell.get_status.name"`
+	IrancellGetStatusStart           time.Duration `path:"providers.internal.irancell.get_status.start"`
+	IrancellGetStatusEnd             time.Duration `path:"providers.internal.irancell.get_status.end"`
+	IrancellGetStatusChunk           int           `path:"providers.internal.irancell.get_status.chunk"`
+	IrancellGetStatusEvery           time.Duration `path:"providers.internal.irancell.get_status.every"`
+	IrancellGetStatusLockTime        time.Duration `path:"providers.internal.irancell.get_status.lock_time"`
+	IrancellGetStatusIsLockable      bool          `path:"providers.internal.irancell.get_status.is_lockable"`
+	IrancellGetStatusReverseDeadline time.Duration `path:"providers.internal.irancell.get_status.reverse_deadline"`
+	IrancellGetStatusSyncAPICall     time.Duration `path:"providers.internal.irancell.get_status.sync_operations.api_call_get_status"`
+	IrancellGetStatusSyncGetOrder    time.Duration `path:"providers.internal.irancell.get_status.sync_operations.get_order_query"`
+	IrancellGetStatusSyncInsertOrder time.Duration `path:"providers.internal.irancell.get_status.sync_operations.insert_order_query"`
 
 	// The config of the Jiring Switch and the Parsian provider (task 036, the MCI mobile bill): each
 	// adapter (provider/jiring, provider/parsianproxy) is a gRPC client of our own service
@@ -192,44 +192,53 @@ type Config struct {
 	// config.yml) and are not read yet: they belong to the order flow and its status cron. The three
 	// sync_operations keys are bill's list getStatus.syncOperations as three keys, as for Irancell.
 	// Not hot-reloadable.
-	JiringSwitchEnabled     bool          `path:"providers.jiring_switch.enabled"`
-	JiringSwitchTimeout     time.Duration `path:"providers.jiring_switch.timeout"`
-	JiringSwitchGRPCAddress string        `path:"providers.jiring_switch.grpc_address"`
-	ParsianEnabled          bool          `path:"providers.parsian.enabled"`
-	ParsianTimeout          time.Duration `path:"providers.parsian.timeout"`
-	ParsianGRPCAddress      string        `path:"providers.parsian.grpc_address"`
+	JiringSwitchEnabled     bool          `path:"providers.internal.jiring_switch.enabled"`
+	JiringSwitchTimeout     time.Duration `path:"providers.internal.jiring_switch.timeout"`
+	JiringSwitchGRPCAddress string        `path:"providers.internal.jiring_switch.grpc_address"`
+	ParsianEnabled          bool          `path:"providers.internal.parsian.enabled"`
+	ParsianTimeout          time.Duration `path:"providers.internal.parsian.timeout"`
+	ParsianGRPCAddress      string        `path:"providers.internal.parsian.grpc_address"`
 
-	JiringSwitchName                     string        `path:"providers.jiring_switch.name"`
-	JiringSwitchGetStatusName            string        `path:"providers.jiring_switch.get_status.name"`
-	JiringSwitchGetStatusChunk           int           `path:"providers.jiring_switch.get_status.chunk"`
-	JiringSwitchGetStatusStart           time.Duration `path:"providers.jiring_switch.get_status.start"`
-	JiringSwitchGetStatusEnd             time.Duration `path:"providers.jiring_switch.get_status.end"`
-	JiringSwitchGetStatusCronTime        time.Duration `path:"providers.jiring_switch.get_status.cron_time"`
-	JiringSwitchGetStatusLockTime        time.Duration `path:"providers.jiring_switch.get_status.lock_time"`
-	JiringSwitchGetStatusIsLockable      bool          `path:"providers.jiring_switch.get_status.is_lockable"`
-	JiringSwitchGetStatusReverseDeadline time.Duration `path:"providers.jiring_switch.get_status.reverse_deadline"`
-	JiringSwitchGetStatusSyncAPICall     time.Duration `path:"providers.jiring_switch.get_status.sync_operations.api_call_get_status"`
-	JiringSwitchGetStatusSyncGetOrder    time.Duration `path:"providers.jiring_switch.get_status.sync_operations.get_order_query"`
-	JiringSwitchGetStatusSyncInsertOrder time.Duration `path:"providers.jiring_switch.get_status.sync_operations.insert_order_query"`
+	JiringSwitchName                     string        `path:"providers.internal.jiring_switch.name"`
+	JiringSwitchGetStatusName            string        `path:"providers.internal.jiring_switch.get_status.name"`
+	JiringSwitchGetStatusChunk           int           `path:"providers.internal.jiring_switch.get_status.chunk"`
+	JiringSwitchGetStatusStart           time.Duration `path:"providers.internal.jiring_switch.get_status.start"`
+	JiringSwitchGetStatusEnd             time.Duration `path:"providers.internal.jiring_switch.get_status.end"`
+	JiringSwitchGetStatusCronTime        time.Duration `path:"providers.internal.jiring_switch.get_status.cron_time"`
+	JiringSwitchGetStatusLockTime        time.Duration `path:"providers.internal.jiring_switch.get_status.lock_time"`
+	JiringSwitchGetStatusIsLockable      bool          `path:"providers.internal.jiring_switch.get_status.is_lockable"`
+	JiringSwitchGetStatusReverseDeadline time.Duration `path:"providers.internal.jiring_switch.get_status.reverse_deadline"`
+	JiringSwitchGetStatusSyncAPICall     time.Duration `path:"providers.internal.jiring_switch.get_status.sync_operations.api_call_get_status"`
+	JiringSwitchGetStatusSyncGetOrder    time.Duration `path:"providers.internal.jiring_switch.get_status.sync_operations.get_order_query"`
+	JiringSwitchGetStatusSyncInsertOrder time.Duration `path:"providers.internal.jiring_switch.get_status.sync_operations.insert_order_query"`
 
-	ParsianName                           string        `path:"providers.parsian.name"`
-	ParsianGetStatusName                  string        `path:"providers.parsian.get_status.name"`
-	ParsianGetStatusChunk                 int           `path:"providers.parsian.get_status.chunk"`
-	ParsianGetStatusStart                 time.Duration `path:"providers.parsian.get_status.start"`
-	ParsianGetStatusEnd                   time.Duration `path:"providers.parsian.get_status.end"`
-	ParsianGetStatusCronTime              time.Duration `path:"providers.parsian.get_status.cron_time"`
-	ParsianGetStatusLockTime              time.Duration `path:"providers.parsian.get_status.lock_time"`
-	ParsianGetStatusIsLockable            bool          `path:"providers.parsian.get_status.is_lockable"`
-	ParsianGetStatusReverseDeadline       time.Duration `path:"providers.parsian.get_status.reverse_deadline"`
-	ParsianGetStatusSyncAPICall           time.Duration `path:"providers.parsian.get_status.sync_operations.api_call_get_status"`
-	ParsianGetStatusSyncGetOrder          time.Duration `path:"providers.parsian.get_status.sync_operations.get_order_query"`
-	ParsianGetStatusSyncInsertOrder       time.Duration `path:"providers.parsian.get_status.sync_operations.insert_order_query"`
-	ParsianSettlementInquiryWater         time.Duration `path:"providers.parsian.settlement_inquiry_water"`
-	ParsianSettlementInquiryElectricity   time.Duration `path:"providers.parsian.settlement_inquiry_electricity"`
-	ParsianSettlementInquiryGas           time.Duration `path:"providers.parsian.settlement_inquiry_gas"`
-	ParsianSettlementInquiryTelephone     time.Duration `path:"providers.parsian.settlement_inquiry_telephone"`
-	ParsianSettlementInquiryMCIMobile     time.Duration `path:"providers.parsian.settlement_inquiry_mci_mobile"`
-	ParsianSettlementInquiryRightelMobile time.Duration `path:"providers.parsian.settlement_inquiry_rightel_mobile"`
+	ParsianName                           string        `path:"providers.internal.parsian.name"`
+	ParsianGetStatusName                  string        `path:"providers.internal.parsian.get_status.name"`
+	ParsianGetStatusChunk                 int           `path:"providers.internal.parsian.get_status.chunk"`
+	ParsianGetStatusStart                 time.Duration `path:"providers.internal.parsian.get_status.start"`
+	ParsianGetStatusEnd                   time.Duration `path:"providers.internal.parsian.get_status.end"`
+	ParsianGetStatusCronTime              time.Duration `path:"providers.internal.parsian.get_status.cron_time"`
+	ParsianGetStatusLockTime              time.Duration `path:"providers.internal.parsian.get_status.lock_time"`
+	ParsianGetStatusIsLockable            bool          `path:"providers.internal.parsian.get_status.is_lockable"`
+	ParsianGetStatusReverseDeadline       time.Duration `path:"providers.internal.parsian.get_status.reverse_deadline"`
+	ParsianGetStatusSyncAPICall           time.Duration `path:"providers.internal.parsian.get_status.sync_operations.api_call_get_status"`
+	ParsianGetStatusSyncGetOrder          time.Duration `path:"providers.internal.parsian.get_status.sync_operations.get_order_query"`
+	ParsianGetStatusSyncInsertOrder       time.Duration `path:"providers.internal.parsian.get_status.sync_operations.insert_order_query"`
+	ParsianSettlementInquiryWater         time.Duration `path:"providers.internal.parsian.settlement_inquiry_water"`
+	ParsianSettlementInquiryElectricity   time.Duration `path:"providers.internal.parsian.settlement_inquiry_electricity"`
+	ParsianSettlementInquiryGas           time.Duration `path:"providers.internal.parsian.settlement_inquiry_gas"`
+	ParsianSettlementInquiryTelephone     time.Duration `path:"providers.internal.parsian.settlement_inquiry_telephone"`
+	ParsianSettlementInquiryMCIMobile     time.Duration `path:"providers.internal.parsian.settlement_inquiry_mci_mobile"`
+	ParsianSettlementInquiryRightelMobile time.Duration `path:"providers.internal.parsian.settlement_inquiry_rightel_mobile"`
+
+	// The config of the payment service (task 041; bill: paymentServer.host, paymentServer.port,
+	// paymentServer.privateKeyPath). Operator decisions of task 041: snake_case names, as the other
+	// keys (payment_server, private_key_path); one key address in place of bill's host and port. No default:
+	// the real values are only in config.yml. Not read yet: task 039 reads
+	// PaymentServerPrivateKeyPath (the general private key that signs the order token). Not
+	// hot-reloadable.
+	PaymentServerAddress        string `path:"providers.internal.payment_server.address"`
+	PaymentServerPrivateKeyPath string `path:"providers.internal.payment_server.private_key_path"`
 
 	// The config of the Karashop provider (task 025, the landline bill; bill: thirdparty.karashop):
 	// the adapter (provider/karashop) calls the Karashop HTTPS API itself.
@@ -243,12 +252,12 @@ type Config struct {
 	//   - KarashopBillPaymentInfoURL (bill: billPaymentInfoURL) is not read yet: it belongs to the
 	//     landline order flow (SendPaymentInfo).
 	// Not hot-reloadable.
-	KarashopEnabled            bool          `path:"providers.karashop.enabled"`
-	KarashopTimeout            time.Duration `path:"providers.karashop.timeout"`
-	KarashopCode               string        `path:"providers.karashop.code"`
-	KarashopPassword           Secret        `path:"providers.karashop.password"`
-	KarashopBillInquiryURL     string        `path:"providers.karashop.bill_inquiry_url"`
-	KarashopBillPaymentInfoURL string        `path:"providers.karashop.bill_payment_info_url"`
+	KarashopEnabled            bool          `path:"providers.external.karashop.enabled"`
+	KarashopTimeout            time.Duration `path:"providers.external.karashop.timeout"`
+	KarashopCode               string        `path:"providers.external.karashop.code"`
+	KarashopPassword           Secret        `path:"providers.external.karashop.password"`
+	KarashopBillInquiryURL     string        `path:"providers.external.karashop.bill_inquiry_url"`
+	KarashopBillPaymentInfoURL string        `path:"providers.external.karashop.bill_payment_info_url"`
 
 	// CachingWater is how long a saved water inquiry answers the same bill again with no provider
 	// call (bill: caching.water, 1h). 0 turns the cache off; a negative value is rejected. Not
@@ -439,13 +448,13 @@ func (c Config) validate() error {
 		errs = append(errs, fmt.Errorf("providers.general.load_interval must be at least %s", ProvidersMinLoadInterval))
 	}
 	if c.QabzinoTimeout <= 0 {
-		errs = append(errs, errors.New("providers.qabzino.timeout must be a positive duration (for example 10s)"))
+		errs = append(errs, errors.New("providers.external.qabzino.timeout must be a positive duration (for example 10s)"))
 	}
 	if c.TavanirTimeout <= 0 {
-		errs = append(errs, errors.New("providers.tavanir.timeout must be a positive duration (for example 10s)"))
+		errs = append(errs, errors.New("providers.external.tavanir.timeout must be a positive duration (for example 10s)"))
 	}
 	if c.IrancellTimeout <= 0 {
-		errs = append(errs, errors.New("providers.irancell.timeout must be a positive duration (for example 10s)"))
+		errs = append(errs, errors.New("providers.internal.irancell.timeout must be a positive duration (for example 10s)"))
 	}
 	if c.CachingIrancell < 0 {
 		errs = append(errs, errors.New("caching.irancell must not be negative (0 turns the cache off)"))
@@ -454,10 +463,10 @@ func (c Config) validate() error {
 		errs = append(errs, fmt.Errorf("debug.mocks.irancell.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if c.JiringSwitchTimeout <= 0 {
-		errs = append(errs, errors.New("providers.jiring_switch.timeout must be a positive duration (for example 10s)"))
+		errs = append(errs, errors.New("providers.internal.jiring_switch.timeout must be a positive duration (for example 10s)"))
 	}
 	if c.ParsianTimeout <= 0 {
-		errs = append(errs, errors.New("providers.parsian.timeout must be a positive duration (for example 10s)"))
+		errs = append(errs, errors.New("providers.internal.parsian.timeout must be a positive duration (for example 10s)"))
 	}
 	if c.CachingMobile < 0 {
 		errs = append(errs, errors.New("caching.mobile must not be negative (0 turns the cache off)"))
@@ -469,7 +478,7 @@ func (c Config) validate() error {
 		errs = append(errs, fmt.Errorf("debug.mocks.parsian.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if c.KarashopTimeout <= 0 {
-		errs = append(errs, errors.New("providers.karashop.timeout must be a positive duration (for example 30s)"))
+		errs = append(errs, errors.New("providers.external.karashop.timeout must be a positive duration (for example 30s)"))
 	}
 	if c.CachingTel < 0 {
 		errs = append(errs, errors.New("caching.tel must not be negative (0 turns the cache off)"))

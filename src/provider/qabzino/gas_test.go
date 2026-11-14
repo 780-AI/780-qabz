@@ -186,7 +186,7 @@ func TestGasDisabledAndNotConfigured(t *testing.T) {
 		o    Options
 		text string
 	}{
-		{"disabled", Options{Enabled: false, Token: testToken, GasEndpoint: srv.URL}, "providers.qabzino.enabled is false"},
+		{"disabled", Options{Enabled: false, Token: testToken, GasEndpoint: srv.URL}, "providers.external.qabzino.enabled is false"},
 		{"no token", Options{Enabled: true, GasEndpoint: srv.URL}, "gas_bill_endpoint"},
 		{"no gas endpoint", Options{Enabled: true, Token: testToken, WaterEndpoint: srv.URL}, "gas_bill_endpoint"},
 	}
@@ -200,7 +200,7 @@ func TestGasDisabledAndNotConfigured(t *testing.T) {
 	assert.EqualValues(t, 0, s.calls.Load(), "no request reached the server")
 	// The water error text is the one of before task 023.
 	_, err := newAdapter(t, Options{Enabled: true, Token: testToken, GasEndpoint: srv.URL}).Inquiry(context.Background(), waterReq)
-	assert.ErrorContains(t, err, "providers.qabzino.token and providers.qabzino.water_bill_endpoint are required")
+	assert.ErrorContains(t, err, "providers.external.qabzino.token and providers.external.qabzino.water_bill_endpoint are required")
 }
 
 func TestGasMockFixture(t *testing.T) {

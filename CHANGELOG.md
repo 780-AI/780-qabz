@@ -1,7 +1,8 @@
-<!-- VERSION: 3.25 -->
+<!-- VERSION: 3.26 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.26 — 2026-11-14 — Added 041-providers-internal-external entry.
 v3.25 — 2026-11-14 — Added session-wrap-up (tasks 025 and 040 session) entry.
 v3.24 — 2026-11-14 — Added 025-qa-scenario-passed entry.
 v3.23 — 2026-11-14 — Added 040-remove-circuit-breaker-keys entry.
@@ -141,6 +142,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Task 041: providers.internal and providers.external
+- **Type:** Major (config key paths changed, new config keys; Critical File `system.html`).
+- **Files:** `src/config/config.go` (every provider `path` tag under `providers.internal.*` or `providers.external.*`; new fields `PaymentServerAddress` and `PaymentServerPrivateKeyPath` at `providers.internal.payment_server.address` and `private_key_path`, zero defaults, not read yet; `bill` has `paymentServer.host`, `port` and `privateKeyPath`); `src/config/config_test.go` and `src/app/*_test.go` (test YAML in the new layout; new `TestParsePaymentServerKeys`); `src/config/example_test.go` (new `TestProvidersGroups`); `src/app/defaults.go` (the "disabled" warn line names the new path); `src/provider/*/` (error texts and comments name the new paths); `config.yml.example` (new layout, `payment_server` block); `docs/initial-discovery/system.html` (v2.12); `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.20, § 8 Providers); `docs/this_vs_bill.md` (v0.19); `docs/folder_structure.md` (v0.45); `src/app/README.md` (v0.32); `qabz.postman_collection.json` (descriptions); `docs/Plans/OPEN_TASKS.md` (v1.68); `docs/Plans/done_tasks/041_providers_internal_external.md` (moved from `pending_tasks/`, v0.2, not manifest-tracked). The local `config.yml` (git-ignored) has the new layout and the real `payment_server` values.
+- **Impact:** Yes, the config layout changes. `providers.irancell`, `jiring_switch` and `parsian` move to `providers.internal`; `providers.karashop`, `qabzino` and `tavanir` move to `providers.external`; `providers.general` and `debug.mocks.*` do not change. Operator decision: the old layout is forgotten. A config that still has the old layout loads with no error, and each provider gets its default (disabled): every stage or prod config must move to the new layout with this release. The error and warn texts name the new paths (for example `providers.internal.parsian.enabled is false`). The env names of `scripts/yml_to_env` change (for example `PROVIDERS_EXTERNAL_KARASHOP_TIMEOUT`); no file reads them. With the same config content in the new layout, every `Config` value is the same as before.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, "Task 041 `providers.internal` and `providers.external`" (⏸; the implementer part passed, the real Irancell call waits for the operator).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Session wrap-up (tasks 025 and 040 session)
 - **Type:** Minor (documentation; no code, no new files).

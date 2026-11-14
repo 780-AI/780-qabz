@@ -1,5 +1,5 @@
 // Package tavanir is the adapter of the Tavanir provider (part of Qabz, system.html). It is a client
-// of the Tavanir (SAAPA) endpoints of providers.tavanir over HTTPS (task 034): it logs in with the
+// of the Tavanir (SAAPA) endpoints of providers.external.tavanir over HTTPS (task 034): it logs in with the
 // user name and the password, keeps the token in memory, and asks the basic branch endpoint for the
 // inquiry of an electricity bill. It calls no other service: the former gRPC client of the tavanir
 // microservice is removed. The flow and the answer mapping copy that microservice
@@ -86,17 +86,17 @@ type Doer interface {
 
 // Options configure New.
 type Options struct {
-	// Enabled is providers.tavanir.enabled. False: no call is sent; every Inquiry fails as provider
+	// Enabled is providers.external.tavanir.enabled. False: no call is sent; every Inquiry fails as provider
 	// down.
 	Enabled bool
-	// AuthEndpoint is providers.tavanir.auth_endpoint (the login). Empty: every Inquiry fails as
+	// AuthEndpoint is providers.external.tavanir.auth_endpoint (the login). Empty: every Inquiry fails as
 	// provider down.
 	AuthEndpoint string
-	// BasicBranchEndpoint is providers.tavanir.basic_branch_endpoint (the inquiry). Empty: the same.
+	// BasicBranchEndpoint is providers.external.tavanir.basic_branch_endpoint (the inquiry). Empty: the same.
 	BasicBranchEndpoint string
-	// Username is providers.tavanir.username. Empty: the same.
+	// Username is providers.external.tavanir.username. Empty: the same.
 	Username string
-	// Password is providers.tavanir.password (secret). Empty: the same.
+	// Password is providers.external.tavanir.password (secret). Empty: the same.
 	Password string
 	// Timeout limits each HTTP call (the login and the inquiry each). Required, positive.
 	Timeout time.Duration
@@ -155,7 +155,7 @@ func (a *Adapter) SupportsInquiry(billType string) bool {
 	return billType == provider.BillTypeElectricity
 }
 
-// Enabled reports providers.tavanir.enabled.
+// Enabled reports providers.external.tavanir.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
 // loginRequest is the body of the login (the tavanir service: entity.AuthenticationReq).
@@ -211,10 +211,10 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 		return nil, fmt.Errorf("tavanir: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
 	if !a.enabled {
-		return nil, down("providers.tavanir.enabled is false")
+		return nil, down("providers.external.tavanir.enabled is false")
 	}
 	if a.authEndpoint == "" || a.branchEndpoint == "" || a.username == "" || a.password == "" {
-		return nil, down("providers.tavanir.auth_endpoint, basic_branch_endpoint, username and password are required")
+		return nil, down("providers.external.tavanir.auth_endpoint, basic_branch_endpoint, username and password are required")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -468,7 +468,7 @@ func (*Adapter) Status(context.Context, provider.StatusRequest) (*provider.Statu
 	return nil, provider.ErrNotSupported
 }
 
-// GetDocument is not supported yet (providers.tavanir.bill_document_endpoint is not used).
+// GetDocument is not supported yet (providers.external.tavanir.bill_document_endpoint is not used).
 func (*Adapter) GetDocument(context.Context, provider.DocumentRequest) (*provider.DocumentResponse, error) {
 	return nil, provider.ErrNotSupported
 }

@@ -33,7 +33,7 @@ const inquiryTypeRegular = "regular"
 const successMessage = "عملیات با موفقیت انجام شد"
 
 // errNoAddress is the error of every call of a client made with no address.
-var errNoAddress = errors.New("qabzinoproxy: providers.qabzino.grpc_address is not set")
+var errNoAddress = errors.New("qabzinoproxy: providers.external.qabzino.grpc_address is not set")
 
 // Client is the part of the generated gRPC client (pb.InquiryClient) that the adapter uses. Tests
 // give a fake.

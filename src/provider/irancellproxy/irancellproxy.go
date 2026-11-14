@@ -27,9 +27,9 @@ const successMessage = "عملیات با موفقیت انجام شد"
 
 var (
 	// errNoAddress is the cause of every call of a client made with no address.
-	errNoAddress = errors.New("providers.irancell.grpc_address is not set")
-	// errDisabled is the cause of every call while providers.irancell.enabled is false.
-	errDisabled = errors.New("providers.irancell.enabled is false")
+	errNoAddress = errors.New("providers.internal.irancell.grpc_address is not set")
+	// errDisabled is the cause of every call while providers.internal.irancell.enabled is false.
+	errDisabled = errors.New("providers.internal.irancell.enabled is false")
 )
 
 // Client is the part of the generated gRPC client (pb.InternalServiceClient) that the adapter
@@ -40,7 +40,7 @@ type Client interface {
 
 // Options configure New.
 type Options struct {
-	// Enabled is providers.irancell.enabled. False: no call is sent; every Inquiry fails as
+	// Enabled is providers.internal.irancell.enabled. False: no call is sent; every Inquiry fails as
 	// "provider down".
 	Enabled bool
 	// Client calls the irancell service. Required.
@@ -96,7 +96,7 @@ func (a *Adapter) Name() string { return Name }
 // SupportsInquiry reports whether Inquiry answers the bill type: only the Irancell mobile bill (task 036).
 func (a *Adapter) SupportsInquiry(billType string) bool { return billType == provider.BillTypeIrancell }
 
-// Enabled reports providers.irancell.enabled.
+// Enabled reports providers.internal.irancell.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
 // Inquiry asks the irancell service for the inquiry of a mobile bill (bill: IrancellMobile.Execute).

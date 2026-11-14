@@ -27,9 +27,9 @@ const successMessage = "عملیات با موفقیت انجام شد"
 
 var (
 	// errNoAddress is the cause of every call of a client made with no address.
-	errNoAddress = errors.New("providers.jiring_switch.grpc_address is not set")
-	// errDisabled is the cause of every call while providers.jiring_switch.enabled is false.
-	errDisabled = errors.New("providers.jiring_switch.enabled is false")
+	errNoAddress = errors.New("providers.internal.jiring_switch.grpc_address is not set")
+	// errDisabled is the cause of every call while providers.internal.jiring_switch.enabled is false.
+	errDisabled = errors.New("providers.internal.jiring_switch.enabled is false")
 )
 
 // Client is the part of the generated gRPC client (pb.InternalInquiryServiceClient) that the
@@ -40,7 +40,7 @@ type Client interface {
 
 // Options configure New.
 type Options struct {
-	// Enabled is providers.jiring_switch.enabled. False: no call is sent; every Inquiry fails as
+	// Enabled is providers.internal.jiring_switch.enabled. False: no call is sent; every Inquiry fails as
 	// "provider down".
 	Enabled bool
 	// Client calls the jiring-switch service. Required.
@@ -96,7 +96,7 @@ func (a *Adapter) Name() string { return Name }
 // SupportsInquiry reports whether Inquiry answers the bill type: only the MCI mobile bill (task 036).
 func (a *Adapter) SupportsInquiry(billType string) bool { return billType == provider.BillTypeMobile }
 
-// Enabled reports providers.jiring_switch.enabled.
+// Enabled reports providers.internal.jiring_switch.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
 // Inquiry asks the jiring-switch service for the inquiry of an MCI mobile bill (bill:

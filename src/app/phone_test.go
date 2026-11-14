@@ -22,16 +22,16 @@ import (
 
 const (
 	irancellMockWarn     = "provider mock enabled (debug.mocks.irancell): development only, no call to the Irancell backend"
-	irancellDisabledWarn = "providers.irancell.enabled is false: every inquiry to Irancell fails as provider down; the Irancell mock does not apply"
+	irancellDisabledWarn = "providers.internal.irancell.enabled is false: every inquiry to Irancell fails as provider down; the Irancell mock does not apply"
 )
 
 var irancellRegistryReq = provider.InquiryRequest{BillType: "irancell", UserID: "u", Dialer: "989121234567", InquiryID: "989351234567"}
 
 // TestNewProviderRegistryIrancell (task 035): the Irancell adapter is registered under the name of
-// seed row 38. The mock applies only in dev mode, with the mock key and providers.irancell.enabled
+// seed row 38. The mock applies only in dev mode, with the mock key and providers.internal.irancell.enabled
 // true; enabled false wins over the mock (one warn line).
 func TestNewProviderRegistryIrancell(t *testing.T) {
-	const on = "providers: {irancell: {enabled: true, timeout: 300ms}}\n"
+	const on = "providers: {internal: {irancell: {enabled: true, timeout: 300ms}}}\n"
 	cases := []struct {
 		name     string
 		yml      string
@@ -45,7 +45,7 @@ func TestNewProviderRegistryIrancell(t *testing.T) {
 		{"dev, mock off, irancell disabled", "mode: dev\n", false, false, irancellDisabledWarn},
 		{"stage, enable ignored, irancell disabled", "mode: stage\ndebug: {mocks: {irancell: {enable: true}}}", false, false, irancellDisabledWarn},
 		{"prod, mock ignored, enabled, no address", "mode: prod\n" + on + "debug: {mocks: {irancell: {enable: true}}}", false, false, ""},
-		{"prod, enabled, local address (nothing listens)", "mode: prod\nproviders: {irancell: {enabled: true, grpc_address: \"127.0.0.1:1\", timeout: 2s}}", false, false, ""},
+		{"prod, enabled, local address (nothing listens)", "mode: prod\nproviders: {internal: {irancell: {enabled: true, grpc_address: \"127.0.0.1:1\", timeout: 2s}}}", false, false, ""},
 	}
 	for _, c := range cases {
 		log := &liveLogger{}
@@ -99,7 +99,7 @@ func (f *fakeIrancellService) BillInquiry(_ context.Context, in *irpb.BillInquir
 	}, nil
 }
 
-// TestProviderRegistryIrancellRealCall: with providers.irancell.grpc_address, the adapter of the
+// TestProviderRegistryIrancellRealCall: with providers.internal.irancell.grpc_address, the adapter of the
 // registry calls the BillInquiry method of the irancell service (a local gRPC server here) with the
 // phone, the user and the dialer.
 func TestProviderRegistryIrancellRealCall(t *testing.T) {
@@ -113,7 +113,7 @@ func TestProviderRegistryIrancellRealCall(t *testing.T) {
 	go func() { _ = srv.Serve(lis) }()
 	defer srv.Stop()
 
-	reg, err := newProviderRegistry(registryConfig(t, "mode: prod\nproviders: {irancell: {enabled: true, grpc_address: \""+lis.Addr().String()+"\", timeout: 5s}}"), nil)
+	reg, err := newProviderRegistry(registryConfig(t, "mode: prod\nproviders: {internal: {irancell: {enabled: true, grpc_address: \""+lis.Addr().String()+"\", timeout: 5s}}}"), nil)
 	if !assert.NoError(t, err) || !assert.NotNil(t, reg) {
 		return
 	}

@@ -1,10 +1,12 @@
 package config
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,4 +118,29 @@ func TestLocalConfigInSync(t *testing.T) {
 func TestLeafPaths(t *testing.T) {
 	m := map[string]any{"a": 1, "b": map[string]any{"c": "x", "d": map[string]any{"e": true}}}
 	assert.Equal(t, []string{"a", "b.c", "b.d.e"}, leafPaths(m))
+}
+
+// TestProvidersGroups (task 041): the providers section has only general, internal and external;
+// internal holds our own services and external the third-party services. Each Config path tag under
+// providers is in one of the three groups, and each provider of the example is in its group.
+func TestProvidersGroups(t *testing.T) {
+	providers, ok := readYAML(t, examplePath)["providers"].(map[string]any)
+	if !assert.True(t, ok, "config.yml.example has no providers object") {
+		return
+	}
+	keys := func(v any) []string {
+		m, _ := v.(map[string]any)
+		return slices.Sorted(maps.Keys(m))
+	}
+	assert.Equal(t, []string{"external", "general", "internal"}, keys(providers))
+	assert.Equal(t, []string{"irancell", "jiring_switch", "parsian", "payment_server"}, keys(providers["internal"]))
+	assert.Equal(t, []string{"karashop", "qabzino", "tavanir"}, keys(providers["external"]))
+
+	for _, p := range configPaths() {
+		parts := strings.Split(p, ".")
+		if parts[0] != "providers" {
+			continue
+		}
+		assert.Contains(t, []string{"general", "internal", "external"}, parts[1], "path %s is outside the providers groups", p)
+	}
 }

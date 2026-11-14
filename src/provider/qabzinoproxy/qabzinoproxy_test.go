@@ -85,7 +85,7 @@ func TestInquiryRequestFields(t *testing.T) {
 	assert.Equal(t, "1234567890125", r.GetInquiryId())
 	assert.Equal(t, "trace-1", r.GetTraceNumber())
 	assert.Equal(t, "water", r.GetBillType())
-	assert.True(t, f.dl, "each call has a deadline (providers.qabzino.timeout)")
+	assert.True(t, f.dl, "each call has a deadline (providers.external.qabzino.timeout)")
 }
 
 func TestInquiryAnswerMapping(t *testing.T) {

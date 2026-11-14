@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.11 -->
+<!-- VERSION: 2.12 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.12 — 2026-11-14 — Task 041: the `providers` section has two groups, `providers.internal` (our own services: irancell, jiring_switch, parsian, the new payment_server) and `providers.external` (karashop, qabzino, tavanir); every key path in this document uses the new layout; the config example has the `payment_server` block (address, private_key_path; not read yet).
 v2.11 — 2026-11-14 — Task 040: the unused config keys `providers.tavanir.circuit_breaker.*` removed from the config example (the circuit breaker comes at the end of the project with its own keys; a `@todo` in `src/config/config.go`).
 v2.10 — 2026-11-14 — Task 025 landline inquiry: `POST /v1/tel/inquiry` (`Tel.Inquiry`, bill type `tel`, `tid` prefix 4; the inquiry ID is the number in the 98 form; a request with billId and payId is the raw inquiry); only the Karashop provider may answer (operator decision, `onlyProvider` in `billTypes`); the Karashop adapter (`provider/karashop`, direct HTTPS) sends two calls at the same time (full term, mid term) and the flow writes one request row; each inquiry can have its own bill ID (`InquiryItem.BillID`); `providers.karashop.*`, `caching.tel` (1h), `debug.mocks.karashop`. No new metric (`bill_type="tel"`, `provider="karashop"`).
 v2.9 — 2026-11-14 — Task 038 mobile number normalization: `POST /v1/mobile/inquiry` (every operator) and the mobile type of `POST /v1/mybill` convert the phone to the 98 form before the request check (`helpers.NormalizeMobile`); the 98 form is the inquiry ID. No new metric.
@@ -183,14 +184,14 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/BillInquiry` | internal | Inquiry | MCI mobile |
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/PayBill` | internal | Order | MCI mobile |
 | `jiring-switch` | gRPC | `haf80.api.jiringSwitch.InternalInquiryService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | MCI mobile |
-| `qabzino` | HTTPS (Ayantech, direct since task 030; the gRPC adapter `haf80.api.qabzino.Inquiry/BillInquiry` is QabzinoProxy, not used) | `providers.qabzino.*_bill_endpoint` | Ayantech token | Inquiry (water: task 030; gas: task 023, with the participate code; Rightel mobile: task 037, with the phone in the 0 form) | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
-| `irancell` | gRPC | `pb.InternalService/BillInquiry` | internal (IrancellProxy since task 035; `providers.irancell.grpc_address`) | Inquiry (task 035; only the Irancell provider answers the bill type `irancell`) | `Irancell` mobile |
+| `qabzino` | HTTPS (Ayantech, direct since task 030; the gRPC adapter `haf80.api.qabzino.Inquiry/BillInquiry` is QabzinoProxy, not used) | `providers.external.qabzino.*_bill_endpoint` | Ayantech token | Inquiry (water: task 030; gas: task 023, with the participate code; Rightel mobile: task 037, with the phone in the 0 form) | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
+| `irancell` | gRPC | `pb.InternalService/BillInquiry` | internal (IrancellProxy since task 035; `providers.internal.irancell.grpc_address`) | Inquiry (task 035; only the Irancell provider answers the bill type `irancell`) | `Irancell` mobile |
 | `irancell` | gRPC | `pb.InternalService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | `Irancell` mobile (also called by `recharge`, so it has to stay) |
 | `irancell` | NATS | `irancell-bill` | internal | Order | `Irancell` mobile payment |
-| `tavanir` | HTTPS (Tavanir SAAPA, direct since task 034; Qabz does not call the `tavanir` microservice) | `providers.tavanir.auth_endpoint` (login), `providers.tavanir.basic_branch_endpoint` (inquiry) | user name and password, then a Bearer token kept in memory | Inquiry | Electricity |
-| `tavanir` | HTTPS (not implemented yet) | `providers.tavanir.bill_document_endpoint`, `providers.tavanir.branch_debit_endpoint` | the same token | Inquiry (bill document, debit) | Electricity |
-| `Karashab` (outside our projects) | HTTPS (direct from Qabz since task 025: `provider/karashop`) | `providers.karashop.bill_inquiry_url`, called by `bill` (`BillInquiry`) and by Qabz (two calls per inquiry: `tci-end-getBillAccInfo`, `tci-mid-getBillAccInfo`) | code and password in the body (`providers.karashop.code`, `password`) | Inquiry (task 025; only Karashop answers the bill type `tel`) | Landline |
-| `Karashab` (outside our projects) | HTTP | payment URL (`providers.karashop.bill_payment_info_url`, not read yet), called by `bill` (`SendPaymentInfo`) | internal | Order | Landline |
+| `tavanir` | HTTPS (Tavanir SAAPA, direct since task 034; Qabz does not call the `tavanir` microservice) | `providers.external.tavanir.auth_endpoint` (login), `providers.external.tavanir.basic_branch_endpoint` (inquiry) | user name and password, then a Bearer token kept in memory | Inquiry | Electricity |
+| `tavanir` | HTTPS (not implemented yet) | `providers.external.tavanir.bill_document_endpoint`, `providers.external.tavanir.branch_debit_endpoint` | the same token | Inquiry (bill document, debit) | Electricity |
+| `Karashab` (outside our projects) | HTTPS (direct from Qabz since task 025: `provider/karashop`) | `providers.external.karashop.bill_inquiry_url`, called by `bill` (`BillInquiry`) and by Qabz (two calls per inquiry: `tci-end-getBillAccInfo`, `tci-mid-getBillAccInfo`) | code and password in the body (`providers.external.karashop.code`, `password`) | Inquiry (task 025; only Karashop answers the bill type `tel`) | Landline |
+| `Karashab` (outside our projects) | HTTP | payment URL (`providers.external.karashop.bill_payment_info_url`, not read yet), called by `bill` (`SendPaymentInfo`) | internal | Order | Landline |
 
 `Parsian` and `Irancell`: from the app's perspective, the call is internal. Inside `qabz`, `Parsian` proxies the call to its current microservice, and so does `Irancell`.
 
@@ -198,65 +199,70 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 
 Config now contains more entries. It must include the config entries of every provider as well.
 
-Every provider has its own block under `providers` (the section is `providers`, as in the code; the key `providers.general` holds the settings of `ProvidersService`). The real blocks of `qabzino` (task 021), `tavanir` (task 022), `irancell` (task 035), `jiring_switch` and `parsian` (task 036):
+Every provider has its own block under `providers` (the section is `providers`, as in the code; the key `providers.general` holds the settings of `ProvidersService`). Since task 041 each provider block is in one of two groups: `providers.internal` holds the providers that are our own services (`irancell`, `jiring_switch`, `parsian`, and the payment service `payment_server`), and `providers.external` holds the third-party services (`karashop`, `qabzino`, `tavanir`). A new provider goes in the group of its kind. The old layout (`providers.<provider>`) is not read: a key at an old path is ignored, as every untagged path. The real blocks of `qabzino` (task 021), `tavanir` (task 022), `irancell` (task 035), `jiring_switch` and `parsian` (task 036), `karashop` (task 025) and `payment_server` (task 041):
 
 ```yaml
 providers:
   general:
     load_interval: 1m
-  qabzino:
-    grpc_address: qabzino:9000   # host:port of the old qabzino service; read only by QabzinoProxy (not used since task 030)
-    timeout: 10s                 # limit of each call to Ayantech; positive
-    enabled: false               # false (default): Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply) (task 030)
-    token: ""                    # Ayantech token (secret); the real value only in config.yml (task 029)
-    electricity_bill_endpoint: "" # no default (task 036): the real URL only in config.yml
-    gas_bill_endpoint: ""        # no default (task 036): the real URL only in config.yml; read since task 023
-    rightel_bill_endpoint: ""    # no default: the real URL only in config.yml; the Rightel mobile inquiry (task 037)
-    water_bill_endpoint: ""      # no default (task 036): the real URL only in config.yml
-  tavanir:
-    enabled: false               # false (default): every Tavanir call fails as "provider down", nothing is sent, the mock does not apply (task 034)
-    timeout: 10s                 # limit of each HTTP call (the login and the inquiry each); positive
-    auth_endpoint: ""            # no default (task 036): the real URL only in config.yml; the login; the adapter uses auth_endpoint, basic_branch_endpoint, username and password (task 034)
-    basic_branch_endpoint: ""    # no default (task 036): the real URL only in config.yml
-    bill_document_endpoint: ""   # no default (task 036): the real URL only in config.yml
-    branch_debit_endpoint: ""    # no default (task 036): the real URL only in config.yml
-    username: ""                 # Tavanir (SAAPA) user name; the real value only in config.yml
-    password: ""                 # Tavanir (SAAPA) password (secret); the real value only in config.yml
-  irancell:                      # the irancell service, our own service (task 035)
-    enabled: false               # false (default): every Irancell call fails as "provider down", nothing is sent, the mock does not apply
-    timeout: 10s                 # limit of each call to the irancell service; positive
-    grpc_address: irancell:8084  # host:port of the internal gRPC server of the irancell service (no TLS); empty: every call fails as "provider down"
-    name: irancell               # the bill keys (bill: irancell.name, natsSubject, getStatus); not read yet (order flow and its status cron)
-    nats_subject: irancell-bill
-    get_status: {cron_time: 15m, name: irancell-get-status, start: 30m, end: 48h, chunk: 100, every: 15m, lock_time: 30m, is_lockable: true, reverse_deadline: 10h,
-                 sync_operations: {api_call_get_status: 30s, get_order_query: 3ms, insert_order_query: 3ms}}
-  jiring_switch:                 # the jiring-switch service, our own service (task 036); the providers.name is jiring-switch
-    enabled: false               # false (default): every Jiring Switch call fails as "provider down", nothing is sent, the mock does not apply
-    timeout: 10s                 # limit of each call to the jiring-switch service; positive
-    grpc_address: ""             # host:port of the internal gRPC server of the jiring-switch service (no TLS); empty: every call fails as "provider down"
-    name: ""                     # bill's keys of the service client (jiringSwitch.name and the getStatus block); no default, the real values only in config.yml; not read yet (order flow)
-    get_status: {name: "", chunk: 0, start: 0s, end: 0s, cron_time: 0s, lock_time: 0s, is_lockable: false, reverse_deadline: 0s,
-                 sync_operations: {api_call_get_status: 0s, get_order_query: 0s, insert_order_query: 0s}}
-  parsian:                       # the parsian-v2 service, our own service (task 036)
-    enabled: false
-    timeout: 10s
-    grpc_address: ""             # host:port of the internal gRPC server of the parsian-v2 service (no TLS)
-    name: ""                     # bill's keys (parsian.name, getStatus, settlementInquiry*); no default; not read yet (order flow, settlement)
-    get_status: {name: "", chunk: 0, start: 0s, end: 0s, cron_time: 0s, lock_time: 0s, is_lockable: false, reverse_deadline: 0s,
-                 sync_operations: {api_call_get_status: 0s, get_order_query: 0s, insert_order_query: 0s}}
-    settlement_inquiry_water: 0s
-    settlement_inquiry_electricity: 0s
-    settlement_inquiry_gas: 0s
-    settlement_inquiry_telephone: 0s
-    settlement_inquiry_mci_mobile: 0s
-    settlement_inquiry_rightel_mobile: 0s
-  karashop:                      # the Karashop (digitalport) HTTPS API (task 025): the landline bill
-    enabled: false               # false: every Karashop call fails as "provider down", the mock does not apply
-    timeout: 30s                 # limit of each of the two calls of an inquiry (bill: karashop.timeout)
-    code: ""                     # no default: the real values only in config.yml
-    password: ""                 # a Secret, never printed
-    bill_inquiry_url: ""         # empty: every call fails as "provider down"
-    bill_payment_info_url: ""    # not read yet (the landline order flow)
+  internal:                  # our own services
+    irancell:                      # the irancell service, our own service (task 035)
+      enabled: false               # false (default): every Irancell call fails as "provider down", nothing is sent, the mock does not apply
+      timeout: 10s                 # limit of each call to the irancell service; positive
+      grpc_address: irancell:8084  # host:port of the internal gRPC server of the irancell service (no TLS); empty: every call fails as "provider down"
+      name: irancell               # the bill keys (bill: irancell.name, natsSubject, getStatus); not read yet (order flow and its status cron)
+      nats_subject: irancell-bill
+      get_status: {cron_time: 15m, name: irancell-get-status, start: 30m, end: 48h, chunk: 100, every: 15m, lock_time: 30m, is_lockable: true, reverse_deadline: 10h,
+                   sync_operations: {api_call_get_status: 30s, get_order_query: 3ms, insert_order_query: 3ms}}
+    jiring_switch:                 # the jiring-switch service, our own service (task 036); the providers.name is jiring-switch
+      enabled: false               # false (default): every Jiring Switch call fails as "provider down", nothing is sent, the mock does not apply
+      timeout: 10s                 # limit of each call to the jiring-switch service; positive
+      grpc_address: ""             # host:port of the internal gRPC server of the jiring-switch service (no TLS); empty: every call fails as "provider down"
+      name: ""                     # bill's keys of the service client (jiringSwitch.name and the getStatus block); no default, the real values only in config.yml; not read yet (order flow)
+      get_status: {name: "", chunk: 0, start: 0s, end: 0s, cron_time: 0s, lock_time: 0s, is_lockable: false, reverse_deadline: 0s,
+                   sync_operations: {api_call_get_status: 0s, get_order_query: 0s, insert_order_query: 0s}}
+    parsian:                       # the parsian-v2 service, our own service (task 036)
+      enabled: false
+      timeout: 10s
+      grpc_address: ""             # host:port of the internal gRPC server of the parsian-v2 service (no TLS)
+      name: ""                     # bill's keys (parsian.name, getStatus, settlementInquiry*); no default; not read yet (order flow, settlement)
+      get_status: {name: "", chunk: 0, start: 0s, end: 0s, cron_time: 0s, lock_time: 0s, is_lockable: false, reverse_deadline: 0s,
+                   sync_operations: {api_call_get_status: 0s, get_order_query: 0s, insert_order_query: 0s}}
+      settlement_inquiry_water: 0s
+      settlement_inquiry_electricity: 0s
+      settlement_inquiry_gas: 0s
+      settlement_inquiry_telephone: 0s
+      settlement_inquiry_mci_mobile: 0s
+      settlement_inquiry_rightel_mobile: 0s
+    payment_server:          # the payment service (our own service; bill: paymentServer); not read yet (task 039 reads private_key_path)
+      address: ""            # address of the payment service; the real value only in config.yml
+      private_key_path: ""   # path of the general private key file (the order token signature); the real value only in config.yml
+  external:                  # third-party services
+    karashop:                      # the Karashop (digitalport) HTTPS API (task 025): the landline bill
+      enabled: false               # false: every Karashop call fails as "provider down", the mock does not apply
+      timeout: 30s                 # limit of each of the two calls of an inquiry (bill: karashop.timeout)
+      code: ""                     # no default: the real values only in config.yml
+      password: ""                 # a Secret, never printed
+      bill_inquiry_url: ""         # empty: every call fails as "provider down"
+      bill_payment_info_url: ""    # not read yet (the landline order flow)
+    qabzino:
+      grpc_address: qabzino:9000   # host:port of the old qabzino service; read only by QabzinoProxy (not used since task 030)
+      timeout: 10s                 # limit of each call to Ayantech; positive
+      enabled: false               # false (default): Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply) (task 030)
+      token: ""                    # Ayantech token (secret); the real value only in config.yml (task 029)
+      electricity_bill_endpoint: "" # no default (task 036): the real URL only in config.yml
+      gas_bill_endpoint: ""        # no default (task 036): the real URL only in config.yml; read since task 023
+      rightel_bill_endpoint: ""    # no default: the real URL only in config.yml; the Rightel mobile inquiry (task 037)
+      water_bill_endpoint: ""      # no default (task 036): the real URL only in config.yml
+    tavanir:
+      enabled: false               # false (default): every Tavanir call fails as "provider down", nothing is sent, the mock does not apply (task 034)
+      timeout: 10s                 # limit of each HTTP call (the login and the inquiry each); positive
+      auth_endpoint: ""            # no default (task 036): the real URL only in config.yml; the login; the adapter uses auth_endpoint, basic_branch_endpoint, username and password (task 034)
+      basic_branch_endpoint: ""    # no default (task 036): the real URL only in config.yml
+      bill_document_endpoint: ""   # no default (task 036): the real URL only in config.yml
+      branch_debit_endpoint: ""    # no default (task 036): the real URL only in config.yml
+      username: ""                 # Tavanir (SAAPA) user name; the real value only in config.yml
+      password: ""                 # Tavanir (SAAPA) password (secret); the real value only in config.yml
 
 caching:
   water: 1h                      # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
@@ -292,7 +298,7 @@ debug:
       return_type: success   # success or error
 ```
 
-With `enable: true` the adapter does not call the backend (only when `providers.qabzino.enabled` / `providers.tavanir.enabled` / `providers.irancell.enabled` / `providers.jiring_switch.enabled` / `providers.parsian.enabled` / `providers.karashop.enabled` is `true`; `enabled: false` wins over the mock, tasks 030, 034, 035, 036 and 025). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Qabzino gas: bill ID `1234567890125`, pay ID `3200012345`, 32 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`; for Irancell mobile: a mid-term inquiry of 150 000 rials and a final-term inquiry of 450 000 rials, no bill ID, no pay ID, no deadline, the `Mock...` constants of `src/provider/irancellproxy/irancellproxy.go`; for Jiring Switch (MCI mobile): bill ID `9120000036`, a mid-term inquiry of 210 000 rials and a final-term inquiry of 610 000 rials, no deadline; for Parsian (MCI mobile): bill ID `9120000039`, 220 000 and 620 000 rials, deadline `2026-12-20`; for Qabzino Rightel mobile (task 037): bill ID `9200000034`, a mid-term inquiry of 230 000 rials (pay ID `23000341`) and a final-term inquiry of 630 000 rials (pay ID `63000342`), no deadline, the `MockRightel...` constants of `src/provider/qabzino/qabzino.go`; for Karashop landline (task 025): bill ID `2101234560040`, a mid-term inquiry of 120 000 rials (pay ID `12000035`) and a final-term inquiry of 350 000 rials (pay ID `35000042`), no deadline, the `Mock...` constants of `src/provider/karashop/karashop.go`; the `Mock...` constants of `src/provider/jiring/jiring.go` and `src/provider/parsianproxy/parsianproxy.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
+With `enable: true` the adapter does not call the backend (only when `providers.external.qabzino.enabled` / `providers.external.tavanir.enabled` / `providers.internal.irancell.enabled` / `providers.internal.jiring_switch.enabled` / `providers.internal.parsian.enabled` / `providers.external.karashop.enabled` is `true`; `enabled: false` wins over the mock, tasks 030, 034, 035, 036 and 025). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Qabzino gas: bill ID `1234567890125`, pay ID `3200012345`, 32 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`; for Irancell mobile: a mid-term inquiry of 150 000 rials and a final-term inquiry of 450 000 rials, no bill ID, no pay ID, no deadline, the `Mock...` constants of `src/provider/irancellproxy/irancellproxy.go`; for Jiring Switch (MCI mobile): bill ID `9120000036`, a mid-term inquiry of 210 000 rials and a final-term inquiry of 610 000 rials, no deadline; for Parsian (MCI mobile): bill ID `9120000039`, 220 000 and 620 000 rials, deadline `2026-12-20`; for Qabzino Rightel mobile (task 037): bill ID `9200000034`, a mid-term inquiry of 230 000 rials (pay ID `23000341`) and a final-term inquiry of 630 000 rials (pay ID `63000342`), no deadline, the `MockRightel...` constants of `src/provider/qabzino/qabzino.go`; for Karashop landline (task 025): bill ID `2101234560040`, a mid-term inquiry of 120 000 rials (pay ID `12000035`) and a final-term inquiry of 350 000 rials (pay ID `35000042`), no deadline, the `Mock...` constants of `src/provider/karashop/karashop.go`; the `Mock...` constants of `src/provider/jiring/jiring.go` and `src/provider/parsianproxy/parsianproxy.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
 
 Inquiry store switch (task 031). Development only, in the same `debug` section:
 
@@ -323,7 +329,7 @@ Only certain configs are hot reloadable. The new system must say which, and trea
 | Log level | Yes | A runtime flag |
 | Fee rules (the `fees` table) | Yes | It is read from the database |
 | JWT public keys | Yes | Already reloaded through etcd |
-| Provider URLs and timeouts (`providers.qabzino.*`, `providers.tavanir.*`, `providers.irancell.*`, `providers.jiring_switch.*`, `providers.parsian.*`) | No | Held by the client built at startup |
+| Provider URLs and timeouts (`providers.external.qabzino.*`, `providers.external.tavanir.*`, `providers.internal.irancell.*`, `providers.internal.jiring_switch.*`, `providers.internal.parsian.*`) | No | Held by the client built at startup |
 | Inquiry cache TTL of a bill type (`caching.water`, `caching.electricity`, `caching.gas`, `caching.irancell`, `caching.mobile`) | No | Read at startup (tasks 021, 022, 023, 035 and 036); hot reload would need an `app_hot_configs` key and a migration |
 | Provider mocks (`debug.mocks.<provider>`) | No | Applied when the adapters are built, in dev mode only |
 | Inquiry store switch (`debug.cache_inquiries`) | No | Read when the inquiry flow is built (task 031), in dev mode only |
@@ -366,9 +372,9 @@ type ProviderRegistry interface {
 
 **Mobile inquiry, the MCI operator (task 036).** The operator `mci` (also a request with no operator, the enum value 0) gives the bill type `mobile`; the inquiry ID is the phone and the `tid` prefix is 5. The providers are the sorted list of (`mobile`, `inquiry`) (`ProvidersService`, priority ascending): the Jiring Switch adapter (`provider/jiring`, a gRPC client of the `jiring-switch` service, `InternalInquiryService/BillInquiry`; no payment deadline, no trace ID) and the Parsian adapter (ParsianProxy, `provider/parsianproxy`, a gRPC client of the `parsian-v2` service, `TopBill/Inquiry` with the bill type `mobile_mci` and a new tracking and reference ID; it gives the `tid` and a payment deadline). The operator wants Jiring Switch first and Parsian next: the order comes only from the priority of the rows (in the dev seed Jiring Switch, id 28, is disabled and has priority 10 after Parsian, id 39, priority 2). **One request calls one provider:** the pick of `PickProvider`. Its answer is the answer of the request, also when it is an error; the flow never calls Parsian after a failed Jiring Switch call. The move to the next provider is the job of the Provider Switcher (below), the same for every bill type. As in `bill`, two saved rows of the same inquiry type do not answer from the database (`shouldSkipCache`; `skipSameTypePair` in `billTypes`). The cache TTL is `caching.mobile` (default `5h`, as `bill`). `docs/this_vs_bill.md` item 32.
 
-**Mobile inquiry, the Rightel operator (task 037).** The operator `rightel` gives the bill type `mobilemidtermRightel`; the inquiry ID is the phone and the `tid` prefix is 6 (`bill`: `RightelMobileReference`). **Only the Qabzino provider may answer** (operator rule, 2026-11-11): the entry of the bill type in `billTypes` names the one provider (`onlyProvider: qabzino`, the mechanism of Irancell); when the pick of (`mobilemidtermRightel`, `inquiry`) is another provider, or no row is enabled (the seed: row 34, enabled), the flow calls nobody and answers HTTP 503; there is no fallback. The direct Qabzino adapter (`provider/qabzino`, one more kind in its `kinds` table) sends Ayantech `RightelMobileBillInquiry` (`providers.qabzino.rightel_bill_endpoint`, no default) with `MobileNumber` in the 0 form and `TraceNumber`. `G00000` gives the bill ID of the mid-term part and a mid-term and a final-term inquiry (the pay ID and the amount of each part, no deadline); `GD2268` is no debt (two inquiries of amount 0); `GD2261` and `GD2267` are refused with a user text (HTTP 400); `GD2266` and every other code are provider down (HTTP 503). The cache TTL is `caching.mobile` (the key of MCI, as `bill`; operator decision); `bill` has no same-type skip for this bill type. The `bill` row 32 (`mobileRightel`) is not used: the operator table never gives that bill type. `docs/this_vs_bill.md` item 33.
+**Mobile inquiry, the Rightel operator (task 037).** The operator `rightel` gives the bill type `mobilemidtermRightel`; the inquiry ID is the phone and the `tid` prefix is 6 (`bill`: `RightelMobileReference`). **Only the Qabzino provider may answer** (operator rule, 2026-11-11): the entry of the bill type in `billTypes` names the one provider (`onlyProvider: qabzino`, the mechanism of Irancell); when the pick of (`mobilemidtermRightel`, `inquiry`) is another provider, or no row is enabled (the seed: row 34, enabled), the flow calls nobody and answers HTTP 503; there is no fallback. The direct Qabzino adapter (`provider/qabzino`, one more kind in its `kinds` table) sends Ayantech `RightelMobileBillInquiry` (`providers.external.qabzino.rightel_bill_endpoint`, no default) with `MobileNumber` in the 0 form and `TraceNumber`. `G00000` gives the bill ID of the mid-term part and a mid-term and a final-term inquiry (the pay ID and the amount of each part, no deadline); `GD2268` is no debt (two inquiries of amount 0); `GD2261` and `GD2267` are refused with a user text (HTTP 400); `GD2266` and every other code are provider down (HTTP 503). The cache TTL is `caching.mobile` (the key of MCI, as `bill`; operator decision); `bill` has no same-type skip for this bill type. The `bill` row 32 (`mobileRightel`) is not used: the operator table never gives that bill type. `docs/this_vs_bill.md` item 33.
 
-**Landline inquiry (task 025).** `POST /v1/tel/inquiry` (`Tel.Inquiry`, `entry/grpc/tel.go`) gives the bill type `tel`; the `tid` prefix is 4 (`bill`: `TelephoneReference`). The request check is `bill`'s (phone or billId, and phone or payId; a billId that is sent is valid). A request with both billId and payId is the raw inquiry (the one of gas, `inquiry.Service.RawInquiry`): the answer has only `fullTerm`. Else the phone is converted with `bill`'s rule (`helpers.NormalizePhone`) and must be a landline number in the 98 form (`helpers.ValidTel`); it is the inquiry ID. **Only the Karashop provider may answer** (operator decision, 2026-11-14; `onlyProvider: karashop`, the mechanism of Irancell): when the pick of (`tel`, `inquiry`) is another provider (the seed has Parsian 40 and Qabzino 52, both disabled; Karashop 124325 is enabled), or no row is enabled, the flow calls nobody and answers HTTP 503. The Karashop adapter (`provider/karashop`) sends two calls to `providers.karashop.bill_inquiry_url` at the same time, `tci-end-getBillAccInfo` (full term) and `tci-mid-getBillAccInfo` (mid term), each with the code, the password and the number in the local form (no `98`, no `0`); the answer is a JSON object whose `responseText` is the JSON text of the inner answer (read with `fastjson`). `telStatus` 1, 3 and 4 are a success (one inquiry per call; a null amount is 0); `telStatus` 2 and the status codes 400 and 404 are refused with `bill`'s text (HTTP 400); every other answer, an HTTP status other than 200 and a body that cannot be read are provider down (HTTP 503). Both calls must succeed: a call that is down makes the inquiry down, a refused call makes it refused. The flow writes one request row (`bill` writes one for each call, with the bill types `tel` and `telmidterm`) and saves two `bill_inquiries` rows of provider 124325; each row has the bill ID of its own call (`provider.InquiryItem.BillID`); the trace ID is the two Karashop transaction IDs joined with `,`. The row 123456 (`telmidterm`) is not used. The cache TTL is `caching.tel` (default 1h, as `bill`) and two saved rows of the same inquiry type are a miss (`bill`: `shouldSkipCache`). The adapter checks the TLS certificate (`bill` does not). The details (`serviceStatus`) and the payment info (`SendPaymentInfo`) are not in this task. `docs/this_vs_bill.md` items 36 and 37.
+**Landline inquiry (task 025).** `POST /v1/tel/inquiry` (`Tel.Inquiry`, `entry/grpc/tel.go`) gives the bill type `tel`; the `tid` prefix is 4 (`bill`: `TelephoneReference`). The request check is `bill`'s (phone or billId, and phone or payId; a billId that is sent is valid). A request with both billId and payId is the raw inquiry (the one of gas, `inquiry.Service.RawInquiry`): the answer has only `fullTerm`. Else the phone is converted with `bill`'s rule (`helpers.NormalizePhone`) and must be a landline number in the 98 form (`helpers.ValidTel`); it is the inquiry ID. **Only the Karashop provider may answer** (operator decision, 2026-11-14; `onlyProvider: karashop`, the mechanism of Irancell): when the pick of (`tel`, `inquiry`) is another provider (the seed has Parsian 40 and Qabzino 52, both disabled; Karashop 124325 is enabled), or no row is enabled, the flow calls nobody and answers HTTP 503. The Karashop adapter (`provider/karashop`) sends two calls to `providers.external.karashop.bill_inquiry_url` at the same time, `tci-end-getBillAccInfo` (full term) and `tci-mid-getBillAccInfo` (mid term), each with the code, the password and the number in the local form (no `98`, no `0`); the answer is a JSON object whose `responseText` is the JSON text of the inner answer (read with `fastjson`). `telStatus` 1, 3 and 4 are a success (one inquiry per call; a null amount is 0); `telStatus` 2 and the status codes 400 and 404 are refused with `bill`'s text (HTTP 400); every other answer, an HTTP status other than 200 and a body that cannot be read are provider down (HTTP 503). Both calls must succeed: a call that is down makes the inquiry down, a refused call makes it refused. The flow writes one request row (`bill` writes one for each call, with the bill types `tel` and `telmidterm`) and saves two `bill_inquiries` rows of provider 124325; each row has the bill ID of its own call (`provider.InquiryItem.BillID`); the trace ID is the two Karashop transaction IDs joined with `,`. The row 123456 (`telmidterm`) is not used. The cache TTL is `caching.tel` (default 1h, as `bill`) and two saved rows of the same inquiry type are a miss (`bill`: `shouldSkipCache`). The adapter checks the TLS certificate (`bill` does not). The details (`serviceStatus`) and the payment info (`SendPaymentInfo`) are not in this task. `docs/this_vs_bill.md` items 36 and 37.
 
 ### Provider Switcher
 
@@ -382,7 +388,7 @@ type ProviderRegistry interface {
 - **Nothing special.** The switch has no rule for a bill type, an operator or a provider name; the order is the priority of the `providers` rows. A bill type with one provider (for example `irancell`) has no next provider: while its breaker is open, the answer is provider-down.
 - Until the breakers are added (task 034: at the end of the project), no provider is ever switched: each request uses the pick of `PickProvider`, and a disabled row is skipped by the pick itself.
 
-**Gap.** `bill` has no circuit breaker. Only `irancell` and `tavanir` have one. The new system must have one for every provider. Until then no provider adapter of `qabz` has one (operator decision of task 034: it is added to every provider at the end of the project); the keys `providers.tavanir.circuit_breaker.*` are parsed and not used.
+**Gap.** `bill` has no circuit breaker. Only `irancell` and `tavanir` have one. The new system must have one for every provider. Until then no provider adapter of `qabz` has one (operator decision of task 034: it is added to every provider at the end of the project); the keys `providers.external.tavanir.circuit_breaker.*` are parsed and not used.
 
 A circuit breaker counts the recent failures of one provider. When too many calls fail, it opens and stops sending calls to that provider, so requests don't wait for a timeout one by one. After a short time it lets one test call through. If the test succeeds, it closes and the provider is used again.
 

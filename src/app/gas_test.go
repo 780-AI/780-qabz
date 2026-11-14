@@ -25,11 +25,11 @@ var gasRegistryReq = provider.InquiryRequest{BillType: "gas", UserID: "u", Inqui
 
 // TestProviderRegistryServesGas (task 023): the Qabzino adapter of the registry answers a gas
 // inquiry. Dev mode with the mock: the gas fixture. The real adapter: one POST to
-// providers.qabzino.gas_bill_endpoint (a local server here; no call to Ayantech), none to the
-// water endpoint. providers.qabzino.enabled false: provider down, no call.
+// providers.external.qabzino.gas_bill_endpoint (a local server here; no call to Ayantech), none to the
+// water endpoint. providers.external.qabzino.enabled false: provider down, no call.
 func TestProviderRegistryServesGas(t *testing.T) {
 	log := &liveLogger{}
-	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}"), log)
+	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\nproviders: {external: {qabzino: {enabled: true}}}\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}"), log)
 	if !assert.NoError(t, err) || !assert.NotNil(t, reg) {
 		return
 	}
@@ -53,7 +53,7 @@ func TestProviderRegistryServesGas(t *testing.T) {
 		_, _ = w.Write([]byte(`{"Parameters":{"Amount":700,"BillID":"1234567890125","PaymentID":"p1","PaymentDate":"d","Address":"a","ConsumptionType":"k"},"Status":{"Code":"G00000"}}`))
 	}))
 	defer srv.Close()
-	yml := "providers: {qabzino: {enabled: ENABLED, token: t, water_bill_endpoint: \"" + srv.URL + "/water\", gas_bill_endpoint: \"" + srv.URL + "/gas\", timeout: 2s}}"
+	yml := "providers: {external: {qabzino: {enabled: ENABLED, token: t, water_bill_endpoint: \"" + srv.URL + "/water\", gas_bill_endpoint: \"" + srv.URL + "/gas\", timeout: 2s}}}"
 	reg, err = newProviderRegistry(registryConfig(t, "mode: prod\n"+strings.Replace(yml, "ENABLED", "true", 1)), nil)
 	if !assert.NoError(t, err) || !assert.NotNil(t, reg) {
 		return

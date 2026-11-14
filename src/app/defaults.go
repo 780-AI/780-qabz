@@ -310,14 +310,14 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 }
 
 // newProviderRegistry builds the provider adapters: Qabzino (task 021; since task 030 the direct
-// HTTP adapter with providers.qabzino.enabled, token, water_bill_endpoint, gas_bill_endpoint (task
+// HTTP adapter with providers.external.qabzino.enabled, token, water_bill_endpoint, gas_bill_endpoint (task
 // 023), rightel_bill_endpoint (task 037) and timeout, not the gRPC QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
-// endpoints with providers.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
+// endpoints with providers.external.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
 // and timeout; it calls no other service) and Irancell (task 035: a gRPC client of the irancell
-// service with providers.irancell.enabled, grpc_address and timeout), and Jiring Switch and Parsian
+// service with providers.internal.irancell.enabled, grpc_address and timeout), and Jiring Switch and Parsian
 // (task 036, the MCI mobile bill: gRPC clients of the jiring-switch and the parsian-v2 service with
-// providers.jiring_switch.* and providers.parsian.*), and Karashop (task 025, the landline bill: the
-// direct HTTPS client of the Karashop API with providers.karashop.enabled, code, password,
+// providers.internal.jiring_switch.* and providers.internal.parsian.*), and Karashop (task 025, the landline bill: the
+// direct HTTPS client of the Karashop API with providers.external.karashop.enabled, code, password,
 // bill_inquiry_url and timeout). The mock of a provider
 // (debug.mocks.<provider>) is applied only when Config.Mode is dev and its enable key is true (one
 // warn line); then Inquiry answers a fixed answer and never calls the backend. Every provider that
@@ -338,10 +338,10 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	if err != nil {
 		return nil, err
 	}
-	// providers.qabzino.enabled: false wins over the mock. The adapter then fails every call as
+	// providers.external.qabzino.enabled: false wins over the mock. The adapter then fails every call as
 	// "provider down" and the mock must not answer instead of it (task 030).
 	qabzinoMock := provider.MockSettings{Enable: dev && cfg.DebugMockQabzinoEnable && cfg.QabzinoEnabled, ReturnType: cfg.DebugMockQabzinoReturnType}
-	if err := registerAdapter(registry, qabzinoAdapter, "Qabzino", disabledNotice("qabzino", "Qabzino", cfg.QabzinoEnabled),
+	if err := registerAdapter(registry, qabzinoAdapter, "Qabzino", disabledNotice("external.qabzino", "Qabzino", cfg.QabzinoEnabled),
 		qabzinoMock, qabzino.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
@@ -357,9 +357,9 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	if err != nil {
 		return nil, err
 	}
-	// providers.tavanir.enabled: false wins over the mock, as for Qabzino (task 034).
+	// providers.external.tavanir.enabled: false wins over the mock, as for Qabzino (task 034).
 	tavanirMock := provider.MockSettings{Enable: dev && cfg.DebugMockTavanirEnable && cfg.TavanirEnabled, ReturnType: cfg.DebugMockTavanirReturnType}
-	if err := registerAdapter(registry, tavanirAdapter, "Tavanir", disabledNotice("tavanir", "Tavanir", cfg.TavanirEnabled),
+	if err := registerAdapter(registry, tavanirAdapter, "Tavanir", disabledNotice("external.tavanir", "Tavanir", cfg.TavanirEnabled),
 		tavanirMock, tavanir.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
@@ -378,9 +378,9 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	if err != nil {
 		return nil, err
 	}
-	// providers.irancell.enabled: false wins over the mock, as for Qabzino and Tavanir.
+	// providers.internal.irancell.enabled: false wins over the mock, as for Qabzino and Tavanir.
 	irancellMock := provider.MockSettings{Enable: dev && cfg.DebugMockIrancellEnable && cfg.IrancellEnabled, ReturnType: cfg.DebugMockIrancellReturnType}
-	if err := registerAdapter(registry, irancellAdapter, "Irancell", disabledNotice("irancell", "Irancell", cfg.IrancellEnabled),
+	if err := registerAdapter(registry, irancellAdapter, "Irancell", disabledNotice("internal.irancell", "Irancell", cfg.IrancellEnabled),
 		irancellMock, irancellproxy.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
@@ -399,9 +399,9 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	if err != nil {
 		return nil, err
 	}
-	// providers.jiring_switch.enabled: false wins over the mock, as for the other providers.
+	// providers.internal.jiring_switch.enabled: false wins over the mock, as for the other providers.
 	jiringMock := provider.MockSettings{Enable: dev && cfg.DebugMockJiringSwitchEnable && cfg.JiringSwitchEnabled, ReturnType: cfg.DebugMockJiringSwitchReturnType}
-	if err := registerAdapter(registry, jiringAdapter, "Jiring Switch", disabledNotice("jiring_switch", "Jiring Switch", cfg.JiringSwitchEnabled),
+	if err := registerAdapter(registry, jiringAdapter, "Jiring Switch", disabledNotice("internal.jiring_switch", "Jiring Switch", cfg.JiringSwitchEnabled),
 		jiringMock, jiring.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
@@ -419,9 +419,9 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	if err != nil {
 		return nil, err
 	}
-	// providers.parsian.enabled: false wins over the mock, as for the other providers.
+	// providers.internal.parsian.enabled: false wins over the mock, as for the other providers.
 	parsianMock := provider.MockSettings{Enable: dev && cfg.DebugMockParsianEnable && cfg.ParsianEnabled, ReturnType: cfg.DebugMockParsianReturnType}
-	if err := registerAdapter(registry, parsianAdapter, "Parsian", disabledNotice("parsian", "Parsian", cfg.ParsianEnabled),
+	if err := registerAdapter(registry, parsianAdapter, "Parsian", disabledNotice("internal.parsian", "Parsian", cfg.ParsianEnabled),
 		parsianMock, parsianproxy.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
@@ -437,9 +437,9 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	if err != nil {
 		return nil, err
 	}
-	// providers.karashop.enabled: false wins over the mock, as for the other providers.
+	// providers.external.karashop.enabled: false wins over the mock, as for the other providers.
 	karashopMock := provider.MockSettings{Enable: dev && cfg.DebugMockKarashopEnable && cfg.KarashopEnabled, ReturnType: cfg.DebugMockKarashopReturnType}
-	if err := registerAdapter(registry, karashopAdapter, "Karashop", disabledNotice("karashop", "Karashop", cfg.KarashopEnabled),
+	if err := registerAdapter(registry, karashopAdapter, "Karashop", disabledNotice("external.karashop", "Karashop", cfg.KarashopEnabled),
 		karashopMock, karashop.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
@@ -474,13 +474,14 @@ func registerAdapter(registry *provider.Registry, adapter provider.ProviderInter
 	return registry.Register(p)
 }
 
-// disabledNotice is the warn text of a provider with providers.<name>.enabled false ("" when
-// enabled). title is the name of the provider in the text (for example "Qabzino").
-func disabledNotice(name, title string, enabled bool) string {
+// disabledNotice is the warn text of a provider with providers.<key>.enabled false ("" when
+// enabled). key is the group and the provider key (for example "external.qabzino", task 041);
+// title is the name of the provider in the text (for example "Qabzino").
+func disabledNotice(key, title string, enabled bool) string {
 	if enabled {
 		return ""
 	}
-	return "providers." + name + ".enabled is false: every inquiry to " + title + " fails as provider down; the " + title + " mock does not apply"
+	return "providers." + key + ".enabled is false: every inquiry to " + title + " fails as provider down; the " + title + " mock does not apply"
 }
 
 // newInquiryFlow builds the inquiry flow (inquiry.Service) that every inquiry endpoint uses (water:

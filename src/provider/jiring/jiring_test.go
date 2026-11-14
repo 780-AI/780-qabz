@@ -190,7 +190,7 @@ func TestInquiryDisabledSendsNothing(t *testing.T) {
 	res, err := a.Inquiry(context.Background(), mobileReq)
 	assert.Nil(t, res)
 	if assert.ErrorIs(t, err, provider.ErrProviderDown) {
-		assert.Contains(t, err.Error(), "providers.jiring_switch.enabled is false")
+		assert.Contains(t, err.Error(), "providers.internal.jiring_switch.enabled is false")
 	}
 	assert.Equal(t, 0, f.calls(), "no call to the jiring-switch service")
 }
@@ -217,7 +217,7 @@ func TestDial(t *testing.T) {
 		a := newAdapter(t, c)
 		_, err = a.Inquiry(context.Background(), mobileReq)
 		if assert.ErrorIs(t, err, provider.ErrProviderDown) {
-			assert.Contains(t, err.Error(), "providers.jiring_switch.grpc_address is not set")
+			assert.Contains(t, err.Error(), "providers.internal.jiring_switch.grpc_address is not set")
 		}
 	}
 	// A lazy connection: no running service is needed. Port 1 refuses, so a call fails as provider down.

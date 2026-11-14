@@ -1,5 +1,5 @@
 // Package karashop is the adapter of the Karashop provider (task 025). It calls the Karashop
-// (digitalport) HTTPS API with the code, the password and the inquiry URL of providers.karashop, as
+// (digitalport) HTTPS API with the code, the password and the inquiry URL of providers.external.karashop, as
 // bill does (thirdparty/karashop, gateway/inquiry/telephone.go KarashopTelephone and
 // karashopTranslator.go). Only the inquiry of a landline bill (the bill type tel) is implemented;
 // every other method and bill type returns provider.ErrNotSupported.
@@ -70,13 +70,13 @@ type Doer interface {
 
 // Options configure New.
 type Options struct {
-	// Enabled is providers.karashop.enabled. False: no call is sent; every Inquiry fails as
+	// Enabled is providers.external.karashop.enabled. False: no call is sent; every Inquiry fails as
 	// provider down.
 	Enabled bool
-	// Code and Password are providers.karashop.code and providers.karashop.password (secret).
+	// Code and Password are providers.external.karashop.code and providers.external.karashop.password (secret).
 	// Empty: every Inquiry fails as provider down.
 	Code, Password string
-	// InquiryURL is providers.karashop.bill_inquiry_url. Empty: every Inquiry fails as provider down.
+	// InquiryURL is providers.external.karashop.bill_inquiry_url. Empty: every Inquiry fails as provider down.
 	InquiryURL string
 	// Timeout limits each of the two calls of an Inquiry. Required, positive.
 	Timeout time.Duration
@@ -122,7 +122,7 @@ func (a *Adapter) Name() string { return Name }
 // SupportsInquiry reports whether Inquiry answers the bill type: only tel.
 func (a *Adapter) SupportsInquiry(billType string) bool { return billType == provider.BillTypeTel }
 
-// Enabled reports providers.karashop.enabled.
+// Enabled reports providers.external.karashop.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
 type credential struct {
@@ -213,10 +213,10 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 		return nil, fmt.Errorf("karashop: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
 	if !a.enabled {
-		return nil, down("providers.karashop.enabled is false")
+		return nil, down("providers.external.karashop.enabled is false")
 	}
 	if a.code == "" || a.password == "" || a.inquiryURL == "" {
-		return nil, down("providers.karashop.code, password and bill_inquiry_url are required")
+		return nil, down("providers.external.karashop.code, password and bill_inquiry_url are required")
 	}
 	if ctx == nil {
 		ctx = context.Background()

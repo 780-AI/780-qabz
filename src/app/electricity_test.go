@@ -19,16 +19,16 @@ import (
 
 const (
 	tavanirMockWarn     = "provider mock enabled (debug.mocks.tavanir): development only, no call to the Tavanir backend"
-	tavanirDisabledWarn = "providers.tavanir.enabled is false: every inquiry to Tavanir fails as provider down; the Tavanir mock does not apply"
+	tavanirDisabledWarn = "providers.external.tavanir.enabled is false: every inquiry to Tavanir fails as provider down; the Tavanir mock does not apply"
 	mockInfoLine        = "provider mock: inquiry answered with no call to the provider"
 )
 
 // TestNewProviderRegistryTavanir (task 022, task 034): the registry has the Tavanir adapter next to
 // Qabzino; its mock wraps it only in dev mode with debug.mocks.tavanir.enable and
-// providers.tavanir.enabled (false wins over the mock), and does not depend on the Qabzino mock.
+// providers.external.tavanir.enabled (false wins over the mock), and does not depend on the Qabzino mock.
 func TestNewProviderRegistryTavanir(t *testing.T) {
 	req := provider.InquiryRequest{BillType: "electricity", UserID: "u", InquiryID: "1234567890125"}
-	const on = "providers: {tavanir: {enabled: true}}\n"
+	const on = "providers: {external: {tavanir: {enabled: true}}}\n"
 	cases := []struct {
 		name     string
 		yml      string
@@ -40,10 +40,10 @@ func TestNewProviderRegistryTavanir(t *testing.T) {
 		{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {tavanir: {enable: true, return_type: error}}}", true, true, tavanirMockWarn},
 		{"dev, mock on, tavanir disabled", "mode: dev\ndebug: {mocks: {tavanir: {enable: true}}}", false, false, tavanirDisabledWarn},
 		{"dev, mock off, tavanir disabled", "mode: dev\ndebug: {mocks: {tavanir: {enable: false}}}", false, false, tavanirDisabledWarn},
-		{"dev, only the Qabzino mock", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, tavanirDisabledWarn},
+		{"dev, only the Qabzino mock", "mode: dev\nproviders: {external: {qabzino: {enabled: true}}}\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, tavanirDisabledWarn},
 		{"stage, enable ignored, tavanir disabled", "mode: stage\ndebug: {mocks: {tavanir: {enable: true}}}", false, false, tavanirDisabledWarn},
 		{"prod, mock ignored, enabled, no credentials", "mode: prod\n" + on + "debug: {mocks: {tavanir: {enable: true, return_type: error}}}", false, false, ""},
-		{"prod, enabled, local endpoint (nothing listens)", "mode: prod\nproviders: {tavanir: {enabled: true, username: u, password: p, auth_endpoint: \"http://127.0.0.1:1/a\", basic_branch_endpoint: \"http://127.0.0.1:1/b\", timeout: 300ms}}", false, false, ""},
+		{"prod, enabled, local endpoint (nothing listens)", "mode: prod\nproviders: {external: {tavanir: {enabled: true, username: u, password: p, auth_endpoint: \"http://127.0.0.1:1/a\", basic_branch_endpoint: \"http://127.0.0.1:1/b\", timeout: 300ms}}}", false, false, ""},
 	}
 	for _, c := range cases {
 		log := &liveLogger{}

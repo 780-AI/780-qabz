@@ -36,9 +36,9 @@ const successMessage = "عملیات با موفقیت انجام شد"
 
 var (
 	// errNoAddress is the cause of every call of a client made with no address.
-	errNoAddress = errors.New("providers.parsian.grpc_address is not set")
-	// errDisabled is the cause of every call while providers.parsian.enabled is false.
-	errDisabled = errors.New("providers.parsian.enabled is false")
+	errNoAddress = errors.New("providers.internal.parsian.grpc_address is not set")
+	// errDisabled is the cause of every call while providers.internal.parsian.enabled is false.
+	errDisabled = errors.New("providers.internal.parsian.enabled is false")
 )
 
 // Client is the part of the generated gRPC client (pb.TopBillClient) that the adapter uses. Tests
@@ -49,7 +49,7 @@ type Client interface {
 
 // Options configure New.
 type Options struct {
-	// Enabled is providers.parsian.enabled. False: no call is sent; every Inquiry fails as
+	// Enabled is providers.internal.parsian.enabled. False: no call is sent; every Inquiry fails as
 	// "provider down".
 	Enabled bool
 	// Client calls the parsian-v2 service. Required.
@@ -114,7 +114,7 @@ func (a *Adapter) Name() string { return Name }
 // SupportsInquiry reports whether Inquiry answers the bill type: only the MCI mobile bill (Parsian answers other bill types in bill; this adapter does not) (task 036).
 func (a *Adapter) SupportsInquiry(billType string) bool { return billType == provider.BillTypeMobile }
 
-// Enabled reports providers.parsian.enabled.
+// Enabled reports providers.internal.parsian.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
 // Inquiry asks the parsian-v2 service for the inquiry of an MCI mobile bill (bill:

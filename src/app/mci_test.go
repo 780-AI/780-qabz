@@ -17,9 +17,9 @@ import (
 
 const (
 	jiringMockWarn      = "provider mock enabled (debug.mocks.jiring_switch): development only, no call to the Jiring Switch backend"
-	jiringDisabledWarn  = "providers.jiring_switch.enabled is false: every inquiry to Jiring Switch fails as provider down; the Jiring Switch mock does not apply"
+	jiringDisabledWarn  = "providers.internal.jiring_switch.enabled is false: every inquiry to Jiring Switch fails as provider down; the Jiring Switch mock does not apply"
 	parsianMockWarn     = "provider mock enabled (debug.mocks.parsian): development only, no call to the Parsian backend"
-	parsianDisabledWarn = "providers.parsian.enabled is false: every inquiry to Parsian fails as provider down; the Parsian mock does not apply"
+	parsianDisabledWarn = "providers.internal.parsian.enabled is false: every inquiry to Parsian fails as provider down; the Parsian mock does not apply"
 )
 
 var mciRegistryReq = provider.InquiryRequest{BillType: "mobile", UserID: "u", Dialer: "989121234567", InquiryID: "989121112233"}
@@ -39,7 +39,7 @@ func TestNewProviderRegistryMCI(t *testing.T) {
 		{parsianproxy.Name, "parsian", parsianMockWarn, parsianDisabledWarn, parsianproxy.MockMidtermAmount, parsianproxy.MockFinalTermAmount},
 	}
 	for _, a := range adapters {
-		on := "providers: {" + a.key + ": {enabled: true, timeout: 300ms}}\n"
+		on := "providers: {internal: {" + a.key + ": {enabled: true, timeout: 300ms}}}\n"
 		cases := []struct {
 			name     string
 			yml      string
@@ -53,7 +53,7 @@ func TestNewProviderRegistryMCI(t *testing.T) {
 			{"dev, mock off, disabled", "mode: dev\n", false, false, a.disWarn},
 			{"stage, enable ignored, disabled", "mode: stage\ndebug: {mocks: {" + a.key + ": {enable: true}}}", false, false, a.disWarn},
 			{"prod, mock ignored, enabled, no address", "mode: prod\n" + on + "debug: {mocks: {" + a.key + ": {enable: true}}}", false, false, ""},
-			{"prod, enabled, local address (nothing listens)", "mode: prod\nproviders: {" + a.key + ": {enabled: true, grpc_address: \"127.0.0.1:1\", timeout: 2s}}", false, false, ""},
+			{"prod, enabled, local address (nothing listens)", "mode: prod\nproviders: {internal: {" + a.key + ": {enabled: true, grpc_address: \"127.0.0.1:1\", timeout: 2s}}}", false, false, ""},
 		}
 		for _, c := range cases {
 			name := a.name + ": " + c.name
@@ -156,8 +156,8 @@ func TestProviderRegistryMCIRealCall(t *testing.T) {
 	pf := &fakeParsianService{reqs: make(chan *pspb.BillInquiryRequest, 1)}
 	pAddr := serveGRPC(t, func(s *grpc.Server) { pspb.RegisterTopBillServer(s, pf) })
 
-	reg, err := newProviderRegistry(registryConfig(t, "mode: prod\nproviders: {jiring_switch: {enabled: true, grpc_address: \""+jAddr+
-		"\", timeout: 5s}, parsian: {enabled: true, grpc_address: \""+pAddr+"\", timeout: 5s}}"), nil)
+	reg, err := newProviderRegistry(registryConfig(t, "mode: prod\nproviders: {internal: {jiring_switch: {enabled: true, grpc_address: \""+jAddr+
+		"\", timeout: 5s}, parsian: {enabled: true, grpc_address: \""+pAddr+"\", timeout: 5s}}}"), nil)
 	if !assert.NoError(t, err) || !assert.NotNil(t, reg) {
 		return
 	}

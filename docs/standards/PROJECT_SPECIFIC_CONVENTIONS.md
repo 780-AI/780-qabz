@@ -1,7 +1,8 @@
-<!-- VERSION: 0.19 -->
-<!-- Last Updated: 2026-11-11 -->
+<!-- VERSION: 0.20 -->
+<!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v0.20 — 2026-11-14 — Section 8: the provider blocks are in `providers.internal` (our own services) or `providers.external` (third-party services); a new provider goes in the group of its kind (task 041).
 v0.19 — 2026-11-11 — Section 13: one request calls one provider; what it returns (also an error or an answer that cannot be used) is the answer; only the circuit breaker of a provider starts a switch (the Provider Switcher), the same for every bill type, with no rule special to a bill type or a provider (operator, task 036).
 v0.18 — 2026-11-09 — Section 15: every provider adapter has a development mock (`debug.mocks.<provider>`, `provider.NewMock`), applied in dev mode only (task 021).
 v0.17 — 2026-11-09 — Section 14: tests never touch the development database; one throw-away run database per `make test` (`QABZ_TEST_RUN_DSN`), the `postgrestest` guard, `make test-db-clean` (task 020b); the guard checks the database the driver uses (`pgconn.ParseConfig`), no DSN or password on a command line, `config_generated.env` parsed (never sourced as shell), trap before create, `GO_TEST_PKGS` operator-approved, `make test-db-clean` also drops the `qabz_test_` roles and a test login role has a random password (decision 7); nothing outside the `qabz_test_` databases is touched, a role with objects or privileges outside them is kept and the command exits 1, no `REASSIGN OWNED` / `DROP OWNED` (decision 8); the kept line labels each place (`(not a test database)` only next to a non-`qabz_test_` database, a shared object by its catalog) and a 2BP01 with no `pg_shdepend` row has its own line (fix round 4). Section 11: measured with `make test` (the run database), not `QABZ_TEST_POSTGRES_DSN`.
@@ -210,6 +211,8 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **A config change updates both files in the same change:** a new key, a removed or renamed key, or a changed default. A new key is a `path` tag on a `Config` field in `src/config/config.go`. A secret key uses the `Secret` type, so its value never prints.
 
 **Layout.** Auth secrets are under `auth.secrets` (for example `auth.secrets.hmac`). Other keys follow the area they configure (`database.*`, `server.*`, `metrics.*`, `debug.*`). Do not put a config value in a separate file.
+
+**Providers.** Each provider block is in one of two groups (task 041). `providers.internal.<provider>`: a provider that is one of our own services (for example `irancell`, `jiring_switch`, `parsian`, `payment_server`). `providers.external.<provider>`: a provider that is a third-party service (for example `karashop`, `qabzino`, `tavanir`). A new provider goes in the group of its kind. Only `providers.general` (the settings of `ProvidersService`) is outside the two groups. `TestProvidersGroups` in `src/config/example_test.go` checks it.
 
 **Check.** The tests in `src/config/example_test.go` fail when:
 - `config.yml.example` and the `Config` path tags do not have the same keys.

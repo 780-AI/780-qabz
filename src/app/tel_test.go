@@ -15,16 +15,16 @@ import (
 
 const (
 	karashopMockWarn     = "provider mock enabled (debug.mocks.karashop): development only, no call to the Karashop backend"
-	karashopDisabledWarn = "providers.karashop.enabled is false: every inquiry to Karashop fails as provider down; the Karashop mock does not apply"
+	karashopDisabledWarn = "providers.external.karashop.enabled is false: every inquiry to Karashop fails as provider down; the Karashop mock does not apply"
 )
 
 // TestNewProviderRegistryKarashop (task 025): the Karashop adapter is registered under the name of
 // the seed rows 123456 and 124325 and inquires only the bill type tel. Its mock applies only in dev
-// mode, with debug.mocks.karashop.enable and providers.karashop.enabled true; enabled false wins
+// mode, with debug.mocks.karashop.enable and providers.external.karashop.enabled true; enabled false wins
 // over the mock (one warn line).
 func TestNewProviderRegistryKarashop(t *testing.T) {
 	req := provider.InquiryRequest{BillType: provider.BillTypeTel, UserID: "u", Dialer: "989121234567", InquiryID: "982188776655"}
-	on := "providers: {karashop: {enabled: true, timeout: 300ms}}\n"
+	on := "providers: {external: {karashop: {enabled: true, timeout: 300ms}}}\n"
 	cases := []struct {
 		name     string
 		yml      string
@@ -38,7 +38,7 @@ func TestNewProviderRegistryKarashop(t *testing.T) {
 		{"dev, mock off, disabled", "mode: dev\n", false, false, karashopDisabledWarn},
 		{"stage, enable ignored, disabled", "mode: stage\ndebug: {mocks: {karashop: {enable: true}}}", false, false, karashopDisabledWarn},
 		{"prod, mock ignored, enabled, no credential", "mode: prod\n" + on + "debug: {mocks: {karashop: {enable: true}}}", false, false, ""},
-		{"prod, enabled, local URL (nothing listens)", "mode: prod\nproviders: {karashop: {enabled: true, code: c, password: p, bill_inquiry_url: \"http://127.0.0.1:1/k\", timeout: 2s}}", false, false, ""},
+		{"prod, enabled, local URL (nothing listens)", "mode: prod\nproviders: {external: {karashop: {enabled: true, code: c, password: p, bill_inquiry_url: \"http://127.0.0.1:1/k\", timeout: 2s}}}", false, false, ""},
 	}
 	for _, c := range cases {
 		log := &liveLogger{}

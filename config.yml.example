@@ -44,93 +44,98 @@ database:
 providers:
   general:
     load_interval: "1m"     # how often the providers table is loaded again; at least 1s; hot-reloadable (key providers_load_interval)
-  qabzino:
-    grpc_address: ""         # host:port of the Qabzino backend (gRPC, no TLS); empty: every Qabzino call fails as "provider down"
-    timeout: "10s"           # limit of each call to the Qabzino backend; positive
-    enabled: false           # false: Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply)
-    token: ""                # Ayantech token (secret); the real value only in config.yml
-    electricity_bill_endpoint: "" # the real URL only in config.yml
-    gas_bill_endpoint: ""    # the real URL only in config.yml
-    rightel_bill_endpoint: "" # Rightel mobile inquiry (task 037); the real URL only in config.yml
-    water_bill_endpoint: ""  # the real URL only in config.yml
-  tavanir:
-    enabled: false           # false: every Tavanir call fails as "provider down", nothing is sent to Tavanir, the mock does not apply
-    timeout: "10s"           # limit of each HTTP call to Tavanir (the login and the inquiry each); positive
-    auth_endpoint: ""        # the real URL only in config.yml
-    basic_branch_endpoint: "" # the real URL only in config.yml
-    bill_document_endpoint: "" # the real URL only in config.yml
-    branch_debit_endpoint: "" # the real URL only in config.yml
-    username: ""             # Tavanir (SAAPA) user name; the real value only in config.yml
-    password: ""             # Tavanir (SAAPA) password (secret); the real value only in config.yml
-  irancell:                  # the irancell service (our own service); the real values only in config.yml
-    enabled: false           # false: every Irancell call fails as "provider down", nothing is sent to the irancell service, the mock does not apply
-    timeout: "10s"           # limit of each call to the irancell service; positive
-    name: ""                 # name of the provider (bill: irancell.name); not read yet
-    grpc_address: ""         # host:port of the internal gRPC server of the irancell service (no TLS); empty: every Irancell call fails as "provider down"
-    nats_subject: ""         # NATS subject of the Irancell bill payment; not read yet (order flow)
-    get_status:              # cron that asks the status of pending Irancell orders; not read yet (order flow)
-      cron_time: "0s"
-      name: ""
-      start: "0s"
-      end: "0s"
-      chunk: 0
-      every: "0s"
-      lock_time: "0s"
-      is_lockable: false
-      reverse_deadline: "0s"
-      sync_operations:
-        api_call_get_status: "0s"
-        get_order_query: "0s"
-        insert_order_query: "0s"
-  jiring_switch:             # the jiring-switch service (our own service); answers the MCI mobile bill (bill type mobile)
-    enabled: false           # false: every Jiring Switch call fails as "provider down", nothing is sent to the jiring-switch service, the mock does not apply
-    timeout: "10s"           # limit of each call to the jiring-switch service; positive
-    grpc_address: ""         # host:port of the internal gRPC server of the jiring-switch service (no TLS); empty: every call fails as "provider down"
-    name: ""                 # name of the provider (bill: jiringSwitch.name); not read yet
-    get_status:              # cron that asks the status of pending orders; not read yet (order flow)
-      name: ""
-      chunk: 0
-      start: "0s"
-      end: "0s"
-      cron_time: "0s"
-      lock_time: "0s"
-      is_lockable: false
-      reverse_deadline: "0s"
-      sync_operations:
-        api_call_get_status: "0s"
-        get_order_query: "0s"
-        insert_order_query: "0s"
-  parsian:                   # the parsian-v2 service (our own service); answers the MCI mobile bill (bill type mobile)
-    enabled: false           # false: every Parsian call fails as "provider down", nothing is sent to the parsian-v2 service, the mock does not apply
-    timeout: "10s"           # limit of each call to the parsian-v2 service; positive
-    grpc_address: ""         # host:port of the internal gRPC server of the parsian-v2 service (no TLS); empty: every call fails as "provider down"
-    name: ""                 # name of the provider (bill: parsian.name); not read yet
-    get_status:              # cron that asks the status of pending orders; not read yet (order flow)
-      name: ""
-      chunk: 0
-      start: "0s"
-      end: "0s"
-      cron_time: "0s"
-      lock_time: "0s"
-      is_lockable: false
-      reverse_deadline: "0s"
-      sync_operations:
-        api_call_get_status: "0s"
-        get_order_query: "0s"
-        insert_order_query: "0s"
-    settlement_inquiry_water: "0s"       # not read yet (settlement)
-    settlement_inquiry_electricity: "0s"
-    settlement_inquiry_gas: "0s"
-    settlement_inquiry_telephone: "0s"
-    settlement_inquiry_mci_mobile: "0s"
-    settlement_inquiry_rightel_mobile: "0s"
-  karashop:                  # the Karashop (digitalport) HTTPS API; answers the landline bill (bill type tel)
-    enabled: false           # false: every Karashop call fails as "provider down", nothing is sent to Karashop, the mock does not apply
-    timeout: "30s"           # limit of each Karashop call (an inquiry is two calls, at the same time); positive
-    code: ""                 # Karashop credential code; the real value only in config.yml
-    password: ""             # Karashop credential password (secret); the real value only in config.yml
-    bill_inquiry_url: ""     # the real URL only in config.yml; empty: every Karashop call fails as "provider down"
-    bill_payment_info_url: "" # not read yet (landline order flow); the real URL only in config.yml
+  internal:                  # our own services
+    irancell:                  # the irancell service (our own service); the real values only in config.yml
+      enabled: false           # false: every Irancell call fails as "provider down", nothing is sent to the irancell service, the mock does not apply
+      timeout: "10s"           # limit of each call to the irancell service; positive
+      name: ""                 # name of the provider (bill: irancell.name); not read yet
+      grpc_address: ""         # host:port of the internal gRPC server of the irancell service (no TLS); empty: every Irancell call fails as "provider down"
+      nats_subject: ""         # NATS subject of the Irancell bill payment; not read yet (order flow)
+      get_status:              # cron that asks the status of pending Irancell orders; not read yet (order flow)
+        cron_time: "0s"
+        name: ""
+        start: "0s"
+        end: "0s"
+        chunk: 0
+        every: "0s"
+        lock_time: "0s"
+        is_lockable: false
+        reverse_deadline: "0s"
+        sync_operations:
+          api_call_get_status: "0s"
+          get_order_query: "0s"
+          insert_order_query: "0s"
+    jiring_switch:             # the jiring-switch service (our own service); answers the MCI mobile bill (bill type mobile)
+      enabled: false           # false: every Jiring Switch call fails as "provider down", nothing is sent to the jiring-switch service, the mock does not apply
+      timeout: "10s"           # limit of each call to the jiring-switch service; positive
+      grpc_address: ""         # host:port of the internal gRPC server of the jiring-switch service (no TLS); empty: every call fails as "provider down"
+      name: ""                 # name of the provider (bill: jiringSwitch.name); not read yet
+      get_status:              # cron that asks the status of pending orders; not read yet (order flow)
+        name: ""
+        chunk: 0
+        start: "0s"
+        end: "0s"
+        cron_time: "0s"
+        lock_time: "0s"
+        is_lockable: false
+        reverse_deadline: "0s"
+        sync_operations:
+          api_call_get_status: "0s"
+          get_order_query: "0s"
+          insert_order_query: "0s"
+    parsian:                   # the parsian-v2 service (our own service); answers the MCI mobile bill (bill type mobile)
+      enabled: false           # false: every Parsian call fails as "provider down", nothing is sent to the parsian-v2 service, the mock does not apply
+      timeout: "10s"           # limit of each call to the parsian-v2 service; positive
+      grpc_address: ""         # host:port of the internal gRPC server of the parsian-v2 service (no TLS); empty: every call fails as "provider down"
+      name: ""                 # name of the provider (bill: parsian.name); not read yet
+      get_status:              # cron that asks the status of pending orders; not read yet (order flow)
+        name: ""
+        chunk: 0
+        start: "0s"
+        end: "0s"
+        cron_time: "0s"
+        lock_time: "0s"
+        is_lockable: false
+        reverse_deadline: "0s"
+        sync_operations:
+          api_call_get_status: "0s"
+          get_order_query: "0s"
+          insert_order_query: "0s"
+      settlement_inquiry_water: "0s"       # not read yet (settlement)
+      settlement_inquiry_electricity: "0s"
+      settlement_inquiry_gas: "0s"
+      settlement_inquiry_telephone: "0s"
+      settlement_inquiry_mci_mobile: "0s"
+      settlement_inquiry_rightel_mobile: "0s"
+    payment_server:          # the payment service (our own service; bill: paymentServer); not read yet (task 039 reads private_key_path)
+      address: ""            # address of the payment service; the real value only in config.yml
+      private_key_path: ""   # path of the general private key file (the order token signature); the real value only in config.yml
+  external:                  # third-party services
+    karashop:                  # the Karashop (digitalport) HTTPS API; answers the landline bill (bill type tel)
+      enabled: false           # false: every Karashop call fails as "provider down", nothing is sent to Karashop, the mock does not apply
+      timeout: "30s"           # limit of each Karashop call (an inquiry is two calls, at the same time); positive
+      code: ""                 # Karashop credential code; the real value only in config.yml
+      password: ""             # Karashop credential password (secret); the real value only in config.yml
+      bill_inquiry_url: ""     # the real URL only in config.yml; empty: every Karashop call fails as "provider down"
+      bill_payment_info_url: "" # not read yet (landline order flow); the real URL only in config.yml
+    qabzino:
+      grpc_address: ""         # host:port of the Qabzino backend (gRPC, no TLS); empty: every Qabzino call fails as "provider down"
+      timeout: "10s"           # limit of each call to the Qabzino backend; positive
+      enabled: false           # false: Qabzino cannot be used (every call fails as "provider down", no call to Ayantech, the mock does not apply)
+      token: ""                # Ayantech token (secret); the real value only in config.yml
+      electricity_bill_endpoint: "" # the real URL only in config.yml
+      gas_bill_endpoint: ""    # the real URL only in config.yml
+      rightel_bill_endpoint: "" # Rightel mobile inquiry (task 037); the real URL only in config.yml
+      water_bill_endpoint: ""  # the real URL only in config.yml
+    tavanir:
+      enabled: false           # false: every Tavanir call fails as "provider down", nothing is sent to Tavanir, the mock does not apply
+      timeout: "10s"           # limit of each HTTP call to Tavanir (the login and the inquiry each); positive
+      auth_endpoint: ""        # the real URL only in config.yml
+      basic_branch_endpoint: "" # the real URL only in config.yml
+      bill_document_endpoint: "" # the real URL only in config.yml
+      branch_debit_endpoint: "" # the real URL only in config.yml
+      username: ""             # Tavanir (SAAPA) user name; the real value only in config.yml
+      password: ""             # Tavanir (SAAPA) password (secret); the real value only in config.yml
 
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off

@@ -150,7 +150,7 @@ func TestRightelDisabledAndNotConfigured(t *testing.T) {
 		o    Options
 		text string
 	}{
-		"disabled":            {Options{Enabled: false, Token: testToken, RightelEndpoint: srv.URL}, "providers.qabzino.enabled is false"},
+		"disabled":            {Options{Enabled: false, Token: testToken, RightelEndpoint: srv.URL}, "providers.external.qabzino.enabled is false"},
 		"no token":            {Options{Enabled: true, RightelEndpoint: srv.URL}, "rightel_bill_endpoint"},
 		"no rightel endpoint": {Options{Enabled: true, Token: testToken, WaterEndpoint: srv.URL, GasEndpoint: srv.URL}, "rightel_bill_endpoint"},
 	} {

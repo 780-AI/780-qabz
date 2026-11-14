@@ -36,8 +36,8 @@ func registryConfig(t *testing.T, yml string) config.Config {
 	return c
 }
 
-// qabzinoDisabledWarn is the start warn line of Qabzino with providers.qabzino.enabled false (task 030).
-const qabzinoDisabledWarn = "providers.qabzino.enabled is false: every inquiry to Qabzino fails as provider down; the Qabzino mock does not apply"
+// qabzinoDisabledWarn is the start warn line of Qabzino with providers.external.qabzino.enabled false (task 030).
+const qabzinoDisabledWarn = "providers.external.qabzino.enabled is false: every inquiry to Qabzino fails as provider down; the Qabzino mock does not apply"
 
 // TestNewProviderRegistry: the registry has the Qabzino adapter; the mock wraps it only in dev mode
 // with debug.mocks.qabzino.enable (decision 4).
@@ -50,13 +50,13 @@ func TestNewProviderRegistry(t *testing.T) {
 		wantErr  bool // a mock error answer
 		wantWarn string
 	}{
-		{"dev, mock success", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}", true, false, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
-		{"dev, mock error", "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true, return_type: error}}}", true, true, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
+		{"dev, mock success", "mode: dev\nproviders: {external: {qabzino: {enabled: true}}}\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}", true, false, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
+		{"dev, mock error", "mode: dev\nproviders: {external: {qabzino: {enabled: true}}}\ndebug: {mocks: {qabzino: {enable: true, return_type: error}}}", true, true, "provider mock enabled (debug.mocks.qabzino): development only, no call to the Qabzino backend"},
 		{"dev, mock on, qabzino disabled", "mode: dev\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}", false, false, qabzinoDisabledWarn},
 		{"dev, mock off, qabzino disabled", "mode: dev\ndebug: {mocks: {qabzino: {enable: false}}}", false, false, qabzinoDisabledWarn},
 		{"stage, enable ignored, qabzino disabled", "mode: stage\ndebug: {mocks: {qabzino: {enable: true}}}", false, false, qabzinoDisabledWarn},
-		{"prod, enabled, no token", "mode: prod\nproviders: {qabzino: {enabled: true, timeout: 300ms}, tavanir: {enabled: true, timeout: 300ms}}", false, false, ""},
-		{"prod, enabled, local endpoint (nothing listens)", "mode: prod\nproviders: {qabzino: {enabled: true, token: t, water_bill_endpoint: \"http://127.0.0.1:1/w\", timeout: 300ms}, tavanir: {enabled: true, timeout: 300ms}}", false, false, ""},
+		{"prod, enabled, no token", "mode: prod\nproviders: {external: {qabzino: {enabled: true, timeout: 300ms}, tavanir: {enabled: true, timeout: 300ms}}}", false, false, ""},
+		{"prod, enabled, local endpoint (nothing listens)", "mode: prod\nproviders: {external: {qabzino: {enabled: true, token: t, water_bill_endpoint: \"http://127.0.0.1:1/w\", timeout: 300ms}, tavanir: {enabled: true, timeout: 300ms}}}", false, false, ""},
 	}
 	for _, c := range cases {
 		log := &liveLogger{}
@@ -88,7 +88,7 @@ func TestNewProviderRegistry(t *testing.T) {
 		}
 	}
 	// A nil logger writes nothing and does not panic.
-	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\nproviders: {qabzino: {enabled: true}}\ndebug: {mocks: {qabzino: {enable: true}}}"), nil)
+	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\nproviders: {external: {qabzino: {enabled: true}}}\ndebug: {mocks: {qabzino: {enable: true}}}"), nil)
 	if assert.NoError(t, err) && assert.NotNil(t, reg) {
 		p, _ := reg.Get("qabzino")
 		_, err = p.Inquiry(context.Background(), req)

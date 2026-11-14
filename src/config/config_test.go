@@ -377,7 +377,7 @@ func TestParseWaterInquiryKeys(t *testing.T) {
 	assert.False(t, c.DebugMockQabzinoEnable, "the mock is off by default")
 	assert.Equal(t, MockReturnSuccess, c.DebugMockQabzinoReturnType)
 
-	c, err = Parse([]byte(base + `providers: {qabzino: {grpc_address: "q:9", timeout: "2s"}}
+	c, err = Parse([]byte(base + `providers: {external: {qabzino: {grpc_address: "q:9", timeout: "2s"}}}
 caching: {water: "0s"}
 debug: {mocks: {qabzino: {enable: true, return_type: error}}}
 `))
@@ -390,8 +390,8 @@ debug: {mocks: {qabzino: {enable: true, return_type: error}}}
 	}
 
 	for yml, want := range map[string]string{
-		"providers: {qabzino: {timeout: \"0s\"}}":                      "providers.qabzino.timeout must be a positive duration",
-		"providers: {qabzino: {timeout: \"-1s\"}}":                     "providers.qabzino.timeout must be a positive duration",
+		"providers: {external: {qabzino: {timeout: \"0s\"}}}":          "providers.external.qabzino.timeout must be a positive duration",
+		"providers: {external: {qabzino: {timeout: \"-1s\"}}}":         "providers.external.qabzino.timeout must be a positive duration",
 		"caching: {water: \"-1s\"}":                                    "caching.water must not be negative",
 		"debug: {mocks: {qabzino: {return_type: \"maybe\"}}}":          "debug.mocks.qabzino.return_type must be",
 		"debug: {mocks: {qabzino: {enable: true, return_type: \"\"}}}": "debug.mocks.qabzino.return_type must be",
@@ -440,7 +440,7 @@ func TestParseElectricityInquiryKeys(t *testing.T) {
 	assert.False(t, c.DebugMockTavanirEnable, "the mock is off by default")
 	assert.Equal(t, MockReturnSuccess, c.DebugMockTavanirReturnType)
 
-	c, err = Parse([]byte(base + `providers: {tavanir: {enabled: true, timeout: "3s"}}
+	c, err = Parse([]byte(base + `providers: {external: {tavanir: {enabled: true, timeout: "3s"}}}
 caching: {electricity: "0s"}
 debug: {mocks: {tavanir: {enable: true, return_type: error}}}
 `))
@@ -462,8 +462,8 @@ debug: {mocks: {tavanir: {enable: true, return_type: error}}}
 	}
 
 	for yml, want := range map[string]string{
-		"providers: {tavanir: {timeout: \"0s\"}}":                      "providers.tavanir.timeout must be a positive duration",
-		"providers: {tavanir: {timeout: \"-1s\"}}":                     "providers.tavanir.timeout must be a positive duration",
+		"providers: {external: {tavanir: {timeout: \"0s\"}}}":          "providers.external.tavanir.timeout must be a positive duration",
+		"providers: {external: {tavanir: {timeout: \"-1s\"}}}":         "providers.external.tavanir.timeout must be a positive duration",
 		"caching: {electricity: \"-1s\"}":                              "caching.electricity must not be negative",
 		"debug: {mocks: {tavanir: {return_type: \"maybe\"}}}":          "debug.mocks.tavanir.return_type must be",
 		"debug: {mocks: {tavanir: {enable: true, return_type: \"\"}}}": "debug.mocks.tavanir.return_type must be",
@@ -508,7 +508,7 @@ func TestParseQabzinoProviderKeys(t *testing.T) {
 	assert.Empty(t, c.QabzinoRightelBillEndpoint, "no default (task 037, as the other endpoints)")
 	assert.Empty(t, c.QabzinoWaterBillEndpoint)
 
-	c, err = Parse([]byte(base + `providers: {qabzino: {enabled: true, token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", rightel_bill_endpoint: "http://r", water_bill_endpoint: "http://w"}}
+	c, err = Parse([]byte(base + `providers: {external: {qabzino: {enabled: true, token: "tok", electricity_bill_endpoint: "http://e", gas_bill_endpoint: "http://g", rightel_bill_endpoint: "http://r", water_bill_endpoint: "http://w"}}}
 `))
 	if assert.NoError(t, err) {
 		assert.True(t, c.QabzinoEnabled)
@@ -537,7 +537,7 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 	assert.Equal(t, "", c.TavanirUsername)
 	assert.Equal(t, "", c.TavanirPassword.Reveal(), "default password is empty")
 
-	c, err = Parse([]byte(base + `providers: {tavanir: {timeout: "120s", auth_endpoint: "http://a", basic_branch_endpoint: "http://b", bill_document_endpoint: "http://d", branch_debit_endpoint: "http://r", username: "u", password: "secret-pw", circuit_breaker: {name: "n", max_requests: 5, interval: "2s", timeout: "3s", failure_ratio: 50}}}
+	c, err = Parse([]byte(base + `providers: {external: {tavanir: {timeout: "120s", auth_endpoint: "http://a", basic_branch_endpoint: "http://b", bill_document_endpoint: "http://d", branch_debit_endpoint: "http://r", username: "u", password: "secret-pw", circuit_breaker: {name: "n", max_requests: 5, interval: "2s", timeout: "3s", failure_ratio: 50}}}}
 `))
 	if assert.NoError(t, err) {
 		assert.Equal(t, 120*time.Second, c.TavanirTimeout)
@@ -547,7 +547,7 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 	}
 
 	// Task 040: the old circuit_breaker block (no field reads it) is still a valid config.
-	_, err = Parse([]byte(base + "providers: {tavanir: {circuit_breaker: {name: \"tavanir\", max_requests: 100000, interval: \"1s\", timeout: \"10s\", failure_ratio: 101}}}\n"))
+	_, err = Parse([]byte(base + "providers: {external: {tavanir: {circuit_breaker: {name: \"tavanir\", max_requests: 100000, interval: \"1s\", timeout: \"10s\", failure_ratio: 101}}}}\n"))
 	assert.NoError(t, err, "an old circuit_breaker block is ignored")
 }
 
@@ -569,7 +569,7 @@ func TestParseIrancellProviderKeys(t *testing.T) {
 	assert.Equal(t, 0, c.IrancellGetStatusChunk)
 	assert.False(t, c.IrancellGetStatusIsLockable)
 
-	c, err = Parse([]byte(base + `providers: {irancell: {name: "irancell", grpc_address: "irancell:8084", nats_subject: "irancell-bill", get_status: {cron_time: "15m", name: "irancell-get-status", start: "30m", end: "48h", chunk: 100, every: "16m", lock_time: "31m", is_lockable: true, reverse_deadline: "10h", sync_operations: {api_call_get_status: "30s", get_order_query: "3ms", insert_order_query: "4ms"}}}}
+	c, err = Parse([]byte(base + `providers: {internal: {irancell: {name: "irancell", grpc_address: "irancell:8084", nats_subject: "irancell-bill", get_status: {cron_time: "15m", name: "irancell-get-status", start: "30m", end: "48h", chunk: 100, every: "16m", lock_time: "31m", is_lockable: true, reverse_deadline: "10h", sync_operations: {api_call_get_status: "30s", get_order_query: "3ms", insert_order_query: "4ms"}}}}}
 `))
 	if assert.NoError(t, err) {
 		assert.Equal(t, []string{"irancell", "irancell:8084", "irancell-bill", "irancell-get-status"},
@@ -587,10 +587,10 @@ func TestParseIrancellProviderKeys(t *testing.T) {
 		assert.Equal(t, 10*time.Second, c.QabzinoTimeout, "the keys of the other providers keep their defaults")
 	}
 
-	_, err = Parse([]byte(base + "providers: {irancell: {get_status: {every: \"soon\"}}}\n"))
-	assert.ErrorContains(t, err, "providers.irancell.get_status.every")
-	_, err = Parse([]byte(base + "providers: {irancell: {get_status: {chunk: \"many\"}}}\n"))
-	assert.ErrorContains(t, err, "providers.irancell.get_status.chunk")
+	_, err = Parse([]byte(base + "providers: {internal: {irancell: {get_status: {every: \"soon\"}}}}\n"))
+	assert.ErrorContains(t, err, "providers.internal.irancell.get_status.every")
+	_, err = Parse([]byte(base + "providers: {internal: {irancell: {get_status: {chunk: \"many\"}}}}\n"))
+	assert.ErrorContains(t, err, "providers.internal.irancell.get_status.chunk")
 }
 
 // TestParseGasInquiryKeys (task 023): caching.gas has its default, takes its value and is checked;
@@ -604,7 +604,7 @@ func TestParseGasInquiryKeys(t *testing.T) {
 	assert.Equal(t, time.Hour, c.CachingGas, "default cache TTL (bill: caching.gas 1h)")
 	assert.Empty(t, c.QabzinoGasBillEndpoint)
 
-	c, err = Parse([]byte(base + "caching: {gas: \"0s\"}\nproviders: {qabzino: {gas_bill_endpoint: \"http://127.0.0.1:1/gas\"}}\n"))
+	c, err = Parse([]byte(base + "caching: {gas: \"0s\"}\nproviders: {external: {qabzino: {gas_bill_endpoint: \"http://127.0.0.1:1/gas\"}}}\n"))
 	if assert.NoError(t, err) {
 		assert.Equal(t, time.Duration(0), c.CachingGas, "0 turns the cache off")
 		assert.Equal(t, "http://127.0.0.1:1/gas", c.QabzinoGasBillEndpoint)
@@ -638,7 +638,7 @@ func TestParseMCIProviderKeys(t *testing.T) {
 	assert.False(t, c.DebugMockParsianEnable)
 	assert.Equal(t, []string{MockReturnSuccess, MockReturnSuccess}, []string{c.DebugMockJiringSwitchReturnType, c.DebugMockParsianReturnType})
 
-	c, err = Parse([]byte(base + `providers: {jiring_switch: {enabled: true, timeout: "3s", grpc_address: "jiring-switch:8082"}, parsian: {enabled: true, timeout: "4s", grpc_address: "parsian-v2:8083"}}
+	c, err = Parse([]byte(base + `providers: {internal: {jiring_switch: {enabled: true, timeout: "3s", grpc_address: "jiring-switch:8082"}, parsian: {enabled: true, timeout: "4s", grpc_address: "parsian-v2:8083"}}}
 caching: {mobile: "0s"}
 debug: {mocks: {jiring_switch: {enable: true, return_type: error}, parsian: {enable: true, return_type: success}}}
 `))
@@ -655,11 +655,11 @@ debug: {mocks: {jiring_switch: {enable: true, return_type: error}, parsian: {ena
 	}
 
 	for yml, want := range map[string]string{
-		"providers: {jiring_switch: {timeout: \"0s\"}}\n":         "providers.jiring_switch.timeout",
-		"providers: {parsian: {timeout: \"-1s\"}}\n":              "providers.parsian.timeout",
-		"caching: {mobile: \"-1s\"}\n":                            "caching.mobile must not be negative",
-		"debug: {mocks: {jiring_switch: {return_type: maybe}}}\n": "debug.mocks.jiring_switch.return_type",
-		"debug: {mocks: {parsian: {return_type: maybe}}}\n":       "debug.mocks.parsian.return_type",
+		"providers: {internal: {jiring_switch: {timeout: \"0s\"}}}\n": "providers.internal.jiring_switch.timeout",
+		"providers: {internal: {parsian: {timeout: \"-1s\"}}}\n":      "providers.internal.parsian.timeout",
+		"caching: {mobile: \"-1s\"}\n":                                "caching.mobile must not be negative",
+		"debug: {mocks: {jiring_switch: {return_type: maybe}}}\n":     "debug.mocks.jiring_switch.return_type",
+		"debug: {mocks: {parsian: {return_type: maybe}}}\n":           "debug.mocks.parsian.return_type",
 	} {
 		_, err := Parse([]byte(base + yml))
 		assert.ErrorContains(t, err, want, yml)
@@ -682,7 +682,7 @@ func TestParseKarashopKeys(t *testing.T) {
 	assert.False(t, c.DebugMockKarashopEnable)
 	assert.Equal(t, MockReturnSuccess, c.DebugMockKarashopReturnType)
 
-	c, err = Parse([]byte(base + `providers: {karashop: {enabled: true, timeout: "5s", code: "c1", password: "p@ss", bill_inquiry_url: "https://127.0.0.1:1/in", bill_payment_info_url: "https://127.0.0.1:1/pay"}}
+	c, err = Parse([]byte(base + `providers: {external: {karashop: {enabled: true, timeout: "5s", code: "c1", password: "p@ss", bill_inquiry_url: "https://127.0.0.1:1/in", bill_payment_info_url: "https://127.0.0.1:1/pay"}}}
 caching: {tel: "0s"}
 debug: {mocks: {karashop: {enable: true, return_type: error}}}
 `))
@@ -698,9 +698,9 @@ debug: {mocks: {karashop: {enable: true, return_type: error}}}
 	}
 
 	for yml, want := range map[string]string{
-		"providers: {karashop: {timeout: \"0s\"}}\n":         "providers.karashop.timeout",
-		"caching: {tel: \"-1s\"}\n":                          "caching.tel must not be negative",
-		"debug: {mocks: {karashop: {return_type: maybe}}}\n": "debug.mocks.karashop.return_type",
+		"providers: {external: {karashop: {timeout: \"0s\"}}}\n": "providers.external.karashop.timeout",
+		"caching: {tel: \"-1s\"}\n":                              "caching.tel must not be negative",
+		"debug: {mocks: {karashop: {return_type: maybe}}}\n":     "debug.mocks.karashop.return_type",
 	} {
 		_, err := Parse([]byte(base + yml))
 		assert.ErrorContains(t, err, want, yml)
@@ -732,9 +732,9 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	assert.False(t, c.ParsianGetStatusIsLockable)
 
 	status := `get_status: {name: "%s-getstatus", chunk: 100, start: "30m", end: "10h", cron_time: "15m", lock_time: "30m", is_lockable: true, reverse_deadline: "10h", sync_operations: {api_call_get_status: "30s", get_order_query: "3ms", insert_order_query: "4ms"}}`
-	yml := base + "providers:\n" +
-		"  jiring_switch: {name: \"jiring-switch\", grpc_address: \"jiring-switch:8084\", " + fmt.Sprintf(status, "jiring-switch") + "}\n" +
-		"  parsian: {name: \"parsian\", grpc_address: \"parsian-v2:8084\", " + fmt.Sprintf(status, "parsian") +
+	yml := base + "providers:\n  internal:\n" +
+		"    jiring_switch: {name: \"jiring-switch\", grpc_address: \"jiring-switch:8084\", " + fmt.Sprintf(status, "jiring-switch") + "}\n" +
+		"    parsian: {name: \"parsian\", grpc_address: \"parsian-v2:8084\", " + fmt.Sprintf(status, "parsian") +
 		", settlement_inquiry_water: \"360h\", settlement_inquiry_electricity: \"361h\", settlement_inquiry_gas: \"362h\", settlement_inquiry_telephone: \"363h\", settlement_inquiry_mci_mobile: \"0s\", settlement_inquiry_rightel_mobile: \"364h\"}\n"
 	c, err = Parse([]byte(yml))
 	if !assert.NoError(t, err) {
@@ -754,10 +754,10 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	assert.True(t, c.JiringSwitchGetStatusIsLockable)
 	assert.True(t, c.ParsianGetStatusIsLockable)
 
-	_, err = Parse([]byte(base + "providers: {parsian: {settlement_inquiry_gas: \"soon\"}}\n"))
-	assert.ErrorContains(t, err, "providers.parsian.settlement_inquiry_gas")
-	_, err = Parse([]byte(base + "providers: {jiring_switch: {get_status: {chunk: \"many\"}}}\n"))
-	assert.ErrorContains(t, err, "providers.jiring_switch.get_status.chunk")
+	_, err = Parse([]byte(base + "providers: {internal: {parsian: {settlement_inquiry_gas: \"soon\"}}}\n"))
+	assert.ErrorContains(t, err, "providers.internal.parsian.settlement_inquiry_gas")
+	_, err = Parse([]byte(base + "providers: {internal: {jiring_switch: {get_status: {chunk: \"many\"}}}}\n"))
+	assert.ErrorContains(t, err, "providers.internal.jiring_switch.get_status.chunk")
 }
 
 // TestParseCacheInquiries (task 031): debug.cache_inquiries is true by default, takes false in dev,
@@ -787,4 +787,23 @@ func TestParseCacheInquiries(t *testing.T) {
 	}
 	_, err = Parse([]byte("mode: dev\n" + base + "debug: {cache_inquiries: \"no\"}\n"))
 	assert.Error(t, err, "not a bool")
+}
+
+// TestParsePaymentServerKeys (task 041): the payment_server keys (address, private_key_path,
+// snake_case) under providers.internal; the defaults are the zero values.
+func TestParsePaymentServerKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "", c.PaymentServerAddress)
+	assert.Equal(t, "", c.PaymentServerPrivateKeyPath)
+
+	c, err = Parse([]byte(base + `providers: {internal: {payment_server: {address: "payment:8084", private_key_path: "paymentPrivateKey.pem"}}}` + "\n"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "payment:8084", c.PaymentServerAddress)
+	assert.Equal(t, "paymentPrivateKey.pem", c.PaymentServerPrivateKeyPath)
 }

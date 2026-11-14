@@ -1,4 +1,4 @@
-<!-- VERSION: 2.26 -->
+<!-- VERSION: 2.27 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.25 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.26 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.26 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.44 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v2.27 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.45 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -36,27 +36,28 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v2.11 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v2.12 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.67 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.68 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
-| 30 | Project Specific Conventions | v0.19 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
+| 30 | Project Specific Conventions | v0.20 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.31 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.18 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.32 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.19 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-14
-- **Change**: 2026-11-14 — Session wrap-up (tasks 025 and 040 session): 5 lesson candidates and more evidence for 2 in the register; push of 853d538..daf05f3 done; no code, no new files. Bumped #3 CHANGELOG v3.25, #5 manifest v2.26, #28 OPEN_TASKS v1.67.
-- **Previous change**: 2026-11-14 — Task 025 QA scenario passed (operator confirmation, Postman, a real Karashop call): removed from the register, with follow-up (a) (the first real call); no code, no new files. Bumped #3 CHANGELOG v3.24, #5 manifest v2.25, #28 OPEN_TASKS v1.66.
+- **Change**: 2026-11-14 — Task 041 `providers_internal_external`: the provider config blocks are under `providers.internal` (irancell, jiring_switch, parsian, the new `payment_server`: address, private_key_path, not read yet) and `providers.external` (karashop, qabzino, tavanir); the old layout is not read; new test `TestProvidersGroups`; conventions § 8 rule; Go files and `config.yml.example` have no VERSION header, so no rows; the task file is in `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.26, #5 manifest v2.27, #6 folder_structure v0.45, #21 system.html v2.12, #28 OPEN_TASKS v1.68, #30 conventions v0.20, #34 app README v0.32, #35 this_vs_bill v0.19.
+- **Previous change**: 2026-11-14 — Session wrap-up (tasks 025 and 040 session): 5 lesson candidates and more evidence for 2 in the register; push of 853d538..daf05f3 done; no code, no new files. Bumped #3 CHANGELOG v3.25, #5 manifest v2.26, #28 OPEN_TASKS v1.67.
+- **Earlier change**: 2026-11-14 — Task 025 QA scenario passed (operator confirmation, Postman, a real Karashop call): removed from the register, with follow-up (a) (the first real call); no code, no new files. Bumped #3 CHANGELOG v3.24, #5 manifest v2.25, #28 OPEN_TASKS v1.66.
 - **Earlier change**: 2026-11-14 — Task 040 `remove_circuit_breaker_keys`: the unused config keys `providers.tavanir.circuit_breaker.*` removed (code, `config.yml.example`, the `system.html` config example), a `@todo` for the circuit breaker feature; no behavior change; Go files and `config.yml.example` have no VERSION header, so no rows; the new task file is in `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.23, #5 manifest v2.24, #21 system.html v2.11, #28 OPEN_TASKS v1.65, #35 this_vs_bill v0.18.
 - **Earlier change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint`: `POST /v1/tel/inquiry` on the shared inquiry flow (bill type `tel`, `tid` prefix 4, only Karashop may answer); new `src/provider/karashop/` (direct HTTPS, two calls per inquiry) and `src/entry/grpc/tel.go`; `providers.karashop.*`, `caching.tel`, `debug.mocks.karashop.*` (`config.yml.example`, no VERSION header, no row); Postman folder `Tel` (no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.22, #5 manifest v2.23, #6 folder_structure v0.44, #21 system.html v2.10, #28 OPEN_TASKS v1.64, #34 app README v0.31, #35 this_vs_bill v0.17.
 - **Earlier change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint` updated (v0.3, task files are not manifest-tracked): Karashop only (operator decision), the Karashop adapter and config keys in scope, the Qabzino and Parsian tel adapters out; no code, no new files. Bumped #3 CHANGELOG v3.21, #5 manifest v2.22.

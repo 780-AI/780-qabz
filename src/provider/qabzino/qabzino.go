@@ -1,5 +1,5 @@
 // Package qabzino is the direct adapter of the Qabzino provider (task 030). It calls Ayantech over
-// HTTPS with the token and the endpoints of providers.qabzino, as the old qabzino service does
+// HTTPS with the token and the endpoints of providers.external.qabzino, as the old qabzino service does
 // (client/qabzino, gateway/water.go, gateway/gas.go, gateway/rightel_mobile.go), with no hop through
 // that service. Inquiry of a water bill (task 030), of a gas bill (task 023) and of a Rightel mobile
 // bill (task 037) is implemented; every other method and bill type returns provider.ErrNotSupported.
@@ -166,18 +166,18 @@ type Doer interface {
 
 // Options configure New.
 type Options struct {
-	// Enabled is providers.qabzino.enabled. False: no call is sent; every Inquiry fails as
+	// Enabled is providers.external.qabzino.enabled. False: no call is sent; every Inquiry fails as
 	// provider down.
 	Enabled bool
-	// Token is providers.qabzino.token (secret). Empty: every Inquiry fails as provider down.
+	// Token is providers.external.qabzino.token (secret). Empty: every Inquiry fails as provider down.
 	Token string
-	// WaterEndpoint is providers.qabzino.water_bill_endpoint. Empty: every water Inquiry fails as
+	// WaterEndpoint is providers.external.qabzino.water_bill_endpoint. Empty: every water Inquiry fails as
 	// provider down.
 	WaterEndpoint string
-	// GasEndpoint is providers.qabzino.gas_bill_endpoint. Empty: every gas Inquiry fails as provider
+	// GasEndpoint is providers.external.qabzino.gas_bill_endpoint. Empty: every gas Inquiry fails as provider
 	// down.
 	GasEndpoint string
-	// RightelEndpoint is providers.qabzino.rightel_bill_endpoint (task 037). Empty: every Rightel
+	// RightelEndpoint is providers.external.qabzino.rightel_bill_endpoint (task 037). Empty: every Rightel
 	// Inquiry fails as provider down.
 	RightelEndpoint string
 	// Timeout limits each call. Required, positive.
@@ -233,7 +233,7 @@ func (a *Adapter) SupportsInquiry(billType string) bool {
 	return ok && k.endpoint != nil && k.parameters != nil && k.success != nil
 }
 
-// Enabled reports providers.qabzino.enabled.
+// Enabled reports providers.external.qabzino.enabled.
 func (a *Adapter) Enabled() bool { return a != nil && a.enabled }
 
 type identity struct {
@@ -330,11 +330,11 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 		return nil, fmt.Errorf("qabzino: inquiry of %q: %w", req.BillType, provider.ErrNotSupported)
 	}
 	if !a.enabled {
-		return nil, down("providers.qabzino.enabled is false")
+		return nil, down("providers.external.qabzino.enabled is false")
 	}
 	endpoint := k.endpoint(a)
 	if a.token == "" || endpoint == "" {
-		return nil, down("providers.qabzino.token and providers.qabzino.%s are required", k.endpointKey)
+		return nil, down("providers.external.qabzino.token and providers.external.qabzino.%s are required", k.endpointKey)
 	}
 	if ctx == nil {
 		ctx = context.Background()
