@@ -1,7 +1,8 @@
-<!-- VERSION: 1.68 -->
+<!-- VERSION: 1.69 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v1.69 — 2026-11-14 — Session wrap-up (task 041 session): 5 lesson candidates and more evidence for 1; push of ff29be7 to the wrap-up commit done.
 v1.68 — 2026-11-14 — Task 041 `providers.internal` / `providers.external`: QA scenario added; every open item names the new config paths.
 v1.67 — 2026-11-14 — Session wrap-up (tasks 025 and 040 session): 5 lesson candidates and more evidence for 2 others; push of 853d538..daf05f3 done.
 v1.66 — 2026-11-14 — Task 025 QA scenario: passed, confirmed by the operator (Postman, a real Karashop call); removed from the register; follow-up (a) (the first real call) is done and removed.
@@ -408,3 +409,11 @@ Found in the 2026-11-14 session wrap-up (tasks 025 and 040 session):
 - More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): the agent ran before the task 025 commit and found 4 nil-safety defects (an unchecked HTTP response in the new adapter, three unguarded indexes or `err.Error()` in new tests) and one minor point (a failed call waited for the other call up to 30 s). All were fixed before the commit. Recommend: codify (the Definition of Done of task 025 already asked for it).
 - More evidence for **Commit the task file when it is created** (2026-11-08): the task 025 v0.3 update was uncommitted at the start of this session, so its commit had to be made from saved copies before the implementation commit.
 
+Found in the 2026-11-14 session wrap-up (task 041 session):
+
+- **Config key names are snake_case, also when a key comes from `bill`.** The first decision of task 041 kept the camelCase names of `bill` (`paymentServer`, `privateKeyPath`); during the review the operator changed them to `payment_server` and `private_key_path` "to make it consistent with other names". Candidate rule for conventions § 8: every Qabz config key is snake_case; a comment quotes the `bill` name.
+- **An open editor can save over an agent edit of the git-ignored `config.yml`.** The agent renamed `paymentServer` to `payment_server` in `config.yml`; minutes later the key was `paymentServer` again and `TestLocalConfigInSync` failed. Candidate: before an agent edits `config.yml`, ask the operator to save and close it in the editor, and check the key names again just before the test run.
+- **Check a redaction filter before it reads secret lines.** The macOS `sed` does not know `\s`, so a filter meant to hide values printed two values of `config.yml` (not secrets). Candidate: hide values with Python or `[[:space:]]`, and test the filter on a line with no secret first.
+- **A bulk rename also changes quotes of the other system.** `sed s/paymentServer/payment_server/` also changed the `bill` key names in task 039 and in a `config.go` comment; the agent restored them. Candidate: after a bulk rename of a name that `bill` also uses, grep the result for `bill:` quotes and the other task files before the review.
+- **A text built at run time escapes a rename of literal paths.** The sed of `providers.<provider>` changed every literal path, but the warn line of `disabledNotice` (`"providers." + name + ".enabled ..."`) still named the old path; only the test run found it. Candidate: grep for `"providers." +` (string concatenation of a key path) in each config rename.
+- More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): two runs in task 041 found a hand-written key sort (conventions § 5) and an old test comment that the in-chat review did not see.

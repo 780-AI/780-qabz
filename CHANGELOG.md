@@ -1,7 +1,8 @@
-<!-- VERSION: 3.26 -->
+<!-- VERSION: 3.27 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.27 — 2026-11-14 — Added session-wrap-up (task 041 session) entry.
 v3.26 — 2026-11-14 — Added 041-providers-internal-external entry.
 v3.25 — 2026-11-14 — Added session-wrap-up (tasks 025 and 040 session) entry.
 v3.24 — 2026-11-14 — Added 025-qa-scenario-passed entry.
@@ -142,6 +143,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Session wrap-up (task 041 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.69: 5 lesson candidates and more evidence for 1); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. Session commits ff29be7 (task 041 created), 4460331 (task 041) and this wrap-up commit are pushed.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Task 041: providers.internal and providers.external
 - **Type:** Major (config key paths changed, new config keys; Critical File `system.html`).
