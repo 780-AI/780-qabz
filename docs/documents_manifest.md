@@ -1,4 +1,4 @@
-<!-- VERSION: 2.25 -->
+<!-- VERSION: 2.26 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.24 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.25 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.25 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.26 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.44 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.66 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.67 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.19 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-14
-- **Change**: 2026-11-14 — Task 025 QA scenario passed (operator confirmation, Postman, a real Karashop call): removed from the register, with follow-up (a) (the first real call); no code, no new files. Bumped #3 CHANGELOG v3.24, #5 manifest v2.25, #28 OPEN_TASKS v1.66.
-- **Previous change**: 2026-11-14 — Task 040 `remove_circuit_breaker_keys`: the unused config keys `providers.tavanir.circuit_breaker.*` removed (code, `config.yml.example`, the `system.html` config example), a `@todo` for the circuit breaker feature; no behavior change; Go files and `config.yml.example` have no VERSION header, so no rows; the new task file is in `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.23, #5 manifest v2.24, #21 system.html v2.11, #28 OPEN_TASKS v1.65, #35 this_vs_bill v0.18.
+- **Change**: 2026-11-14 — Session wrap-up (tasks 025 and 040 session): 5 lesson candidates and more evidence for 2 in the register; push of 853d538..daf05f3 done; no code, no new files. Bumped #3 CHANGELOG v3.25, #5 manifest v2.26, #28 OPEN_TASKS v1.67.
+- **Previous change**: 2026-11-14 — Task 025 QA scenario passed (operator confirmation, Postman, a real Karashop call): removed from the register, with follow-up (a) (the first real call); no code, no new files. Bumped #3 CHANGELOG v3.24, #5 manifest v2.25, #28 OPEN_TASKS v1.66.
+- **Earlier change**: 2026-11-14 — Task 040 `remove_circuit_breaker_keys`: the unused config keys `providers.tavanir.circuit_breaker.*` removed (code, `config.yml.example`, the `system.html` config example), a `@todo` for the circuit breaker feature; no behavior change; Go files and `config.yml.example` have no VERSION header, so no rows; the new task file is in `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.23, #5 manifest v2.24, #21 system.html v2.11, #28 OPEN_TASKS v1.65, #35 this_vs_bill v0.18.
 - **Earlier change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint`: `POST /v1/tel/inquiry` on the shared inquiry flow (bill type `tel`, `tid` prefix 4, only Karashop may answer); new `src/provider/karashop/` (direct HTTPS, two calls per inquiry) and `src/entry/grpc/tel.go`; `providers.karashop.*`, `caching.tel`, `debug.mocks.karashop.*` (`config.yml.example`, no VERSION header, no row); Postman folder `Tel` (no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.22, #5 manifest v2.23, #6 folder_structure v0.44, #21 system.html v2.10, #28 OPEN_TASKS v1.64, #34 app README v0.31, #35 this_vs_bill v0.17.
 - **Earlier change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint` updated (v0.3, task files are not manifest-tracked): Karashop only (operator decision), the Karashop adapter and config keys in scope, the Qabzino and Parsian tel adapters out; no code, no new files. Bumped #3 CHANGELOG v3.21, #5 manifest v2.22.
 - **Earlier change**: 2026-11-14 — Session wrap-up (task 039 creation session): 4 lesson candidates in the register; new task 039 `mobile_irancell_order` (commit 59717e1, task files are not manifest-tracked); push of 59717e1 done; no code, no new files. Bumped #3 CHANGELOG v3.20, #5 manifest v2.21, #28 OPEN_TASKS v1.63.

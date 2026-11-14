@@ -1,7 +1,8 @@
-<!-- VERSION: 3.24 -->
+<!-- VERSION: 3.25 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.25 — 2026-11-14 — Added session-wrap-up (tasks 025 and 040 session) entry.
 v3.24 — 2026-11-14 — Added 025-qa-scenario-passed entry.
 v3.23 — 2026-11-14 — Added 040-remove-circuit-breaker-keys entry.
 v3.22 — 2026-11-14 — Added 025-tel-inquiry-endpoint entry.
@@ -140,6 +141,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Session wrap-up (tasks 025 and 040 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.67: 5 lesson candidates and more evidence for 2); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. Session commits 853d538, d7bf28b, c014cc7 and daf05f3 are pushed (`origin/main` = daf05f3).
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Task 025 QA scenario passed (operator confirmation)
 - **Type:** Minor (documentation; no code, no new files).
