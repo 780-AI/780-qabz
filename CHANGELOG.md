@@ -1,7 +1,8 @@
-<!-- VERSION: 3.16 -->
+<!-- VERSION: 3.17 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v3.17 — 2026-11-11 — Added session-wrap-up (task 031 session) entry.
 v3.16 — 2026-11-11 — Added 031-debug-cache-inquiries entry.
 v3.15 — 2026-11-11 — Added session-wrap-up (task 037 session) entry.
 v3.14 — 2026-11-11 — Added 037-mobile-rightel-inquiry entry.
@@ -132,6 +133,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-11] — Session wrap-up (task 031 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.60: 2 lesson candidates, more evidence for 2); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The push of 921f145..374585e (task 031) is done.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-11] — Task 031: `debug.cache_inquiries`, a development switch of the inquiry tables
 - **Type:** Major (a new config key, domain logic of the inquiry flow, Critical File `system.html`)

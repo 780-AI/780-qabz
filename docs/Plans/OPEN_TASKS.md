@@ -1,7 +1,8 @@
-<!-- VERSION: 1.59 -->
+<!-- VERSION: 1.60 -->
 <!-- Last Updated: 2026-11-11 -->
 <!--
 CHANGE LOG
+v1.60 — 2026-11-11 — Session wrap-up (task 031 session): 2 lesson candidates and more evidence for 2 others; push of 921f145..374585e done.
 v1.59 — 2026-11-11 — Task 031 `debug.cache_inquiries`: QA scenario added; the task 033 line no longer says that task 031 is pending.
 v1.58 — 2026-11-11 — Session wrap-up (task 037 session): 2 lesson candidates and more evidence for 3 others; task 037 operator report (the first real Rightel call answered GD2266); push of bc27f56..359f2c9 done.
 v1.57 — 2026-11-11 — Task 037 Rightel mobile inquiry: QA scenario and follow-ups added.
@@ -368,3 +369,10 @@ Found in the 2026-11-11 session wrap-up (task 037 session):
 - More evidence for **Check the input forms that the real clients send before copying a bill check** (2026-11-11, task 035): the operator's first Rightel test used a phone in the 0 form and got HTTP 400 again. Task 038 (normalize the mobile number) is now the cheapest fix for the operator's tests. Recommendation: do task 038 next.
 - More evidence for **Run the full `make test` before the task commit, not a `-run` filter** (2026-11-11, task 036): this session ran the full `make test` before the commit; only the known `TestLocalConfigInSync` failed. No new defect; recorded as a positive instance. Recommendation: codify with the other evidence.
 - Counter-evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): this session did the Rule 10 review inline and did not run the agent; the review found only two long comment lines. The earlier sessions show that the agent finds defects that an inline review does not. Recommendation: codify the candidate (the agent runs before every task commit) so that it does not depend on the session.
+
+Found in the 2026-11-11 session wrap-up (task 031 session):
+
+- **When `git fetch` fails in the pre-flight, read the remote with `git ls-remote`.** In this session `git fetch` stopped with `fatal: expected flush after ref listing`. The pre-flight then read the push state from the local remote-tracking copy (`origin/main` = `921f145`) and did not run `git ls-remote origin main`, which SESSION_OPENER § 1.1 and suite lesson L055 ask for. The later `git push` and `git ls-remote` worked, and the state was correct. Candidate: a § 3.2 row "fetch failed → `ls-remote` before the § 4 block". Recommendation: queue (one instance; L055 already covers it).
+- **A feature-ON check in stage or prod mode needs its own auth secret.** A mode other than `dev` removes the debug section, so `debug.auth.disable` is off and a call needs a JWT. The agent put a scratch HMAC secret in the scratch config copy and signed a local test token with it. It did not sign a token with the real `auth.secrets.hmac` of `config.yml`. Candidate: a small helper (script or test function) that writes the scratch secret into a config copy and prints a test token, so later "ignored outside dev" checks (tasks 020c, 031) do not build it again. Recommendation: queue.
+- More evidence for **Run the full `make test` before the task commit, not a `-run` filter** (2026-11-11, task 036): this session ran the full `make test -race` before the commit; only the known `TestLocalConfigInSync` failed. Recommendation: unchanged (codify after the operator decision).
+- Counter-evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): the Rule 10 review for task 031 was inline again, with no agent; the diff was small (one flow switch, one config key). Recommendation: unchanged, the operator decides whether the agent is required for every task commit.
