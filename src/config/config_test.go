@@ -677,6 +677,47 @@ debug: {mocks: {jiring_switch: {enable: true, return_type: error}, parsian: {ena
 	}
 }
 
+// TestParseKarashopKeys (task 025): the Karashop keys, caching.tel and the Karashop mock have their
+// defaults, take their values, and a bad value names its key. The password never prints.
+func TestParseKarashopKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.False(t, c.KarashopEnabled, "default: off")
+	assert.Equal(t, []time.Duration{30 * time.Second, time.Hour}, []time.Duration{c.KarashopTimeout, c.CachingTel},
+		"defaults (bill: karashop.timeout 30s, caching.tel 1h)")
+	assert.Equal(t, []string{"", "", "", ""},
+		[]string{c.KarashopCode, c.KarashopPassword.Reveal(), c.KarashopBillInquiryURL, c.KarashopBillPaymentInfoURL})
+	assert.False(t, c.DebugMockKarashopEnable)
+	assert.Equal(t, MockReturnSuccess, c.DebugMockKarashopReturnType)
+
+	c, err = Parse([]byte(base + `providers: {karashop: {enabled: true, timeout: "5s", code: "c1", password: "p@ss", bill_inquiry_url: "https://127.0.0.1:1/in", bill_payment_info_url: "https://127.0.0.1:1/pay"}}
+caching: {tel: "0s"}
+debug: {mocks: {karashop: {enable: true, return_type: error}}}
+`))
+	if assert.NoError(t, err) {
+		assert.True(t, c.KarashopEnabled)
+		assert.Equal(t, []time.Duration{5 * time.Second, 0}, []time.Duration{c.KarashopTimeout, c.CachingTel}, "0 turns the cache off")
+		assert.Equal(t, []string{"c1", "p@ss", "https://127.0.0.1:1/in", "https://127.0.0.1:1/pay"},
+			[]string{c.KarashopCode, c.KarashopPassword.Reveal(), c.KarashopBillInquiryURL, c.KarashopBillPaymentInfoURL})
+		assert.NotContains(t, fmt.Sprint(c.KarashopPassword), "p@ss", "the password never prints")
+		assert.True(t, c.DebugMockKarashopEnable)
+		assert.Equal(t, MockReturnError, c.DebugMockKarashopReturnType)
+		assert.Equal(t, []time.Duration{time.Hour, 5 * time.Hour}, []time.Duration{c.CachingWater, c.CachingMobile}, "the other cache keys keep their defaults")
+	}
+
+	for yml, want := range map[string]string{
+		"providers: {karashop: {timeout: \"0s\"}}\n":         "providers.karashop.timeout",
+		"caching: {tel: \"-1s\"}\n":                          "caching.tel must not be negative",
+		"debug: {mocks: {karashop: {return_type: maybe}}}\n": "debug.mocks.karashop.return_type",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+}
+
 // TestParseJiringSwitchAndParsianBillKeys (task 036): bill's keys of the jiring-switch and the
 // parsian-v2 service clients have no default, take their values, and a wrong type names the key.
 func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {

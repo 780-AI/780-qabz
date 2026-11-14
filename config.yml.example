@@ -130,6 +130,13 @@ providers:
     settlement_inquiry_telephone: "0s"
     settlement_inquiry_mci_mobile: "0s"
     settlement_inquiry_rightel_mobile: "0s"
+  karashop:                  # the Karashop (digitalport) HTTPS API; answers the landline bill (bill type tel)
+    enabled: false           # false: every Karashop call fails as "provider down", nothing is sent to Karashop, the mock does not apply
+    timeout: "30s"           # limit of each Karashop call (an inquiry is two calls, at the same time); positive
+    code: ""                 # Karashop credential code; the real value only in config.yml
+    password: ""             # Karashop credential password (secret); the real value only in config.yml
+    bill_inquiry_url: ""     # the real URL only in config.yml; empty: every Karashop call fails as "provider down"
+    bill_payment_info_url: "" # not read yet (landline order flow); the real URL only in config.yml
 
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
@@ -137,6 +144,7 @@ caching:
   gas: "1h"                  # how long a saved gas inquiry answers the same participate code with no provider call; 0: cache off
   irancell: "0s"             # how long a saved Irancell mobile inquiry answers the same phone with no provider call; 0: cache off (as bill)
   mobile: "5h"               # how long a saved MCI or Rightel mobile inquiry (bill types mobile, mobilemidtermRightel) answers the same phone with no provider call; 0: cache off
+  tel: "1h"                  # how long a saved landline inquiry (bill type tel) answers the same number with no provider call; 0: cache off
 
 auth:
   secrets:
@@ -161,6 +169,9 @@ debug:
       enable: false
       return_type: "success" # "success" or "error"
     parsian:                 # the Parsian mock: a fixed answer, no call to the parsian-v2 service
+      enable: false
+      return_type: "success" # "success" or "error"
+    karashop:                # the Karashop mock: a fixed answer, no call to Karashop
       enable: false
       return_type: "success" # "success" or "error"
   cache_inquiries: true      # development only: false = the inquiry flow does not read or write bill_inquiries / bill_inquiry_requests (every inquiry calls the provider)

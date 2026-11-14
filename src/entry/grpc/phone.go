@@ -99,9 +99,7 @@ func validPhoneInquiry(req *pb.InquiryPhoneRequest, phone string) bool {
 //     no operator is mci (the enum value 0), so it runs the MCI inquiry (task 036).
 //   - The inquiry ID is the phone (bill: controller.SetInquiryID(billId, phone); the phone is never
 //     empty after the request check).
-//   - The answer has a mid-term and a full-term inquiry: the inquiry of the type
-//     provider.InquiryTypeMidterm goes to midTerm, every other one to fullTerm (the last one of
-//     each wins); a part with no inquiry is an empty object. providerId is not set, as in bill.
+//   - The answer has a mid-term and a full-term inquiry (phoneInquiryResponse).
 //
 // An operator with an empty bill type in phoneOperators is Unimplemented (no log line): task 035,
 // decision B; since task 037 no operator has one. The operator "unknown" has no bill type:
@@ -145,6 +143,18 @@ func (p *Phone) Inquiry(ctx context.Context, req *pb.InquiryPhoneRequest) (*pb.I
 	if err != nil {
 		return nil, answerInquiryError(ctx, p.logger, billType, err)
 	}
+	return phoneInquiryResponse(p.logger, billType, res)
+}
+
+// phoneInquiryResponse is the answer of a mobile or a landline inquiry (Phone.Inquiry, Tel.Inquiry;
+// bill: handleResponseWithInquiry of controller/phone and controller/telephone): the inquiry of the
+// type provider.InquiryTypeMidterm goes to midTerm, every other one to fullTerm (the last one of
+// each wins); a part with no inquiry is an empty object. Each part has the bill ID of its own
+// inquiry (inquiry.Inquiry.BillID; for one provider answer it is the bill ID of the answer, except
+// for an adapter that gives each inquiry its own bill ID: Karashop, task 025). providerId is not set,
+// as in bill. An amount above the uint32 price field is Internal with one error line (the prefix is
+// the bill type).
+func phoneInquiryResponse(logger ErrorLogger, billType string, res inquiry.Result) (*pb.InquiryPhoneResponse, error) {
 	out := &pb.InquiryPhoneResponse{
 		MidTerm:  &pb.InquiryPhoneResponse_PhoneInquiry{},
 		FullTerm: &pb.InquiryPhoneResponse_PhoneInquiry{},
@@ -153,13 +163,17 @@ func (p *Phone) Inquiry(ctx context.Context, req *pb.InquiryPhoneRequest) (*pb.I
 		if in.Amount > math.MaxUint32 {
 			// The proto has uint32 for the price. bill converts without a check (a wrong price).
 			// @todo See docs/this_vs_bill.md, item 22.
-			if p.logger != nil {
-				p.logger.Error(billType+": inquiry amount does not fit the price field", "amount", in.Amount)
+			if logger != nil {
+				logger.Error(billType+": inquiry amount does not fit the price field", "amount", in.Amount)
 			}
 			return nil, errInternal
 		}
+		billID := in.BillID
+		if billID == "" {
+			billID = res.BillID
+		}
 		part := &pb.InquiryPhoneResponse_PhoneInquiry{
-			BillId:          res.BillID,
+			BillId:          billID,
 			PayId:           in.PayID,
 			Price:           uint32(in.Amount),
 			PaymentDeadline: in.PaymentDeadline,

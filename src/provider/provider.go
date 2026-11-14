@@ -17,14 +17,16 @@ const (
 	// BillTypeMobileMidTermRightel is the bill type of a Rightel mobile bill (bill:
 	// entity.MOBILEMIDTERMRIGHTEL; task 037).
 	BillTypeMobileMidTermRightel = "mobilemidtermRightel"
+	// BillTypeTel is the bill type of a landline (telephone) bill (bill: entity.TEL; task 025).
+	BillTypeTel = "tel"
 
 	ActionInquiry = "inquiry"
 
 	ResponseSuccess = "success" // InquiryResponse.Status of a call that the provider answered
 	ResponseFailed  = "failed"  // InquiryResponse.Status of a call that failed
 
-	// The inquiry types of a mobile bill (bill: entity.MidtermInquiryType, FinalTermInquiryType):
-	// one answer has a mid-term and a final-term (full-term) inquiry.
+	// The inquiry types of a mobile and a landline bill (bill: entity.MidtermInquiryType,
+	// FinalTermInquiryType): one answer has a mid-term and a final-term (full-term) inquiry.
 	InquiryTypeMidterm   = "midterm"
 	InquiryTypeFinalTerm = "final_term"
 )
@@ -45,16 +47,21 @@ type InquiryRequest struct {
 	UserID   string // the user, a UUID
 	Dialer   string // the mobile number of the user
 	// InquiryID is the ID that the provider inquires: the bill ID of a water or an electricity bill,
-	// the participate code (کد اشتراک) of a gas bill, the phone (or the bill ID) of a mobile bill.
+	// the participate code (کد اشتراک) of a gas bill, the phone (or the bill ID) of a mobile bill, the
+	// landline number (98 form) of a landline bill.
 	InquiryID string
 }
 
 // InquiryItem is one inquiry of an answer (one amount to pay).
 type InquiryItem struct {
+	// BillID is the bill ID of this inquiry when the provider gives each inquiry its own bill ID
+	// (Karashop: one call for each part of a landline bill, task 025). Empty: the bill ID of the
+	// answer (InquiryResponse.BillID), as for every other provider.
+	BillID          string
 	PayID           string
 	Amount          uint64 // rials
 	PaymentDeadline string // as the provider sends it
-	InquiryType     string // "regular" for a water, an electricity and a gas bill; InquiryTypeMidterm or InquiryTypeFinalTerm for a mobile bill
+	InquiryType     string // "regular" for a water, an electricity and a gas bill; InquiryTypeMidterm or InquiryTypeFinalTerm for a mobile and a landline bill
 }
 
 // NoDebtMobileInquiries returns the inquiries of a mobile bill with no debt (bill:

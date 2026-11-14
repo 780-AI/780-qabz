@@ -232,6 +232,25 @@ type Config struct {
 	ParsianSettlementInquiryMCIMobile     time.Duration `path:"providers.parsian.settlement_inquiry_mci_mobile"`
 	ParsianSettlementInquiryRightelMobile time.Duration `path:"providers.parsian.settlement_inquiry_rightel_mobile"`
 
+	// The config of the Karashop provider (task 025, the landline bill; bill: thirdparty.karashop):
+	// the adapter (provider/karashop) calls the Karashop HTTPS API itself.
+	//   - KarashopEnabled turns the provider on. False (the default): every call fails as "provider
+	//     down", nothing is sent to Karashop and the mock (debug.mocks.karashop) does not apply.
+	//   - KarashopTimeout limits each Karashop call (an inquiry is two calls, sent at the same time).
+	//     Positive. Default 30s (bill: karashop.timeout).
+	//   - KarashopCode and KarashopPassword are the credential of every call; the password is a
+	//     Secret (never printed). KarashopBillInquiryURL is the inquiry URL. They have no default:
+	//     the real values are only in config.yml. An empty one makes every call fail as "provider down".
+	//   - KarashopBillPaymentInfoURL (bill: billPaymentInfoURL) is not read yet: it belongs to the
+	//     landline order flow (SendPaymentInfo).
+	// Not hot-reloadable.
+	KarashopEnabled            bool          `path:"providers.karashop.enabled"`
+	KarashopTimeout            time.Duration `path:"providers.karashop.timeout"`
+	KarashopCode               string        `path:"providers.karashop.code"`
+	KarashopPassword           Secret        `path:"providers.karashop.password"`
+	KarashopBillInquiryURL     string        `path:"providers.karashop.bill_inquiry_url"`
+	KarashopBillPaymentInfoURL string        `path:"providers.karashop.bill_payment_info_url"`
+
 	// CachingWater is how long a saved water inquiry answers the same bill again with no provider
 	// call (bill: caching.water, 1h). 0 turns the cache off; a negative value is rejected. Not
 	// hot-reloadable (task 021, decision 1): read at start.
@@ -254,6 +273,10 @@ type Config struct {
 	// answers the same phone again with no provider call (bill: caching.mobile, 5h). 0 turns the
 	// cache off; a negative value is rejected. Not hot-reloadable (task 036, as caching.water): read at start.
 	CachingMobile time.Duration `path:"caching.mobile"`
+	// CachingTel is how long a saved landline inquiry (the bill type tel, task 025) answers the same
+	// number again with no provider call (bill: caching.tel, 1h). 0 turns the cache off; a negative
+	// value is rejected. Not hot-reloadable (as caching.water): read at start.
+	CachingTel time.Duration `path:"caching.tel"`
 
 	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -285,6 +308,12 @@ type Config struct {
 	DebugMockJiringSwitchReturnType string `path:"debug.mocks.jiring_switch.return_type"`
 	DebugMockParsianEnable          bool   `path:"debug.mocks.parsian.enable"`
 	DebugMockParsianReturnType      string `path:"debug.mocks.parsian.return_type"`
+
+	// DebugMockKarashopEnable makes the Karashop adapter answer with a fixed answer, with no call to
+	// Karashop (task 025). Development only, as DebugMockQabzinoEnable. Not hot-reloadable. The
+	// return type is MockReturnSuccess or MockReturnError; no effect while the mock is off.
+	DebugMockKarashopEnable     bool   `path:"debug.mocks.karashop.enable"`
+	DebugMockKarashopReturnType string `path:"debug.mocks.karashop.return_type"`
 
 	// DebugCacheInquiries is the switch of every use of the inquiry tables (bill_inquiries,
 	// bill_inquiry_requests) by the inquiry flow (task 031). True (the default): the flow reads the
@@ -320,6 +349,7 @@ func defaults() Config {
 		IrancellTimeout:     10 * time.Second,
 		JiringSwitchTimeout: 10 * time.Second,
 		ParsianTimeout:      10 * time.Second,
+		KarashopTimeout:     30 * time.Second,
 
 		TavanirCircuitBreakerName:         "tavanir",
 		TavanirCircuitBreakerMaxRequests:  100000,
@@ -330,11 +360,13 @@ func defaults() Config {
 		CachingElectricity:                time.Hour,
 		CachingGas:                        time.Hour,
 		CachingMobile:                     5 * time.Hour,
+		CachingTel:                        time.Hour,
 		DebugMockQabzinoReturnType:        MockReturnSuccess,
 		DebugMockTavanirReturnType:        MockReturnSuccess,
 		DebugMockIrancellReturnType:       MockReturnSuccess,
 		DebugMockJiringSwitchReturnType:   MockReturnSuccess,
 		DebugMockParsianReturnType:        MockReturnSuccess,
+		DebugMockKarashopReturnType:       MockReturnSuccess,
 		DebugCacheInquiries:               true,
 	}
 }
@@ -444,6 +476,15 @@ func (c Config) validate() error {
 	}
 	if !ValidMockReturnType(c.DebugMockParsianReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.parsian.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
+	}
+	if c.KarashopTimeout <= 0 {
+		errs = append(errs, errors.New("providers.karashop.timeout must be a positive duration (for example 30s)"))
+	}
+	if c.CachingTel < 0 {
+		errs = append(errs, errors.New("caching.tel must not be negative (0 turns the cache off)"))
+	}
+	if !ValidMockReturnType(c.DebugMockKarashopReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.karashop.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if c.CachingWater < 0 {
 		errs = append(errs, errors.New("caching.water must not be negative (0 turns the cache off)"))

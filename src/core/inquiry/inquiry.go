@@ -6,7 +6,9 @@
 // an answer (provider.Details), task 023 adds gas (the inquiry ID is the participate code), task 035
 // adds the Irancell mobile bill (the inquiry ID is the phone; only the Irancell provider answers),
 // task 036 adds the MCI mobile bill (the bill type "mobile"; the inquiry ID is the phone), task 037
-// adds the Rightel mobile bill (the bill type "mobilemidtermRightel"; only Qabzino answers).
+// adds the Rightel mobile bill (the bill type "mobilemidtermRightel"; only Qabzino answers), task 025
+// adds the landline bill (the bill type "tel"; the inquiry ID is the landline number; only Karashop
+// answers).
 //
 // One request calls one provider: the first enabled provider of the sorted list (PickProvider).
 // What that provider returns is the answer, also when it is an error or an answer that cannot be
@@ -96,6 +98,10 @@ type billType struct {
 //   - mobilemidtermRightel (task 037, the Rightel operator): the inquiry ID is the phone, as
 //     irancell. Only the Qabzino provider may answer (operator rule of task 037). bill has no cache
 //     skip for this bill type (shouldSkipCache: only mobile and tel).
+//   - tel (task 025, the landline bill): the inquiry ID is the landline number in the 98 form
+//     (helpers.ValidTel). Only the Karashop provider may answer (operator decision of 2026-11-14).
+//     One answer has a mid-term and a final-term inquiry, and the cache skip of bill applies
+//     (shouldSkipCache: mobile and tel).
 var billTypes = map[string]billType{
 	provider.BillTypeWater:       {tidPrefix: 1, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeElectricity: {tidPrefix: 2, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
@@ -104,6 +110,8 @@ var billTypes = map[string]billType{
 	provider.BillTypeMobile:      {tidPrefix: 5, validInquiryID: helpers.ValidMobile, invalid: "phone", skipSameTypePair: true},
 	// bill: pkg/reference RightelMobileReference (6).
 	provider.BillTypeMobileMidTermRightel: {tidPrefix: 6, validInquiryID: helpers.ValidMobile, invalid: "phone", onlyProvider: qabzinoProvider},
+	// bill: pkg/reference TelephoneReference (4).
+	provider.BillTypeTel: {tidPrefix: 4, validInquiryID: helpers.ValidTel, invalid: "phone", onlyProvider: karashopProvider, skipSameTypePair: true},
 }
 
 // irancellProvider is the providers.name of the Irancell provider (the adapter
@@ -113,6 +121,10 @@ const irancellProvider = "irancell"
 // qabzinoProvider is the providers.name of the Qabzino provider (the adapter provider/qabzino has
 // the same name). The package does not import the adapter: the flow knows only provider names.
 const qabzinoProvider = "qabzino"
+
+// karashopProvider is the providers.name of the Karashop provider (the adapter provider/karashop
+// has the same name).
+const karashopProvider = "karashop"
 
 // notEmpty is the rule of an inquiry ID that only has to be there.
 func notEmpty(id string) bool { return id != "" }
@@ -300,10 +312,11 @@ func generateTID(billType string) (string, error) {
 //     ProviderInterface.SupportsInquiry).
 //  3. Saved inquiries of the same bill and provider that are valid answer the call with no
 //     provider call, with the details that were saved with them; copies for the user are saved
-//     (is_cached true). For the bill type mobile, two saved rows of the same inquiry type do not
-//     answer (bill: shouldSkipCache). A failed read or a failed copy write is logged and does not fail the call.
+//     (is_cached true). For the bill types mobile and tel, two saved rows of the same inquiry type
+//     do not answer (bill: shouldSkipCache). A failed read or a failed copy write is logged and does not fail the call.
 //  4. Else it writes the request row (RequestInitial), calls the provider, writes the final status
-//     and the provider trace ID, and saves each inquiry of the answer with the details. A call
+//     and the provider trace ID, and saves each inquiry of the answer with the details (the bill ID
+//     of a row is the one of its inquiry when the adapter gives one, else the one of the answer). A call
 //     that fails gives an error that wraps provider.ErrProviderDown; an answer with no inquiry
 //     gives *RefusedError.
 //
@@ -488,9 +501,13 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 	res := Result{BillID: resp.BillID, Details: resp.Details, Inquiries: make([]Inquiry, 0, len(resp.Inquiries))}
 	rows := make([]Row, 0, len(resp.Inquiries))
 	for _, it := range resp.Inquiries {
+		billID := resp.BillID
+		if it.BillID != "" {
+			billID = it.BillID // the inquiry has its own bill ID (provider.InquiryItem.BillID)
+		}
 		r := Row{
 			ID: s.newID(), UserID: req.UserID, InquiryID: req.InquiryID, ProviderID: pro.ID, ProviderName: pro.Name,
-			BillType: req.BillType, ProviderTraceID: resp.ProviderTraceID, InquiryType: it.InquiryType, BillID: resp.BillID,
+			BillType: req.BillType, ProviderTraceID: resp.ProviderTraceID, InquiryType: it.InquiryType, BillID: billID,
 			PayID: it.PayID, PaymentDeadline: fixPaymentDeadline(it.PaymentDeadline), Amount: it.Amount,
 			Details: resp.Details,
 		}

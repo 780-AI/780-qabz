@@ -1,13 +1,14 @@
-<!-- VERSION: 0.3 -->
+<!-- VERSION: 0.4 -->
 <!--
 CHANGE LOG
+v0.4 — 2026-11-14 — Done: design decisions, implementation record and verification record added; status done; moved to `done_tasks/`.
 v0.3 — 2026-11-14 — Operator decision: the tel inquiry uses Karashop only (and nothing else). The task now adds the Karashop adapter (direct HTTPS, config `providers.karashop.*`, mock); the Qabzino and Parsian tel adapters are out. The Karashop config values given by the operator are recorded by reference (no secret in this file).
 v0.2 — 2026-11-11 — Names tasks 035 to 037 in place of task 024.
 v0.1 — 2026-11-02 — Created.
 -->
 # 025_tel_inquiry_endpoint — POST /v1/tel/inquiry and the Karashop telephone adapter
 
-Status: pending
+Status: done
 
 ## Description
 
@@ -69,3 +70,50 @@ Feature ON (Rule 15), in dev mode against the compose dev database, with `debug.
 4. With `return_type: error`, call with the `phone` of step 1 within the TTL. Pass: the success answer from the database (the provider is not called, so the mock error does not show).
 5. Disable the Karashop `tel` row (wait for the provider reload) and call with a new `phone`. Pass: the "no enabled provider" answer, no request row, no provider call. Enable the row again.
 6. Operator only: the first real call, with `debug.mocks.karashop.enable: false` and a real phone. Pass: the real mid-term and full-term debt, or the refused text of Karashop.
+
+## Design decisions (2026-11-14)
+
+The operator said "Questions answered" for the points of the design step. The task text decides the provider ("Karashop only") and proposes the shape of the two calls; the implementer decided the rest as below, each by the practice of an earlier task. Each difference from `bill` is in `docs/this_vs_bill.md`, items 36 and 37.
+
+1. **Two Karashop calls, one flow call (the proposal of the task).** The adapter sends `tci-end-getBillAccInfo` (full term) and `tci-mid-getBillAccInfo` (mid term) at the same time inside one `Inquiry` call and returns a mid-term and a final-term inquiry. The flow writes one request row (bill type `tel`, `tid` prefix 4) and saves two `bill_inquiries` rows. The calls run at the same time so the wait is one call, not two; each call has `providers.karashop.timeout`.
+2. **The bill ID of each part.** `provider.InquiryItem` gets an optional `BillID`: the flow saves it on the row of that inquiry (else the bill ID of the answer, as before for every other adapter). The answer mapping of `Phone.Inquiry` moves to `phoneInquiryResponse` (shared by `Phone` and `Tel`) and sends the bill ID of each inquiry; for the mobile bill types it is the same value as before (one bill ID per answer). The bill ID of the answer is the full-term one (the mid-term one when it is empty). The trace ID is the two transaction IDs joined with `,` (only the full-term one when the join is longer than 100 bytes, the column length).
+3. **The answer of each call** (bill: `telStatusMap`, `resultStatusCodeMap`, `statusCodeMap`): `telStatus` 1, 3, 4: success (a null amount is 0, a negative amount is 0). `telStatus` 2, `status.code` 400 and 404: refused with bill's text (HTTP 400). Every other answer: provider down (HTTP 503): `result.status.code` set (codes 1 to 6: method, definitions, province header, access, provider down, duplicate data: faults of the integration, not of the user), `status.code` 200 or 202 with no success `telStatus`, 401, 403, 410, 422, 429, 499, 500, 502, 503, 504, 520 and every unknown code (item 26 practice).
+4. **When one of the two calls fails:** a provider-down call makes the inquiry provider down and stops the other call at once (code review, 2026-11-14; the error of the call that failed first is reported); else a refused call makes it refused (the full term is reported first). Nothing is saved, so the cache never holds one part only.
+5. **The provider pick and the rows.** `billTypes` gets `tel` with `onlyProvider: karashop` and `skipSameTypePair: true`. The pick of (`tel`, `inquiry`) is the seed row 124325 (priority 9; Parsian 40 and Qabzino 52 are disabled); the saved rows get `provider_id` 124325, as bill (bill saves every step with the picked row of `tel`). The row 123456 (`telmidterm`) is not used.
+6. **When Karashop is not the enabled provider:** the answer of "no enabled provider" (HTTP 503, one error line `tel: no enabled provider for inquiry`, no row, no call), the mechanism of tasks 035 and 037.
+7. **The request check** (bill: `validateInquiryTelRequest`): phone or `billId`, and phone or `payId`; a `billId` that is sent is valid. `billId` and `payId` together: the raw inquiry (`inquiry.Service.RawInquiry`; its error mapping is shared with gas as `answerRawInquiry`); the answer has only `fullTerm`, as bill. Else `helpers.NormalizePhone` (bill's `NormalizePhoneNumber`) and `helpers.ValidTel` (`98` and ten digits): no new rule (conventions § 5); an invalid phone is HTTP 400 (bill sends it to the provider).
+8. **`caching.tel`:** default `1h` (bill), `0` turns the cache off, a negative value is rejected, not hot-reloadable (task 021 decision 1).
+9. **Config:** `providers.karashop.enabled` (default `false`), `timeout` (default `30s`, bill), `code`, `password` (`Secret`), `bill_inquiry_url`, `bill_payment_info_url` (not read); no default for the credential and the URLs. `config.yml` has the values of bill's `config.example.yaml` with `enabled: true`; `config.yml.example` has the dummied copy.
+10. **Mock** (`debug.mocks.karashop`, dev mode only, `providers.karashop.enabled` true): bill ID `2101234560040` (a valid bill ID of the type tel), mid-term 120 000 rials (pay ID `12000035`), final-term 350 000 rials (pay ID `35000042`); both pay IDs are valid and their amount rule gives the amount; no deadline. `return_type: error` is provider down.
+11. **JSON:** the answer is read on a hot path with `fastjson` (two pooled parsers: the outer object and the JSON text of `responseText`); the request is written with `encoding/json/v2`.
+12. **TLS:** the adapter checks the certificate (bill skips the check). The chain of `core.digitalport.ir` (`*.digitalport.ir`, Certum) verified on 2026-11-14.
+13. **Metrics and logs:** no new metric. `qabz_inquiries_total{bill_type="tel"}` (also `raw`), `qabz_provider_calls_total{provider="karashop"}` and `qabz_provider_call_duration_ms` (the two calls together) count it; the log prefix is `tel:`; the password is never in a log line or an error text.
+14. **Not in this task:** the details (`serviceStatus`), the payment info (`SendPaymentInfo`), the tel order endpoints (HTTP 501).
+
+## Implementation record (2026-11-14)
+
+- `provider`: `BillTypeTel`; `InquiryItem.BillID`.
+- `core/inquiry`: the `tel` entry of `billTypes` (`tid` prefix 4, `helpers.ValidTel`, `onlyProvider: karashop`, `skipSameTypePair`); the row bill ID from the inquiry when set.
+- `provider/karashop` (new): the adapter, `MockFixtures`.
+- `entry/grpc`: `tel.go` (new: `Tel`, `RegisterTel`, `validTelRequest`); `phoneInquiryResponse` (from `Phone.Inquiry`); `answerRawInquiry` (from `Gas.rawInquiry`).
+- `config`: the `providers.karashop.*` keys, `caching.tel`, `debug.mocks.karashop.*`, their defaults and checks.
+- `app`: the Karashop adapter in `newProviderRegistry`, `newTel`, the Tel gRPC service and gateway handler, the TTL of `tel`, the help text of `qabz_inquiries_total`.
+- Tests: `provider/karashop/karashop_test.go`, `core/inquiry/tel_test.go`, `entry/grpc/tel_test.go`, `entry/http/tel_test.go`, `app/tel_test.go`, `app/tel_live_test.go`, `config` `TestParseKarashopKeys`; four old tests that named `tel` as an unknown bill type or counted the bill types are updated.
+- Docs: `system.html` v2.10, `this_vs_bill.md` v0.17 (items 36, 37), `folder_structure.md` v0.44, `src/app/README.md` v0.31, `config.yml.example`, `qabz.postman_collection.json` (folder `Tel`).
+
+## Verification record (2026-11-14, implementer)
+
+- Build, vet, `gofmt`: clean. `make test GO_TEST_ARGS="-race -count=1 -cover"`: every package passes but `qabz/config` `TestLocalConfigInSync` (the old task 023 follow-up (c): the local `config.yml` has the `providers.tavanir.circuit_breaker` block commented out; the new keys are in both files). Coverage: `app` 87.7%, `config` 96.9% (with that test skipped), `core/inquiry` 99.3%, `entry/grpc` 98.8%, `entry/http` 88.4%, `provider` 96.4%, `provider/karashop` 96.8%.
+- Live tests (the run database): `TestLiveTelInquiryFlow`, `TestLiveTelMockError`, `TestLiveTelOnlyKarashop` pass, no skip.
+- Positive controls (each test failed with the rule removed, then passed after the restore): `onlyProvider` → `TestTelOnlyKarashop`; `skipSameTypePair` → `TestTelSavedRowsThatDoNotAnswer`; the row bill ID → `TestTelMissSavesTwoInquiries`; the `telStatus` 2 refusal → `TestInquiryTelStatusMap`; the mid-term error → `TestInquiryOneCallFails`; the `ValidTel` check → `TestTelInquiryPhoneForms`; the bill ID of each part → `TestTelInquiryMapsRequestAndAnswer`.
+- Feature ON (Rule 15): an App copy on ports 18080 / 18082 / 19090 (the operator debug App on 8080 stayed up), config copies in the scratchpad with `debug.mocks.karashop.enable: true`, `providers.general.load_interval: 5s`, `debug.auth.disable: true`. No call to Karashop.
+  1. Mock `success`, `{"phone":"02199250251"}`: HTTP 200, `midTerm` `2101234560040` / `12000035` / 120000, `fullTerm` `2101234560040` / `35000042` / 350000, empty deadlines. One request row (`tel`, `karashop`, `success`, trace `mock-karashop-0001`, `tid` prefix 4, inquiry ID `982199250251`: the 98 form); two `bill_inquiries` rows of provider 124325 (`midterm`, `final_term`). Log lines `provider mock: inquiry answered with no call to the provider` and `inquiry: provider call` (2 inquiries). Pass.
+  2. `{"phone":"982199250251"}`: the same answer; still one request row; two copies (`is_cached`); one mock line; `qabz_inquiries_total{bill_type="tel",provider="karashop",result="db_hit"} 1`, `provider_ok 1`, `qabz_provider_calls_total{provider="karashop",result="ok"} 1`. Pass.
+  3. Restart with mock `error`, `982199250252`: HTTP 503 `{"code":14,...}` (provider-down text); one request row `failed`, no trace; no `bill_inquiries` row; one error line `tel: provider inquiry failed`. Pass.
+  4. Mock `error`, the number of step 1: HTTP 200 with the saved answer; `db_hit 1`. Pass.
+  5. Restart with mock `success`; row 124325 disabled, wait 7 s: `982199250253` HTTP 503; then row 52 (Qabzino `tel`) enabled, wait 7 s: `982199250254` HTTP 503 with the error `only "karashop" may answer, the pick is "qabzino"`. No request row, no mock line; `qabz_inquiries_total{bill_type="tel",provider="none",result="no_provider"} 2`. Pass. Rows 124325 (enable) and 52 (disable) restored.
+  - Also: `{"phone":"12345"}` HTTP 400 `invalid parameter`; `{"billId":"2101234560040","payId":"35000042"}` HTTP 200 with only `fullTerm` (350000) and an empty `midTerm`.
+- After the run: the test rows of the numbers `9821992502__` deleted (6 inquiry rows, 2 request rows). The providers rows 35, 36 and 43 differ from the seed (24 enabled, the seed has 23); this run did not change them.
+- Step 6 (the first real call) is for the operator.
+- Code review (`code-reviewer` agent, 2026-11-14): NOT READY with 4 nil-safety defects (no nil check of the HTTP response in `karashop.go`; three test indexes or `err.Error()` with no guard). All four fixed; the minor point "a failed call waits for the other call" fixed too (`TestInquiryOneFailureStopsTheOther`, `TestInquiryEmptyAnswer`; positive controls: both failed with the stop or the cause rule removed). `make test GO_TEST_ARGS="-race -count=1"` after the fixes: every package passes but the old `TestLocalConfigInSync`; `provider/karashop` coverage 97.0%.
+

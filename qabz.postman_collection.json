@@ -110,6 +110,24 @@
       "value": "989201234567",
       "type": "string",
       "description": "Phone/Inquiry Rightel body phone (a mobile number in the 98 form; the inquiry ID)"
+    },
+    {
+      "key": "tel_phone",
+      "value": "982188776655",
+      "type": "string",
+      "description": "Tel/Inquiry body phone (a landline number; 98 form, 0 form or ten digits; the inquiry ID)"
+    },
+    {
+      "key": "tel_billId",
+      "value": "",
+      "type": "string",
+      "description": "Tel/Inquiry body billId (optional; a valid bill ID when set; with payId: the raw inquiry)"
+    },
+    {
+      "key": "tel_payId",
+      "value": "",
+      "type": "string",
+      "description": "Tel/Inquiry body payId (optional; with billId: the raw inquiry)"
     }
   ],
   "auth": {
@@ -605,6 +623,56 @@
                 "exec": [
                   "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
                   "pm.test(\"has midTerm and fullTerm with a price\", function () { const b = pm.response.json(); [\"midTerm\", \"fullTerm\"].forEach(function (k) { pm.expect(b).to.have.property(k); pm.expect(b[k].price).to.be.a(\"number\"); pm.expect(b[k]).to.have.property(\"billId\"); pm.expect(b[k]).to.have.property(\"payId\"); pm.expect(b[k]).to.have.property(\"paymentDeadline\"); }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tel",
+      "item": [
+        {
+          "name": "Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{tel_phone}}\",\n  \"billId\": \"{{tel_billId}}\",\n  \"payId\": \"{{tel_payId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/tel/inquiry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "tel",
+                "inquiry"
+              ]
+            },
+            "description": "haf80.api.bill.Tel/Inquiry (task 025). Inquires a landline (telephone) bill by phone. The request and the answer are those of bill (InquiryTelRequest, InquiryPhoneResponse), unchanged. Request rules, as in bill: phone or billId is required, and phone or payId is required; a billId that is sent must be a valid bill ID. So a request with only billId or only payId is invalid. A request with both billId and payId is the raw inquiry of bill (with or without a phone): no provider, no saved inquiry; the price is read from the pay ID; the answer has only fullTerm (billId, payId, price, no paymentDeadline) and an empty midTerm; a bad pay ID or a bill ID of an unknown type is HTTP 400 with bill's text. Else the phone is converted to the 98 form with bill's rule (982188776655, 02188776655 and 2188776655 are one number) and must then be 98 and ten digits (else HTTP 400; bill sends any phone to the provider). The 98 form is the inquiry ID: the cache key and what the provider gets. ONLY Karashop answers (operator decision of 2026-11-14): the provider of (tel, inquiry) is picked with ProvidersService (the dev seed has Karashop row 124325 enabled); when the pick is another provider (Parsian 40, Qabzino 52), nobody is called and the answer is HTTP 503. The Karashop adapter sends two calls to the Karashop API at the same time (tci-end-getBillAccInfo for the full term, tci-mid-getBillAccInfo for the mid term) and writes one request row; providers.karashop.enabled false fails every call as provider down. caching.tel (default 1h): saved inquiries of the same number younger than the TTL answer with no provider call; two saved rows of the same inquiry type do not answer (as bill). With debug.mocks.karashop.enable true (dev mode only, providers.karashop.enabled true) the adapter answers a fixed answer: billId 2101234560040, midTerm payId 12000035 price 120000, fullTerm payId 35000042 price 350000, no paymentDeadline (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"midTerm\":{\"billId\":...,\"payId\":...,\"price\":<rials>,\"paymentDeadline\":\"\",\"providerId\":0},\"fullTerm\":{...}} (each part has the bill ID of its own Karashop call; providerId is always 0, as in bill; no debt: price 0). An invalid request HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a provider other than Karashop or a failed Karashop call (either of the two) HTTP 503 (message: the provider inquiry is temporarily disabled); Karashop refuses the number (telStatus 2, status 400 or 404) HTTP 400 with bill's text; any other failure HTTP 500. POST /v1/tel/order, /v2/tel/order and /v1/tel/complete-order are not implemented yet (HTTP 501)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"has midTerm and fullTerm with a price\", function () { const b = pm.response.json(); [\"midTerm\", \"fullTerm\"].forEach(function (k) { pm.expect(b).to.have.property(k); pm.expect(b[k].price).to.be.a(\"number\"); pm.expect(b[k]).to.have.property(\"billId\"); pm.expect(b[k]).to.have.property(\"payId\"); }); });"
                 ]
               }
             }

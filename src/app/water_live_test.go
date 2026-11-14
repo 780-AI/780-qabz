@@ -35,6 +35,7 @@ type liveWaterStack struct {
 	electricity *grpcserver.Electricity
 	gas         *grpcserver.Gas
 	phone       *grpcserver.Phone
+	tel         *grpcserver.Tel
 	metrics     *prometheus.Server
 	log         *liveLogger
 }
@@ -72,6 +73,10 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 	cfg.DebugMockIrancellEnable = true
 	cfg.DebugMockIrancellReturnType = returnType
 	cfg.CachingIrancell = time.Hour
+	cfg.KarashopEnabled = true
+	cfg.DebugMockKarashopEnable = true
+	cfg.DebugMockKarashopReturnType = returnType
+	cfg.CachingTel = time.Hour
 	if change != nil {
 		change(&cfg)
 	}
@@ -90,7 +95,7 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 	if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 		t.FailNow()
 	}
-	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log), phone: newPhone(flow, log), metrics: metrics, log: log}
+	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log), phone: newPhone(flow, log), tel: newTel(flow, log), metrics: metrics, log: log}
 }
 
 func (s *liveWaterStack) ask(user, bill string) (*pb.InquiryBillPayResponse, error) {

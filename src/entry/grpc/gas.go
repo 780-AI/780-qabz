@@ -154,25 +154,38 @@ func (g *Gas) Inquiry(ctx context.Context, req *pb.InquiryBillPayRequest) (*pb.I
 // uint32 field without a check (a wrong price); Qabz answers the pay ID text. See
 // docs/this_vs_bill.md, item 28.
 func (g *Gas) rawInquiry(billID, payID string) (*pb.InquiryBillPayResponse, error) {
-	if g.raw == nil {
-		return nil, errRawNotAvailable
-	}
-	res, err := g.raw.RawInquiry(provider.BillTypeGas, billID, payID)
-	switch {
-	case errors.Is(err, inquiry.ErrInvalidBillID):
-		return nil, status.Error(codes.InvalidArgument, rawInvalidBillIDText)
-	case errors.Is(err, inquiry.ErrInvalidPayID):
-		return nil, status.Error(codes.InvalidArgument, rawInvalidPayIDText)
-	case errors.Is(err, inquiry.ErrUnknownBillType):
-		return nil, status.Error(codes.InvalidArgument, rawUnknownBillTypeText)
-	case err != nil:
-		if g.logger != nil {
-			g.logger.Error("gas: raw inquiry failed", "error", err)
-		}
-		return nil, errInternal
-	case res.Amount > math.MaxUint32:
-		// The price is the user's own pay ID: a client error, not a server fault (no log line).
-		return nil, status.Error(codes.InvalidArgument, rawInvalidPayIDText)
+	res, err := answerRawInquiry(g.raw, g.logger, provider.BillTypeGas, billID, payID)
+	if err != nil {
+		return nil, err
 	}
 	return &pb.InquiryBillPayResponse{Price: uint32(res.Amount), PayId: res.PayID, BillId: res.BillID}, nil
+}
+
+// answerRawInquiry runs a raw inquiry (raw.RawInquiry) for the endpoint of billType and maps its
+// errors (Gas.rawInquiry, Tel.rawInquiry): a nil raw is Unimplemented; a bill ID or a pay ID that is
+// not valid, a bill ID of an unknown bill type and a price above the uint32 price field are
+// InvalidArgument with the text of bill and no log line; any other error is Internal with one error
+// line (the prefix is the bill type). A nil error means that res.Amount fits uint32.
+func answerRawInquiry(raw RawInquirer, logger ErrorLogger, billType, billID, payID string) (inquiry.RawResult, error) {
+	if raw == nil {
+		return inquiry.RawResult{}, errRawNotAvailable
+	}
+	res, err := raw.RawInquiry(billType, billID, payID)
+	switch {
+	case errors.Is(err, inquiry.ErrInvalidBillID):
+		return inquiry.RawResult{}, status.Error(codes.InvalidArgument, rawInvalidBillIDText)
+	case errors.Is(err, inquiry.ErrInvalidPayID):
+		return inquiry.RawResult{}, status.Error(codes.InvalidArgument, rawInvalidPayIDText)
+	case errors.Is(err, inquiry.ErrUnknownBillType):
+		return inquiry.RawResult{}, status.Error(codes.InvalidArgument, rawUnknownBillTypeText)
+	case err != nil:
+		if logger != nil {
+			logger.Error(billType+": raw inquiry failed", "error", err)
+		}
+		return inquiry.RawResult{}, errInternal
+	case res.Amount > math.MaxUint32:
+		// The price is the user's own pay ID: a client error, not a server fault (no log line).
+		return inquiry.RawResult{}, status.Error(codes.InvalidArgument, rawInvalidPayIDText)
+	}
+	return res, nil
 }

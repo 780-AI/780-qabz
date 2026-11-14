@@ -25,6 +25,7 @@ import (
 	"qabz/provider"
 	"qabz/provider/irancellproxy"
 	"qabz/provider/jiring"
+	"qabz/provider/karashop"
 	"qabz/provider/parsianproxy"
 	"qabz/provider/qabzino"
 	"qabz/provider/tavanir"
@@ -100,7 +101,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	water, electricity, gas, phone := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger), newPhone(flow, logger)
+	water, electricity, gas, phone, tel := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger), newPhone(flow, logger), newTel(flow, logger)
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
 	opts, err := newRequestMetrics(metrics)
 	if err != nil {
@@ -108,7 +109,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		return nil, err
 	}
 	opts = append(opts, authCheck.ServerOptions()...)
-	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity), grpcserver.RegisterGas(gas), grpcserver.RegisterPhone(phone))
+	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity), grpcserver.RegisterGas(gas), grpcserver.RegisterPhone(phone), grpcserver.RegisterTel(tel))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
 	}
@@ -116,7 +117,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler, pb.RegisterMyBillsHandler, pb.RegisterWaterHandler, pb.RegisterElectricityHandler, pb.RegisterGasHandler, pb.RegisterPhoneHandler)
+	gw, err := httpserver.New(cfg.HTTPAddr, gs.DialAddr, pb.RegisterServiceHandler, pb.RegisterMyBillsHandler, pb.RegisterWaterHandler, pb.RegisterElectricityHandler, pb.RegisterGasHandler, pb.RegisterPhoneHandler, pb.RegisterTelHandler)
 	if err == nil && gw == nil {
 		err = errors.New("http gateway: New returned nil")
 	}
@@ -315,7 +316,9 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 // and timeout; it calls no other service) and Irancell (task 035: a gRPC client of the irancell
 // service with providers.irancell.enabled, grpc_address and timeout), and Jiring Switch and Parsian
 // (task 036, the MCI mobile bill: gRPC clients of the jiring-switch and the parsian-v2 service with
-// providers.jiring_switch.* and providers.parsian.*). The mock of a provider
+// providers.jiring_switch.* and providers.parsian.*), and Karashop (task 025, the landline bill: the
+// direct HTTPS client of the Karashop API with providers.karashop.enabled, code, password,
+// bill_inquiry_url and timeout). The mock of a provider
 // (debug.mocks.<provider>) is applied only when Config.Mode is dev and its enable key is true (one
 // warn line); then Inquiry answers a fixed answer and never calls the backend. Every provider that
 // is added later follows the same pattern (registerAdapter) with its own debug.mocks.<provider>. A
@@ -422,6 +425,24 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		parsianMock, parsianproxy.MockFixtures(), logger); err != nil {
 		return nil, err
 	}
+
+	// Karashop (task 025): a direct HTTPS client of the Karashop API, as Qabzino and Tavanir.
+	karashopAdapter, err := karashop.New(karashop.Options{
+		Enabled:    cfg.KarashopEnabled,
+		Code:       cfg.KarashopCode,
+		Password:   cfg.KarashopPassword.Reveal(),
+		InquiryURL: cfg.KarashopBillInquiryURL,
+		Timeout:    cfg.KarashopTimeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	// providers.karashop.enabled: false wins over the mock, as for the other providers.
+	karashopMock := provider.MockSettings{Enable: dev && cfg.DebugMockKarashopEnable && cfg.KarashopEnabled, ReturnType: cfg.DebugMockKarashopReturnType}
+	if err := registerAdapter(registry, karashopAdapter, "Karashop", disabledNotice("karashop", "Karashop", cfg.KarashopEnabled),
+		karashopMock, karashop.MockFixtures(), logger); err != nil {
+		return nil, err
+	}
 	return registry, nil
 }
 
@@ -463,9 +484,9 @@ func disabledNotice(name, title string, enabled bool) string {
 }
 
 // newInquiryFlow builds the inquiry flow (inquiry.Service) that every inquiry endpoint uses (water:
-// task 021; electricity: task 022; gas: task 023; the Irancell mobile bill: task 035, caching.irancell; the MCI mobile bill: task 036, caching.mobile). It picks the provider with ProvidersService, answers from the
+// task 021; electricity: task 022; gas: task 023; the Irancell mobile bill: task 035, caching.irancell; the MCI mobile bill: task 036, caching.mobile; the landline bill: task 025, caching.tel). It picks the provider with ProvidersService, answers from the
 // saved inquiries of bill_inquiries when they are younger than the cache TTL of the bill type
-// (caching.water, caching.electricity, caching.gas; read at start), else calls the adapter of the provider and
+// (caching.water, caching.electricity, caching.gas, ..., caching.tel; read at start), else calls the adapter of the provider and
 // saves the answer. With metrics on, each inquiry adds 1 to
 // qabz_inquiries_total{bill_type,provider,result} (result: db_hit, provider_ok, provider_refused,
 // provider_down, no_provider, canceled, error, raw; provider "none" when no provider was picked); each
@@ -481,7 +502,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 	if reg := metrics.Registry(); reg != nil {
 		inquiries := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_inquiries_total",
-			Help: "Bill inquiries by bill type (water, electricity, gas, irancell, mobile), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas request with billId and payId, answered from the two IDs with no provider).",
+			Help: "Bill inquiries by bill type (water, electricity, gas, irancell, mobile, mobilemidtermRightel, tel), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas or tel request with billId and payId, answered from the two IDs with no provider).",
 		}, []string{"bill_type", "provider", "result"})
 		calls := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_provider_calls_total",
@@ -517,6 +538,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 		provider.BillTypeMobile:      cfg.CachingMobile,
 		// Rightel (task 037): the key of MCI, as bill (operator decision).
 		provider.BillTypeMobileMidTermRightel: cfg.CachingMobile,
+		provider.BillTypeTel:                  cfg.CachingTel, // task 025
 	}
 	if !cfg.DebugCacheInquiries && logger != nil {
 		logger.Warn("inquiry store disabled (debug.cache_inquiries: false): development only, every inquiry calls the provider and nothing is saved")
@@ -588,6 +610,22 @@ func newPhone(flow *inquiry.Service, logger Logger) *grpcserver.Phone {
 		deps.Logger = logger
 	}
 	return grpcserver.NewPhone(deps)
+}
+
+// newTel builds the gRPC Tel service: POST /v1/tel/inquiry (task 025, the landline bill) on the same
+// inquiry flow as Water; the flow also answers the raw inquiry (a request with billId and payId). A
+// server fault writes one error log line (grpcserver.Tel). A nil flow gives a service whose Inquiry
+// answers Unimplemented.
+func newTel(flow *inquiry.Service, logger Logger) *grpcserver.Tel {
+	deps := grpcserver.TelDeps{}
+	if flow != nil {
+		deps.Inquiry = flow
+		deps.Raw = flow
+	}
+	if logger != nil {
+		deps.Logger = logger
+	}
+	return grpcserver.NewTel(deps)
 }
 
 // newRequestMetrics returns the gRPC server options that measure every call (and so every gateway
