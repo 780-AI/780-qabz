@@ -197,11 +197,19 @@ func inquiryID(req InsertRequest) (string, error) {
 		if phone == "" {
 			phone = req.BillID // bill: with no phone, the bill ID is the phone number
 		}
-		phone = helpers.NormalizePhone(phone)
 		valid := helpers.ValidTel
 		if req.Type == TypeMobile {
 			valid = helpers.ValidMobile
+			// Task 038: a mobile number is valid in every common form ("+98", "0098", separators,
+			// Persian or Arabic digits). @todo bill has only NormalizePhoneNumber here. See
+			// docs/this_vs_bill.md, item 35.
+			if m := helpers.NormalizeMobile(phone); m != "" {
+				return m, nil
+			}
 		}
+		// bill's rule: the landline, and each mobile input that bill accepts and NormalizeMobile
+		// does not (eleven bytes whose first byte is not "0").
+		phone = helpers.NormalizePhone(phone)
 		if !valid(phone) {
 			return "", fmt.Errorf("%w: bad %s number", ErrInvalid, req.Type)
 		}

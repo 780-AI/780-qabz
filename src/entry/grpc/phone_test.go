@@ -120,9 +120,22 @@ func TestPhoneInquiryRequestCheck(t *testing.T) {
 		{"nil request", nil, false},
 		{"no phone", &pb.InquiryPhoneRequest{Operator: ir}, false},
 		{"no phone, bill ID and pay ID", &pb.InquiryPhoneRequest{Operator: ir, BillId: irBill, PayId: "1"}, false},
-		{"phone with 0", &pb.InquiryPhoneRequest{Phone: "09351234567", Operator: ir}, false},
-		{"phone without 98", &pb.InquiryPhoneRequest{Phone: "9351234567", Operator: ir}, false},
+		// Task 038: every common form of the mobile number is valid and becomes the 98 form.
+		{"phone with 0", &pb.InquiryPhoneRequest{Phone: "09351234567", Operator: ir}, true},
+		{"phone without 98", &pb.InquiryPhoneRequest{Phone: "9351234567", Operator: ir}, true},
+		{"phone with +98", &pb.InquiryPhoneRequest{Phone: "+989351234567", Operator: ir}, true},
+		{"phone with 0098", &pb.InquiryPhoneRequest{Phone: "00989351234567", Operator: ir}, true},
+		{"phone with spaces", &pb.InquiryPhoneRequest{Phone: "+98 935 123 4567", Operator: ir}, true},
+		{"phone with dashes", &pb.InquiryPhoneRequest{Phone: "0935-123-4567", Operator: ir}, true},
+		{"phone with brackets", &pb.InquiryPhoneRequest{Phone: "(0935) 123 4567", Operator: ir}, true},
+		{"phone in Persian digits", &pb.InquiryPhoneRequest{Phone: "۰۹۳۵۱۲۳۴۵۶۷", Operator: ir}, true},
+		{"phone in Arabic digits", &pb.InquiryPhoneRequest{Phone: "٠٩٣٥١٢٣٤٥٦٧", Operator: ir}, true},
+		{"phone with 0 and a valid bill ID", &pb.InquiryPhoneRequest{Phone: "09351234567", Operator: ir, BillId: irBill}, true},
+		{"phone with 0 and a bad bill ID", &pb.InquiryPhoneRequest{Phone: "09351234567", Operator: ir, BillId: "1234567890124"}, false},
 		{"a landline", &pb.InquiryPhoneRequest{Phone: "982112345678", Operator: ir}, false},
+		{"a landline with 0", &pb.InquiryPhoneRequest{Phone: "02112345678", Operator: ir}, false},
+		{"phone with 0, one digit short", &pb.InquiryPhoneRequest{Phone: "0935123456", Operator: ir}, false},
+		{"phone with letters", &pb.InquiryPhoneRequest{Phone: "0935123456a", Operator: ir}, false},
 		{"phone too long", &pb.InquiryPhoneRequest{Phone: irPhone + "1", Operator: ir}, false},
 		{"a bad bill ID", &pb.InquiryPhoneRequest{Phone: irPhone, Operator: ir, BillId: "1234567890124"}, false},
 		{"an operator number outside the enum", &pb.InquiryPhoneRequest{Phone: irPhone, Operator: 9}, false},
@@ -148,12 +161,16 @@ func TestPhoneInquiryRequestCheck(t *testing.T) {
 	}
 }
 
+// TestValidPhoneInquiry: the check reads the phone that the handler converted (its second
+// argument), never the phone of the request.
 func TestValidPhoneInquiry(t *testing.T) {
-	assert.True(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Phone: irPhone}), "the unknown operator is a value of the enum: the operator table rejects it")
-	assert.True(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Phone: irPhone, Operator: pb.InquiryPhoneRequest_unknown}))
-	assert.False(t, validPhoneInquiry(nil))
-	assert.False(t, validPhoneInquiry(&pb.InquiryPhoneRequest{}))
-	assert.False(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Phone: irPhone, Operator: -1}))
+	assert.True(t, validPhoneInquiry(&pb.InquiryPhoneRequest{}, irPhone), "the unknown operator is a value of the enum: the operator table rejects it")
+	assert.True(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Operator: pb.InquiryPhoneRequest_unknown}, irPhone))
+	assert.True(t, validPhoneInquiry(nil, irPhone), "a nil request has no bill ID and the enum value 0")
+	assert.False(t, validPhoneInquiry(nil, ""))
+	assert.False(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Phone: irPhone}, ""), "the phone of the request is not read")
+	assert.False(t, validPhoneInquiry(&pb.InquiryPhoneRequest{}, "09351234567"), "a phone that is not converted is invalid")
+	assert.False(t, validPhoneInquiry(&pb.InquiryPhoneRequest{Operator: -1}, irPhone))
 }
 
 // TestPhoneInquiryOperators: the operator table. Irancell, mci (task 036; also a request with no

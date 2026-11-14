@@ -63,12 +63,13 @@ func RegisterPhone(svc pb.PhoneServer) Register {
 	return func(r grpc.ServiceRegistrar) { pb.RegisterPhoneServer(r, svc) }
 }
 
-// validPhoneInquiry is the request check of bill (controller/phone validateInquiryRequest): the
-// phone is a mobile number in the 98 form (989 and nine digits; an empty phone is invalid, so the
-// "phone or billId" and "phone or payId" rules of bill never decide), a billId that is there is a
-// valid bill ID, and operator and service are values of the enum. The payId is not checked.
-func validPhoneInquiry(req *pb.InquiryPhoneRequest) bool {
-	if !helpers.ValidMobile(req.GetPhone()) {
+// validPhoneInquiry is the request check of bill (controller/phone validateInquiryRequest) on a
+// phone that helpers.NormalizeMobile already converted: phone is a mobile number in the 98 form
+// (989 and nine digits; an empty phone is invalid, so the "phone or billId" and "phone or payId"
+// rules of bill never decide), a billId that is there is a valid bill ID, and operator and service
+// are values of the enum. The payId is not checked.
+func validPhoneInquiry(req *pb.InquiryPhoneRequest, phone string) bool {
+	if !helpers.ValidMobile(phone) {
 		return false
 	}
 	if id := req.GetBillId(); id != "" && !helpers.ValidBillID(id) {
@@ -86,6 +87,11 @@ func validPhoneInquiry(req *pb.InquiryPhoneRequest) bool {
 // MCI operator, "mobile:", for the Rightel operator "mobilemidtermRightel:").
 //
 // What is special to the mobile bill, as in bill:
+//   - The phone is converted to the 98 form first (helpers.NormalizeMobile, task 038): the 0 form,
+//     ten digits, "+98", "0098", separators and Persian or Arabic digits are valid. The converted
+//     phone is the one that the request check, the inquiry ID, the rows and the provider get, so
+//     every form of one number is one saved inquiry.
+//     @todo bill accepts only the 98 form here. See docs/this_vs_bill.md, item 35.
 //   - The request check is validPhoneInquiry (InvalidArgument, no log line).
 //   - The operator of the request gives the bill type (phoneOperators). As in bill, only operator
 //     is read: service is never used (the text of an enum value is never empty, so bill's
@@ -118,7 +124,8 @@ func (p *Phone) Inquiry(ctx context.Context, req *pb.InquiryPhoneRequest) (*pb.I
 		// @todo bill answers gRPC Unknown here. See docs/this_vs_bill.md, item 14.
 		return nil, errRejected
 	}
-	if !validPhoneInquiry(req) { // req nil: an empty phone, invalid
+	phone := helpers.NormalizeMobile(req.GetPhone()) // "" when it is not a mobile number
+	if !validPhoneInquiry(req, phone) {              // req nil: an empty phone, invalid
 		// @todo bill answers gRPC Unknown (HTTP 500). See docs/this_vs_bill.md, item 14.
 		return nil, errInvalidParameter
 	}
@@ -131,7 +138,7 @@ func (p *Phone) Inquiry(ctx context.Context, req *pb.InquiryPhoneRequest) (*pb.I
 	}
 	res, err := p.inquiry.Inquire(ctx, inquiry.Request{
 		BillType:  billType,
-		InquiryID: req.GetPhone(),
+		InquiryID: phone,
 		UserID:    claims.UserID,
 		Dialer:    claims.Mobile,
 	})

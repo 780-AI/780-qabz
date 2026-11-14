@@ -1,7 +1,8 @@
-<!-- VERSION: 0.15 -->
-<!-- Last Updated: 2026-11-11 -->
+<!-- VERSION: 0.16 -->
+<!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v0.16 — 2026-11-14 — Task 038: item 35 (a mobile number is valid in every common form in POST /v1/mobile/inquiry and POST /v1/mybill; bill accepts only the 98 form in the inquiry and the forms of `NormalizePhoneNumber` in My Bills).
 v0.15 — 2026-11-11 — Task 031: item 34 (`debug.cache_inquiries`: a development switch that turns off the inquiry tables; bill has none).
 v0.14 — 2026-11-11 — Task 037: item 33 (POST /v1/mobile/inquiry for the Rightel operator: only Qabzino, the direct Ayantech call, the status codes, the differences of the water inquiry apply); item 31 no longer names Rightel as not available.
 v0.13 — 2026-11-11 — Task 036: item 32 (POST /v1/mobile/inquiry for the MCI operator: the provider order, one provider per request, Parsian for other bill types, the differences of the water inquiry apply); item 31 no longer names MCI as not available; item 15 covers an adapter that does not inquire the bill type.
@@ -243,3 +244,9 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **Qabz:** `debug.cache_inquiries` (default `true`) in the `debug` section. `true` is the flow of bill. `false`, in dev mode only (a mode other than dev removes the section), turns off every use of the two tables by the inquiry flow: no saved inquiry answers, and no request row, no inquiry and no copy for the user is written. Every inquiry calls the provider. The `id` of an inquiry in the answer is then not the id of a row.
     - **Reason:** the operator wants to test the providers in development with no saved state ("nothing stored regarding inquiries", task 031).
     - **Code:** `Options.NoStore` in `src/core/inquiry/inquiry.go` (the `@todo` comment names item 34); `newInquiryFlow` in `src/app/defaults.go`.
+
+35. **`POST /v1/mobile/inquiry` and `POST /v1/mybill`: the forms of a mobile number.**
+    - **bill:** the mobile inquiry does not normalize the phone: only the 98 form (`989` and nine digits) is valid, and `09373969041` is an invalid request. My Bills (and the mobile order) use `NormalizePhoneNumber`: the 98 form, eleven bytes (the first byte goes) and ten bytes.
+    - **Qabz:** `helpers.NormalizeMobile` converts the phone to the 98 form before the request check. Valid forms: the 98 form, the 0 form (`09373969041`), ten digits (`9373969041`), `+98` and `0098`, with white space, `-`, `(` and `)` as separators, in ASCII, Persian or Arabic digits. The ten digits must start with `9`, so a landline stays invalid. Any other character or length is an invalid request (HTTP 400, no log line, no provider call). The 98 form is the inquiry ID, so the cache key, the request row, the saved inquiries and the provider call are the same for every form of one number. In My Bills the mobile type uses the same function first and then bill's rule, so every input that bill accepts stays valid with the same saved value; the landline type (`tel`) is not changed. The `phone` field of the My Bills answer is the phone as the client sent it, as before.
+    - **Reason:** the real clients send the 0 form (operator report, 2026-11-11: HTTP 400 for `09373969041`); the operator asked for every common form (task 038) and for the same rule in My Bills (2026-11-14).
+    - **Code:** the `@todo` comments in `Phone.Inquiry` (`src/entry/grpc/phone.go`) and in `inquiryID` (`src/core/savedbill/savedbill.go`); `NormalizeMobile` in `src/common/helpers/phone.go`.

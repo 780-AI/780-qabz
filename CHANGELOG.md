@@ -1,7 +1,8 @@
-<!-- VERSION: 3.17 -->
-<!-- Last Updated: 2026-11-11 -->
+<!-- VERSION: 3.18 -->
+<!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.18 — 2026-11-14 — Added 038-mobile-phone-normalization entry.
 v3.17 — 2026-11-11 — Added session-wrap-up (task 031 session) entry.
 v3.16 — 2026-11-11 — Added 031-debug-cache-inquiries entry.
 v3.15 — 2026-11-11 — Added session-wrap-up (task 037 session) entry.
@@ -133,6 +134,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Task 038: a mobile number is valid in every common form (normalized to the 98 form)
+- **Type:** Major (request rule of two endpoints, Critical File `system.html`)
+- **Files:** `src/common/helpers/phone.go` (`NormalizeMobile`) + `helpers_test.go`; `src/entry/grpc/phone.go` (`Phone.Inquiry` converts the phone before the request check; the converted phone is the inquiry ID) + `phone_test.go`; `src/entry/http/phone_test.go`; `src/core/savedbill/savedbill.go` (the mobile type of My Bills) + `savedbill_test.go`; `src/app/phone_live_test.go`; `qabz.postman_collection.json` (descriptions of Phone / Inquiry and MyBills / Insert); `docs/initial-discovery/system.html` (v2.9); `docs/this_vs_bill.md` (v0.16, item 35); `src/app/README.md` (v0.30); `docs/documents_manifest.md`; `docs/Plans/OPEN_TASKS.md` (v1.61); the task file v0.2 (design, implementation and verification record; moved to `done_tasks/`).
+- **Impact:** Behavior change. `POST /v1/mobile/inquiry` (Irancell, MCI, Rightel) accepts the phone in the 98 form, the 0 form, ten digits, `+98`, `0098`, with spaces, dashes and brackets, in ASCII, Persian or Arabic digits; before, every form but the 98 form was HTTP 400. The 98 form is the inquiry ID, so every form of one number is one cache key, one request row and one provider call. `POST /v1/mybill` with type `mobile` accepts the same forms; every input that was valid before stays valid with the same saved value. The `tel` type, `helpers.NormalizePhone`, the answers, the config and the database schema are not changed. No new metric and no new log line (the check outcome is in the `code` label of `qabz_request_duration_ms`). `make test` still fails at the known `TestLocalConfigInSync` (local `config.yml`, not from this task).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, "Task 038 mobile number normalization": the unit, gateway and My Bills tests; feature ON with the Irancell mock (0 form, `+98` form with spaces, ten digits: one request row, `db_hit` for the later forms; a landline and a short number give HTTP 400; My Bills saves `989...`). Done by the implementer on 2026-11-14, awaiting operator confirmation.
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-11] — Session wrap-up (task 031 session)
 - **Type:** Minor (documentation; no code, no new files).

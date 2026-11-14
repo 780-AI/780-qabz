@@ -155,7 +155,7 @@ func TestLiveIrancellOnlyIrancell(t *testing.T) {
 		want codes.Code
 	}{
 		"no phone":    {&pb.InquiryPhoneRequest{Operator: pb.InquiryPhoneRequest_irancell}, codes.InvalidArgument},
-		"a bad phone": {&pb.InquiryPhoneRequest{Phone: "09351234567", Operator: pb.InquiryPhoneRequest_irancell}, codes.InvalidArgument},
+		"a bad phone": {&pb.InquiryPhoneRequest{Phone: "02112345678", Operator: pb.InquiryPhoneRequest_irancell}, codes.InvalidArgument}, // a landline; the 0 form of a mobile number is valid since task 038
 		"unknown":     {&pb.InquiryPhoneRequest{Phone: livePhone, Operator: pb.InquiryPhoneRequest_unknown}, codes.InvalidArgument},
 	} {
 		_, err = s.askPhone(liveUserOne, c.req)

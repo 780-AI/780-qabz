@@ -76,6 +76,22 @@ func TestPhoneInquiryRouteSuccess(t *testing.T) {
 	}
 }
 
+// TestPhoneInquiryRoutePhoneForms (task 038): a JSON body with the phone in another form than the 98
+// form is valid, and the flow gets the 98 form as the inquiry ID.
+func TestPhoneInquiryRoutePhoneForms(t *testing.T) {
+	for _, phone := range []string{"09351234567", "9351234567", "+989351234567", "00989351234567", "+98 935 123 4567", "0935-123-4567", "(0935) 123 4567", "۰۹۳۵۱۲۳۴۵۶۷", "٠٩٣٥١٢٣٤٥٦٧"} {
+		f := &fakeWaterFlow{res: irancellFlowResult()}
+		gw := phoneStack(t, f)
+		code, body := postPhone(t, gw, `{"phone":"`+phone+`","operator":"irancell"}`, true)
+		assert.Equal(t, http.StatusOK, code, phone+": "+string(body))
+		f.mu.Lock()
+		if assert.Len(t, f.reqs, 1, phone) {
+			assert.Equal(t, "989351234567", f.reqs[0].InquiryID, phone)
+		}
+		f.mu.Unlock()
+	}
+}
+
 func TestPhoneInquiryRouteStatusCodes(t *testing.T) {
 	const irancell = `{"phone":"989351234567","operator":"irancell"}`
 	cases := []struct {
@@ -90,7 +106,9 @@ func TestPhoneInquiryRouteStatusCodes(t *testing.T) {
 		{"the operator as a number", `{"phone":"989351234567","operator":1}`, nil, true, http.StatusOK, 1},
 		{"nothing", `{}`, nil, true, http.StatusBadRequest, 0},
 		{"no phone", `{"operator":"irancell","billId":"1234567890125","payId":"1"}`, nil, true, http.StatusBadRequest, 0},
-		{"a bad phone", `{"phone":"09351234567","operator":"irancell"}`, nil, true, http.StatusBadRequest, 0},
+		{"the phone in the 0 form (task 038)", `{"phone":"09351234567","operator":"irancell"}`, nil, true, http.StatusOK, 1},
+		{"a landline", `{"phone":"02112345678","operator":"irancell"}`, nil, true, http.StatusBadRequest, 0},
+		{"a phone one digit short", `{"phone":"0935123456","operator":"irancell"}`, nil, true, http.StatusBadRequest, 0},
 		{"a bad bill ID", `{"phone":"989351234567","operator":"irancell","billId":"12345"}`, nil, true, http.StatusBadRequest, 0},
 		{"an operator number that is not in the enum", `{"phone":"989351234567","operator":9}`, nil, true, http.StatusBadRequest, 0},
 		{"an operator name that is not in the enum is read as 0 (mci) by the gateway", `{"phone":"989351234567","operator":"mtn"}`, nil, true, http.StatusOK, 1},
