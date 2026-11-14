@@ -1,7 +1,8 @@
-<!-- VERSION: 3.19 -->
+<!-- VERSION: 3.20 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.20 — 2026-11-14 — Added session-wrap-up (task 039 creation session) entry.
 v3.19 — 2026-11-14 — Added 038-qa-scenario-passed entry.
 v3.18 — 2026-11-14 — Added 038-mobile-phone-normalization entry.
 v3.17 — 2026-11-11 — Added session-wrap-up (task 031 session) entry.
@@ -135,6 +136,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Session wrap-up (task 039 creation session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.63: 4 lesson candidates); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The session made task 039 `mobile_irancell_order` (commit 59717e1: the task file and the task counter; task files are not manifest-tracked). The push of 59717e1 is done.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-14] — Task 038 QA scenario passed (operator confirmation)
 - **Type:** Minor (documentation; no code, no new files).
