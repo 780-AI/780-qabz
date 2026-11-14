@@ -62,12 +62,6 @@ providers:
     branch_debit_endpoint: "" # the real URL only in config.yml
     username: ""             # Tavanir (SAAPA) user name; the real value only in config.yml
     password: ""             # Tavanir (SAAPA) password (secret); the real value only in config.yml
-    circuit_breaker:         # not used yet: no provider has a circuit breaker
-      name: "tavanir"
-      max_requests: 100000
-      interval: "1s"
-      timeout: "10s"
-      failure_ratio: 99      # percent, 0 to 100
   irancell:                  # the irancell service (our own service); the real values only in config.yml
     enabled: false           # false: every Irancell call fails as "provider down", nothing is sent to the irancell service, the mock does not apply
     timeout: "10s"           # limit of each call to the irancell service; positive

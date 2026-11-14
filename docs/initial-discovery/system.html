@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.10 -->
+<!-- VERSION: 2.11 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.11 — 2026-11-14 — Task 040: the unused config keys `providers.tavanir.circuit_breaker.*` removed from the config example (the circuit breaker comes at the end of the project with its own keys; a `@todo` in `src/config/config.go`).
 v2.10 — 2026-11-14 — Task 025 landline inquiry: `POST /v1/tel/inquiry` (`Tel.Inquiry`, bill type `tel`, `tid` prefix 4; the inquiry ID is the number in the 98 form; a request with billId and payId is the raw inquiry); only the Karashop provider may answer (operator decision, `onlyProvider` in `billTypes`); the Karashop adapter (`provider/karashop`, direct HTTPS) sends two calls at the same time (full term, mid term) and the flow writes one request row; each inquiry can have its own bill ID (`InquiryItem.BillID`); `providers.karashop.*`, `caching.tel` (1h), `debug.mocks.karashop`. No new metric (`bill_type="tel"`, `provider="karashop"`).
 v2.9 — 2026-11-14 — Task 038 mobile number normalization: `POST /v1/mobile/inquiry` (every operator) and the mobile type of `POST /v1/mybill` convert the phone to the 98 form before the request check (`helpers.NormalizeMobile`); the 98 form is the inquiry ID. No new metric.
 v2.8 — 2026-11-11 — Task 031 `debug.cache_inquiries`: a development switch (default `true`) of every use of `bill_inquiries` and `bill_inquiry_requests` by the inquiry flow; `false` (dev mode only) reads no saved inquiry and writes no row, so every inquiry calls the provider; one warn line at start; read at start (the Hot Reload table).
@@ -221,7 +222,6 @@ providers:
     branch_debit_endpoint: ""    # no default (task 036): the real URL only in config.yml
     username: ""                 # Tavanir (SAAPA) user name; the real value only in config.yml
     password: ""                 # Tavanir (SAAPA) password (secret); the real value only in config.yml
-    circuit_breaker: {name: tavanir, max_requests: 100000, interval: 1s, timeout: 10s, failure_ratio: 99}   # failure_ratio in percent; not used yet (no provider has a circuit breaker)
   irancell:                      # the irancell service, our own service (task 035)
     enabled: false               # false (default): every Irancell call fails as "provider down", nothing is sent, the mock does not apply
     timeout: 10s                 # limit of each call to the irancell service; positive

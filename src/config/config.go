@@ -132,14 +132,13 @@ type Config struct {
 	TavanirBranchDebitEndpoint  string `path:"providers.tavanir.branch_debit_endpoint"`
 	TavanirUsername             string `path:"providers.tavanir.username"`
 	TavanirPassword             Secret `path:"providers.tavanir.password"`
-	// The circuit breaker (task 033, as the tavanir service): TavanirCircuitBreakerFailureRatio is a
-	// percentage, 0 to 100. Not used yet: no provider has a circuit breaker (operator decision of
-	// task 034; it comes at the end of the project).
-	TavanirCircuitBreakerName         string        `path:"providers.tavanir.circuit_breaker.name"`
-	TavanirCircuitBreakerMaxRequests  uint32        `path:"providers.tavanir.circuit_breaker.max_requests"`
-	TavanirCircuitBreakerInterval     time.Duration `path:"providers.tavanir.circuit_breaker.interval"`
-	TavanirCircuitBreakerTimeout      time.Duration `path:"providers.tavanir.circuit_breaker.timeout"`
-	TavanirCircuitBreakerFailureRatio uint8         `path:"providers.tavanir.circuit_breaker.failure_ratio"`
+	// @todo circuit breaker: no provider has one yet (operator decision of task 034: every provider
+	// gets one at the end of the project). Task 040 removed the unused keys
+	// providers.tavanir.circuit_breaker.* (name "tavanir", max_requests 100000, interval 1s, timeout
+	// 10s, failure_ratio 99 percent, as the tavanir service). When the circuit breaker feature lands,
+	// add its keys for every provider (in config.yml and config.yml.example, conventions § 8) and the
+	// metrics qabz_circuit_breaker_state and qabz_circuit_breaker_transitions_total (system.html,
+	// Metrics). A config.yml that still has the old block is valid: the decoder reads only tagged paths.
 
 	// The config of the Irancell provider (task 035): the keys that bill has for its irancell
 	// service client (bill: irancell.name, irancell.grpcAddress, irancell.natsSubject and the
@@ -351,23 +350,18 @@ func defaults() Config {
 		ParsianTimeout:      10 * time.Second,
 		KarashopTimeout:     30 * time.Second,
 
-		TavanirCircuitBreakerName:         "tavanir",
-		TavanirCircuitBreakerMaxRequests:  100000,
-		TavanirCircuitBreakerInterval:     time.Second,
-		TavanirCircuitBreakerTimeout:      10 * time.Second,
-		TavanirCircuitBreakerFailureRatio: 99,
-		CachingWater:                      time.Hour,
-		CachingElectricity:                time.Hour,
-		CachingGas:                        time.Hour,
-		CachingMobile:                     5 * time.Hour,
-		CachingTel:                        time.Hour,
-		DebugMockQabzinoReturnType:        MockReturnSuccess,
-		DebugMockTavanirReturnType:        MockReturnSuccess,
-		DebugMockIrancellReturnType:       MockReturnSuccess,
-		DebugMockJiringSwitchReturnType:   MockReturnSuccess,
-		DebugMockParsianReturnType:        MockReturnSuccess,
-		DebugMockKarashopReturnType:       MockReturnSuccess,
-		DebugCacheInquiries:               true,
+		CachingWater:                    time.Hour,
+		CachingElectricity:              time.Hour,
+		CachingGas:                      time.Hour,
+		CachingMobile:                   5 * time.Hour,
+		CachingTel:                      time.Hour,
+		DebugMockQabzinoReturnType:      MockReturnSuccess,
+		DebugMockTavanirReturnType:      MockReturnSuccess,
+		DebugMockIrancellReturnType:     MockReturnSuccess,
+		DebugMockJiringSwitchReturnType: MockReturnSuccess,
+		DebugMockParsianReturnType:      MockReturnSuccess,
+		DebugMockKarashopReturnType:     MockReturnSuccess,
+		DebugCacheInquiries:             true,
 	}
 }
 
@@ -446,9 +440,6 @@ func (c Config) validate() error {
 	}
 	if c.QabzinoTimeout <= 0 {
 		errs = append(errs, errors.New("providers.qabzino.timeout must be a positive duration (for example 10s)"))
-	}
-	if c.TavanirCircuitBreakerFailureRatio > 100 {
-		errs = append(errs, errors.New("providers.tavanir.circuit_breaker.failure_ratio must be a percentage from 0 to 100"))
 	}
 	if c.TavanirTimeout <= 0 {
 		errs = append(errs, errors.New("providers.tavanir.timeout must be a positive duration (for example 10s)"))

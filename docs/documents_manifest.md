@@ -1,4 +1,4 @@
-<!-- VERSION: 2.23 -->
+<!-- VERSION: 2.24 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.22 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.23 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.23 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.24 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.44 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -36,27 +36,28 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v2.10 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v2.11 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.64 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.65 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.19 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
 | 34 | App module README | v0.31 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.17 | Docs | `docs/this_vs_bill.md` |
+| 35 | Qabz vs bill differences | v0.18 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-14
-- **Change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint`: `POST /v1/tel/inquiry` on the shared inquiry flow (bill type `tel`, `tid` prefix 4, only Karashop may answer); new `src/provider/karashop/` (direct HTTPS, two calls per inquiry) and `src/entry/grpc/tel.go`; `providers.karashop.*`, `caching.tel`, `debug.mocks.karashop.*` (`config.yml.example`, no VERSION header, no row); Postman folder `Tel` (no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.22, #5 manifest v2.23, #6 folder_structure v0.44, #21 system.html v2.10, #28 OPEN_TASKS v1.64, #34 app README v0.31, #35 this_vs_bill v0.17.
-- **Previous change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint` updated (v0.3, task files are not manifest-tracked): Karashop only (operator decision), the Karashop adapter and config keys in scope, the Qabzino and Parsian tel adapters out; no code, no new files. Bumped #3 CHANGELOG v3.21, #5 manifest v2.22.
+- **Change**: 2026-11-14 — Task 040 `remove_circuit_breaker_keys`: the unused config keys `providers.tavanir.circuit_breaker.*` removed (code, `config.yml.example`, the `system.html` config example), a `@todo` for the circuit breaker feature; no behavior change; Go files and `config.yml.example` have no VERSION header, so no rows; the new task file is in `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.23, #5 manifest v2.24, #21 system.html v2.11, #28 OPEN_TASKS v1.65, #35 this_vs_bill v0.18.
+- **Previous change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint`: `POST /v1/tel/inquiry` on the shared inquiry flow (bill type `tel`, `tid` prefix 4, only Karashop may answer); new `src/provider/karashop/` (direct HTTPS, two calls per inquiry) and `src/entry/grpc/tel.go`; `providers.karashop.*`, `caching.tel`, `debug.mocks.karashop.*` (`config.yml.example`, no VERSION header, no row); Postman folder `Tel` (no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.22, #5 manifest v2.23, #6 folder_structure v0.44, #21 system.html v2.10, #28 OPEN_TASKS v1.64, #34 app README v0.31, #35 this_vs_bill v0.17.
+- **Earlier change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint` updated (v0.3, task files are not manifest-tracked): Karashop only (operator decision), the Karashop adapter and config keys in scope, the Qabzino and Parsian tel adapters out; no code, no new files. Bumped #3 CHANGELOG v3.21, #5 manifest v2.22.
 - **Earlier change**: 2026-11-14 — Session wrap-up (task 039 creation session): 4 lesson candidates in the register; new task 039 `mobile_irancell_order` (commit 59717e1, task files are not manifest-tracked); push of 59717e1 done; no code, no new files. Bumped #3 CHANGELOG v3.20, #5 manifest v2.21, #28 OPEN_TASKS v1.63.
 - **Earlier change**: 2026-11-14 — Task 038 QA scenario passed (operator confirmation): removed from the register; no code, no new files. Bumped #3 CHANGELOG v3.19, #5 manifest v2.20, #28 OPEN_TASKS v1.62.
 - **Earlier change**: 2026-11-14 — Task 038 `mobile_phone_normalization`: `helpers.NormalizeMobile` converts a mobile number in every common form (0 form, ten digits, `+98`, `0098`, separators, Persian or Arabic digits) to the 98 form before the request check of `POST /v1/mobile/inquiry` (every operator) and of the mobile type of `POST /v1/mybill`; the 98 form is the inquiry ID; Postman descriptions updated; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.18, #5 manifest v2.19, #21 system.html v2.9, #28 OPEN_TASKS v1.61, #34 app README v0.30, #35 this_vs_bill v0.16.

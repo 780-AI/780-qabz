@@ -536,11 +536,6 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 	assert.Empty(t, c.TavanirBranchDebitEndpoint)
 	assert.Equal(t, "", c.TavanirUsername)
 	assert.Equal(t, "", c.TavanirPassword.Reveal(), "default password is empty")
-	assert.Equal(t, "tavanir", c.TavanirCircuitBreakerName)
-	assert.EqualValues(t, 100000, c.TavanirCircuitBreakerMaxRequests)
-	assert.Equal(t, time.Second, c.TavanirCircuitBreakerInterval)
-	assert.Equal(t, 10*time.Second, c.TavanirCircuitBreakerTimeout)
-	assert.EqualValues(t, 99, c.TavanirCircuitBreakerFailureRatio)
 
 	c, err = Parse([]byte(base + `providers: {tavanir: {timeout: "120s", auth_endpoint: "http://a", basic_branch_endpoint: "http://b", bill_document_endpoint: "http://d", branch_debit_endpoint: "http://r", username: "u", password: "secret-pw", circuit_breaker: {name: "n", max_requests: 5, interval: "2s", timeout: "3s", failure_ratio: 50}}}
 `))
@@ -548,18 +543,12 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 		assert.Equal(t, 120*time.Second, c.TavanirTimeout)
 		assert.Equal(t, []string{"http://a", "http://b", "http://d", "http://r", "u", "secret-pw"},
 			[]string{c.TavanirAuthEndpoint, c.TavanirBasicBranchEndpoint, c.TavanirBillDocumentEndpoint, c.TavanirBranchDebitEndpoint, c.TavanirUsername, c.TavanirPassword.Reveal()})
-		assert.Equal(t, "n", c.TavanirCircuitBreakerName)
-		assert.EqualValues(t, 5, c.TavanirCircuitBreakerMaxRequests)
-		assert.Equal(t, 2*time.Second, c.TavanirCircuitBreakerInterval)
-		assert.Equal(t, 3*time.Second, c.TavanirCircuitBreakerTimeout)
-		assert.EqualValues(t, 50, c.TavanirCircuitBreakerFailureRatio)
 		assert.NotContains(t, fmt.Sprintf("%v %+v %#v", c.TavanirPassword, c.TavanirPassword, c.TavanirPassword), "secret-pw")
 	}
 
-	_, err = Parse([]byte(base + "providers: {tavanir: {circuit_breaker: {failure_ratio: 101}}}\n"))
-	assert.ErrorContains(t, err, "providers.tavanir.circuit_breaker.failure_ratio")
-	_, err = Parse([]byte(base + "providers: {tavanir: {circuit_breaker: {failure_ratio: 100}}}\n"))
-	assert.NoError(t, err, "100 is valid")
+	// Task 040: the old circuit_breaker block (no field reads it) is still a valid config.
+	_, err = Parse([]byte(base + "providers: {tavanir: {circuit_breaker: {name: \"tavanir\", max_requests: 100000, interval: \"1s\", timeout: \"10s\", failure_ratio: 101}}}\n"))
+	assert.NoError(t, err, "an old circuit_breaker block is ignored")
 }
 
 // TestParseIrancellProviderKeys (task 035): the keys of the Irancell provider have no default, take

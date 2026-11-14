@@ -1,7 +1,8 @@
-<!-- VERSION: 3.22 -->
+<!-- VERSION: 3.23 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.23 — 2026-11-14 — Added 040-remove-circuit-breaker-keys entry.
 v3.22 — 2026-11-14 — Added 025-tel-inquiry-endpoint entry.
 v3.21 — 2026-11-14 — Added 025-task-update-karashop-only entry.
 v3.20 — 2026-11-14 — Added session-wrap-up (task 039 creation session) entry.
@@ -138,6 +139,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Task 040: remove the unused providers.tavanir.circuit_breaker keys
+- **Type:** Major (config keys removed; Critical File `system.html`).
+- **Files:** `src/config/config.go` (five fields, their defaults and the `failure_ratio` check removed; a `@todo` for the circuit breaker feature); `src/config/config_test.go`; `config.yml.example`; `docs/initial-discovery/system.html` (v2.11); `docs/this_vs_bill.md` (v0.18, item 27 (f)); `docs/Plans/OPEN_TASKS.md` (v1.65); `docs/Plans/done_tasks/040_remove_circuit_breaker_keys.md` (new, not manifest-tracked); `docs/Plans/pending_tasks/task_counter.json` (041); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** No runtime behavior change: no code read the keys. A `config.yml` that still has the block (commented or not) stays valid: the decoder reads only tagged paths (a test checks it). `TestLocalConfigInSync` passes again on the operator machine, so `make test` exits 0. Operator decision: the commented block in the local `config.yml` stays.
+- **QA scenarios:** none (Rule 11 exempt: no behavior change; the task file has the positive control).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Task 025: POST /v1/tel/inquiry and the Karashop adapter
 - **Type:** Major (new endpoint, new provider adapter, new config keys, the inquiry flow gets the bill type `tel`; Critical File `system.html`).
