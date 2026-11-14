@@ -1,7 +1,8 @@
-<!-- VERSION: 3.23 -->
+<!-- VERSION: 3.24 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.24 — 2026-11-14 — Added 025-qa-scenario-passed entry.
 v3.23 — 2026-11-14 — Added 040-remove-circuit-breaker-keys entry.
 v3.22 — 2026-11-14 — Added 025-tel-inquiry-endpoint entry.
 v3.21 — 2026-11-14 — Added 025-task-update-karashop-only entry.
@@ -140,6 +141,13 @@ v1.0 — 2026-10-28 — Initial.
 
 # CHANGELOG
 
+## [2026-11-14] — Task 025 QA scenario passed (operator confirmation)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.66: the task 025 scenario is removed from "Pending verification"; follow-up (a), the first real Karashop call, is done and removed); `CHANGELOG.md` (the QA line of the task 025 entry); `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The operator tested `POST /v1/tel/inquiry` with Postman on 2026-11-14 with a real Karashop call: it works (step 3 of the scenario; the operator said the call was real). The evidence of steps 1 to 5 (the mock) is the implementer run of the same day, in `docs/Plans/done_tasks/025_tel_inquiry_endpoint.md`.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
+
 ## [2026-11-14] — Task 040: remove the unused providers.tavanir.circuit_breaker keys
 - **Type:** Major (config keys removed; Critical File `system.html`).
 - **Files:** `src/config/config.go` (five fields, their defaults and the `failure_ratio` check removed; a `@todo` for the circuit breaker feature); `src/config/config_test.go`; `config.yml.example`; `docs/initial-discovery/system.html` (v2.11); `docs/this_vs_bill.md` (v0.18, item 27 (f)); `docs/Plans/OPEN_TASKS.md` (v1.65); `docs/Plans/done_tasks/040_remove_circuit_breaker_keys.md` (new, not manifest-tracked); `docs/Plans/pending_tasks/task_counter.json` (041); `CHANGELOG.md`; `docs/documents_manifest.md`.
@@ -151,7 +159,7 @@ v1.0 — 2026-10-28 — Initial.
 - **Type:** Major (new endpoint, new provider adapter, new config keys, the inquiry flow gets the bill type `tel`; Critical File `system.html`).
 - **Files:** `src/provider/provider.go` (`BillTypeTel`, `InquiryItem.BillID`); `src/core/inquiry/inquiry.go` (the `tel` entry of `billTypes`: `tid` prefix 4, `helpers.ValidTel`, `onlyProvider: karashop`, `skipSameTypePair`; the row bill ID of an inquiry); `src/provider/karashop/karashop.go` (new); `src/entry/grpc/tel.go` (new), `phone.go` (`phoneInquiryResponse`), `gas.go` (`answerRawInquiry`); `src/config/config.go` (`providers.karashop.*`, `caching.tel`, `debug.mocks.karashop.*`); `src/app/defaults.go` (the Karashop adapter, `newTel`, the Tel service and gateway handler, the TTL); tests (`karashop_test.go`, `core/inquiry/tel_test.go`, `entry/grpc/tel_test.go`, `entry/http/tel_test.go`, `app/tel_test.go`, `app/tel_live_test.go`, `config_test.go`; four old tests updated); `config.yml.example`; `qabz.postman_collection.json` (folder `Tel`, item `Inquiry`, variables `tel_phone`, `tel_billId`, `tel_payId`); `docs/initial-discovery/system.html` (v2.10); `docs/this_vs_bill.md` (v0.17, items 36, 37); `docs/folder_structure.md` (v0.44); `src/app/README.md` (v0.31); `docs/Plans/OPEN_TASKS.md` (v1.64); the task file moved to `done_tasks/` (v0.4); `CHANGELOG.md`; `docs/documents_manifest.md`.
 - **Impact:** Yes, new behavior. `POST /v1/tel/inquiry` answered HTTP 501; it now inquires a landline bill. Only Karashop may answer (operator decision of 2026-11-14): another pick or no enabled row is HTTP 503 with no call. The Karashop adapter sends two calls at the same time (full term, mid term); the flow writes one request row and saves a mid-term and a final-term row, each with the bill ID of its own call. A request with `billId` and `payId` is the raw inquiry. `caching.tel` (default `1h`) and the cache skip of two same-type rows apply. `providers.karashop.enabled` is `false` by default (provider down, one warn line). The other bill types do not change: the shared answer mapping sends the bill ID of each inquiry, which is the bill ID of the answer for every other adapter, and the raw-inquiry error mapping is shared with gas with no change. No new metric (`bill_type="tel"`, `provider="karashop"`). No schema change.
-- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → "Task 025 `POST /v1/tel/inquiry`, the Karashop adapter and its mock" (⏸; steps 1 to 5 done by the implementer with the mock; step 3 of the scenario, the first real call, is for the operator).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` → "Task 025 `POST /v1/tel/inquiry`, the Karashop adapter and its mock" (⏸; steps 1 to 5 done by the implementer with the mock; step 3 of the scenario, the first real call, is for the operator). ✅ Passed: confirmed by the operator on 2026-11-14 (Postman, a real Karashop call: step 3 of the scenario).
 - **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Task 025 (tel inquiry) updated: Karashop only
