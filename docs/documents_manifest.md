@@ -1,4 +1,4 @@
-<!-- VERSION: 2.21 -->
+<!-- VERSION: 2.22 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.20 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.21 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.21 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.22 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.43 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-14
-- **Change**: 2026-11-14 — Session wrap-up (task 039 creation session): 4 lesson candidates in the register; new task 039 `mobile_irancell_order` (commit 59717e1, task files are not manifest-tracked); push of 59717e1 done; no code, no new files. Bumped #3 CHANGELOG v3.20, #5 manifest v2.21, #28 OPEN_TASKS v1.63.
-- **Previous change**: 2026-11-14 — Task 038 QA scenario passed (operator confirmation): removed from the register; no code, no new files. Bumped #3 CHANGELOG v3.19, #5 manifest v2.20, #28 OPEN_TASKS v1.62.
+- **Change**: 2026-11-14 — Task 025 `tel_inquiry_endpoint` updated (v0.3, task files are not manifest-tracked): Karashop only (operator decision), the Karashop adapter and config keys in scope, the Qabzino and Parsian tel adapters out; no code, no new files. Bumped #3 CHANGELOG v3.21, #5 manifest v2.22.
+- **Previous change**: 2026-11-14 — Session wrap-up (task 039 creation session): 4 lesson candidates in the register; new task 039 `mobile_irancell_order` (commit 59717e1, task files are not manifest-tracked); push of 59717e1 done; no code, no new files. Bumped #3 CHANGELOG v3.20, #5 manifest v2.21, #28 OPEN_TASKS v1.63.
+- **Earlier change**: 2026-11-14 — Task 038 QA scenario passed (operator confirmation): removed from the register; no code, no new files. Bumped #3 CHANGELOG v3.19, #5 manifest v2.20, #28 OPEN_TASKS v1.62.
 - **Earlier change**: 2026-11-14 — Task 038 `mobile_phone_normalization`: `helpers.NormalizeMobile` converts a mobile number in every common form (0 form, ten digits, `+98`, `0098`, separators, Persian or Arabic digits) to the 98 form before the request check of `POST /v1/mobile/inquiry` (every operator) and of the mobile type of `POST /v1/mybill`; the 98 form is the inquiry ID; Postman descriptions updated; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.18, #5 manifest v2.19, #21 system.html v2.9, #28 OPEN_TASKS v1.61, #34 app README v0.30, #35 this_vs_bill v0.16.
 - **Earlier change**: 2026-11-11 — Session wrap-up (task 031 session): 2 lesson candidates and more evidence for 2 in the register; push of 921f145..374585e done; no code, no new files. Bumped #3 CHANGELOG v3.17, #5 manifest v2.18, #28 OPEN_TASKS v1.60.
 - **Earlier change**: 2026-11-11 — Task 031 `debug_cache_inquiries`: the development key `debug.cache_inquiries` (default `true`; `false` in dev mode makes the inquiry flow read and write no `bill_inquiries` / `bill_inquiry_requests` row, `inquiry.Options.NoStore`; one warn line at start); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.16, #5 manifest v2.17, #21 system.html v2.8, #28 OPEN_TASKS v1.59, #34 app README v0.29, #35 this_vs_bill v0.15.

@@ -1,7 +1,8 @@
-<!-- VERSION: 3.20 -->
+<!-- VERSION: 3.21 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.21 — 2026-11-14 — Added 025-task-update-karashop-only entry.
 v3.20 — 2026-11-14 — Added session-wrap-up (task 039 creation session) entry.
 v3.19 — 2026-11-14 — Added 038-qa-scenario-passed entry.
 v3.18 — 2026-11-14 — Added 038-mobile-phone-normalization entry.
@@ -136,6 +137,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Task 025 (tel inquiry) updated: Karashop only
+- **Type:** Minor (task file; no code).
+- **Files:** `docs/Plans/pending_tasks/025_tel_inquiry_endpoint.md` (v0.3); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. Operator decision of 2026-11-14: the tel inquiry uses Karashop only (and nothing else). The task now adds the Karashop adapter (`provider/karashop/`: direct HTTPS, `providers.karashop.*` config, `enabled` switch, mock) and the `onlyProvider` rule for `tel`; the Qabzino and Parsian tel adapters are out. The task records the two Karashop calls of `bill` (end and mid term) as a design point, the raw inquiry, and the config keys. The Karashop values that the operator gave go into `config.yml` only in the implementation session; the task file names the `bill` config block with the same values and has no secret. The task stays in `pending_tasks/`. Task files are not manifest-tracked.
+- **QA scenarios:** none (task file only; the task has its own Verification section).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Session wrap-up (task 039 creation session)
 - **Type:** Minor (documentation; no code, no new files).
