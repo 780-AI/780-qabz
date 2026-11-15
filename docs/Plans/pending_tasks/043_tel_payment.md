@@ -1,6 +1,7 @@
-<!-- VERSION: 0.1 -->
+<!-- VERSION: 0.2 -->
 <!--
 CHANGE LOG
+v0.2 — 2026-11-15 — Operator decisions A (as bill), B (no reject, as bill) and C (a Kafka client, the message of bill exactly) recorded.
 v0.1 — 2026-11-15 — Created (operator request): the supertask of the telephone payment; split into tasks 044, 045 and 046.
 -->
 # 043_tel_payment — telephone (landline) payment through Parsian (supertask)
@@ -29,16 +30,16 @@ The telephone (landline) payment works as the Irancell mobile order (task 039), 
 | Operator statement | `bill` | Result |
 |---|---|---|
 | A payment with no success from Parsian is checked again by a worker. | `pkg/cronTask/parsianGetStatus.go` → `service/billPaymentInquiry/dto.go` `InquiryCron`: orders of the provider `parsian` with the last status `pending` or `in-progress`. Config `parsian`: `every: 15m`, `start: 30m`, `end: 10h`, `chunk: 100`, `lockTime: 30m`. | Correct. |
-| The worker has ten hours to finalize, else a refund. | The worker reads only orders created between 10 h and 30 min ago. An order that is still pending after 10 h leaves the window; `bill` does nothing more with it (no refund, no message). A final status that comes after `ReverseDeadline` is saved with the message `reverse_deadline_exceeded` and is **not** sent to the payment service. | **Partly correct.** The 10 h is correct. `bill` does not refund after 10 h. A refund after 10 h is a new rule (operator decision A below). |
+| The worker has ten hours to finalize, else a refund. | The worker reads only orders created between 10 h and 30 min ago. An order that is still pending after 10 h leaves the window; `bill` does nothing more with it (no refund, no message). A final status that comes after `ReverseDeadline` is saved with the message `reverse_deadline_exceeded` and is **not** sent to the payment service. | **Partly correct.** The 10 h is correct. `bill` does not refund after 10 h. Qabz does the same (operator decision A). |
 | A status `failed` from Parsian is refunded at once. | `bill` never refunds by itself. In the payment step, the status goes back to the payment service in the answer of `OrderComplete`. In the worker, the status goes to the payment service on Kafka (topic `kafka.topic.payment.write.subject`, `paymentwriter`). **The payment service decides the refund** (`docs/initial-discovery/qabz-cron-diagram.html`). | **Correct in effect, but the payment service does the refund, not Qabz.** |
 | After a payment success, Karashop settlement at once. | `service/billPayment/completeOrder.go`: on `success`, `go s.ConfirmPayment(...)` for `tel` and `telmidterm` (providers Parsian and EWays): Karashop `SendPaymentInfo`; on success `provider_confirmed = true`. | Correct. |
-| A failed settlement goes to a Karashop worker, every X minutes, settle or reject. | `pkg/cronTask/paymentConfirm.go` → `ConfirmPaymentBunch`: orders with the last status `success`, `is_raw = false`, `provider_confirmed = false`, bill type `tel` and `telmidterm`, in a window (`confirmPayment.telephone`: `every`, `lockTime`, `start`, `end`, `chunk`). | **Partly correct.** `bill` only tries again until the order leaves the window. `bill` has **no reject**. A reject is a new rule (operator decision B below). |
+| A failed settlement goes to a Karashop worker, every X minutes, settle or reject. | `pkg/cronTask/paymentConfirm.go` → `ConfirmPaymentBunch`: orders with the last status `success`, `is_raw = false`, `provider_confirmed = false`, bill type `tel` and `telmidterm`, in a window (`confirmPayment.telephone`: `every`, `lockTime`, `start`, `end`, `chunk`). | **Partly correct.** `bill` only tries again until the order leaves the window. `bill` has **no reject**. Qabz does the same (operator decision B). |
 | All workers use the same pattern and one instance runs a worker. | `pkg/cronTask/cron.go` (gocron, `Every(interval)`), `pkg/lock/lock.go`: `SETNX <service.name>:crons_<name>_lock1` with a TTL, extended per chunk (`ChargeTTL`); `Release` deletes the key. | Correct. |
 
-**Operator decisions needed before the design of task 045 and task 046:**
-- **A. After 10 h with no final status.** (1) As `bill`: nothing (the order stays pending, the operator team fixes it by hand). (2) Qabz sends `failed` to the payment service so that the payment service refunds. (2) is a new money rule; Parsian can still pay the bill after Qabz sends `failed` (a double loss risk).
-- **B. Karashop "reject".** What does reject mean, and when? `bill` has no reject. Options: (1) as `bill`, try until the window ends; (2) mark the order as not settled after N tries or after the window, with an error log line and a metric for the operator team. Karashop settlement does not move money, so a reject is not a refund.
-- **C. The Kafka report of the worker.** Qabz has no Kafka client yet (`src/system/kafka/` is empty). The worker of task 045 needs it to tell the payment service the final status, as `bill` does.
+**Operator decisions (2026-11-15):**
+- **A. After 10 h with no final status: as `bill`.** Qabz does nothing more with the order (no refund, no report). It stays pending. A final status that comes after the reverse deadline is saved with the message `reverse_deadline_exceeded` and is not reported. No `this_vs_bill.md` item.
+- **B. Karashop "reject": none, as `bill`.** The worker tries again at each run until the order is outside the window. There is no reject and no end state for "not settled". No `this_vs_bill.md` item.
+- **C. Kafka: a Kafka client in Qabz, as `bill`.** The worker of task 045 sends `success` and `failed` to the payment service on Kafka. The topic name is a config key. **The message MUST NOT differ from the message of `bill`** (the details are in task 045).
 
 **Risk (design step checks it).** If Qabz writes into the same `orders` table that the `bill` workers read, the `bill` workers also take the Qabz orders (both select by `provider_name` or `bill_type`). The design step confirms that Qabz has its own database (`database.postgres.db: qabz`).
 
@@ -49,5 +50,5 @@ Help:
 ## Definition of Done
 
 - Tasks 044, 045 and 046 are done.
-- Operator decisions A, B and C are recorded in the task files, and each difference from `bill` is an item in `docs/this_vs_bill.md`.
+- Operator decisions A, B and C are applied, and each difference from `bill` is an item in `docs/this_vs_bill.md`.
 - The operator ran the real end-to-end test (a real tel payment through the payment service, Parsian and Karashop) and confirmed it.
