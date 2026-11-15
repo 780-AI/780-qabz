@@ -1,7 +1,8 @@
-<!-- VERSION: 3.29 -->
+<!-- VERSION: 3.30 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.30 — 2026-11-14 — Added postman-base-url-and-client-headers entry.
 v3.29 — 2026-11-14 — Added config-service-name entry.
 v3.28 — 2026-11-14 — Added 039-mobile-irancell-order entry.
 v3.27 — 2026-11-14 — Added session-wrap-up (task 041 session) entry.
@@ -145,6 +146,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Postman: one BASE_URL and the web client headers (operator request)
+- **Type:** Minor (the Postman collection and the rule text of conventions § 7; no runtime code).
+- **Files:** `qabz.postman_collection.json` (also the requests of task 039: Phone / Order V2 with a test script that saves the order token and the total, and the folder Payment (external) / Invoice with the saved values and `serviceId` 149, operator request; the variable `baseUrl` replaced by `BASE_URL`, default `http://localhost:8080`; every URL is `{{BASE_URL}}/...`, Invoice `{{BASE_URL}}/payment/v2/product/invoice`; a collection pre-request script adds 20 headers of the stage web client to every request: `Accept`, `Accept-Encoding`, `Accept-Language` `fa-IR`, `Connection`, `Grpc-metadata-Device-ID`, `Grpc-metadata-Device-Info`, `Grpc-metadata-Phone`, `Grpc-metadata-Platform`, `Grpc-metadata-Version`, `Host` `stage-api.780.ir`, `Origin`, `Referer`, `Sec-Fetch-*`, `User-Agent`, `client`, `sec-ch-ua*`; a header that a request sets itself wins); `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.21, § 7); `CHANGELOG.md`; `docs/documents_manifest.md`. The local skill file `.claude/skills/postman-update/SKILL.md` (git-ignored) names `BASE_URL`.
+- **Impact:** None on the service. In Postman, `BASE_URL` is the host of every request, so a run against the local App and the Invoice request to the payment service need `BASE_URL` changed between them. The `Grpc-metadata-*` headers reach the gRPC handlers as metadata (Qabz reads none of them now). The `Host` header goes to every host, also to the local App.
+- **QA scenarios:** none (Rule 11 exempt: a tool collection, no runtime behavior).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Config: service.name in the service block (operator request)
 - **Type:** Major (a config key path changes).

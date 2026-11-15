@@ -1,7 +1,8 @@
-<!-- VERSION: 0.20 -->
+<!-- VERSION: 0.21 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v0.21 — 2026-11-14 — Section 7: the URL variable of the collection is `BASE_URL` (was `baseUrl`; operator); a request to another service (for example the payment service) uses `BASE_URL` with the path of that service; the collection pre-request script adds the web client headers.
 v0.20 — 2026-11-14 — Section 8: the provider blocks are in `providers.internal` (our own services) or `providers.external` (third-party services); a new provider goes in the group of its kind (task 041).
 v0.19 — 2026-11-11 — Section 13: one request calls one provider; what it returns (also an error or an answer that cannot be used) is the answer; only the circuit breaker of a provider starts a switch (the Provider Switcher), the same for every bill type, with no rule special to a bill type or a provider (operator, task 036).
 v0.18 — 2026-11-09 — Section 15: every provider adapter has a development mock (`debug.mocks.<provider>`, `provider.NewMock`), applied in dev mode only (task 021).
@@ -185,11 +186,12 @@ The first command lists each file changed since the `pb` commit that this repo r
 - A changed HTTP method or path (the `google.api.http` rule in `pb/proto/qabz/`).
 - A changed request or response: a field added, removed or renamed, a changed type, a changed required field, a changed example body.
 - Changed headers, query parameters, authentication, or status codes.
-- A changed default listen address (`server.http.addr`), which changes the `baseUrl` variable.
+- A changed default listen address (`server.http.addr`), which changes the `BASE_URL` variable.
 
 **What the collection contains:**
 - One request for each implemented endpoint, grouped in folders by gRPC service (for example `Service`). An endpoint that only returns Unimplemented (HTTP 501) is added when it is implemented.
-- The URL uses the variable `{{baseUrl}}`. Do not write a host or a port in a request.
+- The URL uses the variable `{{BASE_URL}}` (operator, 2026-11-14; was `baseUrl`). Do not write a host or a port in a request. A request to another service that reads a Qabz answer (folder `Payment (external)`) uses `{{BASE_URL}}` and the path of that service (for example `{{BASE_URL}}/payment/...`). No two variables have names that differ only in letter case.
+- The collection pre-request script adds the headers of the web client (the `Grpc-metadata-*` device headers, `Origin`, `User-Agent`, ...) to every request; a header that a request sets itself wins.
 - A request with a body has a valid example body.
 - Each request has a short description: the gRPC method name and the expected result.
 - No secret: no real password, token or key. Use a variable (for example `{{token}}`) and leave its value empty.

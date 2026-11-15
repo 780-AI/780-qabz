@@ -1,14 +1,13 @@
 {
   "info": {
     "name": "Qabz",
-    "description": "HTTP API of the Qabz service (grpc-gateway). Kept up to date with every API change: docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md section 7. The request IDs of each bill type are collection variables (<billType>_billId, <billType>_payId, gas_participateCode, irancell_mobile_phone): set them in the collection Variables tab (or an environment of the same names) and every request body uses them.",
+    "description": "HTTP API of the Qabz service (grpc-gateway). Kept up to date with every API change: docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md section 7. The request IDs of each bill type are collection variables (<billType>_billId, <billType>_payId, gas_participateCode, irancell_mobile_phone): set them in the collection Variables tab (or an environment of the same names) and every request body uses them. A collection pre-request script adds the headers of the web client (Accept, Accept-Language fa-IR, the Grpc-metadata-* device headers, Origin and Referer of the stage PWA, User-Agent, client, sec-ch-ua*, Host stage-api.780.ir, ...) to every request; a header that a request sets itself wins.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
-      "key": "baseUrl",
-      "value": "http://localhost:8080",
-      "type": "string"
+      "key": "BASE_URL",
+      "value": "http://localhost:8080"
     },
     {
       "key": "token",
@@ -128,6 +127,14 @@
       "value": "",
       "type": "string",
       "description": "Tel/Inquiry body payId (optional; with billId: the raw inquiry)"
+    },
+    {
+      "key": "order_token",
+      "value": ""
+    },
+    {
+      "key": "order_price",
+      "value": ""
     }
   ],
   "auth": {
@@ -150,9 +157,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/greeting",
+              "raw": "{{BASE_URL}}/v1/greeting",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -188,9 +195,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v1/services",
+              "raw": "{{BASE_URL}}/v1/services",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -224,9 +231,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/mybill",
+              "raw": "{{BASE_URL}}/v1/mybill",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -270,9 +277,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/mybill",
+              "raw": "{{BASE_URL}}/v1/mybill",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -301,9 +308,9 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/mybill/:id",
+              "raw": "{{BASE_URL}}/v1/mybill/:id",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -359,9 +366,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/water/inquiry",
+              "raw": "{{BASE_URL}}/v1/water/inquiry",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -410,9 +417,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/electricity/inquiry",
+              "raw": "{{BASE_URL}}/v1/electricity/inquiry",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -462,9 +469,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/gas/inquiry",
+              "raw": "{{BASE_URL}}/v1/gas/inquiry",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -513,9 +520,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/mobile/inquiry",
+              "raw": "{{BASE_URL}}/v1/mobile/inquiry",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -558,9 +565,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/mobile/inquiry",
+              "raw": "{{BASE_URL}}/v1/mobile/inquiry",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -603,9 +610,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/mobile/inquiry",
+              "raw": "{{BASE_URL}}/v1/mobile/inquiry",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -623,6 +630,55 @@
                 "exec": [
                   "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
                   "pm.test(\"has midTerm and fullTerm with a price\", function () { const b = pm.response.json(); [\"midTerm\", \"fullTerm\"].forEach(function (k) { pm.expect(b).to.have.property(k); pm.expect(b[k].price).to.be.a(\"number\"); pm.expect(b[k]).to.have.property(\"billId\"); pm.expect(b[k]).to.have.property(\"payId\"); pm.expect(b[k]).to.have.property(\"paymentDeadline\"); }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Order V2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{irancell_mobile_phone}}\",\n  \"operator\": \"irancell\",\n  \"type\": \"fullTerm\",\n  \"paymentType\": \"direct\",\n  \"price\": 450000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/v2/mobile/order",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "v2",
+                "mobile",
+                "order"
+              ]
+            },
+            "description": "haf80.api.bill.Phone/NewOrderV2 (task 039: the Irancell operator). Saves an order of a mobile bill and answers the signed order token. The request and the answer are those of bill (NewOrderPhoneRequest, NewOrderResponse), unchanged. The steps are those of bill: (1) the phone is converted to the 98 form (as the inquiry, task 038) and checked: a mobile number; operator and paymentType values of the enum. (2) operator irancell gives the bill type irancell for type midTerm and fullTerm; mci and rightel are HTTP 501 (not available yet); unknown is HTTP 400. (3) the order provider of (irancell, order) (providers row 26 in the dev seed) is picked with ProvidersService; none enabled: HTTP 503. (4) the price, by the first rule that applies: a price that is not 0 and no payId: that price, the pay ID is the text irancell, no inquiry; a numeric billId and payId: the raw inquiry (the amount of the pay ID); else the Irancell inquiry (always a provider call, no saved inquiry; with the mock: final term 450000), whose final-term inquiry is the price also for midTerm (as bill). A price of 0: HTTP 400 with bill's text. (5) the fee from the fees table (the row of the user and the provider, else of the user, else of the provider; no row: 9000; the dev seed row 900001: 9000 fixed for provider 26); a fee row with a bad config gives 0 and the order goes on. (6) the total = price + fee; above 4294967295: HTTP 400. (7) one orders row with the status initial. (8) the token: a JWT signed RS256 with the key at providers.internal.payment_server.private_key_path (header kid = service.name, typ JWT); payload serviceId, orderId, provider, price, userId and data (type, phone, service, billId, payId, payAmount, rawAmount, about, aboutIcon, receiptMobile, invoiceMobile; feeAmount and feeDescription when the fee is above 0). Answer: serviceId (service.id), orderId = the token, price = the total. Expected with the dev seed and price 450000: HTTP 200, price 459000. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. POST /v1/mobile/order stays HTTP 501. After a 200 answer, the test script of this request saves orderId (the token) and price in the collection variables order_token and order_price, for the request Payment (external) / Invoice."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Saves the order token and the total of the answer for Payment (external) / Invoice.",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('order_token', body.orderId);",
+                  "    pm.collectionVariables.set('order_price', String(body.price));",
+                  "}"
                 ]
               }
             }
@@ -653,9 +709,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/tel/inquiry",
+              "raw": "{{BASE_URL}}/v1/tel/inquiry",
               "host": [
-                "{{baseUrl}}"
+                "{{BASE_URL}}"
               ],
               "path": [
                 "v1",
@@ -679,6 +735,85 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Payment (external)",
+      "description": "Requests to other services that read the answers of Qabz. They are not Qabz endpoints (not served by the grpc-gateway), but they use the same BASE_URL with the path of their service (/payment).",
+      "item": [
+        {
+          "name": "Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": 149,\n  \"orderId\": \"{{order_token}}\",\n  \"price\": {{order_price}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/payment/v2/product/invoice",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "payment",
+                "v2",
+                "product",
+                "invoice"
+              ]
+            },
+            "description": "The invoice request of the payment service (our own service; not a Qabz endpoint), with the order token of Qabz. Run Phone / Order V2 first: its test script sets order_token (the JWT of orderId) and order_price (the total), and this body sends them. serviceId is 149, fixed in the body (operator request); it is not the serviceId of the Order V2 answer. The payment service checks the token with the public key of the general private key (providers.internal.payment_server.private_key_path), so the Qabz App must sign with that key. The URL is {{BASE_URL}}/payment/v2/product/invoice (operator: one BASE_URL for every request); set BASE_URL to the host of the payment service (for example https://stage-api.780.ir) before this request. The request uses the collection auth (Bearer {{token}}); change it here if the payment service needs another one."
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Adds the headers of the web client (stage PWA) to every request of the collection (operator request).",
+          "// A header that a request already has keeps its own value.",
+          "const clientHeaders = {",
+          "    \"Accept\": \"application/json, text/plain, */*\",",
+          "    \"Accept-Encoding\": \"gzip, deflate, br, zstd\",",
+          "    \"Accept-Language\": \"fa-IR\",",
+          "    \"Connection\": \"keep-alive\",",
+          "    \"Grpc-metadata-Device-ID\": \"877878665319-6337631744971-17416517622064\",",
+          "    \"Grpc-metadata-Device-Info\": \"Apple iOS 18 Mobile Safari 18.5\",",
+          "    \"Grpc-metadata-Phone\": \"fbed496f-cd72-45a4-84d1-b8d192e8c6a5\",",
+          "    \"Grpc-metadata-Platform\": \"web\",",
+          "    \"Grpc-metadata-Version\": \"20115\",",
+          "    \"Host\": \"stage-api.780.ir\",",
+          "    \"Origin\": \"https://stage-pwa.780.ir\",",
+          "    \"Referer\": \"https://stage-pwa.780.ir/\",",
+          "    \"Sec-Fetch-Dest\": \"empty\",",
+          "    \"Sec-Fetch-Mode\": \"cors\",",
+          "    \"Sec-Fetch-Site\": \"same-site\",",
+          "    \"User-Agent\": \"Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1\",",
+          "    \"client\": \"web\",",
+          "    \"sec-ch-ua\": \"\\\"Chromium\\\";v=\\\"154\\\", \\\"Google Chrome\\\";v=\\\"154\\\", \\\"Not A(Brand\\\";v=\\\"99\\\"\",",
+          "    \"sec-ch-ua-mobile\": \"?1\",",
+          "    \"sec-ch-ua-platform\": \"\\\"iOS\\\"\",",
+          "};",
+          "for (const [key, value] of Object.entries(clientHeaders)) {",
+          "    if (!pm.request.headers.has(key)) {",
+          "        pm.request.headers.add({ key: key, value: value });",
+          "    }",
+          "}"
+        ]
+      }
     }
   ]
 }
