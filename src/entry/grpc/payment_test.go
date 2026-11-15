@@ -43,7 +43,7 @@ func paymentReq() *pb.PaymentOrder {
 }
 
 func newPaymentComplete(p *fakePayments, log *payLogger) *PaymentComplete {
-	deps := PaymentCompleteDeps{Payments: p, ServiceID: 105, ServiceName: "qabz"}
+	deps := PaymentCompleteDeps{Payments: p, ServiceID: 105, EcosystemName: "bill"}
 	if log != nil { // a typed nil in the interface is not "no logger"
 		deps.Logger = log
 	}
@@ -62,7 +62,7 @@ func TestOrderCompleteSuccess(t *testing.T) {
 		}
 		assert.Equal(t, []order.CompleteRequest{{OrderID: "order-1", RRN: "778899", Price: 150000}}, p.reqs, st)
 		assert.Equal(t, int32(4), res.GetVersion(), st)
-		assert.Equal(t, "qabz", res.GetCurrentStep(), st)
+		assert.Equal(t, "bill", res.GetCurrentStep(), st)
 		assert.Equal(t, st, res.GetStatus(), st)
 		assert.Equal(t, st, res.GetStepStatus().GetService(), st)
 		assert.Equal(t, "success", res.GetStepStatus().GetPayment(), st)

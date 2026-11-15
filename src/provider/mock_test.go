@@ -181,6 +181,41 @@ func TestMockSettle(t *testing.T) {
 	assert.Equal(t, StatusSuccess, resp.Status)
 }
 
+var statusFixtures = MockFixtures{Inquiry: testFixtures.Inquiry, Status: func(StatusRequest) *StatusResponse {
+	return &StatusResponse{Status: StatusSuccess, ProviderTraceID: "t"}
+}}
+
+// TestMockStatus (task 045): success gives the fixture, failed a failed answer, pending an error
+// that wraps ErrProviderDown, with no call to the adapter; with no Status fixture the adapter
+// answers; an unknown status return type is rejected.
+func TestMockStatus(t *testing.T) {
+	for rt, want := range map[string]string{MockReturnSuccess: StatusSuccess, MockReturnFailed: StatusFailed, "": StatusSuccess} {
+		log := &infoLog{}
+		m, err := NewMock(&stubAdapter{name: "parsian"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, StatusReturnType: rt}, statusFixtures, log)
+		if !assert.NoError(t, err, rt) {
+			continue
+		}
+		resp, err := m.Status(context.Background(), StatusRequest{OrderID: "o1"})
+		if assert.NoError(t, err, rt) && assert.NotNil(t, resp, rt) {
+			assert.Equal(t, want, resp.Status, rt)
+		}
+		assert.Len(t, log.lines, 1, rt)
+	}
+	m, _ := NewMock(&stubAdapter{name: "parsian"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, StatusReturnType: MockReturnPending}, statusFixtures, nil)
+	_, err := m.Status(context.Background(), StatusRequest{})
+	assert.ErrorIs(t, err, ErrProviderDown)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = m.Status(ctx, StatusRequest{})
+	assert.ErrorIs(t, err, context.Canceled)
+
+	m, _ = NewMock(&stubAdapter{name: "x"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, StatusReturnType: "nonsense"}, testFixtures, nil)
+	_, err = m.Status(context.Background(), StatusRequest{})
+	assert.ErrorIs(t, err, ErrNotSupported, "the status return type is not checked with no Status fixture")
+	_, err = NewMock(&stubAdapter{name: "x"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, StatusReturnType: MockReturnError}, statusFixtures, nil)
+	assert.Error(t, err, "error is not a status return type")
+}
+
 // TestTelServiceStatus: bill's map of the three Karashop texts; any other text gives "".
 func TestTelServiceStatus(t *testing.T) {
 	assert.Equal(t, TelServiceActive, TelServiceStatus("وصل"))

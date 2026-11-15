@@ -708,19 +708,18 @@ debug: {mocks: {karashop: {enable: true, return_type: error}}}
 }
 
 // TestParseJiringSwitchAndParsianBillKeys (task 036): bill's keys of the jiring-switch and the
-// parsian-v2 service clients have no default, take their values, and a wrong type names the key.
+// parsian-v2 service clients have no default (task 045: but the Parsian get_status keys, which have
+// the values of the operator's config), take their values, and a wrong type names the key.
 func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
 	c, err := Parse([]byte(base))
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Equal(t, []string{"", "", "", ""}, []string{c.JiringSwitchName, c.JiringSwitchGetStatusName, c.ParsianName, c.ParsianGetStatusName})
+	assert.Equal(t, []string{"", "", ""}, []string{c.JiringSwitchName, c.JiringSwitchGetStatusName, c.ParsianName})
 	for _, d := range []time.Duration{
 		c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
 		c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder,
-		c.ParsianGetStatusStart, c.ParsianGetStatusEnd, c.ParsianGetStatusCronTime, c.ParsianGetStatusLockTime,
-		c.ParsianGetStatusReverseDeadline, c.ParsianGetStatusSyncAPICall, c.ParsianGetStatusSyncGetOrder, c.ParsianGetStatusSyncInsertOrder,
 		c.ParsianSettlementInquiryWater, c.ParsianSettlementInquiryElectricity, c.ParsianSettlementInquiryGas,
 		c.ParsianSettlementInquiryMCIMobile, c.ParsianSettlementInquiryRightelMobile,
 	} {
@@ -728,9 +727,15 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	}
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryTelephone, "task 044: bill's default")
 	assert.Zero(t, c.JiringSwitchGetStatusChunk)
-	assert.Zero(t, c.ParsianGetStatusChunk)
 	assert.False(t, c.JiringSwitchGetStatusIsLockable)
-	assert.False(t, c.ParsianGetStatusIsLockable)
+	// Task 045: the defaults of the Parsian status worker.
+	assert.False(t, c.ParsianGetStatusEnabled)
+	assert.Equal(t, "parsian-getstatus", c.ParsianGetStatusName)
+	assert.Equal(t, 100, c.ParsianGetStatusChunk)
+	assert.True(t, c.ParsianGetStatusIsLockable)
+	assert.Equal(t, []time.Duration{30 * time.Minute, 10 * time.Hour, 15 * time.Minute, 30 * time.Minute, 10 * time.Hour, 30 * time.Second, 3 * time.Millisecond, 3 * time.Millisecond},
+		[]time.Duration{c.ParsianGetStatusStart, c.ParsianGetStatusEnd, c.ParsianGetStatusCronTime, c.ParsianGetStatusLockTime,
+			c.ParsianGetStatusReverseDeadline, c.ParsianGetStatusSyncAPICall, c.ParsianGetStatusSyncGetOrder, c.ParsianGetStatusSyncInsertOrder})
 
 	status := `get_status: {name: "%s-getstatus", chunk: 100, start: "30m", end: "10h", cron_time: "15m", lock_time: "30m", is_lockable: true, reverse_deadline: "10h", sync_operations: {api_call_get_status: "30s", get_order_query: "3ms", insert_order_query: "4ms"}}`
 	yml := base + "providers:\n  internal:\n" +
@@ -870,4 +875,66 @@ func TestValidMockPayReturnType(t *testing.T) {
 	for _, v := range []string{"", MockReturnError, "Success", "timeout"} {
 		assert.False(t, ValidMockPayReturnType(v), v)
 	}
+}
+
+// TestParseParsianStatusWorker (task 045): the worker switch, the Kafka keys, the ecosystem name and
+// the Redis prefix take their values; with the worker on, each rule names its key; with the worker
+// off, the worker keys are not checked.
+func TestParseParsianStatusWorker(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "bill", c.ServiceEcosystemName)
+	assert.Equal(t, "qabz:", c.RedisPrefix)
+	assert.Equal(t, []string{"localhost:9092"}, c.KafkaBrokers)
+	assert.Equal(t, []string{"paymentwriter", "paymentwriter", "payment", "paymentBill", ""},
+		[]string{c.KafkaPaymentWriteSubject, c.KafkaPaymentWriteGroup, c.KafkaPaymentReadSubject, c.KafkaPaymentReadGroup, c.KafkaUsername})
+	assert.Equal(t, 5*time.Second, c.KafkaTimeout)
+	assert.False(t, c.KafkaAuth)
+	assert.Equal(t, MockReturnSuccess, c.DebugMockParsianStatusReturnType)
+
+	yml := "mode: dev\n" + `service: {ecosystem_name: "x"}
+database: {postgres: {password: pw}, redis: {prefix: "p:"}}
+kafka: {brokers: ["k1:9092", "k2:9092"], topic: {payment: {write: {subject: "w"}}}, password: "s3cret"}
+providers: {internal: {parsian: {get_status: {enabled: true, cron_time: "10s"}}}}
+debug: {mocks: {parsian: {status_return_type: failed}}}
+`
+	c, err = Parse([]byte(yml))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.True(t, c.ParsianGetStatusEnabled)
+	assert.Equal(t, 10*time.Second, c.ParsianGetStatusCronTime)
+	assert.Equal(t, []string{"x", "p:", "w"}, []string{c.ServiceEcosystemName, c.RedisPrefix, c.KafkaPaymentWriteSubject})
+	assert.Equal(t, []string{"k1:9092", "k2:9092"}, c.KafkaBrokers)
+	assert.NotContains(t, fmt.Sprint(c.KafkaPassword), "s3cret", "the password never prints")
+	assert.Equal(t, MockReturnFailed, c.DebugMockParsianStatusReturnType)
+
+	on := "providers: {internal: {parsian: {get_status: {enabled: true}}}}\n"
+	for yml, want := range map[string]string{
+		"service: {ecosystem_name: \"\"}\n":                                                                                  "service.ecosystem_name must not be empty",
+		"debug: {mocks: {parsian: {status_return_type: x}}}\n":                                                               "debug.mocks.parsian.status_return_type",
+		"providers: {internal: {parsian: {get_status: {enabled: true, name: \"\"}}}}\n":                                      "get_status.name must not be empty",
+		"providers: {internal: {parsian: {get_status: {enabled: true, cron_time: \"0s\"}}}}\n":                               "get_status.cron_time must be a positive duration",
+		"providers: {internal: {parsian: {get_status: {enabled: true, chunk: 0}}}}\n":                                        "get_status.chunk must be positive",
+		"providers: {internal: {parsian: {get_status: {enabled: true, start: \"10h\"}}}}\n":                                  "end must be greater than start",
+		"providers: {internal: {parsian: {get_status: {enabled: true, start: \"-1s\"}}}}\n":                                  "start must not be negative",
+		"providers: {internal: {parsian: {get_status: {enabled: true, reverse_deadline: \"-1s\"}}}}\n":                       "reverse_deadline must not be negative",
+		"providers: {internal: {parsian: {get_status: {enabled: true, sync_operations: {api_call_get_status: \"-1s\"}}}}}\n": "sync_operations must not be negative",
+		on + "kafka: {brokers: []}\n":                                "kafka.brokers must have at least one address",
+		on + "kafka: {brokers: [\"\"]}\n":                            "kafka.brokers must have at least one address",
+		on + "kafka: {topic: {payment: {write: {subject: \"\"}}}}\n": "kafka.topic.payment.write.subject must not be empty",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+
+	// The worker off: its keys are not checked (OFF is the behavior before task 045).
+	_, err = Parse([]byte(base + "kafka: {brokers: []}\nproviders: {internal: {parsian: {get_status: {chunk: 0, cron_time: \"0s\"}}}}\n"))
+	assert.NoError(t, err)
+	// A reverse deadline of 0 is valid (bill: every final status is late).
+	_, err = Parse([]byte(base + "providers: {internal: {parsian: {get_status: {enabled: true, reverse_deadline: \"0s\"}}}}\n"))
+	assert.NoError(t, err)
 }

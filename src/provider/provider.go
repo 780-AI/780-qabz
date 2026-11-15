@@ -203,11 +203,25 @@ type SettleResponse struct {
 	ProviderTraceID string
 }
 
+// StatusRequest is the input of ProviderInterface.Status: the status of a paid order (task 045;
+// bill: payment_inquiry_gateway.PaymentInquiryRequest).
+type StatusRequest struct {
+	OrderID  string // orders.order_id
+	BillType string // the order bill type, for example BillTypeTel
+}
+
+// StatusResponse is the answer of ProviderInterface.Status: the answer of the provider as it came.
+// Only StatusSuccess and StatusFailed are final (bill: validStatusMap); any other Status means that
+// the status is not known yet.
+type StatusResponse struct {
+	Status          string
+	Message         string
+	ProviderTraceID string
+}
+
 // The request and response types of the methods that no adapter implements yet. Each later task
 // that implements one of them gives its type the fields it needs.
 type (
-	StatusRequest    struct{}
-	StatusResponse   struct{}
 	DocumentRequest  struct{}
 	DocumentResponse struct{}
 )
@@ -227,6 +241,9 @@ type ProviderInterface interface {
 	// Pay pays a bill. An error that wraps ErrProviderDown means that the provider gave no answer
 	// (a timeout too): the payment status is not known (pending). Other errors: ErrNotSupported.
 	Pay(ctx context.Context, req PaymentRequest) (*PaymentResponse, error)
+	// Status asks the status of a paid order (task 045). An error that wraps ErrProviderDown means
+	// that the provider gave no answer (a timeout too): the status is not known (pending). Other
+	// errors: ErrNotSupported.
 	Status(ctx context.Context, req StatusRequest) (*StatusResponse, error)
 	GetDocument(ctx context.Context, req DocumentRequest) (*DocumentResponse, error)
 	// Settle reports a payment to the provider of the bill. An error means that the provider gave no

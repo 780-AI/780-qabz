@@ -1,7 +1,8 @@
-<!-- VERSION: 3.34 -->
+<!-- VERSION: 3.35 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.35 — 2026-11-15 — Added 045-parsian-status-worker entry.
 v3.34 — 2026-11-15 — Added 044-qa-scenario-passed entry.
 v3.33 — 2026-11-15 — Added 044-tel-order-payment entry.
 v3.32 — 2026-11-15 — Added config-example-service-id-comment entry.
@@ -150,6 +151,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 045: the Parsian status worker, the shared worker runner and the Kafka producer
+- **Type:** Major (new modules, a background worker, a new external dependency, new config keys, a change of the `OrderComplete` answer, `system.html` and conventions §§ 15, 16).
+- **Files:** `src/entry/cron/cron.go` (new: the shared worker runner: `Cron`, `LockPolicy` = bill's lock TTL, `Runner`), `src/core/reconcile/status.go` (new: `StatusWorker`), `src/core/reconcile/report.go` (new: bill's `entity.Payment` message, `PaymentReporter`), `src/system/kafka/kafka.go` and `balancer.go` (new: the producer on confluent-kafka-go v2.16.1, bill's `LeastBytes` rule), `src/system/redis/redis.go` (the key prefix, `Key`; `Raw` removed) and `lock.go` (new: `TryLock`, `ExtendAtLeast`, `Release` of the own token only), `src/system/postgres/order_repository.go` (`PendingIDs`, `InsertFinal`), `src/provider/provider.go` (`StatusRequest`, `StatusResponse`), `src/provider/mock.go` (the mock of `Status`), `src/provider/parsianproxy/parsianproxy.go` (`Status` = `TopBill/OrderInquiry`, the `Status` fixture), `src/config/config.go` (new keys; the get_status keys read, with defaults; `validateParsianGetStatus`), `src/app/crons.go` (new: the worker metrics and wiring), `src/app/app.go`, `builder.go`, `defaults.go`, `src/entry/grpc/payment.go` (`currentStep` = `service.ecosystem_name`), the tests (`*_test.go`; new live tests `TestLiveTwoRunnersOneLock`, `TestLivePendingIDs`, `TestLiveInsertFinal`, the Redis lock tests), `src/system/postgres/postgrestest/testdb/main.go` (verb `redis-url`), `Makefile` (`make test` gives `QABZ_TEST_REDIS_URL`), `docker-compose.yml` (the `kafka` service, profile `kafka`), `src/go.mod`, `src/go.sum`, `config.yml.example`, `docs/initial-discovery/system.html` (v2.16), `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.23), `docs/this_vs_bill.md` (v0.23, items 43 and 44), `docs/folder_structure.md` (v0.48), `src/app/README.md` (v0.36), `docs/Plans/OPEN_TASKS.md` (v1.74), `docs/Plans/done_tasks/045_parsian_status_worker.md` (v1.0), `CHANGELOG.md`, `docs/documents_manifest.md`.
+- **Impact:** Yes. With `providers.internal.parsian.get_status.enabled: true` each instance runs the Parsian status worker every `cron_time` (default 15m), one instance at a time (a Redis lock `<database.redis.prefix>crons_<name>_lock1`, deleted after the run): the `pending` and `in-progress` orders of the provider `parsian` created from 10 h to 30 min ago are asked at `parsian-v2` (`TopBill/OrderInquiry`); a `success` or `failed` is reported to the payment service on Kafka (`kafka.topic.payment.write.subject`, key `bill`, bill's message bytes, bill's partition rule) and then saved as a new `orders` row; a status after the reverse deadline is saved and not reported. With the switch off (the default) no worker and no Kafka producer exist: the behavior before task 045, except two changes: `OrderComplete` answers `currentStep` = `service.ecosystem_name` (default `bill`; it was `service.name`, `qabz`), and the Redis client puts `database.redis.prefix` (default `qabz:`) in front of every key (no Redis key was used before). New keys: `service.ecosystem_name`, `database.redis.prefix`, `providers.internal.parsian.get_status.enabled`, the `kafka` block (bill's keys; only `brokers` and the write subject are read), `debug.mocks.parsian.status_return_type`; the get_status keys get the defaults of the operator's config. The build needs cgo (librdkafka). New metrics: `qabz_cron_runs_total`, `qabz_cron_duration_ms`, `qabz_cron_orders_processed_total`, `qabz_kafka_publish_total`, `qabz_kafka_publish_duration_ms`; `qabz_provider_calls_total` and `qabz_provider_call_duration_ms` count the action `status`. Differences from bill: `docs/this_vs_bill.md` items 43 and 44.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, task 045 (⏸): step 1 (the Go tests) and step 2 (feature ON with the compose Kafka, the Parsian mock and two instances) passed by the implementer on 2026-11-15; awaiting the operator.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Task 044 QA scenario passed (steps 1 and 2)
 - **Type:** Minor (documentation; no code, no new files).

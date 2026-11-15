@@ -8,7 +8,7 @@ import (
 
 // Builder makes an App. Every dependency is an interface, so tests inject fakes.
 // The config, logger, database, cache and metrics are required. The tracer, migrator, config reloader,
-// provider list, gRPC server, HTTP gateway, internal gRPC server and background jobs are optional.
+// provider list, gRPC server, HTTP gateway, internal gRPC server, background jobs and workers are optional.
 type Builder struct {
 	cfg       *config.Holder[config.Config]
 	logger    Logger
@@ -23,6 +23,7 @@ type Builder struct {
 	http      Server
 	internal  Server
 	bg        Background
+	crons     Crons
 }
 
 // NewBuilder returns an empty Builder.
@@ -54,6 +55,9 @@ func (b *Builder) WithInternalGRPCServer(s Server) *Builder { b.internal = s; re
 
 // WithBackground sets the background jobs that Stop waits for (task 044). Skip it for none.
 func (b *Builder) WithBackground(bg Background) *Builder { b.bg = bg; return b }
+
+// WithCrons sets the workers (task 045). Skip it for none.
+func (b *Builder) WithCrons(c Crons) *Builder { b.crons = c; return b }
 
 // WithLogger sets the logger.
 func (b *Builder) WithLogger(l Logger) *Builder { b.logger = l; return b }
@@ -92,5 +96,5 @@ func (b *Builder) Build() (*App, error) {
 		return nil, err
 	}
 	return &App{cfg: b.cfg, logger: b.logger, db: b.db, cache: b.cache, metrics: b.metrics, tracer: b.tracer,
-		migrator: b.migrator, reloader: b.reloader, providers: b.providers, grpc: b.grpc, http: b.http, internal: b.internal, bg: b.bg}, nil
+		migrator: b.migrator, reloader: b.reloader, providers: b.providers, grpc: b.grpc, http: b.http, internal: b.internal, bg: b.bg, crons: b.crons}, nil
 }

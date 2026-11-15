@@ -195,6 +195,9 @@ var qabzMetrics = []string{
 	"qabz_providers_active_count",
 	"qabz_inquiries_total", "qabz_provider_calls_total", "qabz_provider_call_duration_ms",
 	"qabz_order_create_total", "qabz_fee_resolve_total",
+	// Task 045: the workers (registered also with the worker switch off).
+	"qabz_cron_runs_total", "qabz_cron_duration_ms", "qabz_cron_orders_processed_total",
+	"qabz_kafka_publish_total", "qabz_kafka_publish_duration_ms",
 }
 
 // TestDefaultBuilderMetricsSwitch: with metrics on, the composition root registers every qabz

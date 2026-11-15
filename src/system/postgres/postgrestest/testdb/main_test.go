@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -121,6 +122,38 @@ func TestAdminDSN(t *testing.T) {
 	var out, errOut bytes.Buffer
 	assert.Equal(t, 0, run(context.Background(), []string{"admin-dsn", path}, env(nil), &out, &errOut))
 	assert.Equal(t, "postgres://qabz:p%40ss%2Fw%3Ard@127.0.0.1:55432/postgres\n", out.String())
+}
+
+// TestRedisURL (task 045): redis-url gives the compose Redis as a URL that go-redis reads back with
+// the same password; an empty password gives no user part; missing variables name the keys.
+func TestRedisURL(t *testing.T) {
+	for _, password := range []string{specialPassword, "p@ss/w:rd", "a\"b`c$d @/:e"} {
+		path := writeEnv(t, "REDIS_HOST=127.0.0.1\nREDIS_PORT=56379\nREDIS_PASSWORD="+generatorQuote(password)+"\n")
+		var out, errOut bytes.Buffer
+		if !assert.Equal(t, 0, run(context.Background(), []string{"redis-url", path}, env(nil), &out, &errOut), errOut.String()) {
+			continue
+		}
+		u, err := url.Parse(strings.TrimSpace(out.String()))
+		if !assert.NoError(t, err, password) || !assert.NotNil(t, u.User) {
+			continue
+		}
+		got, _ := u.User.Password()
+		assert.Equal(t, password, got)
+		assert.Equal(t, "127.0.0.1:56379", u.Host)
+		assert.Equal(t, "redis", u.Scheme)
+	}
+	path := writeEnv(t, "REDIS_HOST=127.0.0.1\nREDIS_PORT=56379\n")
+	var out, errOut bytes.Buffer
+	assert.Equal(t, 0, run(context.Background(), []string{"redis-url", path}, env(nil), &out, &errOut))
+	assert.Equal(t, "redis://127.0.0.1:56379\n", out.String())
+
+	path = writeEnv(t, "REDIS_PASSWORD=secret\n")
+	out.Reset()
+	errOut.Reset()
+	assert.Equal(t, 1, run(context.Background(), []string{"redis-url", path}, env(nil), &out, &errOut))
+	assert.Empty(t, out.String())
+	assert.Contains(t, errOut.String(), "REDIS_HOST, REDIS_PORT not set")
+	assert.NotContains(t, errOut.String(), "secret")
 }
 
 func TestAdminDSNMissingVariables(t *testing.T) {

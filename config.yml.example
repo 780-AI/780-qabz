@@ -10,6 +10,7 @@ hot_reload_interval: "30s"
 service:
   name: "qabz"               # the name of the service: the log lines, tracing and the kid header of the order token
   id: 0                      # ID in the payment flow (the deployed bill uses 108); sent as serviceId by GET /v1/services, GET /v1/mybill, the order answer and the order token
+  ecosystem_name: "bill"     # the name that the other services see: the Kafka message key and client ID, currentStep of the OrderComplete answer; not empty (Qabz is not known in the ecosystem yet)
 
 logs:
   level: "info"
@@ -39,6 +40,7 @@ database:
     host: "localhost"
     port: 6379
     password: ""
+    prefix: "qabz:"          # put in front of every Redis key of Qabz (for example the worker locks)
   migration:
     on_start: true
     timeout: "60s"
@@ -90,19 +92,20 @@ providers:
       timeout: "10s"           # limit of each call to the parsian-v2 service; positive
       grpc_address: ""         # host:port of the internal gRPC server of the parsian-v2 service (no TLS); empty: every call fails as "provider down"
       name: ""                 # name of the provider (bill: parsian.name); not read yet
-      get_status:              # cron that asks the status of pending orders; not read yet (order flow)
-        name: ""
-        chunk: 0
-        start: "0s"
-        end: "0s"
-        cron_time: "0s"
-        lock_time: "0s"
-        is_lockable: false
-        reverse_deadline: "0s"
-        sync_operations:
-          api_call_get_status: "0s"
-          get_order_query: "0s"
-          insert_order_query: "0s"
+      get_status:              # the worker that asks Parsian the status of the pending and in-progress orders (task 045; bill: parsian.getStatus)
+        enabled: false         # false: no worker; true: the keys below are checked at start
+        name: "parsian-getstatus" # the lock key, the metric label cron and the log lines
+        chunk: 100             # orders in one page; positive
+        start: "30m"           # the window of the orders: created from now-end to now-start; end greater than start
+        end: "10h"
+        cron_time: "15m"       # the interval; positive
+        lock_time: "30m"       # only logged, as bill (the lock TTL comes from sync_operations)
+        is_lockable: true      # not read (bill has it): Qabz always takes the lock
+        reverse_deadline: "10h" # a final status of an order older than this is saved as reverse_deadline_exceeded and not reported; 0: every final status
+        sync_operations:       # the lock TTL: sum x 1.1 x chunk + 5m (bill)
+          api_call_get_status: "30s"
+          get_order_query: "3ms"
+          insert_order_query: "3ms"
       settlement_inquiry_water: "0s"       # not read yet (settlement)
       settlement_inquiry_electricity: "0s"
       settlement_inquiry_gas: "0s"
@@ -149,6 +152,22 @@ caching:
   tel: "1h"                  # how long a saved landline inquiry (bill type tel) answers the same number with no provider call; 0: cache off
   paid_tel: "72h"            # how long a saved landline inquiry gives the price of a landline order (tel, telmidterm) with no provider call (bill: paidTel); 0: every order asks the provider
 
+kafka:                       # the Kafka client (bill: kafka); the producer exists only while providers.internal.parsian.get_status.enabled is true
+  brokers:                   # the broker addresses; not empty while the worker is on
+    - "localhost:9092"
+  topic:
+    payment:
+      write:
+        subject: "paymentwriter" # the topic of the status messages to the payment service; not empty while the worker is on
+        group: "paymentwriter"   # not read yet (bill has it and does not use it)
+      read:
+        subject: "payment"       # not read yet (bill has it and does not use it)
+        group: "paymentBill"     # not read yet (bill has it and does not use it)
+  username: ""               # not read yet (bill has it and does not use it)
+  password: ""               # not read yet (bill has it and does not use it)
+  auth: false                # not read yet (bill has it and does not use it)
+  timeout: "5s"              # not read yet (bill has it and does not use it)
+
 auth:
   secrets:
     hmac: ""                 # the auth service JWT secret; required while the auth check is on
@@ -175,6 +194,7 @@ debug:
       enable: false
       return_type: "success" # inquiry: "success" or "error"
       pay_return_type: "success" # payment: "success", "failed" or "pending" (the answer of a timeout)
+      status_return_type: "success" # status of an order (the status worker): "success", "failed" or "pending" (the answer of a timeout)
     karashop:                # the Karashop mock: a fixed answer, no call to Karashop
       enable: false
       return_type: "success" # inquiry: "success" or "error"

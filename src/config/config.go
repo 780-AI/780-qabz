@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -43,8 +44,13 @@ type Config struct {
 	// ServiceID is the ID of this service in the payment flow. GET /v1/services sends it as
 	// serviceId. The old bill service has the same key (service.id); qabz uses bill's ID.
 	// 0 to 2147483647 (int32 in the proto).
-	ServiceID int    `path:"service.id"`
-	LogLevel  string `path:"logs.level"`
+	ServiceID int `path:"service.id"`
+	// ServiceEcosystemName is the name of the service that the other services of the ecosystem see
+	// (task 045 D17): the key and the client ID of every Kafka message and currentStep of the
+	// OrderComplete answer. Default "bill": Qabz is not known in the ecosystem yet, and the deployed
+	// bill sends its name, bill. service.name stays the name of the logs and the tracing. Not empty.
+	ServiceEcosystemName string `path:"service.ecosystem_name"`
+	LogLevel             string `path:"logs.level"`
 
 	PostgresHost     string `path:"database.postgres.host"`
 	PostgresPort     int    `path:"database.postgres.port"`
@@ -55,6 +61,9 @@ type Config struct {
 	RedisHost     string `path:"database.redis.host"`
 	RedisPort     int    `path:"database.redis.port"`
 	RedisPassword Secret `path:"database.redis.password"`
+	// RedisPrefix is put in front of every Redis key of Qabz by the Redis client (task 045,
+	// supertask 043), so a Redis that other services share cannot mix the keys. Default "qabz:".
+	RedisPrefix string `path:"database.redis.prefix"`
 
 	// GRPCAddr is the listen address of the gRPC server (host:port; port 0 picks a free port).
 	GRPCAddr string `path:"server.grpc.addr"`
@@ -196,8 +205,9 @@ type Config struct {
 	// env generator scripts/yml_to_env rejects a key with a hyphen).
 	// The other keys are bill's keys of the two service clients (bill: jiringSwitch.* and
 	// parsian.*: name, the getStatus block, and for Parsian the settlementInquiry* durations), in the
-	// layout of this project, as for Irancell. They have no default (the real values are only in
-	// config.yml) and are not read yet: they belong to the order flow and its status cron. The three
+	// layout of this project, as for Irancell. The Jiring Switch keys have no default (the real values
+	// are only in config.yml) and are not read yet: they belong to the order flow and its status cron.
+	// The Parsian get_status keys are read since task 045 (see ParsianGetStatusEnabled). The three
 	// sync_operations keys are bill's list getStatus.syncOperations as three keys, as for Irancell.
 	// Not hot-reloadable.
 	JiringSwitchEnabled     bool          `path:"providers.internal.jiring_switch.enabled"`
@@ -220,6 +230,17 @@ type Config struct {
 	JiringSwitchGetStatusSyncGetOrder    time.Duration `path:"providers.internal.jiring_switch.get_status.sync_operations.get_order_query"`
 	JiringSwitchGetStatusSyncInsertOrder time.Duration `path:"providers.internal.jiring_switch.get_status.sync_operations.insert_order_query"`
 
+	// The Parsian status worker (task 045; bill: ParsianGetStatusTask, InquiryCron). It reads the
+	// get_status keys since task 045; the defaults are the values of the operator's config (the
+	// bill example config does not fill bill's getStatus block). ParsianGetStatusEnabled (not a bill
+	// key) turns the worker on; false (the default): no worker, as before task 045. With the worker
+	// on: CronTime is the interval (positive), Start and End give the window of the orders (now-End
+	// to now-Start; End greater than Start), Chunk is the page size (positive), ReverseDeadline is
+	// the age after which a final status is saved as reverse_deadline_exceeded and not reported (0:
+	// every final status, as bill), and the three sync_operations durations give the lock TTL
+	// (bill's formula). LockTime is only logged and IsLockable is not read (bill: lockTime is only
+	// logged; Qabz always takes the lock). ParsianName is not read. Not hot-reloadable.
+	ParsianGetStatusEnabled             bool          `path:"providers.internal.parsian.get_status.enabled"`
 	ParsianName                         string        `path:"providers.internal.parsian.name"`
 	ParsianGetStatusName                string        `path:"providers.internal.parsian.get_status.name"`
 	ParsianGetStatusChunk               int           `path:"providers.internal.parsian.get_status.chunk"`
@@ -341,6 +362,11 @@ type Config struct {
 	// MockReturnPending (the answer of a timeout). No effect while the mock is off. Development only.
 	DebugMockParsianPayReturnType string `path:"debug.mocks.parsian.pay_return_type"`
 
+	// DebugMockParsianStatusReturnType is the answer of the Parsian mock to a status call (task
+	// 045): MockReturnSuccess, MockReturnFailed or MockReturnPending (the answer of a timeout). No
+	// effect while the mock is off. Development only.
+	DebugMockParsianStatusReturnType string `path:"debug.mocks.parsian.status_return_type"`
+
 	// DebugMockKarashopEnable makes the Karashop adapter answer with a fixed answer, with no call to
 	// Karashop (task 025). Development only, as DebugMockQabzinoEnable. Not hot-reloadable. The
 	// return type is MockReturnSuccess or MockReturnError; no effect while the mock is off.
@@ -349,6 +375,23 @@ type Config struct {
 	// DebugMockKarashopSettleReturnType is the answer of the Karashop mock to a settlement (task
 	// 044): MockReturnSuccess or MockReturnError. No effect while the mock is off. Development only.
 	DebugMockKarashopSettleReturnType string `path:"debug.mocks.karashop.settle_return_type"`
+
+	// The Kafka client (task 045, supertask 043 decision C; bill: kafka.*). Every key of bill's
+	// kafka block, with the defaults of bill's example config. Read: KafkaBrokers (the addresses
+	// of the producer) and KafkaPaymentWriteSubject (the topic of the status messages to the payment
+	// service). Not read (bill has them and does not use them): the write group, the read subject
+	// and group, the user name, the password (a Secret), auth and the timeout. The producer exists
+	// only while the Parsian status worker is on; then the brokers and the write subject must not be
+	// empty. Not hot-reloadable.
+	KafkaBrokers             []string      `path:"kafka.brokers"`
+	KafkaPaymentWriteSubject string        `path:"kafka.topic.payment.write.subject"`
+	KafkaPaymentWriteGroup   string        `path:"kafka.topic.payment.write.group"`
+	KafkaPaymentReadSubject  string        `path:"kafka.topic.payment.read.subject"`
+	KafkaPaymentReadGroup    string        `path:"kafka.topic.payment.read.group"`
+	KafkaUsername            string        `path:"kafka.username"`
+	KafkaPassword            Secret        `path:"kafka.password"`
+	KafkaAuth                bool          `path:"kafka.auth"`
+	KafkaTimeout             time.Duration `path:"kafka.timeout"`
 
 	// DebugCacheInquiries is the switch of every use of the inquiry tables (bill_inquiries,
 	// bill_inquiry_requests) by the inquiry flow (task 031). True (the default): the flow reads the
@@ -361,21 +404,23 @@ type Config struct {
 
 func defaults() Config {
 	return Config{
-		ServiceName:       "qabz",
-		LogLevel:          "info",
-		PostgresHost:      "localhost",
-		PostgresPort:      5432,
-		PostgresUser:      "qabz",
-		PostgresDB:        "qabz",
-		RedisHost:         "localhost",
-		RedisPort:         6379,
-		GRPCAddr:          ":8082",
-		HTTPAddr:          ":8080",
-		MetricsAddr:       ":9090",
-		MetricsEnabled:    true,
-		HotReloadInterval: 30 * time.Second,
-		MigrateOnStart:    true,
-		MigrateTimeout:    60 * time.Second,
+		ServiceName:          "qabz",
+		ServiceEcosystemName: "bill",
+		RedisPrefix:          "qabz:",
+		LogLevel:             "info",
+		PostgresHost:         "localhost",
+		PostgresPort:         5432,
+		PostgresUser:         "qabz",
+		PostgresDB:           "qabz",
+		RedisHost:            "localhost",
+		RedisPort:            6379,
+		GRPCAddr:             ":8082",
+		HTTPAddr:             ":8080",
+		MetricsAddr:          ":9090",
+		MetricsEnabled:       true,
+		HotReloadInterval:    30 * time.Second,
+		MigrateOnStart:       true,
+		MigrateTimeout:       60 * time.Second,
 
 		ProvidersLoadInterval: time.Minute,
 
@@ -393,6 +438,24 @@ func defaults() Config {
 		CachingTel:                        time.Hour,
 		CachingPaidTel:                    72 * time.Hour,
 		ParsianSettlementInquiryTelephone: 360 * time.Hour,
+		ParsianGetStatusName:              "parsian-getstatus",
+		ParsianGetStatusChunk:             100,
+		ParsianGetStatusStart:             30 * time.Minute,
+		ParsianGetStatusEnd:               10 * time.Hour,
+		ParsianGetStatusCronTime:          15 * time.Minute,
+		ParsianGetStatusLockTime:          30 * time.Minute,
+		ParsianGetStatusIsLockable:        true,
+		ParsianGetStatusReverseDeadline:   10 * time.Hour,
+		ParsianGetStatusSyncAPICall:       30 * time.Second,
+		ParsianGetStatusSyncGetOrder:      3 * time.Millisecond,
+		ParsianGetStatusSyncInsertOrder:   3 * time.Millisecond,
+		KafkaBrokers:                      []string{"localhost:9092"},
+		KafkaPaymentWriteSubject:          "paymentwriter",
+		KafkaPaymentWriteGroup:            "paymentwriter",
+		KafkaPaymentReadSubject:           "payment",
+		KafkaPaymentReadGroup:             "paymentBill",
+		KafkaTimeout:                      5 * time.Second,
+		DebugMockParsianStatusReturnType:  MockReturnSuccess,
 		DebugMockQabzinoReturnType:        MockReturnSuccess,
 		DebugMockTavanirReturnType:        MockReturnSuccess,
 		DebugMockIrancellReturnType:       MockReturnSuccess,
@@ -530,6 +593,15 @@ func (c Config) validate() error {
 	if !ValidMockPayReturnType(c.DebugMockParsianPayReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.parsian.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
 	}
+	if !ValidMockPayReturnType(c.DebugMockParsianStatusReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.parsian.status_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
+	}
+	if c.ServiceEcosystemName == "" {
+		errs = append(errs, errors.New("service.ecosystem_name must not be empty (the name that the other services see; for example bill)"))
+	}
+	if c.ParsianGetStatusEnabled {
+		errs = append(errs, c.validateParsianGetStatus()...)
+	}
 	if !ValidMockReturnType(c.DebugMockKarashopSettleReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.karashop.settle_return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
@@ -557,6 +629,38 @@ func (c Config) validate() error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// validateParsianGetStatus checks the keys of the Parsian status worker and of its Kafka producer
+// (task 045). validate calls it only while the worker is on.
+func (c Config) validateParsianGetStatus() []error {
+	const p = "providers.internal.parsian.get_status."
+	var errs []error
+	if c.ParsianGetStatusName == "" {
+		errs = append(errs, errors.New(p+"name must not be empty (the lock key and the metric label)"))
+	}
+	if c.ParsianGetStatusCronTime <= 0 {
+		errs = append(errs, errors.New(p+"cron_time must be a positive duration (for example 15m)"))
+	}
+	if c.ParsianGetStatusChunk <= 0 {
+		errs = append(errs, errors.New(p+"chunk must be positive (for example 100)"))
+	}
+	if c.ParsianGetStatusStart < 0 || c.ParsianGetStatusEnd <= c.ParsianGetStatusStart {
+		errs = append(errs, errors.New(p+"start must not be negative and end must be greater than start (for example 30m and 10h)"))
+	}
+	if c.ParsianGetStatusReverseDeadline < 0 {
+		errs = append(errs, errors.New(p+"reverse_deadline must not be negative"))
+	}
+	if c.ParsianGetStatusSyncAPICall < 0 || c.ParsianGetStatusSyncGetOrder < 0 || c.ParsianGetStatusSyncInsertOrder < 0 {
+		errs = append(errs, errors.New(p+"sync_operations must not be negative"))
+	}
+	if len(c.KafkaBrokers) == 0 || slices.Contains(c.KafkaBrokers, "") {
+		errs = append(errs, errors.New("kafka.brokers must have at least one address and no empty one (the status worker reports on Kafka)"))
+	}
+	if c.KafkaPaymentWriteSubject == "" {
+		errs = append(errs, errors.New("kafka.topic.payment.write.subject must not be empty (the status worker reports on Kafka)"))
+	}
+	return errs
 }
 
 // checkListenAddr checks that addr is host:port with a port from 0 to 65535 (0 picks a free port).

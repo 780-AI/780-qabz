@@ -72,12 +72,14 @@ test-scripts: venv
 ## test: run the Go tests (go test $(GO_TEST_ARGS) $(GO_TEST_PKGS)) in ONE new database qabz_test_<random hex>
 ## on the Postgres server of $(ENV_OUT) (make compose up; the role needs CREATEDB). The tests get its DSN
 ## in QABZ_TEST_RUN_DSN; the database is dropped at the end, also when a test fails or on Ctrl-C.
+## The live Redis tests get the compose Redis in QABZ_TEST_REDIS_URL (keys with their own test prefix).
 test: env
-	@cd src && admin=$$($(TESTDB) admin-dsn "$(TESTDB_ENV)") && name=$$($(TESTDB) name) || exit 1; \
+	@cd src && admin=$$($(TESTDB) admin-dsn "$(TESTDB_ENV)") && name=$$($(TESTDB) name) && \
+	redis=$$($(TESTDB) redis-url "$(TESTDB_ENV)") || exit 1; \
 	trap 'QABZ_TEST_ADMIN_DSN="$$admin" $(TESTDB) drop "$$name"' EXIT; \
 	trap 'exit 130' INT; trap 'exit 143' TERM; \
 	run=$$(QABZ_TEST_ADMIN_DSN="$$admin" $(TESTDB) create "$$name") || exit 1; \
-	QABZ_TEST_RUN_DSN="$$run" go test $(GO_TEST_ARGS) $(GO_TEST_PKGS)
+	QABZ_TEST_RUN_DSN="$$run" QABZ_TEST_REDIS_URL="$$redis" go test $(GO_TEST_ARGS) $(GO_TEST_PKGS)
 
 ## test-db-clean: drop every qabz_test_% database, then every qabz_test_ role, on the Postgres server of
 ## $(ENV_OUT): the leftovers of a killed `make test`. Nothing else removes them. A role with objects or

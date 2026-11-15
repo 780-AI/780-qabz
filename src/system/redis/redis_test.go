@@ -9,7 +9,7 @@ import (
 )
 
 func TestPingFailsWithoutServer(t *testing.T) {
-	c := New("127.0.0.1:1", "")
+	c := New("127.0.0.1:1", "", "")
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

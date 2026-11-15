@@ -1,7 +1,8 @@
-<!-- VERSION: 0.22 -->
+<!-- VERSION: 0.23 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v0.23 — 2026-11-15 — Task 045: § 15 names `status_return_type` (`success`, `failed`, `pending`; fixture `provider.MockFixtures.Status`); new § 16 — every Redis key goes through `redis.Client.Key`, so it has `database.redis.prefix` (supertask 043 operator rule).
 v0.22 — 2026-11-15 — Task 044 (operator decision D14 (a)): § 15 — one return-type key for each provider method (`return_type` = the inquiry; `<method>_return_type` for another method, for example `pay_return_type` with `success`, `failed`, `pending`); the mock answers a method only when the adapter gives its fixture.
 v0.21 — 2026-11-14 — Section 7: the URL variable of the collection is `BASE_URL` (was `baseUrl`; operator); a request to another service (for example the payment service) uses `BASE_URL` with the path of that service; the collection pre-request script adds the web client headers.
 v0.20 — 2026-11-14 — Section 8: the provider blocks are in `providers.internal` (our own services) or `providers.external` (third-party services); a new provider goes in the group of its kind (task 041).
@@ -379,10 +380,22 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 - **Code.** The adapter package gives its fixed answers as `provider.MockFixtures` (for example `qabzino.MockFixtures()`); the composition root (`src/app/defaults.go`, `newProviderRegistry`) wraps the adapter with `provider.NewMock`. Do not write a second mock mechanism. With the mock off, `NewMock` returns the adapter itself (OFF is the same as no mock).
 - **Dev mode twice.** The composition root applies a mock only when `Config.Mode` is `dev`, and writes one warn line when it does. The mock never runs in `stage` or `prod`.
 - **`return_type: success`** is a valid answer with fixed values (the values are documented in the fixtures and in the Postman description of the endpoint). **`error`** is `provider.ErrProviderDown`, the same error as a failed call.
-- **One return-type key for each method** (task 044, operator decision). `return_type` is the answer of `Inquiry`. Each other method that the mock answers has its own key, `debug.mocks.<provider>.<method>_return_type`, default `success`: `pay_return_type` (`success`, `failed`: a failed answer of the provider, `pending`: `provider.ErrProviderDown`, the answer of a timeout) and `settle_return_type` (`success`, `error`). The mock answers a method only when the adapter gives a fixture for it (`provider.MockFixtures.Pay`, `.Settle`); every other method goes to the adapter. A new method adds its key, its values and its fixture the same way; do not add values to `return_type`.
+- **One return-type key for each method** (task 044, operator decision). `return_type` is the answer of `Inquiry`. Each other method that the mock answers has its own key, `debug.mocks.<provider>.<method>_return_type`, default `success`: `pay_return_type` (`success`, `failed`: a failed answer of the provider, `pending`: `provider.ErrProviderDown`, the answer of a timeout), `settle_return_type` (`success`, `error`) and `status_return_type` (task 045; the values of `pay_return_type`). The mock answers a method only when the adapter gives a fixture for it (`provider.MockFixtures.Pay`, `.Settle`, `.Status`); every other method goes to the adapter. A new method adds its key, its values and its fixture the same way; do not add values to `return_type`.
 - **Settings are read at start.** A mock is not hot-reloadable.
 - **Tests.** A test of the mock for each return type, with the mock off, and with the mode that is not dev.
 
 **Why.** Operator decision, 2026-11-09 (task 021). The feature-ON checks (Rule 15) and the front-end work need a provider answer in development; a mock inside the adapter keeps every other step of the flow real.
 
 **Review.** The `code-reviewer` agent checks each new provider adapter for its mock, its config keys and its tests. A provider with no mock is a defect. The verdict is NOT READY.
+
+## 16. Redis keys have the prefix
+
+**Every Redis key of Qabz starts with `database.redis.prefix`** (default `qabz:`). Many services can share one Redis; the prefix keeps the Qabz keys apart (supertask 043, operator, 2026-11-15).
+
+- `system/redis.Client` puts the prefix in front of every key: a command builds its key with `Client.Key(name)`. The client gives no raw go-redis client to other packages, so a key without the prefix cannot be written.
+- A new Redis command is a method of `system/redis` that uses `Key`. Code outside `system/redis` passes only the name (for example the cron lock name `crons_<name>_lock1`).
+- A live test uses its own random prefix (`qabz_test_<hex>:`), so it never touches a key of the App or of another test.
+
+**Why.** Operator rule of supertask 043 (2026-11-15): the prefix is for every Redis key, not only for the worker locks.
+
+**Review.** The `code-reviewer` agent searches each change for go-redis commands outside `system/redis` and for a key in `system/redis` that is not built with `Key`. Either is a defect. The verdict is NOT READY.

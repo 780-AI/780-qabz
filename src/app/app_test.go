@@ -385,3 +385,33 @@ func TestInternalServerAndBackgroundOrder(t *testing.T) {
 	assert.ErrorContains(t, err, "jobs still running")
 	assert.Equal(t, []string{"db.ping", "cache.ping", "grpc.start", "internal.start", "grpc.stop", "background.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
 }
+
+// TestCronsOrder (task 045): the workers start after the servers and before the metrics endpoint,
+// and stop after the servers and before the background jobs, the cache and the database. A failed
+// metrics start stops the workers; a failed workers start stops the servers and starts no metrics.
+func TestCronsOrder(t *testing.T) {
+	r := newRig()
+	grpcSrv := &fakeServer{name: "grpc", c: r.c}
+	crons := &fakeServer{name: "crons", c: r.c}
+	bg := &fakeBackground{c: r.c}
+	a := build(t, r.builder().WithGRPCServer(grpcSrv).WithCrons(crons).WithBackground(bg))
+	assert.NoError(t, a.Start(context.Background()))
+	assert.Equal(t, []string{"db.ping", "cache.ping", "grpc.start", "crons.start", "metrics.start"}, r.c.order)
+	r.c.order = nil
+	assert.NoError(t, a.Stop(context.Background()))
+	assert.Equal(t, []string{"metrics.stop", "grpc.stop", "crons.stop", "background.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+
+	r = newRig()
+	grpcSrv = &fakeServer{name: "grpc", c: r.c}
+	crons = &fakeServer{name: "crons", c: r.c, startErr: errors.New("no redis")}
+	a = build(t, r.builder().WithGRPCServer(grpcSrv).WithCrons(crons))
+	assert.ErrorContains(t, a.Start(context.Background()), "crons: no redis")
+	assert.Equal(t, []string{"db.ping", "cache.ping", "grpc.start", "crons.start", "grpc.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+	assert.Contains(t, r.log.logs, "ERR crons start failed")
+
+	r = newRig()
+	crons = &fakeServer{name: "crons", c: r.c}
+	a = build(t, r.builder().WithCrons(crons).WithMetrics(&fakeMetrics{c: r.c, startErr: errors.New("port in use")}))
+	assert.Error(t, a.Start(context.Background()))
+	assert.Equal(t, []string{"db.ping", "cache.ping", "crons.start", "metrics.start", "crons.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+}

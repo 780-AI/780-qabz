@@ -74,7 +74,8 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	if reloader.HasHotFields() {
 		b.WithConfigReloader(reloader)
 	}
-	b.WithCache(redis.New(cfg.RedisAddr(), cfg.RedisPassword.Reveal()))
+	cache := redis.New(cfg.RedisAddr(), cfg.RedisPassword.Reveal(), cfg.RedisPrefix)
+	b.WithCache(cache)
 	b.WithMetrics(metrics)
 
 	providers, err := newProviders(holder, postgres.NewProviderRepository(db), metrics, logger)
@@ -157,7 +158,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	// request metrics and no auth check, as bill. Off while server.internal_grpc.addr is empty.
 	if cfg.InternalGRPCAddr != "" {
 		internal, err := grpcserver.NewWithOptions(cfg.InternalGRPCAddr, metricOpts, grpcserver.RegisterPaymentComplete(grpcserver.NewPaymentComplete(grpcserver.PaymentCompleteDeps{
-			Payments: payments, ServiceID: uint32(serviceID), ServiceName: cfg.ServiceName, Logger: logger,
+			Payments: payments, ServiceID: uint32(serviceID), EcosystemName: cfg.ServiceEcosystemName, Logger: logger,
 		})))
 		if err == nil && internal == nil {
 			err = errors.New("internal grpc server: New returned nil")
@@ -178,6 +179,28 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 			return nil, err
 		}
 		b.WithTracer(tr)
+	}
+
+	// The workers (task 045): the metrics exist with metrics on; the Parsian status worker and its
+	// Kafka producer only with providers.internal.parsian.get_status.enabled. Built last, so no later
+	// failed step leaves the producer open.
+	cronMetrics, err := newCronMetrics(metrics)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	if cfg.ParsianGetStatusEnabled {
+		jobs, err := newStatusCrons(cfg, db, cache, registry, cronMetrics, logger)
+		if err != nil {
+			db.Close()
+			if b.tracer != nil {
+				_ = b.tracer.Shutdown(ctx)
+			}
+			return nil, err
+		}
+		b.WithCrons(jobs)
+	} else {
+		logger.Info("parsian status worker off (providers.internal.parsian.get_status.enabled: false)")
 	}
 	return b, nil
 }
@@ -465,7 +488,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	}
 	// providers.internal.parsian.enabled: false wins over the mock, as for the other providers.
 	parsianMock := provider.MockSettings{Enable: dev && cfg.DebugMockParsianEnable && cfg.ParsianEnabled, ReturnType: cfg.DebugMockParsianReturnType,
-		PayReturnType: cfg.DebugMockParsianPayReturnType}
+		PayReturnType: cfg.DebugMockParsianPayReturnType, StatusReturnType: cfg.DebugMockParsianStatusReturnType}
 	if err := registerAdapter(registry, parsianAdapter, "Parsian", disabledNotice("internal.parsian", "Parsian", cfg.ParsianEnabled),
 		parsianMock, parsianproxy.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -510,7 +533,7 @@ func registerAdapter(registry *provider.Registry, adapter provider.ProviderInter
 		switch {
 		case mock.Enable:
 			logger.Warn("provider mock enabled (debug.mocks."+name+"): development only, no call to the "+title+" backend", "return_type", mock.ReturnType,
-				"pay_return_type", mock.PayReturnType, "settle_return_type", mock.SettleReturnType)
+				"pay_return_type", mock.PayReturnType, "settle_return_type", mock.SettleReturnType, "status_return_type", mock.StatusReturnType)
 		case notice != "":
 			logger.Warn(notice)
 		}
@@ -553,15 +576,8 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 			Name: "qabz_inquiries_total",
 			Help: "Bill inquiries by bill type (water, electricity, gas, irancell, mobile, mobilemidtermRightel, tel), provider (none when no provider was picked) and result (db_hit: answered from saved inquiries; provider_ok; provider_refused: the provider has no inquiry; provider_down: the call failed; no_provider; canceled: the client left during the provider call; error; raw: a gas or tel request with billId and payId, answered from the two IDs with no provider).",
 		}, []string{"bill_type", "provider", "result"})
-		calls := promclient.NewCounterVec(promclient.CounterOpts{
-			Name: "qabz_provider_calls_total",
-			Help: "Calls to a provider by provider, action (inquiry) and result (ok, refused: the provider has no inquiry, down: the call failed, canceled: the client left, error).",
-		}, []string{"provider", "action", "result"})
-		duration := promclient.NewHistogramVec(promclient.HistogramOpts{
-			Name:    "qabz_provider_call_duration_ms",
-			Help:    "Duration of each call to a provider in milliseconds, by provider and action (inquiry), for every result.",
-			Buckets: []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000},
-		}, []string{"provider", "action"})
+		calls := promclient.NewCounterVec(providerCallsOpts, providerCallLabels)
+		duration := promclient.NewHistogramVec(providerCallDurationOpts, providerCallDurationLabels)
 		for _, c := range []promclient.Collector{inquiries, calls, duration} {
 			if err := reg.Register(c); err != nil {
 				return nil, fmt.Errorf("inquiry: register metric: %w", err)
@@ -603,6 +619,22 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 		OnProviderCall: onCall,
 	})
 }
+
+// The provider call metrics (task 045: the status worker uses them too, with the action status).
+// newInquiryFlow registers them; newCronMetrics takes the registered ones.
+var (
+	providerCallsOpts = promclient.CounterOpts{
+		Name: "qabz_provider_calls_total",
+		Help: "Calls to a provider by provider, action (inquiry; status: the status worker, task 045) and result (ok, refused: the provider has no inquiry, down: the call failed, canceled: the client left or the App stopped, error).",
+	}
+	providerCallLabels       = []string{"provider", "action", "result"}
+	providerCallDurationOpts = promclient.HistogramOpts{
+		Name:    "qabz_provider_call_duration_ms",
+		Help:    "Duration of each call to a provider in milliseconds, by provider and action (inquiry, status), for every result.",
+		Buckets: []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000},
+	}
+	providerCallDurationLabels = []string{"provider", "action"}
+)
 
 // newWater builds the gRPC Water service: POST /v1/water/inquiry (task 021) on the inquiry flow. A
 // server fault writes one error log line (grpcserver.Water). A nil flow gives a service whose

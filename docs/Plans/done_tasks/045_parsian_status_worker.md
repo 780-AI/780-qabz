@@ -1,6 +1,7 @@
-<!-- VERSION: 0.6 -->
+<!-- VERSION: 1.0 -->
 <!--
 CHANGE LOG
+v1.0 — 2026-11-15 — Done (operator: "Yes, implement"): implemented as designed; the implementation record and the feature-ON evidence added; moved to done_tasks.
 v0.6 — 2026-11-15 — Design change (operator: "Yes, fix it here", then "Add it to task 045"): D17, the currentStep of the OrderComplete answer (task 044) becomes the ecosystem name; kafka.service_name is replaced by one key service.ecosystem_name (default "bill") for every name that Qabz sends to another service (D10, D10a, D11, D17).
 v0.5 — 2026-11-15 — Design change (operator: "Use partitioner like bill service", and the name "bill" from a config wherever a message needs a service name): Qabz picks the partition with bill's LeastBytes rule (D10b); new key kafka.service_name, default "bill", for the message key and the Kafka client ID (D10, D11); D10a updated.
 v0.4 — 2026-11-15 — Design change (operator: "Use the official confluent pkg and not segmentio's"): the Kafka producer uses confluent-kafka-go v2 (D10, D10a, C5, the description), not segmentio/kafka-go; probe of the vendored cgo build recorded.
@@ -10,7 +11,7 @@ v0.1 — 2026-11-15 — Created (operator request): part 2 of supertask 043.
 -->
 # 045_parsian_status_worker — the Parsian status worker and the shared worker runner
 
-Status: in-progress (design approved 2026-11-15; implementation next)
+Status: done (2026-11-15; the operator QA confirmation is open in `OPEN_TASKS.md`)
 
 ## Description
 
@@ -197,3 +198,26 @@ Read on 2026-11-15 from `bill` commit `ff98e25` (not run) and from the Qabz sour
 ### Files (planned)
 
 `src/entry/cron/` (new), `src/core/reconcile/` (new), `src/system/redis/` (prefix, lock), `src/system/kafka/` (new), `src/system/postgres/order_repository.go` (`PendingIDs`, `InsertFinal`), `src/provider/provider.go`, `src/provider/mock.go`, `src/provider/parsianproxy/`, `src/config/config.go`, `src/app/` (wiring, metrics), `src/entry/grpc/payment.go` (D17), `src/go.mod`, `src/go.sum` (confluent-kafka-go v2), `config.yml`, `config.yml.example`, `docker-compose.yml` (D12 a), `docs/initial-discovery/system.html`, `docs/this_vs_bill.md`, `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (§ 15: the `status_return_type` key), `CHANGELOG.md`, `docs/documents_manifest.md`, `docs/Plans/OPEN_TASKS.md`, this task file.
+
+## Implementation (2026-11-15)
+
+Implemented as designed (D1 to D17, decisions D4 (b), D12 (a), D14 (a), the Confluent client, bill's partition rule, `service.ecosystem_name`). What the design did not name, and how it was done:
+
+- **Redis in the live tests.** `make test` also gives the compose Redis to the tests in `QABZ_TEST_REDIS_URL` (a new verb of the test tool, `testdb redis-url <env file>`; no password on a command line). Each live Redis test uses its own random prefix (`qabz_test_<hex>:`) and short TTLs, so no key of the App is touched.
+- **Conventions § 16.** The supertask rule "every Redis key has the prefix" is binding in the conventions doc (memory rule: lasting rules go there). `redis.Client.Raw()` (not used) is removed, so a key without the prefix cannot be written from outside `system/redis`.
+- **The provider call metrics.** The worker uses the counters that the inquiry flow registers (`qabz_provider_calls_total`, `qabz_provider_call_duration_ms`, action `status`), taken from the registry (`registerOrExisting`); the Help texts name the action `status`.
+- **The stop.** The workers stop after the servers and before the background jobs; the Kafka producer is flushed and closed after the workers.
+- **The message JSON (code-reviewer finding).** Conventions § 1 forbids `encoding/json` v1 everywhere, in tests too. The message is marshaled with `encoding/json/v2` and the v1 options of `order.MarshalPayload` (deterministic, the HTML and U+2028/U+2029 escapes, a nil map as `null`); the bytes are bill's for every input that can reach it (a UUID text and `success` or `failed`). v1 writes an invalid UTF-8 byte as the escape `\ufffd` and v2 cannot, so such an input is an error (the report fails, nothing is saved) rather than other bytes; the test checks the escapes against v1's bytes written out and the error.
+- **Other code-reviewer fixes (2026-11-15):** a nil check of the row in `InsertFinal`; length and nil guards in five tests (conventions § 4); a nil-receiver check in `Lock.Key`; the workers are built last in `NewDefaultBuilder`, so no later failed step leaves the Kafka producer open. The publish wait (up to `message.timeout.ms`, 300 s, after the metadata) is follow-up (d) in `OPEN_TASKS.md`.
+
+Verification:
+
+- **Tests:** `make test GO_TEST_ARGS="-race -count=1 -cover"`: every package passes; the changed packages have 87.3 % (`app`), 97.2 % (`config`), 97.5 % (`core/reconcile`), 97.9 % (`entry/cron`), 98.4 % (`entry/grpc`), 96.0 % (`provider`), 96.6 % (`provider/parsianproxy`), 87.3 % (`system/kafka`), 90.9 % (`system/postgres`), 90.6 % (`system/redis`), 92.4 % (`testdb`). The live tests ran (not skipped). Positive controls: a wrong tie rule fails `TestLeastBytesFixed` and `TestLeastBytesDifferential`; a wrong JSON name fails `TestStatusMessageBytes`.
+- **Feature ON (Rule 15),** the compose Postgres, Redis and Kafka, the Parsian mock, `cron_time: 10s`, an App copy on other ports (the operator's debug App was on 8080 / 8082 / 9090 and was not touched):
+  - Mock `pending`: orders 1 to 3 asked at the start and again 10 s later (the own lock was deleted after the first run); no row, no topic, no message; the 11 h order never asked (step 3, step 4).
+  - Mock `success`, two instances at the same time: instance 2 counted `no_lock` at the first tick (step 6); instance 1 reported orders 2 and 3; its first publish (order 1) failed because the topic did not exist yet (`Unknown topic or partition`), so nothing was saved; instance 2 reported order 1 at its next run. One message per order, key `bill`, the value of bill; the partitions follow bill's rule for each instance (step 1).
+  - Mock `failed`: orders 5 and 6 got a `failed` row and one `failed` message each (step 2).
+  - Kafka stopped, mock `success`: one error line `parsian status: report failed` (`Local: Broker transport failure`), the row of order 7 unchanged; Kafka started again: the next run reported and saved it (step 5).
+  - The App exited within 3 s after each Ctrl-C; a stop during a long run was not exercised live (the runs took milliseconds; `TestStopCancelsTheRun` covers it) (step 7).
+  - D17: `OrderComplete` with a wrong price answered `status=pending currentStep=bill`, and `currentStep=x` with `service.ecosystem_name: "x"`.
+  - The 14 QA rows were deleted from the dev database after the run; the Kafka service was stopped.

@@ -49,6 +49,7 @@ var (
 type Client interface {
 	Inquiry(ctx context.Context, in *pb.BillInquiryRequest, opts ...grpc.CallOption) (*pb.BillInquiryResponse, error)
 	Pay(ctx context.Context, in *pb.PayRequest, opts ...grpc.CallOption) (*pb.PayResponse, error)
+	OrderInquiry(ctx context.Context, in *pb.OrderInquiryRequest, opts ...grpc.CallOption) (*pb.OrderInquiryResponse, error)
 }
 
 // Options configure New.
@@ -113,6 +114,10 @@ func (noClient) Inquiry(context.Context, *pb.BillInquiryRequest, ...grpc.CallOpt
 }
 
 func (noClient) Pay(context.Context, *pb.PayRequest, ...grpc.CallOption) (*pb.PayResponse, error) {
+	return nil, errNoAddress
+}
+
+func (noClient) OrderInquiry(context.Context, *pb.OrderInquiryRequest, ...grpc.CallOption) (*pb.OrderInquiryResponse, error) {
 	return nil, errNoAddress
 }
 
@@ -270,9 +275,35 @@ func (a *Adapter) Pay(ctx context.Context, req provider.PaymentRequest) (*provid
 	}, nil
 }
 
-// Status is not supported yet.
-func (*Adapter) Status(context.Context, provider.StatusRequest) (*provider.StatusResponse, error) {
-	return nil, provider.ErrNotSupported
+// Status asks parsian-v2 the status of a paid order (task 045; bill: payment_inquiry_gateway
+// ParsianPaymentInquiry, TopBill/OrderInquiry with order_id and bill_type). The status of the answer
+// is given as it came; only success and failed are final. A gRPC error (a timeout too), an empty
+// answer and providers.internal.parsian.enabled false are ErrProviderDown (bill: pending, the error
+// text as the message). Each call has providers.internal.parsian.timeout (bill sets none).
+func (a *Adapter) Status(ctx context.Context, req provider.StatusRequest) (*provider.StatusResponse, error) {
+	if a == nil || a.client == nil {
+		return nil, errors.New("parsianproxy: adapter not created with New")
+	}
+	if !a.enabled {
+		return nil, fmt.Errorf("parsianproxy: order inquiry: %w: %w", provider.ErrProviderDown, errDisabled)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
+	defer cancel()
+	resp, err := a.client.OrderInquiry(ctx, &pb.OrderInquiryRequest{OrderId: req.OrderID, BillType: req.BillType})
+	if err != nil {
+		return nil, fmt.Errorf("parsianproxy: order inquiry: %w: %w", provider.ErrProviderDown, err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("parsianproxy: order inquiry: %w: empty answer", provider.ErrProviderDown)
+	}
+	return &provider.StatusResponse{
+		Status:          resp.GetStatus(),
+		Message:         resp.GetMessage(),
+		ProviderTraceID: strconv.FormatUint(resp.GetProviderTraceId(), 10),
+	}, nil
 }
 
 // GetDocument is not supported yet.
@@ -305,7 +336,7 @@ const MockPayTrace = "9900000044"
 // MockFixtures returns the fixed answers of the Parsian mock (debug.mocks.parsian): Inquiry answers
 // with the two inquiries above; Pay (task 044) answers a success with the trace ID MockPayTrace.
 func MockFixtures() provider.MockFixtures {
-	return provider.MockFixtures{Pay: mockPay, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
+	return provider.MockFixtures{Pay: mockPay, Status: mockStatus, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
 		return &provider.InquiryResponse{
 			Status:          provider.ResponseSuccess,
 			Code:            200,
@@ -318,6 +349,11 @@ func MockFixtures() provider.MockFixtures {
 			},
 		}
 	}}
+}
+
+// mockStatus is the success answer of the Parsian mock to a status call (task 045).
+func mockStatus(provider.StatusRequest) *provider.StatusResponse {
+	return &provider.StatusResponse{Status: provider.StatusSuccess, Message: successMessage, ProviderTraceID: MockPayTrace}
 }
 
 // mockPay is the success answer of the Parsian mock to a payment.

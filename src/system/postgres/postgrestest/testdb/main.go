@@ -4,6 +4,9 @@
 //	testdb admin-dsn <env file>  print the admin DSN (database "postgres" of the server), built from
 //	                             POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER and POSTGRES_PASSWORD of
 //	                             the env file (config_generated.env; parsed, never run as shell)
+//	testdb redis-url <env file>  print the Redis URL of the compose Redis (redis://:<password>@host:port),
+//	                             built from REDIS_HOST, REDIS_PORT and REDIS_PASSWORD of the env file
+//	                             (task 045: the live Redis tests get it in QABZ_TEST_REDIS_URL)
 //	testdb name                  print a new random name qabz_test_<16 hex>
 //	testdb create <name>         create that database and print its DSN (the run DSN)
 //	testdb drop <name>           drop that database (DROP DATABASE ... WITH (FORCE)); no database of
@@ -15,7 +18,7 @@
 // create, drop and clean connect with the admin DSN in QABZ_TEST_ADMIN_DSN (the environment, never
 // an argument: no DSN or password is ever on a command line). create and drop refuse a name that is
 // not qabz_test_ + letters, digits and _ before they connect; clean drops only qabz_test_ names
-// (databases and roles). No output but the stdout of admin-dsn and create has the password.
+// (databases and roles). No output but the stdout of admin-dsn, redis-url and create has the password.
 //
 // Operator rule (task 020b decision 8): nothing in a database other than a qabz_test_ database is
 // touched. The admin connection (database "postgres") only reads catalogs and runs server-level
@@ -51,10 +54,10 @@ const AdminDSNEnv = "QABZ_TEST_ADMIN_DSN"
 // opTimeout bounds each database step (connect, create, drop, list).
 const opTimeout = 30 * time.Second
 
-const usage = "usage: testdb admin-dsn <env file> | name | create <name> | drop <name> | clean"
+const usage = "usage: testdb admin-dsn <env file> | redis-url <env file> | name | create <name> | drop <name> | clean"
 
 // argCounts is the number of arguments of each verb, the verb included.
-var argCounts = map[string]int{"admin-dsn": 2, "name": 1, "create": 2, "drop": 2, "clean": 1}
+var argCounts = map[string]int{"admin-dsn": 2, "redis-url": 2, "name": 1, "create": 2, "drop": 2, "clean": 1}
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
@@ -75,6 +78,14 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 			return 1
 		}
 		fmt.Fprintln(stdout, dsn)
+		return 0
+	case "redis-url":
+		u, err := redisURLFromFile(args[1])
+		if err != nil {
+			fmt.Fprintf(stderr, "testdb: redis-url failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintln(stdout, u)
 		return 0
 	case "name":
 		name, err := newRunDBName()
@@ -238,6 +249,29 @@ func adminDSN(getenv func(string) string) (string, error) {
 		User:   url.UserPassword(user, getenv("POSTGRES_PASSWORD")),
 		Host:   net.JoinHostPort(host, port),
 		Path:   "/postgres",
+	}
+	return u.String(), nil
+}
+
+// redisURLFromFile builds the Redis URL from the REDIS_* lines of the env file (task 045).
+func redisURLFromFile(path string) (string, error) {
+	vals, err := parseEnvFile(path)
+	if err != nil {
+		return "", err
+	}
+	return redisURL(func(k string) string { return vals[k] })
+}
+
+// redisURL builds redis://:<password>@host:port from REDIS_HOST, REDIS_PORT and REDIS_PASSWORD (the
+// password is escaped; an empty password gives no user part).
+func redisURL(getenv func(string) string) (string, error) {
+	host, port := getenv("REDIS_HOST"), getenv("REDIS_PORT")
+	if host == "" || port == "" {
+		return "", errors.New("REDIS_HOST, REDIS_PORT not set (run make env)")
+	}
+	u := url.URL{Scheme: "redis", Host: net.JoinHostPort(host, port)}
+	if pw := getenv("REDIS_PASSWORD"); pw != "" {
+		u.User = url.UserPassword("", pw)
 	}
 	return u.String(), nil
 }

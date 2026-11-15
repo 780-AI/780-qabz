@@ -77,10 +77,45 @@ WHERE inquiry_id = $1 AND pay_id = $2 AND is_cached = false`
 const setLastOrderDateSQL = `UPDATE bills SET last_order_date = NULLIF($3, ''), payment_deadline = NULL
 WHERE bill_id = $1 AND type = $2`
 
+// pendingIDsSQL reads one page of the order IDs whose newest row in the window has the status
+// pending or in-progress, for one provider (task 045; bill: order.Repository.GetAllPending, the same
+// query). The window filters the rows before the newest row is taken, as bill: a final row newer
+// than the window keeps the order in the list (task 045 C6). The window is in seconds before NOW()
+// (the clock of the database, as latestOrderSQL).
+const pendingIDsSQL = `WITH ranked AS (
+  SELECT order_id, status, created_at,
+    ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY created_at DESC) AS rn
+  FROM orders
+  WHERE provider_name = $1
+    AND created_at >= NOW() - make_interval(secs => $2::double precision)
+    AND created_at <= NOW() - make_interval(secs => $3::double precision)
+)
+SELECT order_id::text FROM ranked
+WHERE rn = 1 AND status IN ('pending', 'in-progress')
+ORDER BY created_at ASC
+LIMIT $4 OFFSET $5`
+
+// lockLatestSQL reads the status of the newest row of an order of the last 24 h and locks it, in
+// the transaction of InsertFinal (bill: NewOrderWithFinalStatus, SELECT ... FOR UPDATE).
+const lockLatestSQL = `SELECT COALESCE(status, '') FROM orders
+WHERE order_id = $1::uuid AND created_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW()
+ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
+
+// ErrAlreadyFinal is the error of InsertFinal when the newest row of the order is success or
+// failed (bill: "order is already in final status"). Test it with errors.Is.
+var ErrAlreadyFinal = errors.New("order repository: order is already in final status")
+
+// beginner starts a transaction (*pgxpool.Pool).
+type beginner interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 // OrderRepository implements order.Repository and order.PaymentRepository on the orders,
-// bill_inquiries, providers and bills tables. Raw queries, no ORM.
+// bill_inquiries, providers and bills tables, and the repository of the status worker (task 045).
+// Raw queries, no ORM.
 type OrderRepository struct {
-	db querier
+	db   querier
+	pool beginner // InsertFinal (task 045)
 }
 
 var (
@@ -92,7 +127,7 @@ var (
 func NewOrderRepository(c *Client) *OrderRepository {
 	r := &OrderRepository{}
 	if c != nil && c.pool != nil {
-		r.db = c.pool
+		r.db, r.pool = c.pool, c.pool
 	}
 	return r
 }
@@ -104,13 +139,72 @@ func (r *OrderRepository) Insert(ctx context.Context, o order.Order) error {
 	if r == nil || r.db == nil {
 		return errNoOrderPool
 	}
+	return insertOrder(ctx, r.db, o)
+}
+
+// insertOrder runs insertOrderSQL for o on q (the pool or a transaction).
+func insertOrder(ctx context.Context, q querier, o order.Order) error {
 	if o.ProviderFee > math.MaxInt64 {
 		return errors.New("order repository: the provider fee does not fit bigint")
 	}
-	_, err := r.db.Exec(ctx, insertOrderSQL, o.ID, o.OrderID, o.UserID, o.BillType, o.BillID, o.PayID, o.Option,
+	_, err := q.Exec(ctx, insertOrderSQL, o.ID, o.OrderID, o.UserID, o.BillType, o.BillID, o.PayID, o.Option,
 		int64(o.Price), o.Data, o.ProviderID, o.ProviderName, o.Status, o.Fee, o.FeeType, string(o.FeeConfig), o.FeeID,
 		o.BasePrice, o.IsRaw, int64(o.ProviderFee), o.BillInquiryID, o.RRN, o.RefID, o.Message, o.StatusCode, o.ProviderConfirmed)
 	return err
+}
+
+// PendingIDs gives one page (limit, offset) of the order IDs of the provider whose newest row
+// created from now-end to now-start has the status pending or in-progress, the oldest first (task
+// 045; bill: GetAllPending).
+func (r *OrderRepository) PendingIDs(ctx context.Context, providerName string, limit, offset int, start, end time.Duration) ([]string, error) {
+	if r == nil || r.db == nil {
+		return nil, errNoOrderPool
+	}
+	rows, err := r.db.Query(ctx, pendingIDsSQL, providerName, end.Seconds(), start.Seconds(), limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return nil, errors.New("order repository: no rows from Query")
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+// InsertFinal adds o, a row with a final status, in one transaction (task 045; bill:
+// NewOrderWithFinalStatus): it locks the newest row of the order of the last 24 h; no row is an
+// error (pgx.ErrNoRows), a final status there is ErrAlreadyFinal, and nothing is saved.
+func (r *OrderRepository) InsertFinal(ctx context.Context, o order.Order) (err error) {
+	if r == nil || r.pool == nil {
+		return errNoOrderPool
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		return errors.New("order repository: no transaction from Begin")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(context.WithoutCancel(ctx))
+		}
+	}()
+	row := tx.QueryRow(ctx, lockLatestSQL, o.OrderID)
+	if row == nil {
+		err = errors.New("order repository: no row from QueryRow")
+		return err
+	}
+	var status string
+	if err = row.Scan(&status); err != nil {
+		return err
+	}
+	if status == order.StatusSuccess || status == order.StatusFailed {
+		return fmt.Errorf("%w: %s", ErrAlreadyFinal, o.OrderID)
+	}
+	if err = insertOrder(ctx, tx, o); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // InquiryFee reads the provider fee fields of the bill_inquiries row with the id. No row is an error

@@ -26,6 +26,23 @@ type fakeClient struct {
 	pays    []*pb.PayRequest
 	payResp *pb.PayResponse
 	payErr  error
+	// The order status (task 045).
+	statuses   []*pb.OrderInquiryRequest
+	statusResp *pb.OrderInquiryResponse
+	statusErr  error
+}
+
+// OrderInquiry records the status request (task 045) and gives statusResp / statusErr.
+func (f *fakeClient) OrderInquiry(ctx context.Context, in *pb.OrderInquiryRequest, _ ...grpc.CallOption) (*pb.OrderInquiryResponse, error) {
+	f.mu.Lock()
+	f.statuses = append(f.statuses, in)
+	_, f.dl = ctx.Deadline()
+	f.mu.Unlock()
+	if f.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return f.statusResp, f.statusErr
 }
 
 func (f *fakeClient) Inquiry(ctx context.Context, in *pb.BillInquiryRequest, _ ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
@@ -90,8 +107,6 @@ func TestNameAndNotSupported(t *testing.T) {
 	var nilAdapter *Adapter
 	assert.False(t, nilAdapter.Enabled())
 	_, err := a.Pay(context.Background(), provider.PaymentRequest{})
-	assert.ErrorIs(t, err, provider.ErrNotSupported)
-	_, err = a.Status(context.Background(), provider.StatusRequest{})
 	assert.ErrorIs(t, err, provider.ErrNotSupported)
 	_, err = a.GetDocument(context.Background(), provider.DocumentRequest{})
 	assert.ErrorIs(t, err, provider.ErrNotSupported)

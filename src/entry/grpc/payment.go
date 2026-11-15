@@ -39,8 +39,9 @@ type PaymentCompleteDeps struct {
 	Payments OrderCompleter
 	// ServiceID is service.id: a request for another service is invalid.
 	ServiceID uint32
-	// ServiceName is service.name: currentStep of the answer.
-	ServiceName string
+	// EcosystemName is service.ecosystem_name: currentStep of the answer (task 045 D17; bill: its
+	// service.name, bill).
+	EcosystemName string
 	// Logger gets the lines of bill. Nil: no line.
 	Logger PaymentLogger
 }
@@ -51,15 +52,15 @@ type PaymentCompleteDeps struct {
 type PaymentComplete struct {
 	pb.UnimplementedPaymentCompleteServer // embedded by value, as protoc-gen-go-grpc requires
 
-	payments    OrderCompleter
-	serviceID   uint32
-	serviceName string
-	logger      PaymentLogger
+	payments      OrderCompleter
+	serviceID     uint32
+	ecosystemName string
+	logger        PaymentLogger
 }
 
 // NewPaymentComplete returns the PaymentComplete implementation.
 func NewPaymentComplete(deps PaymentCompleteDeps) *PaymentComplete {
-	return &PaymentComplete{payments: deps.Payments, serviceID: deps.ServiceID, serviceName: deps.ServiceName, logger: deps.Logger}
+	return &PaymentComplete{payments: deps.Payments, serviceID: deps.ServiceID, ecosystemName: deps.EcosystemName, logger: deps.Logger}
 }
 
 // RegisterPaymentComplete returns a Register that adds svc to a gRPC server. For a nil svc it
@@ -75,7 +76,8 @@ func RegisterPaymentComplete(svc pb.PaymentCompleteServer) Register {
 }
 
 // OrderComplete is the call of the payment service after a payment (bill: Payment.OrderComplete):
-//   - version + 1 and currentStep = service.name are set on the request, which is the answer.
+//   - version + 1 and currentStep = service.ecosystem_name (task 045 D17; bill: its service.name,
+//     bill) are set on the request, which is the answer.
 //   - The request check: payload.serviceId is service.id, stepStatus.payment is "success" and
 //     payload.rrn is not empty. Else one error line "order complete: invalid payment request" and
 //     the error of bill. A request with no payload or no stepStatus is invalid (bill fails on it).
@@ -97,7 +99,7 @@ func (p *PaymentComplete) OrderComplete(ctx context.Context, req *pb.PaymentOrde
 		req = &pb.PaymentOrder{}
 	}
 	req.Version++
-	req.CurrentStep = p.serviceName
+	req.CurrentStep = p.ecosystemName
 	payload, step := req.GetPayload(), req.GetStepStatus()
 	if payload == nil || step == nil || payload.GetServiceId() != p.serviceID || step.GetPayment() != provider.StatusSuccess || payload.GetRrn() == "" {
 		p.log(true, "order complete: invalid payment request", "order_id", payload.GetOrderId(), "request", fmt.Sprintf("%+v", req))

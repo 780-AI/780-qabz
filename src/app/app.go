@@ -73,6 +73,13 @@ type Background interface {
 	Stop(ctx context.Context) error
 }
 
+// Crons are the workers (task 045: the runner of entry/cron and its Kafka producer). Start starts
+// them; Stop cancels the runs and waits for them until ctx is done.
+type Crons interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
 // Tracer exports traces.
 type Tracer interface {
 	Shutdown(ctx context.Context) error
@@ -94,6 +101,7 @@ type App struct {
 	http      Server         // nil: no HTTP gateway
 	internal  Server         // nil: no internal gRPC server (task 044)
 	bg        Background     // nil: no background jobs (task 044)
+	crons     Crons          // nil: no workers (task 045)
 
 	mu      sync.Mutex
 	started bool
@@ -178,6 +186,13 @@ func (a *App) Start(ctx context.Context) error {
 		run.http = true
 		a.logger.Info("http started", "addr", cfg.HTTPAddr)
 	}
+	if a.crons != nil {
+		if err := a.crons.Start(ctx); err != nil {
+			a.logger.Error("crons start failed", "error", err)
+			return a.abort(fmt.Errorf("crons: %w", err), run)
+		}
+		run.crons = true
+	}
 	if err := a.metrics.Start(ctx); err != nil {
 		a.logger.Error("metrics start failed", "addr", cfg.MetricsAddr, "error", err)
 		return a.abort(fmt.Errorf("metrics: %w", err), run)
@@ -201,7 +216,7 @@ func (a *App) Stop(ctx context.Context) error {
 	}
 	a.started = false
 	a.logger.Info("app stopping")
-	return a.release(ctx, running{reloader: true, providers: true, grpc: true, internal: true, http: true, metrics: true})
+	return a.release(ctx, running{reloader: true, providers: true, grpc: true, internal: true, http: true, crons: true, metrics: true})
 }
 
 // Run starts the App, waits until ctx is done, then stops it.
@@ -227,7 +242,7 @@ func (a *App) ping(ctx context.Context, name, target string, c Connection) error
 }
 
 // running records which parts Start has started, so a failed Start stops only those parts.
-type running struct{ reloader, providers, grpc, internal, http, metrics bool }
+type running struct{ reloader, providers, grpc, internal, http, crons, metrics bool }
 
 // abort releases the dependencies after a failed Start. run holds the parts that started.
 func (a *App) abort(cause error, run running) error {
@@ -252,6 +267,10 @@ func (a *App) release(ctx context.Context, run running) error {
 	}
 	if a.grpc != nil && run.grpc {
 		errs = append(errs, a.grpc.Stop(ctx))
+	}
+	// The workers stop after the servers and before the database and the cache close (task 045).
+	if a.crons != nil && run.crons {
+		errs = append(errs, a.crons.Stop(ctx))
 	}
 	// The background jobs stop after the servers (no new payment) and before the database closes.
 	if a.bg != nil {

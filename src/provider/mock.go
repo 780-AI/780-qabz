@@ -13,12 +13,15 @@ import (
 const (
 	MockReturnSuccess = "success"
 	MockReturnError   = "error"
-	MockReturnFailed  = "failed"  // pay_return_type only: the provider answers the payment as failed
-	MockReturnPending = "pending" // pay_return_type only: no answer (a timeout), the status is not known
+	MockReturnFailed  = "failed"  // pay_return_type and status_return_type: the provider answers failed
+	MockReturnPending = "pending" // pay_return_type and status_return_type: no answer (a timeout), the status is not known
 )
 
 // MockPayFailedMessage is the message of a payment that the mock answers as failed.
 const MockPayFailedMessage = "mock: the payment failed"
+
+// MockStatusFailedMessage is the message of a status that the mock answers as failed (task 045).
+const MockStatusFailedMessage = "mock: the order failed"
 
 // MockSettings are the settings of one provider mock (config debug.mocks.<provider>).
 type MockSettings struct {
@@ -31,6 +34,10 @@ type MockSettings struct {
 	// SettleReturnType is the settlement answer (settle_return_type, task 044): MockReturnSuccess or
 	// MockReturnError. Empty is MockReturnSuccess. Used only when the fixtures have Settle.
 	SettleReturnType string
+	// StatusReturnType is the answer of a status call (status_return_type, task 045):
+	// MockReturnSuccess, MockReturnFailed or MockReturnPending. Empty is MockReturnSuccess. Used
+	// only when the fixtures have Status.
+	StatusReturnType string
 }
 
 // MockFixtures are the fixed answers that a provider supplies for its mock. Each function must
@@ -44,6 +51,9 @@ type MockFixtures struct {
 	// Settle returns the success answer of Settle (task 044). Nil: the mock does not answer Settle;
 	// the adapter does.
 	Settle func(req SettleRequest) *SettleResponse
+	// Status returns the success answer of Status (task 045). Nil: the mock does not answer Status;
+	// the adapter does.
+	Status func(req StatusRequest) *StatusResponse
 }
 
 // MockLogger is the logger of a mock.
@@ -57,7 +67,8 @@ type MockLogger interface {
 //   - Settings on: Inquiry does not call p. With MockReturnSuccess it returns fixtures.Inquiry; with
 //     MockReturnError it returns an error that wraps ErrProviderDown. When the fixtures have Pay
 //     (Settle), Pay (Settle) does not call p either and answers by PayReturnType
-//     (SettleReturnType). Every other method goes to p.
+//     (SettleReturnType); the same for Status (StatusReturnType, task 045). Every other method goes
+//     to p.
 //
 // The app calls it in development mode only (Config.Mode is dev). A nil p, a nil inquiry fixture or
 // an unknown return type (with the mock on) is an error. log may be nil (no log line).
@@ -79,6 +90,12 @@ func NewMock(p ProviderInterface, s MockSettings, f MockFixtures, log MockLogger
 	}
 	if s.SettleReturnType == "" {
 		s.SettleReturnType = MockReturnSuccess
+	}
+	if s.StatusReturnType == "" {
+		s.StatusReturnType = MockReturnSuccess
+	}
+	if f.Status != nil && s.StatusReturnType != MockReturnSuccess && s.StatusReturnType != MockReturnFailed && s.StatusReturnType != MockReturnPending {
+		return nil, fmt.Errorf("provider mock %s: status return type must be %q, %q or %q", p.Name(), MockReturnSuccess, MockReturnFailed, MockReturnPending)
 	}
 	if f.Pay != nil && s.PayReturnType != MockReturnSuccess && s.PayReturnType != MockReturnFailed && s.PayReturnType != MockReturnPending {
 		return nil, fmt.Errorf("provider mock %s: pay return type must be %q, %q or %q", p.Name(), MockReturnSuccess, MockReturnFailed, MockReturnPending)
@@ -157,4 +174,25 @@ func (m *mock) Settle(ctx context.Context, req SettleRequest) (*SettleResponse, 
 		return nil, fmt.Errorf("mock %s: settlement: %w", m.Name(), ErrProviderDown)
 	}
 	return m.fixtures.Settle(req), nil
+}
+
+// Status answers with the fixture (success), a failed answer, or ErrProviderDown (pending), with no
+// call to the provider (task 045). With no Status fixture the adapter answers.
+func (m *mock) Status(ctx context.Context, req StatusRequest) (*StatusResponse, error) {
+	if m.fixtures.Status == nil {
+		return m.ProviderInterface.Status(ctx, req)
+	}
+	if err := canceled(ctx); err != nil {
+		return nil, err
+	}
+	if m.log != nil {
+		m.log.Info("provider mock: status answered with no call to the provider", "provider", m.Name(), "status_return_type", m.settings.StatusReturnType, "order_id", req.OrderID)
+	}
+	switch m.settings.StatusReturnType {
+	case MockReturnFailed:
+		return &StatusResponse{Status: StatusFailed, Message: MockStatusFailedMessage}, nil
+	case MockReturnPending:
+		return nil, fmt.Errorf("mock %s: status: %w", m.Name(), ErrProviderDown)
+	}
+	return m.fixtures.Status(req), nil
 }
