@@ -9,7 +9,7 @@ hot_reload_interval: "30s"
 
 service:
   name: "qabz"               # the name of the service: the log lines, tracing and the kid header of the order token
-  id: 0                      # ID in the payment flow (bill uses 105); sent as serviceId by GET /v1/services, GET /v1/mybill, the order answer and the order token
+  id: 0                      # ID in the payment flow (the deployed bill uses 108); sent as serviceId by GET /v1/services, GET /v1/mybill, the order answer and the order token
 
 logs:
   level: "info"

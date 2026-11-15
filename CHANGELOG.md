@@ -1,7 +1,8 @@
-<!-- VERSION: 3.31 -->
+<!-- VERSION: 3.32 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.32 — 2026-11-15 — Added config-example-service-id-comment entry.
 v3.31 — 2026-11-15 — Added 042-order-token-kid entry.
 v3.30 — 2026-11-14 — Added postman-base-url-and-client-headers entry.
 v3.29 — 2026-11-14 — Added config-service-name entry.
@@ -147,6 +148,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Config: the service.id comment names 108, the ID of the deployed bill
+- **Type:** Minor (a comment only).
+- **Files:** `config.yml.example` (the `service.id` comment: "the deployed bill uses 108", was "bill uses 105"); `CHANGELOG.md`; `docs/documents_manifest.md`. The local `config.yml` (git-ignored) has `service.id: 108` (operator test, 2026-11-15).
+- **Impact:** No runtime impact: the default stays `0`. The value 105 is in `config.example.yaml` of `bill`, but a real `bill` order token on stage has `serviceId: 108`. The payment service looks for its gateway row by `service_id` (an invoice with `serviceId: 105` answered `105404 یافت نشد`), so a config that copies the old comment gets no gateway.
+- **QA scenarios:** none (Rule 11: a comment only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Task 042: providers.internal.payment_server.kid (the kid of the order token)
 - **Type:** Major (a new config key that changes runtime behavior).
