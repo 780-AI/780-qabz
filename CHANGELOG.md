@@ -1,7 +1,8 @@
-<!-- VERSION: 3.30 -->
-<!-- Last Updated: 2026-11-14 -->
+<!-- VERSION: 3.31 -->
+<!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.31 — 2026-11-15 — Added 042-order-token-kid entry.
 v3.30 — 2026-11-14 — Added postman-base-url-and-client-headers entry.
 v3.29 — 2026-11-14 — Added config-service-name entry.
 v3.28 — 2026-11-14 — Added 039-mobile-irancell-order entry.
@@ -146,6 +147,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 042: providers.internal.payment_server.kid (the kid of the order token)
+- **Type:** Major (a new config key that changes runtime behavior).
+- **Files:** `src/config/config.go` (`PaymentServerKID`, `Config.OrderTokenKID`); `src/config/config_test.go` (`TestParsePaymentServerKeys`, new `TestOrderTokenKID`); `src/app/defaults.go` (the signer gets `OrderTokenKID()`); `src/app/water_live_test.go`; `src/app/order_live_test.go` (new `TestLiveIrancellOrderTokenKID`); `config.yml.example`; `docs/initial-discovery/system.html` (v2.14); `src/app/README.md` (v0.34); `docs/this_vs_bill.md` (v0.21, item 38); `docs/Plans/OPEN_TASKS.md` (v1.71); `docs/Plans/done_tasks/042_order_token_kid.md`; `docs/Plans/pending_tasks/task_counter.json`; `CHANGELOG.md`; `docs/documents_manifest.md`. The local `config.yml` (git-ignored) has `kid: "bill"` (operator decision).
+- **Impact:** Yes. The header `kid` of the order token is the new key when it is set, else `service.name` as before. With the key empty (the default) nothing changes. Logs, metrics, tracing and the `serviceId` of the token do not change. Read at start (not hot-reloadable). Cause: the payment service rejected an Invoice call with the `kid` `qabz` (`invalid request` in `extractOrder()`); `kid: bill` is a stopgap until the payment service has a key for `qabz`, and the order-complete callback can still fail if the payment service routes it by `kid` or `serviceId`.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, task 042 (⏸).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Postman: one BASE_URL and the web client headers (operator request)
 - **Type:** Minor (the Postman collection and the rule text of conventions § 7; no runtime code).

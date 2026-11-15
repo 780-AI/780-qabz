@@ -171,3 +171,18 @@ func TestLiveIrancellOrderFailures(t *testing.T) {
 		assert.Equal(t, 0, st.count(t, `SELECT count(*) FROM orders`), "no orders row")
 	}
 }
+
+// TestLiveIrancellOrderTokenKID (task 042): providers.internal.payment_server.kid sets the kid of
+// the token header; the signature passes the check and the serviceId of the payload does not change.
+func TestLiveIrancellOrderTokenKID(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	s := newLiveWaterCfg(t, ctx, config.MockReturnSuccess, "", func(c *config.Config) { c.PaymentServerKID = "bill" })
+	res, err := s.order(liveUserOne, irancellOrderReq("09350000391", 450000))
+	if !assert.NoError(t, err) || !assert.NotNil(t, res) {
+		return
+	}
+	header, payload := s.tokenParts(t, res.GetOrderId())
+	assert.Equal(t, map[string]any{"alg": "RS256", "kid": "bill", "typ": "JWT"}, header)
+	assert.Equal(t, 105.0, payload["serviceId"])
+}

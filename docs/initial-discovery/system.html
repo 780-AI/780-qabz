@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.13 -->
-<!-- Last Updated: 2026-11-14 -->
+<!-- VERSION: 2.14 -->
+<!-- Last Updated: 2026-11-15 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.14 — 2026-11-15 — Task 042: new key `providers.internal.payment_server.kid`, the `kid` of the order token header (empty: `service.name`); read at start.
 v2.13 — 2026-11-14 — Task 039 Irancell mobile order: `POST /v2/mobile/order` for the Irancell operator on the shared order flow (`core/order`), the fee resolver (`core/fee`, the `fees` table, read on each order) and the order token signer (`common/crypto`, RS256 with the general private key); `providers.internal.payment_server.private_key_path` is read at start (a missing or bad key stops the App); new metrics `qabz_order_create_total` and `qabz_fee_resolve_total`.
 v2.12 — 2026-11-14 — Task 041: the `providers` section has two groups, `providers.internal` (our own services: irancell, jiring_switch, parsian, the new payment_server) and `providers.external` (karashop, qabzino, tavanir); every key path in this document uses the new layout; the config example has the `payment_server` block (address, private_key_path; not read yet).
 v2.11 — 2026-11-14 — Task 040: the unused config keys `providers.tavanir.circuit_breaker.*` removed from the config example (the circuit breaker comes at the end of the project with its own keys; a `@todo` in `src/config/config.go`).
@@ -238,6 +239,7 @@ providers:
     payment_server:          # the payment service (our own service; bill: paymentServer)
       address: ""            # address of the payment service; not read yet; the real value only in config.yml
       private_key_path: ""   # path of the general private key file (PKCS #1 PEM) that signs the order token; read at start, a missing or bad key stops the App (task 039); the real value only in config.yml
+      kid: ""                # kid of the order token header; the payment service finds the public key by it; empty: service.name (task 042); read at start
   external:                  # third-party services
     karashop:                      # the Karashop (digitalport) HTTPS API (task 025): the landline bill
       enabled: false               # false: every Karashop call fails as "provider down", the mock does not apply

@@ -110,7 +110,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		return nil, err
 	}
 	// A missing or bad key stops the start (task 039): every order needs the signature.
-	signer, err := crypto.LoadSigner(cfg.PaymentServerPrivateKeyPath, cfg.ServiceName)
+	signer, err := crypto.LoadSigner(cfg.PaymentServerPrivateKeyPath, cfg.OrderTokenKID())
 	if err != nil {
 		db.Close()
 		return nil, fmt.Errorf("order token: %w (set providers.internal.payment_server.private_key_path)", err)

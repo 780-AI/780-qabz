@@ -1,7 +1,8 @@
-<!-- VERSION: 0.20 -->
-<!-- Last Updated: 2026-11-14 -->
+<!-- VERSION: 0.21 -->
+<!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v0.21 — 2026-11-15 — Task 042: item 38 names the `kid` of the order token (the key `providers.internal.payment_server.kid`).
 v0.20 — 2026-11-14 — Task 039: item 38 (POST /v2/mobile/order for the Irancell operator: the answers of every failure, the operators and payment terms, no user) and item 39 (the fee: no Redis cache, the order of rows with the same time, log lines and metrics); item 35 also covers the mobile order; item 34 covers the order with `debug.cache_inquiries: false`.
 v0.19 — 2026-11-14 — Task 041: items 33 and 37 name the new config paths (`providers.external.qabzino.*`, `providers.external.karashop.*`).
 v0.18 — 2026-11-14 — Task 040: item 27 (f) no longer names the `providers.tavanir.circuit_breaker.*` keys (removed; not used).
@@ -280,6 +281,7 @@ Each item gives the endpoint or area, the `bill` behavior, the Qabz behavior, an
     - **The operators:** `mci` and `rightel` are HTTP 501 until their own tasks (operator decision of task 039); bill answers them.
     - **No user:** bill saves an order with no `user_id` and fails at the insert (HTTP 500). Qabz answers HTTP 403 (`unauthenticated`), as item 14.
     - **Only V2:** `POST /v1/mobile/order` stays HTTP 501 (operator decision of task 039).
+    - **The `kid` of the token (task 042):** bill puts its `service.name` (`bill`) in the header `kid`. Qabz puts `providers.internal.payment_server.kid`, or `service.name` (`qabz`) when that key is empty. The payment service finds the public key by `kid`; on 2026-11-14 an Invoice call with the `kid` `qabz` failed with `invalid request`, so the local config sets `kid: "bill"` until the payment service has a key for `qabz` (operator decision of task 042).
     - **Reason:** the operator rule of task 039 (the same price and the same steps as bill; the answers improved as the inquiry endpoints); a client error is not a server fault (conventions § 10).
     - **Code:** the `@todo` comments in `Phone.NewOrderV2` (`src/entry/grpc/phone_order.go`); the flow in `src/core/order/order.go`.
 

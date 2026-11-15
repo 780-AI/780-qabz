@@ -239,10 +239,12 @@ type Config struct {
 	// keys (payment_server, private_key_path); one key address in place of bill's host and port. No default:
 	// the real values are only in config.yml. PaymentServerPrivateKeyPath is the path of the general
 	// private key (a PKCS #1 PEM file) that signs the order token (task 039): the App reads it at
-	// start, and a missing or bad key stops the start. PaymentServerAddress is not read yet. Not
-	// hot-reloadable.
+	// start, and a missing or bad key stops the start. PaymentServerKID (task 042) is the kid of the
+	// token header, by which the payment service finds the public key; empty (the default) gives
+	// service.name (see OrderTokenKID). PaymentServerAddress is not read yet. Not hot-reloadable.
 	PaymentServerAddress        string `path:"providers.internal.payment_server.address"`
 	PaymentServerPrivateKeyPath string `path:"providers.internal.payment_server.private_key_path"`
+	PaymentServerKID            string `path:"providers.internal.payment_server.kid"`
 
 	// The config of the Karashop provider (task 025, the landline bill; bill: thirdparty.karashop):
 	// the adapter (provider/karashop) calls the Karashop HTTPS API itself.
@@ -536,6 +538,15 @@ func (c Config) PostgresDSN() string {
 		RawPath: "/" + url.PathEscape(c.PostgresDB), // keeps a "/" in the name escaped as %2F
 	}
 	return u.String()
+}
+
+// OrderTokenKID returns the kid of the order token header (task 042):
+// providers.internal.payment_server.kid, or service.name when that key is empty.
+func (c Config) OrderTokenKID() string {
+	if c.PaymentServerKID != "" {
+		return c.PaymentServerKID
+	}
+	return c.ServiceName
 }
 
 // RedisAddr returns host:port.

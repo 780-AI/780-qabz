@@ -799,11 +799,23 @@ func TestParsePaymentServerKeys(t *testing.T) {
 	}
 	assert.Equal(t, "", c.PaymentServerAddress)
 	assert.Equal(t, "", c.PaymentServerPrivateKeyPath)
+	assert.Equal(t, "", c.PaymentServerKID)
+	assert.Equal(t, "qabz", c.OrderTokenKID(), "an empty kid gives service.name")
 
-	c, err = Parse([]byte(base + `providers: {internal: {payment_server: {address: "payment:8084", private_key_path: "paymentPrivateKey.pem"}}}` + "\n"))
+	c, err = Parse([]byte(base + `providers: {internal: {payment_server: {address: "payment:8084", private_key_path: "paymentPrivateKey.pem", kid: "bill"}}}` + "\n"))
 	if !assert.NoError(t, err) {
 		return
 	}
 	assert.Equal(t, "payment:8084", c.PaymentServerAddress)
 	assert.Equal(t, "paymentPrivateKey.pem", c.PaymentServerPrivateKeyPath)
+	assert.Equal(t, "bill", c.PaymentServerKID)
+	assert.Equal(t, "bill", c.OrderTokenKID(), "the kid key wins over service.name")
+	assert.Equal(t, "qabz", c.ServiceName, "service.name does not change")
+}
+
+// TestOrderTokenKID (task 042): the kid key, else service.name.
+func TestOrderTokenKID(t *testing.T) {
+	assert.Equal(t, "svc", Config{ServiceName: "svc"}.OrderTokenKID())
+	assert.Equal(t, "bill", Config{ServiceName: "svc", PaymentServerKID: "bill"}.OrderTokenKID())
+	assert.Equal(t, "", Config{}.OrderTokenKID())
 }

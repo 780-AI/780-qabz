@@ -101,7 +101,7 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 	if !assert.NoError(t, err) || !assert.NotNil(t, orders) {
 		t.FailNow()
 	}
-	signer, err := crypto.LoadSigner(cfg.PaymentServerPrivateKeyPath, cfg.ServiceName)
+	signer, err := crypto.LoadSigner(cfg.PaymentServerPrivateKeyPath, cfg.OrderTokenKID())
 	if !assert.NoError(t, err) || !assert.NotNil(t, signer) {
 		t.FailNow()
 	}
