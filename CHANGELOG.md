@@ -1,7 +1,8 @@
-<!-- VERSION: 3.41 -->
+<!-- VERSION: 3.42 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.42 — 2026-11-15 — Added 051-task-started entry.
 v3.41 — 2026-11-15 — Added 050-task entry.
 v3.40 — 2026-11-15 — Added 047-tracing-backfill entry.
 v3.39 — 2026-11-15 — Added 047-split-design entry.
@@ -157,6 +158,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — New task 051 `tracing_switch_and_enabled_keys`, started, design approved
+- **Type:** Minor (governance: a task file; no code).
+- **Files:** `docs/Plans/in-progress_tasks/051_tracing_switch_and_enabled_keys.md` (new, started: the tracing switch `logs.tracing.enabled` with `logs.tracing.otlp_endpoint`, and one name `enabled` for every on/off key (`debug.mocks.<provider>.enable` becomes `.enabled`); operator decisions 2026-11-15, all recommended: D1 (a) the `logs.tracing` block, D2 (a) the App does not start when the switch is on with no endpoint, D3 (a) `debug.auth.disable` stays, D4 (a) the App does not start when a config file has a renamed key; not manifest-tracked); `docs/Plans/pending_tasks/task_counter.json` (052); `docs/documents_manifest.md`.
+- **Impact:** No runtime impact (a task file only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — New pending task 050 `irancell_status_worker`
 - **Type:** Minor (governance: a task file; no code).
