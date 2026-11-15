@@ -1,7 +1,8 @@
-<!-- VERSION: 1.81 -->
+<!-- VERSION: 1.82 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v1.82 — 2026-11-15 — Session wrap-up (tasks 047 commit, 050, 051, 043 close): 4 lesson candidates and more evidence for 3 in the register; follow-up: the tracing config is not an item of this_vs_bill.md.
 v1.81 — 2026-11-15 — Supertask 043 closed by the operator before the real end-to-end test; the test item stays open and says so.
 v1.80 — 2026-11-15 — Task 051: QA scenario added (feature-ON run done by the implementer, awaiting operator); the task 047 scenario and follow-up (a) name the new keys `logs.tracing.enabled` and `logs.tracing.otlp_endpoint`.
 v1.79 — 2026-11-15 — Task 047 shared tracing parts: QA scenario (feature-ON run done by the implementer, awaiting operator) and follow-ups added; the task 046 follow-up (c) is done.
@@ -368,6 +369,8 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
 
 ## Maintenance / housekeeping
 
+- ⏸ **The tracing config is not an item of `this_vs_bill.md`** (2026-11-15): bill has `jaeger.hostPort` (the Jaeger agent, UDP 6831, `jaeger-client-go` and OpenTracing) and `jaeger.logSpans`; Qabz has `logs.tracing.enabled` and `logs.tracing.otlp_endpoint` (OTLP gRPC, port 4317, OpenTelemetry; tasks 047 and 051) and no span log lines. The prod value of bill (`jaeger-all-agent.jaeger.svc.prodcluster.local:6831`) does not work for Qabz; the prod Jaeger must take OTLP (to confirm with infra). Add an item when the operator agrees.
+
 - Fill `SESSION_OPENER.md` § 2 environment mapping (stage / production hosts) — before plan Step 3.
 
 ## Lesson candidates
@@ -479,3 +482,13 @@ Found in the 2026-11-15 session wrap-up (task 046 session):
 - More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): the agent ran before the task 046 commit and found a gofmt defect in a new live test that the in-chat checks did not run on (the `gofmt -l` of the agent covered new, untracked files). Recommendation: unchanged, queue; codify soon (many instances).
 - More evidence for **Shared local runtime** (2026-11-08): the operator's debug App was on 8080 / 8082 / 9090; the feature-ON run used App copies on 18080 / 18082 / 19090 and 28080 / 28082 / 29090, inserted its own QA rows (bill IDs `qa046-*`) in the dev database and deleted them after the run. Recommendation: unchanged.
 
+
+Found in the 2026-11-15 session wrap-up (task 047 commit, tasks 050 and 051, supertask 043 close):
+
+- **One wrong path in `git add` stages nothing.** The supertask 043 close ran `git add <4 files> <old path of the moved file>`; the old path did not exist, so `git add` failed and staged nothing, and `git commit` committed only the rename that `git mv` had staged. The output showed it (`1 file changed, 0 insertions`) and the local commit was amended. Candidate: after `git mv`, name only the new path; read `git diff --cached --stat` against the ALLOWLIST before `git commit` (more evidence for **Read a gate before the guarded action**, 2026-11-07).
+- **A key that exists before a task is not compared with bill.** Task 047 used `logs.otlp_endpoint` (from task 003) as given; nobody compared it with bill's `jaeger.hostPort` / `logSpans` (the Jaeger agent, UDP 6831, `jaeger-client-go`), and `this_vs_bill.md` has no item for the tracing config. The operator asked about it after the commit. Candidate: a task that changes the behavior behind a config key also checks the bill key of the same function and records the difference.
+- **A relative path in the config depends on the working directory.** The OFF run of the task 051 feature-ON check started the App from the repo root and failed (`open paymentPrivateKey.pem: no such file or directory`); from `src/` it started. Candidate: resolve a relative path of the config against the folder of the config file, or say "run from `src/`" in each QA scenario (task 051 scenario does).
+- **The scratchpad cannot run a binary.** A binary built into the session scratchpad failed with `permission denied`; the gitignored `tmp/` of the repo worked. Candidate: build live-check binaries into `tmp/` and delete them after the run.
+- More evidence for **Rule 10 review table before every commit** (`CLAUDE.md` Rule 10, L044): the commits `ff5b2ad` (task 050) and `28bf511` (task 051 start) are docs-only and were made with no review table in chat; the agent reported it to the operator in the same session.
+- More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): tasks 047 (`428240d`) and 051 (`6de36c2`) were committed on the in-chat Rule 10 review only; the agent did not run.
+- More evidence for **Shared local runtime** (2026-11-08): the operator's debug App was on 8080 / 8082 / 9090; the task 051 checks used App copies on 18080 / 18082 / 19090 and the running compose Jaeger, and left the compose services running.

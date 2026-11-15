@@ -1,7 +1,8 @@
-<!-- VERSION: 3.44 -->
+<!-- VERSION: 3.45 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.45 — 2026-11-15 — Added session-wrap-up (tasks 047, 050, 051, 043 session) entry.
 v3.44 — 2026-11-15 — Added 043-supertask-done entry.
 v3.43 — 2026-11-15 — Added 051-tracing-switch-and-enabled-keys entry.
 v3.42 — 2026-11-15 — Added 051-task-started entry.
@@ -160,6 +161,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Session wrap-up (task 047 commit, tasks 050 and 051, supertask 043 close)
+- **Type:** Minor (governance: the register; no code).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.82: 4 lesson candidates (one wrong path in `git add` stages nothing; a key that exists before a task is not compared with bill; a relative config path depends on the working directory; the scratchpad cannot run a binary) and more evidence for 3 (Rule 10 review table, the `code-reviewer` agent before the commit, the shared local runtime); a housekeeping item: the tracing config is not an item of `this_vs_bill.md`); `docs/documents_manifest.md`.
+- **Impact:** No runtime impact.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Supertask 043 `tel_payment` done (operator decision)
 - **Type:** Minor (governance: a task file and the register; no code).
