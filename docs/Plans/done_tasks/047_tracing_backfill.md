@@ -1,12 +1,13 @@
-<!-- VERSION: 0.2 -->
+<!-- VERSION: 1.0 -->
 <!--
 CHANGE LOG
+v1.0 — 2026-11-15 — Done: implemented as designed, with the implementation notes I1 to I6; the feature-ON evidence added; moved to done_tasks.
 v0.2 — 2026-11-15 — Started (operator: "Do task 47"): moved to in-progress_tasks; split (operator decision S1 "Two tasks"): the spans of each feature (Part 2) move to new task 049; design written (D1 to D17; operator decisions S1, D4 (a), D10 (a), D7 (a), 2026-11-15, all recommended).
 v0.1 — 2026-11-15 — Created (operator request): add Jaeger tracing to every feature that exists; new features follow conventions § 17.
 -->
 # 047_tracing_backfill — the shared tracing parts
 
-Status: in-progress
+Status: done (2026-11-15; the operator QA confirmation is open in `OPEN_TASKS.md`)
 
 ## Description
 
@@ -70,7 +71,7 @@ Read on 2026-11-15 from the Qabz source at `a8790dc`. The module versions were r
 
 ### Storage and Kafka
 
-- **D7. Postgres** (`system/postgres/tracer.go`, new). A `pgx.QueryTracer` (`TraceQueryStart`, `TraceQueryEnd`), set in `postgres.New` (`pgxpool.ParseConfig`, `cfg.ConnConfig.Tracer`, `pgxpool.NewWithConfig`). One client span for each query (also the `begin` and `commit` of a transaction and the `Ping`). The span name is the SQL operation: the first word of the SQL, in upper case, from a fixed set (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `WITH`, `BEGIN`, `COMMIT`, `ROLLBACK`, `-- ping`→`PING`), else `QUERY`. Attributes: `db.system.name` = `postgresql`, `db.operation.name` = the name. No SQL text, no arguments. A query error: `jaeger.Fail(span, "error", err)` (D10). The migrator connection (`golang-migrate`, start only) is not traced.
+- **D7. Postgres** (`system/postgres/tracer.go`, new). A `pgx.QueryTracer` (`TraceQueryStart`, `TraceQueryEnd`), set in `postgres.New` (`pgxpool.ParseConfig`, `cfg.ConnConfig.Tracer`, `pgxpool.NewWithConfig`). One client span for each query (also the `begin` and `commit` of a transaction; see I2 for `Ping`). The span name is the SQL operation: the first word of the SQL, in upper case, from a fixed set (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `WITH`, `BEGIN`, `COMMIT`, `ROLLBACK`, `CREATE`, `DROP`, `ALTER`), else `QUERY`. Attributes: `db.system.name` = `postgresql`, `db.operation.name` = the name. No SQL text, no arguments. A query error: `jaeger.Fail(span, "error", err)` (D10). The migrator connection (`golang-migrate`, start only) is not traced.
 - **D8. Redis** (`system/redis/redis.go`). `redisotel.InstrumentTracing(rdb, redisotel.WithDBStatement(false), redisotel.WithCallerEnabled(false))`. One client span for each command (the name is the command, for example `get`, `evalsha`), and for each pipeline. No arguments: the keys can have a phone or a bill ID. `redisotel` records its own errors (the Redis error text, for example `WRONGTYPE`; `redis.Nil` is not an error); that text has no input.
 - **D9. Kafka** (`system/kafka/kafka.go`). `Publish` makes a producer span `kafka.Publish` with `messaging.system` = `kafka`, `messaging.destination.name` = the topic (from the config) and `result` (`ok`, `error`: the result of `qabz_kafka_publish_total`). An error: `jaeger.Fail`. The message gets no header (§ 17 exception, task 045 decision C).
 
@@ -88,7 +89,7 @@ Read on 2026-11-15 from the Qabz source at `a8790dc`. The module versions were r
 
 ### Compose, config, tests, docs
 
-- **D13. Jaeger in compose.** A service `jaeger` (image `jaegertracing/jaeger:2.23.0`, the all-in-one with the in-memory store), profile `tracing` (`make compose up` does not start it, as `kafka`): `make compose up ARGS="--profile tracing -d --wait"`. Ports `127.0.0.1:${JAEGER_UI_PORT:-16686}:16686` (the UI) and `127.0.0.1:${JAEGER_OTLP_PORT:-4317}:4317` (OTLP gRPC). `config.yml.example`: `otlp_endpoint: ""  # host:port of the OTLP gRPC receiver (the compose Jaeger: "localhost:4317"); empty: tracing is off`.
+- **D13. Jaeger in compose.** A service `jaeger` (image `jaegertracing/jaeger:2.23.0`, the all-in-one with the in-memory store), profile `tracing` (`make compose up` does not start it, as `kafka`): `COMPOSE_PROFILES=tracing make compose up ARGS="-d --wait"` (see I5). Ports `127.0.0.1:${JAEGER_UI_PORT:-16686}:16686` (the UI) and `127.0.0.1:${JAEGER_OTLP_PORT:-4317}:4317` (OTLP gRPC). `config.yml.example`: `otlp_endpoint: ""  # host:port of the OTLP gRPC receiver (the compose Jaeger: "localhost:4317"); empty: tracing is off`.
 - **D14. The test helper** `common/monitoring/jaeger/jaegertest` (test code imports it; it imports `tracetest`):
   - `Install(t) *tracetest.SpanRecorder`: sets a global tracer provider with the recorder and the `TraceContext` propagator, and puts back the old ones in `t.Cleanup` (a test that uses it does not call `t.Parallel`).
   - `AssertClean(t, spans, inputs ...string)`: every attribute key of each span and event is in a fixed allow-list (`bill_type`, `provider`, `operator`, `result`, `source`, `cron`, `order.id`, `exception.type`, and the keys of the instrumentation: `rpc.*`, `db.system.name`, `db.operation.name`, `db.system`, `server.*`, `network.*`, `http.request.method`, `http.response.status_code`, `url.full`, `messaging.*`, `error.type`), and no span name, attribute value, event attribute or status description has any of `inputs` (the phone, the bill ID, the pay ID, the user ID, the amount, the token of the test).
@@ -106,3 +107,29 @@ Read on 2026-11-15 from the Qabz source at `a8790dc`. The module versions were r
 ### Files (planned)
 
 `src/common/monitoring/jaeger/jaeger.go` (propagator, `Fail`) and its test, `src/common/monitoring/jaeger/jaegertest/jaegertest.go` (new), `src/app/defaults.go`, `src/entry/http/gateway.go`, `src/provider/{jiring,parsianproxy,qabzinoproxy,irancellproxy,qabzino,tavanir,karashop}/*.go`, `src/system/postgres/{postgres.go,tracer.go}`, `src/system/redis/redis.go`, `src/system/kafka/kafka.go`, `src/core/inquiry/inquiry.go`, `src/core/order/{complete.go,settle.go}`, `src/provider/selector.go`, `src/config/hot.go`, `src/entry/cron/cron.go`, the tests of these packages, `src/go.mod`, `src/go.sum`, `docker-compose.yml`, `config.yml.example`, `docs/initial-discovery/system.html`, `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md`, `src/app/README.md`, `CHANGELOG.md`, `docs/documents_manifest.md`, `docs/Plans/OPEN_TASKS.md`, this task file.
+
+## Implementation (2026-11-15)
+
+Implemented as designed (D1 to D17). What the design did not name, and how it was done:
+
+- **I1. The globals delegate once (D2).** The OpenTelemetry global provider and propagator forward to the first ones that a process sets. In the App that is `jaeger.New`, so the handlers and clients made before it work (seen in the feature-ON run: the gRPC servers and the gateway are made before `jaeger.New`). In tests, many `jaegertest.Install` calls replace the globals, so each test makes its handlers after `Install`. The "off" test (`provider.TestNewHTTPClientOff`) runs itself again in a child process that sets no global.
+- **I2. No `Ping` span.** pgx sends `Ping` and the health ping of the pool to `pgconn` directly; they do not reach the query tracer, so they make no span (and no lone trace every second).
+- **I3. One shared HTTP client.** `provider.NewHTTPClient(timeout)` (new `src/provider/http.go`) is the default client of the Qabzino, Tavanir and Karashop adapters: the timeout, the default transport wrapped by `otelhttp.NewTransport`, the span name `HTTP <method>`.
+- **I4. The allow-list of `jaegertest.AssertClean`.** The live Redis test found the `redisotel` keys `db.connection_string` (`tcp://<host:port of the config>`, no password) and `db.redis.num_cmd` (a count): allowed. `redisotel` and `otelhttp` record their own errors with `exception.message`: allowed only on a span of an instrumentation library, never on a span of Qabz code (scope `qabz/...`); its value is still checked against the test inputs.
+- **I5. The compose profiles.** `make compose up ARGS="--profile ..."` does not work (`unknown flag: --profile`: the flag must come before `up`). The compose header now says `COMPOSE_PROFILES=tracing make compose up ARGS="-d --wait"`, and the same for the `kafka` line of task 045, which had the same defect.
+- **I6. The cron root before the lock (D12).** A failed lock now also has the error status and the `exception` event (`jaeger.Fail`); `TestRootSpan` covers done, error, `no_lock` and a lock error.
+
+Verification:
+
+- **Tests:** `make test GO_TEST_ARGS="-race -count=1 -cover"`: every package passes, the live tests ran. Changed packages: `app` 87.6 %, `common/monitoring/jaeger` 92.3 %, `jaegertest` 98.0 %, `config` 97.4 %, `core/inquiry` 98.7 %, `core/order` 94.0 %, `entry/cron` 98.1 %, `entry/http` 88.9 %, `provider` 96.1 %, `provider/irancellproxy` 98.1 %, `jiring` 98.0 %, `karashop` 95.3 %, `parsianproxy` 96.6 %, `qabzino` 98.2 %, `qabzinoproxy` 98.3 %, `tavanir` 98.0 %, `system/kafka` 88.7 %, `system/postgres` 90.4 %, `system/redis` 88.9 %. Positive controls (each check failed once on a known-bad input): the gateway with no `withTraceContext` fails `TestGatewayContinuesTheTrace`; `finishErr` with `context.Background()` fails the 3 cases of `TestFinishKeepsTheRequestSpan`; `span.RecordError` in the Settler fails `TestSettlerResults` (`exception.message` not allowed, the text "down"); `Install` in the child process fails `TestNewHTTPClientOff`; each forbidden case of `TestAssertCleanFails`.
+- **Feature ON (Rule 15),** the compose Postgres, Redis, Kafka and Jaeger (2.23.0), an App copy on the ports 18080 / 18082 / 18083 / 19090 (the operator's debug App on 8080 / 8082 / 9090 was not touched), `logs.otlp_endpoint: localhost:4317`, the mocks of Parsian, Karashop, Tavanir and Irancell, the Qabzino endpoints at a local fake server that answers HTTP 503, `debug.cache_inquiries: true`. Each request sent its own `traceparent`; the traces were read from the Jaeger API:
+  - Greeting, Services, MyBills Insert / GetAll / Delete, the water, electricity, gas, landline and mobile (Irancell, MCI, Rightel) inquiries, the Irancell and landline orders: each is one trace whose root is a child of the `traceparent` of the request; under it the gateway client span, the gRPC server span (the full method), and the Postgres spans (`SELECT`, `INSERT`, `UPDATE`) of the path. No HTTP span.
+  - Water, gas and Rightel (Qabzino at the fake 503 server): the `HTTP POST` span and the server spans have the error status; the fake server got `traceparent` with the trace ID of the request.
+  - Irancell with the mock off and the address `127.0.0.1:1`: the client span `pb.InternalService/BillInquiry` has the error status.
+  - `OrderComplete` on the internal server (a scratch gRPC client with a `traceparent`): one trace, a child of the span of the client. With the Parsian pay mock at `success`: a new root `order.Payments.settle` (`order.id`, `bill_type`, `provider`) with a link to the server span of that `OrderComplete` call; under it the two `UPDATE` writes and `order.Settler.Settle` (`result=success`).
+  - One tick of the Parsian status worker (the `pending` order of the first `OrderComplete`, the mock at `success`): one trace `cron parsian-getstatus` (`result=done`) with the Redis `set` (the lock), the page query, `evalsha` (the charge), `kafka.Publish` (`paymentwriter`, `result=ok`), the `BEGIN`, `SELECT`, `INSERT`, `COMMIT` of the final row and the release `evalsha`; `qabz_cron_orders_processed_total{result="success"}` 1.
+  - `providers load` and `config reload`: roots with `result=ok` and their `SELECT` as a child.
+  - Off: with `logs.otlp_endpoint: ""` the App started and stopped, `lsof` showed no connection to port 4317, the fake server got no `traceparent`, and Jaeger had no trace of the request.
+  - The QA rows were deleted from the dev database after the run (8 `orders`, 11 `bill_inquiries`, 9 `bill_inquiry_requests` rows, 1 `bills` row).
+  - Not covered live: a real call to a Qabz service that is traced too (none runs here); the mocked providers make no call, so they have no provider span (as designed).
+

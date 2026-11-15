@@ -17,6 +17,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
+	"qabz/common/monitoring/jaeger"
 )
 
 // Status values of the providers.status column. Only StatusEnable makes a provider enabled (bill
@@ -366,18 +372,26 @@ func (s *ProvidersService) Load(ctx context.Context) error { return s.load(ctx, 
 // context.Canceled after abort is done, the load was aborted (the App start is aborted, or Stop runs),
 // not failed: no error line and no OnLoad call. A load canceled for another reason, or one that
 // times out (context.DeadlineExceeded), is a failure.
+//
+// Each load is a root span loadSpan (conventions § 17: a run that no request starts; task 047) with
+// the result of qabz_providers_loads_total (an aborted load: "aborted", no error status).
 func (s *ProvidersService) load(ctx, abort context.Context) error {
 	if s.repo == nil || s.log == nil {
 		return errNotBuilt
 	}
+	ctx, span := otel.Tracer("qabz/provider").Start(ctx, loadSpan, trace.WithNewRoot())
+	defer span.End()
 	s.loadMu.Lock()
 	defer s.loadMu.Unlock()
 	start := time.Now()
 	rows, err := s.repo.ListProviders(ctx)
 	if err != nil {
 		if abort != nil && abort.Err() != nil && errors.Is(err, context.Canceled) {
+			span.SetAttributes(attribute.String("result", "aborted"))
 			return err
 		}
+		span.SetAttributes(attribute.String("result", LoadError))
+		jaeger.Fail(span, LoadError, err)
 		s.reportLoad(LoadError, time.Since(start))
 		s.log.Error("providers: load failed; keeping the last list", "error", err)
 		return err
@@ -394,10 +408,14 @@ func (s *ProvidersService) load(ctx, abort context.Context) error {
 	s.snap.Store(next)
 	s.reportActive(next.enabled)
 	s.writeMu.Unlock()
+	span.SetAttributes(attribute.String("result", LoadOK))
 	s.reportLoad(LoadOK, time.Since(start))
 	s.logOrderChanges(prev, next)
 	return nil
 }
+
+// loadSpan is the root span of each load of the provider list (task 047).
+const loadSpan = "providers load"
 
 func (s *ProvidersService) reportLoad(result string, d time.Duration) {
 	if s.onLoad != nil {

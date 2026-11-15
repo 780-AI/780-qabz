@@ -1,7 +1,8 @@
-<!-- VERSION: 3.39 -->
+<!-- VERSION: 3.40 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.40 — 2026-11-15 — Added 047-tracing-backfill entry.
 v3.39 — 2026-11-15 — Added 047-split-design entry.
 v3.38 — 2026-11-15 — Added session-wrap-up (task 046 session) entry.
 v3.37 — 2026-11-15 — Added 046-karashop-settle-worker entry.
@@ -155,6 +156,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 047: the shared tracing parts (conventions § 17)
+- **Type:** Major (new module dependencies, a behavior change of the spans and the outbound headers, a Critical File).
+- **Files:** `src/common/monitoring/jaeger/jaeger.go` (the W3C propagator; `Fail`: the error status with the result and only the error type) and its test; `src/common/monitoring/jaeger/jaegertest/` (new: `Install`, `ByName`, `AssertClean`); `src/app/defaults.go` (the `otelgrpc` server handler first on both gRPC servers); `src/entry/http/gateway.go` (no HTTP span; `traceparent` of the request into the context; the `otelgrpc` client handler); `src/provider/{jiring,parsianproxy,qabzinoproxy,irancellproxy}` (the `otelgrpc` client handler); `src/provider/http.go` (new: `NewHTTPClient`, `otelhttp`) used by `src/provider/{qabzino,tavanir,karashop}`; `src/system/postgres/tracer.go` (new: the pgx tracer, the SQL operation only) and `postgres.go`; `src/system/redis/redis.go` (`redisotel`, no argument); `src/system/kafka/kafka.go` (`kafka.Publish`, no message header); `src/core/inquiry/inquiry.go` (`finish` keeps the request span); `src/core/order/complete.go` (the settlement root `order.Payments.settle` with a link to the request span) and `settle.go` (`jaeger.Fail`); `src/provider/selector.go` (root `providers load`); `src/config/hot.go` (root `config reload`); `src/entry/cron/cron.go` (the root before the lock; `no_lock` has no error status; `jaeger.Fail`); the tests of these packages; `src/go.mod`, `src/go.sum` (`otelgrpc` v0.72.0, `otelhttp` v0.72.0, `redisotel/v9` v9.23.0); `docker-compose.yml` (service `jaeger`, profile `tracing`; the profile commands use `COMPOSE_PROFILES`, also the `kafka` one of task 045, which did not work); `config.yml.example` (`logs.otlp_endpoint` explained); `docs/initial-discovery/system.html` (v2.18, Logs: the tracing as built); `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.25, § 17: `jaeger.Fail`, no `span.RecordError`; no HTTP span on the gateway; the shared hooks; `jaegertest`); `docs/folder_structure.md` (v0.50); `src/app/README.md` (v0.38); `docs/Plans/OPEN_TASKS.md` (v1.79); `docs/Plans/done_tasks/047_tracing_backfill.md` (moved from `in-progress_tasks/`; not manifest-tracked); `docs/documents_manifest.md`.
+- **Impact:** With `logs.otlp_endpoint` empty (the default): no change; no span, no header, no connection. With it set: every request is one trace (the gateway client span, the gRPC server span, the Postgres, Redis, Kafka and provider client spans), the worker ticks, the provider list loads and the config reloads are roots, and the settlement in the background is a root with a link to the request. Outbound gRPC and HTTP calls (also to the external providers Qabzino, Tavanir and Karashop) send the W3C `traceparent` header. The cron root span now starts before the lock, so a tick with no lock is a span too (result `no_lock`, no error status). No metric, no API and no database change.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 047 shared tracing parts" (Go tests; feature ON with the compose Jaeger; off with the key empty). Feature-ON run done by the implementer, awaiting operator.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Task 047 split (new task 049), task 047 started, design approved
 - **Type:** Minor (governance: task files and the register; no code).

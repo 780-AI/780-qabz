@@ -481,7 +481,7 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 	switch {
 	case callErr != nil && ctx.Err() != nil:
 		s.callDone(pro.Name, CallCanceled, d)
-		s.finish(row.ID, provider.ResponseFailed, "")
+		s.finish(ctx, row.ID, provider.ResponseFailed, "")
 		return Result{}, ResultCanceled, ctx.Err()
 	case callErr != nil:
 		result, outcome := CallError, ResultError
@@ -489,11 +489,11 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 			result, outcome = CallDown, ResultProviderDown
 		}
 		s.callDone(pro.Name, result, d)
-		s.finish(row.ID, provider.ResponseFailed, "")
+		s.finish(ctx, row.ID, provider.ResponseFailed, "")
 		return Result{}, outcome, fmt.Errorf("provider %s inquiry: %w", pro.Name, callErr)
 	case resp == nil:
 		s.callDone(pro.Name, CallError, d)
-		s.finish(row.ID, provider.ResponseFailed, "")
+		s.finish(ctx, row.ID, provider.ResponseFailed, "")
 		return Result{}, ResultError, fmt.Errorf("provider %s inquiry: empty answer", pro.Name)
 	}
 
@@ -502,7 +502,7 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 			"status", resp.Status, "inquiries", len(resp.Inquiries), "duration_ms", float64(d)/float64(time.Millisecond))
 	}
 	if !s.noStore {
-		if err := s.finishErr(row.ID, resp.Status, resp.ProviderTraceID); err != nil {
+		if err := s.finishErr(ctx, row.ID, resp.Status, resp.ProviderTraceID); err != nil {
 			s.callDone(pro.Name, CallError, d)
 			return Result{}, ResultError, fmt.Errorf("save request status: %w", err)
 		}
@@ -550,19 +550,21 @@ func (s *Service) callDone(providerName, result string, d time.Duration) {
 }
 
 // finishErr writes the final status of a request row on a context that the client cannot cancel.
-func (s *Service) finishErr(id, status, traceID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), finishTimeout)
+// The context keeps the span of the request (context.WithoutCancel), so the write is in the request
+// trace (conventions § 17; task 047).
+func (s *Service) finishErr(ctx context.Context, id, status, traceID string) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), finishTimeout)
 	defer cancel()
 	return s.repo.FinishRequest(ctx, id, status, traceID)
 }
 
 // finish is finishErr for a failed call: the answer is already an error, so a failed write is only
 // logged. With noStore it writes nothing (there is no request row).
-func (s *Service) finish(id, status, traceID string) {
+func (s *Service) finish(ctx context.Context, id, status, traceID string) {
 	if s.noStore {
 		return
 	}
-	if err := s.finishErr(id, status, traceID); err != nil && s.log != nil {
+	if err := s.finishErr(ctx, id, status, traceID); err != nil && s.log != nil {
 		s.log.Error("inquiry: save request status failed", "request_id", id, "status", status, "error", err)
 	}
 }

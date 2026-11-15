@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -74,7 +77,10 @@ func (g *Gateway) Start(ctx context.Context) error {
 	if target == "" {
 		return errors.New("http gateway: gRPC target is empty")
 	}
-	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// The client span of each call (otelgrpc, the full gRPC method) sends traceparent to the gRPC
+	// server, so the gateway call and the gRPC method are one trace (task 047, conventions § 17).
+	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("http gateway: grpc client for %s: %w", target, err)
 	}
@@ -97,7 +103,7 @@ func (g *Gateway) Start(ctx context.Context) error {
 	if ln == nil {
 		return errors.Join(fmt.Errorf("http gateway: listen %s returned no listener", g.addr), conn.Close())
 	}
-	srv := &http.Server{Handler: mux, ReadHeaderTimeout: readHeaderTimeout}
+	srv := &http.Server{Handler: withTraceContext(mux), ReadHeaderTimeout: readHeaderTimeout}
 	g.ln, g.srv, g.conn = ln, srv, conn
 	g.done = make(chan error, 1)
 	go func(done chan<- error) { done <- srv.Serve(ln) }(g.done)
@@ -146,4 +152,15 @@ func (g *Gateway) Addr() string {
 		return a.String()
 	}
 	return g.addr
+}
+
+// withTraceContext reads the W3C trace context of the request headers (traceparent) into the request
+// context, so the client span of the gateway continues the trace of the app. It makes no span: an
+// HTTP span has url.path, and DELETE /v1/mybill/{id} has the ID in the path (task 047 decision D4).
+// With tracing off the global propagator is the no-op one and reads nothing.
+func withTraceContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

@@ -5,6 +5,7 @@ package redis
 import (
 	"context"
 
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -15,9 +16,14 @@ type Client struct {
 }
 
 // New creates the client. It connects lazily, so call Ping to check the server. prefix is put in
-// front of every key (database.redis.prefix); it can be empty.
+// front of every key (database.redis.prefix); it can be empty. Each command and each pipeline is a
+// client span (redisotel, task 047 decision D8) with the command name and no argument: the keys can
+// have a phone or a bill ID.
 func New(addr, password, prefix string) *Client {
-	return &Client{rdb: goredis.NewClient(&goredis.Options{Addr: addr, Password: password}), prefix: prefix}
+	rdb := goredis.NewClient(&goredis.Options{Addr: addr, Password: password})
+	// InstrumentTracing only adds a hook; it fails only for a client type it does not know.
+	_ = redisotel.InstrumentTracing(rdb, redisotel.WithDBStatement(false), redisotel.WithCallerEnabled(false))
+	return &Client{rdb: rdb, prefix: prefix}
 }
 
 // Ping checks the connection.

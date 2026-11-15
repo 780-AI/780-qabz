@@ -182,8 +182,8 @@ type Options struct {
 	RightelEndpoint string
 	// Timeout limits each call. Required, positive.
 	Timeout time.Duration
-	// HTTPClient sends the requests. Nil: a client with Timeout (the system TLS roots; bill skips
-	// the certificate check, this adapter does not).
+	// HTTPClient sends the requests. Nil: provider.NewHTTPClient with Timeout (a client span; the
+	// system TLS roots; bill skips the certificate check, this adapter does not).
 	HTTPClient Doer
 }
 
@@ -209,7 +209,7 @@ func New(opts Options) (*Adapter, error) {
 	}
 	client := opts.HTTPClient
 	if client == nil {
-		client = &http.Client{Timeout: opts.Timeout}
+		client = provider.NewHTTPClient(opts.Timeout)
 	}
 	return &Adapter{
 		enabled:         opts.Enabled,

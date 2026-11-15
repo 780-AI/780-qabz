@@ -14,7 +14,7 @@ service:
 
 logs:
   level: "info"
-  otlp_endpoint: ""          # empty: tracing is off
+  otlp_endpoint: ""          # host:port of the OTLP gRPC receiver of Jaeger (the compose jaeger: "localhost:4317"); empty: tracing is off (no span, no traceparent header, no connection)
 
 server:
   grpc:

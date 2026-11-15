@@ -6,8 +6,8 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 
+	"qabz/common/monitoring/jaeger"
 	"qabz/provider"
 )
 
@@ -105,7 +105,7 @@ func (s *Settler) Settle(ctx context.Context, o Order) (result string) {
 		span.SetAttributes(attribute.String("order.id", o.OrderID), attribute.String("bill_type", o.BillType),
 			attribute.String("provider", settler), attribute.String("result", result), attribute.String("source", s.source))
 		if result != provider.StatusSuccess {
-			span.SetStatus(codes.Error, result)
+			jaeger.Fail(span, result, nil)
 		}
 		span.End()
 	}()
@@ -129,7 +129,7 @@ func (s *Settler) Settle(ctx context.Context, o Order) (result string) {
 	})
 	switch {
 	case err != nil:
-		span.RecordError(err)
+		jaeger.Fail(span, SettleError, err)
 		s.count(o.BillType, settler, SettleError)
 		s.logError("settle: "+settler+" failed", "order_id", o.OrderID, "source", s.source, "error", err)
 		return SettleError
@@ -145,7 +145,7 @@ func (s *Settler) Settle(ctx context.Context, o Order) (result string) {
 		return status
 	}
 	if err := s.repo.ConfirmProvider(ctx, o.OrderID); err != nil {
-		span.RecordError(err)
+		jaeger.Fail(span, SettleMarkFailed, err)
 		s.count(o.BillType, settler, SettleMarkFailed)
 		s.logError("settle: save provider_confirmed failed", "order_id", o.OrderID, "source", s.source, "error", err)
 		return SettleMarkFailed

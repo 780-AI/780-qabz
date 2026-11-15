@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
+	"qabz/common/monitoring/jaeger/jaegertest"
 	"qabz/provider"
 )
 
@@ -468,6 +472,44 @@ func TestSettlePanic(t *testing.T) {
 	_, err := f.p.Complete(context.Background(), completeReq())
 	assert.NoError(t, err)
 	assert.Contains(t, f.log.lines, "error: order complete: settlement panic")
+}
+
+// TestSettleRootLinksTheRequest (task 047 D11): the settlement in the background is a new root span
+// order.Payments.settle with a link to the request span; the settlement span is its child; no
+// forbidden attribute (the phone, the bill ID, the pay ID, the RRN). A panic gives the error status.
+func TestSettleRootLinksTheRequest(t *testing.T) {
+	sr := jaegertest.Install(t)
+	f := newPayFixture(t)
+	ctx, request := otel.Tracer("test").Start(context.Background(), "request")
+	_, err := f.p.Complete(ctx, completeReq())
+	assert.NoError(t, err)
+	request.End()
+
+	roots, settles := jaegertest.ByName(sr, settleJobSpan), jaegertest.ByName(sr, settleSpan)
+	if !assert.Len(t, roots, 1) || !assert.Len(t, settles, 1) {
+		return
+	}
+	root := roots[0]
+	assert.False(t, root.Parent().IsValid(), "a new root")
+	assert.NotEqual(t, request.SpanContext().TraceID(), root.SpanContext().TraceID(), "a new trace")
+	if assert.Len(t, root.Links(), 1) {
+		assert.Equal(t, request.SpanContext().SpanID(), root.Links()[0].SpanContext.SpanID(), "a link to the request span")
+	}
+	assert.ElementsMatch(t, []attribute.KeyValue{attribute.String("order.id", "order-1"),
+		attribute.String("bill_type", provider.BillTypeTelMidterm), attribute.String("provider", "parsian")}, root.Attributes())
+	assert.Equal(t, codes.Unset, root.Status().Code)
+	assert.Equal(t, root.SpanContext().SpanID(), settles[0].Parent().SpanID())
+	jaegertest.AssertClean(t, sr.Ended(), testTel, "2101234560040", "12000035", "778899", testUser)
+
+	p := newPayFixture(t)
+	p.p.settler.adapters = adapters{"parsian": p.parsian, "karashop": panicAdapter{}}
+	_, err = p.p.Complete(context.Background(), completeReq())
+	assert.NoError(t, err)
+	roots = jaegertest.ByName(sr, settleJobSpan)
+	if assert.Len(t, roots, 2) {
+		assert.Equal(t, codes.Error, roots[1].Status().Code)
+		assert.Equal(t, "panic", roots[1].Status().Description)
+	}
 }
 
 type panicAdapter struct{ provider.ProviderInterface }

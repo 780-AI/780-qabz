@@ -7,10 +7,15 @@
 # It needs a Dockerfile, which arrives with the service code (plan Step 5 and later).
 # The `kafka` service has the profile `kafka` (task 045: the QA of the Parsian status worker); `make compose up`
 # does not start it:
-#   make compose up ARGS="--profile kafka -d --wait"
+#   COMPOSE_PROFILES=kafka make compose up ARGS="-d --wait"    (--profile in ARGS does not work: it must come before up)
 # It listens on localhost:9092, the default of kafka.brokers. Read the status messages with:
 #   docker compose --env-file config_generated.env exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
 #     --bootstrap-server localhost:9092 --topic paymentwriter --from-beginning --property print.key=true
+# The `jaeger` service has the profile `tracing` (task 047: the traces of conventions § 17); `make compose up`
+# does not start it:
+#   COMPOSE_PROFILES=tracing make compose up ARGS="-d --wait"  (both: COMPOSE_PROFILES=tracing,kafka)
+# Set logs.otlp_endpoint: "localhost:4317" in config.yml and open the UI at http://localhost:16686.
+# The store is in memory: a restart of the container drops the traces.
 
 services:
   postgres:
@@ -68,6 +73,14 @@ services:
       timeout: 10s
       retries: 12
       start_period: 20s
+
+  jaeger:
+    profiles: ["tracing"]
+    image: jaegertracing/jaeger:2.23.0   # all-in-one (collector, in-memory store, UI); development only
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${JAEGER_UI_PORT:-16686}:16686"   # the UI and the query API
+      - "127.0.0.1:${JAEGER_OTLP_PORT:-4317}:4317"   # OTLP gRPC: logs.otlp_endpoint
 
   qabz:
     profiles: ["app"]

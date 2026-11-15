@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/trace"
 
 	"qabz/provider"
 )
@@ -35,7 +36,8 @@ type memRepo struct {
 
 	findErr, saveErr, createErr, finishErr error
 	findCalls, saveCalls                   int
-	order                                  []string // calls in order
+	order                                  []string            // calls in order
+	finishSpans                            []trace.SpanContext // the span in ctx of each FinishRequest
 }
 
 func newMemRepo() *memRepo { return &memRepo{finished: map[string][2]string{}} }
@@ -85,14 +87,18 @@ func (m *memRepo) CreateRequest(_ context.Context, r RequestRow) error {
 	return nil
 }
 
-func (m *memRepo) FinishRequest(_ context.Context, id, status, trace string) error {
+func (m *memRepo) FinishRequest(ctx context.Context, id, status, traceID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.order = append(m.order, "finish")
+	m.finishSpans = append(m.finishSpans, trace.SpanContextFromContext(ctx))
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if m.finishErr != nil {
 		return m.finishErr
 	}
-	m.finished[id] = [2]string{status, trace}
+	m.finished[id] = [2]string{status, traceID}
 	return nil
 }
 
@@ -538,6 +544,34 @@ func TestClientLeavesDuringProviderCall(t *testing.T) {
 	}
 	assert.Equal(t, CallCanceled, r.calls[0].result)
 	assert.Equal(t, 0, r.log.count("error"))
+}
+
+// TestFinishKeepsTheRequestSpan (task 047 D11): the final status write runs on a context that the
+// client cannot cancel, but with the span of the request, so the write is in the request trace.
+func TestFinishKeepsTheRequestSpan(t *testing.T) {
+	sc := trace.NewSpanContext(trace.SpanContextConfig{TraceID: trace.TraceID{1}, SpanID: trace.SpanID{2}, TraceFlags: trace.FlagsSampled})
+	for name, set := range map[string]func(*rig, context.CancelFunc){
+		"success": func(r *rig, _ context.CancelFunc) {},
+		"down":    func(r *rig, _ context.CancelFunc) { r.prov.resp, r.prov.err = nil, provider.ErrProviderDown },
+		"client gone": func(r *rig, cancel context.CancelFunc) {
+			r.prov.resp, r.prov.err = nil, errors.Join(provider.ErrProviderDown, context.Canceled)
+			r.prov.run = func(context.Context) { cancel() }
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t, time.Hour)
+			ctx, cancel := context.WithCancel(trace.ContextWithSpanContext(context.Background(), sc))
+			defer cancel()
+			set(r, cancel)
+			_, _ = r.svc.Inquire(ctx, Request{BillType: "water", InquiryID: validBill, UserID: userA})
+			if assert.Len(t, r.repo.finishSpans, 1) {
+				assert.Equal(t, sc, r.repo.finishSpans[0])
+			}
+			if assert.Len(t, r.repo.requests, 1) {
+				assert.NotEmpty(t, r.repo.finished[r.repo.requests[0].ID][0], "the write ran (not canceled)")
+			}
+		})
+	}
 }
 
 func TestDatabaseFailures(t *testing.T) {

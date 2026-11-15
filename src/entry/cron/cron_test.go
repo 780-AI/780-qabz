@@ -11,8 +11,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
+	"qabz/common/monitoring/jaeger/jaegertest"
 )
 
 // fakeLock records the extends and the release of one lock.
@@ -367,15 +367,12 @@ func TestStartCtxDoesNotStopTheRuns(t *testing.T) {
 	assert.NoError(t, never.Stop(context.Background()), "Stop before Start")
 }
 
-// TestRootSpan (conventions § 17): a run that took the lock is one root span "cron <name>" with the
-// attributes cron and result; a step of the run is its child; a failed run has the status Error;
-// a tick with no lock makes no span.
+// TestRootSpan (conventions § 17; task 047): each tick is one root span "cron <name>" with the
+// attributes cron and result, started before the lock; a step of the run is its child; a failed run
+// and a failed lock have the status Error and an exception event with only the error type; a tick
+// with no lock has the result no_lock and no error status.
 func TestRootSpan(t *testing.T) {
-	sr := tracetest.NewSpanRecorder()
-	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
-	prev := otel.GetTracerProvider()
-	otel.SetTracerProvider(tp)
-	t.Cleanup(func() { otel.SetTracerProvider(prev) })
+	sr := jaegertest.Install(t)
 
 	l, rec := &fakeLocker{}, &recorder{}
 	fail := false
@@ -383,7 +380,7 @@ func TestRootSpan(t *testing.T) {
 		_, child := otel.Tracer("test").Start(ctx, "step")
 		child.End()
 		if fail {
-			return errors.New("db down")
+			return errors.New("db down for 989121234567")
 		}
 		return nil
 	}}
@@ -395,11 +392,16 @@ func TestRootSpan(t *testing.T) {
 	l.none = true // another holder
 	l.mu.Unlock()
 	r.tick(context.Background(), c)
+	l.mu.Lock()
+	l.none, l.err = false, errors.New("redis down")
+	l.mu.Unlock()
+	r.tick(context.Background(), c)
 
 	spans := sr.Ended()
-	if !assert.Len(t, spans, 4, "two runs, each a root and a step; no span with no lock") {
+	if !assert.Len(t, spans, 6, "two runs (a root and a step each), a no-lock root, a lock-error root") {
 		return
 	}
+	jaegertest.AssertClean(t, spans, "989121234567")
 	for i, want := range []struct {
 		result string
 		code   codes.Code
@@ -412,4 +414,14 @@ func TestRootSpan(t *testing.T) {
 		assert.Equal(t, want.code, root.Status().Code)
 		assert.ElementsMatch(t, []attribute.KeyValue{attribute.String("cron", "a"), attribute.String("result", want.result)}, root.Attributes())
 	}
+	if assert.Len(t, spans[3].Events(), 1) {
+		assert.Equal(t, []attribute.KeyValue{attribute.String("exception.type", "*errors.errorString")}, spans[3].Events()[0].Attributes)
+	}
+	noLock, lockErr := spans[4], spans[5]
+	assert.Equal(t, "cron a", noLock.Name())
+	assert.Equal(t, codes.Unset, noLock.Status().Code)
+	assert.ElementsMatch(t, []attribute.KeyValue{attribute.String("cron", "a"), attribute.String("result", ResultNoLock)}, noLock.Attributes())
+	assert.Equal(t, codes.Error, lockErr.Status().Code)
+	assert.Equal(t, ResultError, lockErr.Status().Description)
+	assert.Len(t, lockErr.Events(), 1)
 }

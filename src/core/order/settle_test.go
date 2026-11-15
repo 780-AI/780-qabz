@@ -12,6 +12,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
+	"qabz/common/monitoring/jaeger/jaegertest"
 	"qabz/provider"
 )
 
@@ -135,6 +136,8 @@ func TestSettlerResults(t *testing.T) {
 			assert.True(t, allowedSettleKeys[kv.Key], "%s: attribute %s is not allowed", c.name, kv.Key)
 		}
 		assert.Contains(t, span.Attributes(), attribute.String("result", c.result), c.name)
+		// task 047 D10: an error gives only its type, never its text
+		jaegertest.AssertClean(t, spans, testTel, "down", "db")
 	}
 }
 

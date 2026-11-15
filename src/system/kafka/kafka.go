@@ -12,6 +12,11 @@ import (
 	"time"
 
 	ckafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
+	"qabz/common/monitoring/jaeger"
 )
 
 const (
@@ -96,18 +101,26 @@ func (p *Producer) drainEvents() {
 
 // Publish writes one message (key, value, no headers) to the topic, on the partition of bill's rule,
 // and waits for its delivery report or for ctx. A failed metadata read, an error in the report, or
-// a done ctx is an error. When ctx ends first, librdkafka can still deliver the message later.
+// a done ctx is an error. When ctx ends first, librdkafka can still deliver the message later. Each
+// publish is a span kafka.Publish, a child of the span in ctx.
 func (p *Producer) Publish(ctx context.Context, topic string, key, value []byte) error {
 	if p == nil || p.p == nil {
 		return errors.New("kafka: producer not created with New")
 	}
+	// The producer span (task 047 decision D9): the topic of the config and the result of
+	// qabz_kafka_publish_total. The message gets no trace header (conventions § 17 exception).
+	ctx, span := otel.Tracer("qabz/system/kafka").Start(ctx, "kafka.Publish", trace.WithSpanKind(trace.SpanKindProducer),
+		trace.WithAttributes(attribute.String("messaging.system", "kafka"), attribute.String("messaging.destination.name", topic)))
+	defer span.End()
 	start := p.now()
 	err := p.publish(ctx, topic, key, value)
+	result := ResultOK
+	if err != nil {
+		result = ResultError
+		jaeger.Fail(span, result, err)
+	}
+	span.SetAttributes(attribute.String("result", result))
 	if p.onPublish != nil {
-		result := ResultOK
-		if err != nil {
-			result = ResultError
-		}
 		p.onPublish(result, p.now().Sub(start))
 	}
 	return err

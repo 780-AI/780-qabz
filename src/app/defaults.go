@@ -8,6 +8,7 @@ import (
 	"time"
 
 	promclient "github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	pb "qabz/api/pb/qabz"
@@ -135,6 +136,9 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
+	// The tracing handler (task 047, conventions § 17) is the first option of both servers: one server
+	// span for each call, named with the full gRPC method, a child of the traceparent in the metadata.
+	metricOpts = append([]grpc.ServerOption{grpc.StatsHandler(otelgrpc.NewServerHandler())}, metricOpts...)
 	opts := append(append([]grpc.ServerOption(nil), metricOpts...), authCheck.ServerOptions()...)
 	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity), grpcserver.RegisterGas(gas), grpcserver.RegisterPhone(phone), grpcserver.RegisterTel(tel))
 	if err == nil && gs == nil {
@@ -155,7 +159,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	b.WithGRPCServer(gs).WithHTTPServer(gw).WithBackground(payments)
 
 	// The internal gRPC server (task 044; bill: service.internalGrpc): PaymentComplete only, with the
-	// request metrics and no auth check, as bill. Off while server.internal_grpc.addr is empty.
+	// tracing, the request metrics and no auth check, as bill. Off while server.internal_grpc.addr is empty.
 	if cfg.InternalGRPCAddr != "" {
 		internal, err := grpcserver.NewWithOptions(cfg.InternalGRPCAddr, metricOpts, grpcserver.RegisterPaymentComplete(grpcserver.NewPaymentComplete(grpcserver.PaymentCompleteDeps{
 			Payments: payments, ServiceID: uint32(serviceID), EcosystemName: cfg.ServiceEcosystemName, Logger: logger,

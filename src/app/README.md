@@ -1,9 +1,11 @@
-<!-- VERSION: 0.37 -->
+<!-- VERSION: 0.38 -->
 # app
 
 `app` is the bootstrap of the Qabz service. The type `App` owns every long-lived dependency: the logger, the Postgres database, the Redis cache, the metrics endpoint and the optional tracer. Entry points (for example `cmd/start-app`) build an `App` and run it. They hold no wiring of their own.
 
 `App` depends only on small interfaces (`Logger`, `Database`, `Cache`, `Metrics`, `Tracer`), never on the concrete Postgres, Redis, zap or Prometheus types. Only `Config` is a concrete type. You make an `App` with `Builder`. `Build()` fails if the logger, database, cache or metrics is missing. `NewDefaultBuilder` is the one place that creates the real implementations from `Config`, which is read from a YAML file.
+
+**Tracing (task 047, conventions § 17).** With `logs.otlp_endpoint` set (`host:port` of the OTLP gRPC receiver; the compose `jaeger`, profile `tracing`: `localhost:4317`), `NewDefaultBuilder` starts the tracer (`common/monitoring/jaeger`), which also sets the W3C `traceparent` propagator. Both gRPC servers get the `otelgrpc` server handler as their first option; the gateway, the gRPC provider clients and the default HTTP client of the HTTP adapters (`provider.NewHTTPClient`) send `traceparent`; the Postgres pool, the Redis client and the Kafka producer make their own spans. These are made before the tracer starts: the global provider and propagator of OpenTelemetry delegate to the first ones that are set. With the key empty, no span is recorded, no header is sent and no connection is made. `system.html` (Logs) has the shape of the traces.
 
 `Start` pings the database and the cache, prints their status in the log (host, port and database name only, never a password), and starts the metrics endpoint. If a step fails, it releases what it opened. `Stop` closes everything in reverse order and is safe to call twice. `Run` starts, waits for the context to end, then stops. Tests build an `App` with fakes and need no running server.
 

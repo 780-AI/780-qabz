@@ -11,6 +11,12 @@ import (
 
 	ckafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
+	"qabz/common/monitoring/jaeger/jaegertest"
 )
 
 // billLeastBytes is the rule of kafka-go v0.4.31 LeastBytes.Balance as bill's writer runs it,
@@ -222,4 +228,47 @@ func TestPublishNoBroker(t *testing.T) {
 	defer ccancel()
 	assert.NoError(t, p.Close(cctx), "nothing in the queue")
 	assert.NoError(t, p.Close(cctx), "a second close does nothing")
+}
+
+// TestPublishSpans (task 047 D9): with tracing on, each publish is a producer span kafka.Publish, a
+// child of the span in ctx, with the topic and the result; a failed publish has the error status;
+// the message still has no header (conventions § 17 exception).
+func TestPublishSpans(t *testing.T) {
+	const topic = "paymentwriter"
+	sr := jaegertest.Install(t)
+	mc := mockCluster(t, topic, 1)
+	p, err := New(Options{Brokers: []string{mc.BootstrapServers()}, ClientID: "bill"})
+	if !assert.NoError(t, err) || !assert.NotNil(t, p) {
+		return
+	}
+	defer func() { _ = p.Close(context.Background()) }()
+
+	ctx, parent := otel.Tracer("test").Start(context.Background(), "parent")
+	pctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	assert.NoError(t, p.Publish(pctx, topic, []byte("bill"), []byte(`{"phone":"989121234567"}`)))
+	cancel()
+	dead, dcancel := context.WithCancel(ctx)
+	dcancel()
+	assert.Error(t, p.Publish(dead, topic, []byte("bill"), []byte("x")))
+	parent.End()
+
+	spans := jaegertest.ByName(sr, "kafka.Publish")
+	if !assert.Len(t, spans, 2) {
+		return
+	}
+	for i, want := range []string{ResultOK, ResultError} {
+		s := spans[i]
+		assert.Equal(t, trace.SpanKindProducer, s.SpanKind())
+		assert.Equal(t, parent.SpanContext().SpanID(), s.Parent().SpanID())
+		assert.ElementsMatch(t, []attribute.KeyValue{attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.destination.name", topic), attribute.String("result", want)}, s.Attributes())
+	}
+	assert.Equal(t, codes.Unset, spans[0].Status().Code)
+	assert.Equal(t, codes.Error, spans[1].Status().Code)
+	jaegertest.AssertClean(t, sr.Ended(), "989121234567")
+
+	got := readAll(t, mc.BootstrapServers(), topic, 1, 1)
+	if assert.Len(t, got, 1) && assert.NotNil(t, got[0]) {
+		assert.Empty(t, got[0].Headers, "no trace header on the payment message")
+	}
 }

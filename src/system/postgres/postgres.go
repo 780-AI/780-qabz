@@ -3,6 +3,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -10,9 +11,18 @@ import (
 // Client wraps a pgx pool.
 type Client struct{ pool *pgxpool.Pool }
 
-// New opens the pool. pgx connects lazily, so call Ping to check the server.
+// New opens the pool. pgx connects lazily, so call Ping to check the server. Each query of the pool
+// is a span (the tracer of tracer.go; task 047).
 func New(ctx context.Context, dsn string) (*Client, error) {
-	pool, err := pgxpool.New(ctx, dsn)
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	if cfg == nil || cfg.ConnConfig == nil {
+		return nil, errors.New("postgres: ParseConfig returned no config")
+	}
+	cfg.ConnConfig.Tracer = tracer{}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

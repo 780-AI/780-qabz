@@ -11,9 +11,16 @@ import (
 	_ "time/tzdata" // the Asia/Tehran zone also where the system has no zone files
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
+	"qabz/common/monitoring/jaeger"
 	"qabz/provider"
 )
+
+// settleJobSpan is the root span of the settlement in the background (task 047).
+const settleJobSpan = "order.Payments.settle"
 
 // The payment step of an order (task 044; bill: controller/payment/orderComplete.go and
 // service/billPayment/completeOrder.go CompleteOrder). The payment service calls it after the user
@@ -287,7 +294,7 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 	}
 	p.countPayment(o.BillType, name, o.Status)
 	if o.Status == StatusSuccess {
-		p.background(o)
+		p.background(ctx, o)
 	}
 	return o, nil
 }
@@ -314,8 +321,9 @@ func (p *Payments) countPayment(billType, providerName, result string) {
 }
 
 // background starts the job of a successful payment, unless Stop was called (then the job is
-// dropped with one error line: the settlement worker of task 046 settles the order later).
-func (p *Payments) background(o Order) {
+// dropped with one error line: the settlement worker of task 046 settles the order later). ctx is
+// the context of the request: the job gets a link to its span, not its deadline.
+func (p *Payments) background(ctx context.Context, o Order) {
 	p.mu.Lock()
 	if p.stopped {
 		p.mu.Unlock()
@@ -326,21 +334,33 @@ func (p *Payments) background(o Order) {
 	}
 	p.jobs.Add(1)
 	p.mu.Unlock()
+	link := trace.LinkFromContext(ctx)
 	p.spawn(func() {
 		defer p.jobs.Done()
-		p.settle(o)
+		p.settle(link, o)
 	})
 }
 
 // settle is the background job of a successful payment (bill: go s.updateCache and go
 // s.ConfirmPayment). A panic is recovered and logged.
-func (p *Payments) settle(o Order) {
+//
+// The job continues after the answer, so it is a new root span settleJobSpan with a link to the
+// span of the request (conventions § 17; task 047): the request trace ends with the answer, and
+// the job can still be found from it. The writes and the settlement are its children.
+func (p *Payments) settle(link trace.Link, o Order) {
+	ctx, span := otel.Tracer("qabz/core/order").Start(context.Background(), settleJobSpan, trace.WithNewRoot(),
+		trace.WithLinks(link), trace.WithAttributes(attribute.String("order.id", o.OrderID),
+			attribute.String("bill_type", o.BillType), attribute.String("provider", o.ProviderName)))
+	defer span.End()
 	defer func() {
-		if r := recover(); r != nil && p.log != nil {
-			p.log.Error("order complete: settlement panic", "order_id", o.OrderID, "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
+		if r := recover(); r != nil {
+			jaeger.Fail(span, "panic", nil)
+			if p.log != nil {
+				p.log.Error("order complete: settlement panic", "order_id", o.OrderID, "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
+			}
 		}
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), p.settleTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.settleTimeout)
 	defer cancel()
 
 	// bill: updateCache.

@@ -10,6 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
+	"qabz/common/monitoring/jaeger"
 )
 
 // Hot-reload: a field with the tag `hot_reload:"true"` is read again from the backend source
@@ -229,14 +235,24 @@ func (r *Reloader[T]) loop(ctx context.Context, done chan struct{}) {
 	}
 }
 
+// reloadSpan is the root span of each config reload (task 047).
+const reloadSpan = "config reload"
+
 // Reload loads the rows once and assigns the changed values. It returns the keys that changed.
 // A row with an unknown key, a wrong type or a bad value is skipped and logged; the other rows apply.
+// Each run is a root span reloadSpan with the result ok or error (conventions § 17: a run that no
+// request starts; task 047).
 func (r *Reloader[T]) Reload(ctx context.Context) []string {
+	ctx, span := otel.Tracer("qabz/config").Start(ctx, reloadSpan, trace.WithNewRoot())
+	defer span.End()
 	rows, err := r.repo.Load(ctx)
 	if err != nil {
+		span.SetAttributes(attribute.String("result", "error"))
+		jaeger.Fail(span, "error", err)
 		r.log.Error("config reload failed; keeping the last values", "error", err)
 		return nil
 	}
+	span.SetAttributes(attribute.String("result", "ok"))
 	cur := r.holder.Get()
 	next := cur
 	v := reflect.ValueOf(&next).Elem()

@@ -14,8 +14,9 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	"qabz/common/monitoring/jaeger"
 )
 
 // Cron is one worker. Run gets an Extender: after each page of work it calls Charge with the
@@ -236,6 +237,19 @@ func (r *Runner) loop(ctx context.Context, c Cron) {
 func (r *Runner) tick(ctx context.Context, c Cron) {
 	name := c.Name()
 	result := ResultError
+	// The root span of the tick (conventions § 17: a cron tick starts its own root, "cron <name>").
+	// It starts before the lock (task 047), so the Redis lock command is in the tick trace too. The
+	// steps of the worker are its children. no_lock is the normal result of the other instances: no
+	// error status. This defer runs last, after the recover below has set the result.
+	ctx, span := otel.Tracer("qabz/entry/cron").Start(ctx, "cron "+name, trace.WithNewRoot(),
+		trace.WithAttributes(attribute.String("cron", name)))
+	defer func() {
+		span.SetAttributes(attribute.String("result", result))
+		if result != ResultDone && result != ResultNoLock {
+			jaeger.Fail(span, result, nil)
+		}
+		span.End()
+	}()
 	defer func() {
 		if p := recover(); p != nil {
 			result = ResultError
@@ -251,6 +265,7 @@ func (r *Runner) tick(ctx context.Context, c Cron) {
 	ttl, base := c.Lock().TTL()
 	lock, err := r.locker.TryLock(ctx, r.lockKey(name), ttl)
 	if err != nil {
+		jaeger.Fail(span, ResultError, err)
 		if ctx.Err() == nil && r.log != nil {
 			r.log.Error("cron: lock failed", "name", name, "error", err)
 		}
@@ -260,17 +275,6 @@ func (r *Runner) tick(ctx context.Context, c Cron) {
 		result = ResultNoLock
 		return
 	}
-	// The root span of the run (conventions § 17: a cron tick starts its own root, "cron <name>").
-	// The steps of the worker are its children.
-	ctx, span := otel.Tracer("qabz/entry/cron").Start(ctx, "cron "+name, trace.WithNewRoot(),
-		trace.WithAttributes(attribute.String("cron", name)))
-	defer func() {
-		span.SetAttributes(attribute.String("result", result))
-		if result != ResultDone {
-			span.SetStatus(codes.Error, result)
-		}
-		span.End()
-	}()
 	start := r.now()
 	defer func() {
 		if r.onDuration != nil {
@@ -283,7 +287,7 @@ func (r *Runner) tick(ctx context.Context, c Cron) {
 		}
 	}()
 	if err := c.Run(ctx, &extender{lock: lock, base: base}); err != nil {
-		span.RecordError(err)
+		jaeger.Fail(span, ResultError, err)
 		if ctx.Err() == nil && r.log != nil {
 			r.log.Error("cron: run failed", "name", name, "error", err)
 		}
