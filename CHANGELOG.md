@@ -1,7 +1,8 @@
-<!-- VERSION: 3.37 -->
+<!-- VERSION: 3.38 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.38 — 2026-11-15 — Added session-wrap-up (task 046 session) entry.
 v3.37 — 2026-11-15 — Added 046-karashop-settle-worker entry.
 v3.36 — 2026-11-15 — Added conventions-17-tracing entry.
 v3.35 — 2026-11-15 — Added 045-parsian-status-worker entry.
@@ -153,6 +154,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Session wrap-up (task 046 session)
+- **Type:** Minor (documentation; no code, no new files).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.77: 3 lesson candidates and more evidence for 2); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. Session commits 2fd294e (task 046 design) and f35c491 (task 046) are pushed, with the six earlier local commits (92b7498..f35c491); this wrap-up commit is pushed after it.
+- **QA scenarios:** none (documentation only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Task 046: the Karashop settlement worker
 - **Type:** Major (a new background worker, new config keys, a change of the stored orders rows, a metric label, the first spans, `system.html`).

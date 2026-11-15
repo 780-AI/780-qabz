@@ -1,4 +1,4 @@
-<!-- VERSION: 2.38 -->
+<!-- VERSION: 2.39 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.37 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.38 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.38 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.39 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.49 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.76 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.77 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.24 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-15
-- **Change**: 2026-11-15 — Task 046 `karashop_settle_worker`: the settlement worker (`src/core/reconcile/settle.go`) and the shared `order.Settler` (`src/core/order/settle.go`), `OrderRepository.ConfirmCandidates`, the insert writes `is_raw` and `provider_confirmed` as `false`, the root span of each worker run, new keys `confirm_payment.telephone.*`, the label `source` of `qabz_order_settle_total`; `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.37, #5 manifest v2.38, #6 folder_structure v0.49, #21 system.html v2.17, #28 OPEN_TASKS v1.76, #34 app README v0.37, #35 this_vs_bill v0.24.
-- **Previous change**: 2026-11-15 — Conventions § 17 tracing for every feature (OpenTelemetry spans to Jaeger, one trace for each path of execution; root, child and error rules; no personal attributes; span-tree tests); new pending task `047_tracing_backfill` for the features that exist (not manifest-tracked); task counter 048. Bumped #3 CHANGELOG v3.36, #5 manifest v2.37, #28 OPEN_TASKS v1.75, #30 PROJECT_SPECIFIC_CONVENTIONS v0.24.
+- **Change**: 2026-11-15 — Session wrap-up (task 046 session): 3 lesson candidates and more evidence for 2 in the register; no code, no new files. Bumped #3 CHANGELOG v3.38, #5 manifest v2.39, #28 OPEN_TASKS v1.77.
+- **Previous change**: 2026-11-15 — Task 046 `karashop_settle_worker`: the settlement worker (`src/core/reconcile/settle.go`) and the shared `order.Settler` (`src/core/order/settle.go`), `OrderRepository.ConfirmCandidates`, the insert writes `is_raw` and `provider_confirmed` as `false`, the root span of each worker run, new keys `confirm_payment.telephone.*`, the label `source` of `qabz_order_settle_total`; `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.37, #5 manifest v2.38, #6 folder_structure v0.49, #21 system.html v2.17, #28 OPEN_TASKS v1.76, #34 app README v0.37, #35 this_vs_bill v0.24.
+- **Earlier change**: 2026-11-15 — Conventions § 17 tracing for every feature (OpenTelemetry spans to Jaeger, one trace for each path of execution; root, child and error rules; no personal attributes; span-tree tests); new pending task `047_tracing_backfill` for the features that exist (not manifest-tracked); task counter 048. Bumped #3 CHANGELOG v3.36, #5 manifest v2.37, #28 OPEN_TASKS v1.75, #30 PROJECT_SPECIFIC_CONVENTIONS v0.24.
 - **Earlier change**: 2026-11-15 — Task 045 `parsian_status_worker`: the shared worker runner (`src/entry/cron/`), the Parsian status worker (`src/core/reconcile/`), the Kafka producer (`src/system/kafka/`, confluent-kafka-go), the Redis key prefix and lock (`src/system/redis/`), `OrderRepository.PendingIDs` and `InsertFinal`, the adapter `Status` of Parsian, new keys (`service.ecosystem_name`, `database.redis.prefix`, `providers.internal.parsian.get_status.enabled`, the `kafka` block, `debug.mocks.parsian.status_return_type`); `currentStep` of `OrderComplete` = `service.ecosystem_name`; `Makefile`, `docker-compose.yml`, `config.yml.example` (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.35, #5 manifest v2.36, #6 folder_structure v0.48, #21 system.html v2.16, #28 OPEN_TASKS v1.74, #30 conventions v0.23, #34 app README v0.36, #35 this_vs_bill v0.23.
 - **Earlier change**: 2026-11-15 — Task 044 QA scenario passed (steps 1 and 2; a second run by the agent, the operator said to mark it passed): removed from the register; step 3 (the real end-to-end test, operator) stays as its own item; no code, no new files. Bumped #3 CHANGELOG v3.34, #5 manifest v2.35, #28 OPEN_TASKS v1.73.
 - **Earlier change**: 2026-11-15 — Task 044 `tel_order_payment`: `POST /v2/tel/order` (the landline order through Parsian), `PaymentComplete/OrderComplete` on the new internal gRPC server (`server.internal_grpc.addr`), the Parsian payment and the Karashop settlement at once; new code files `src/core/order/complete.go`, `src/provider/karashop/settle.go`, `src/entry/grpc/tel_order.go`, `src/entry/grpc/payment.go` and their tests (Go files have no VERSION header, so no rows); `config.yml.example` and the Postman collection (no VERSION header, no row); the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.33, #5 manifest v2.34, #6 folder_structure v0.47, #21 system.html v2.15, #28 OPEN_TASKS v1.72, #30 conventions v0.22, #34 app README v0.35, #35 this_vs_bill v0.22.

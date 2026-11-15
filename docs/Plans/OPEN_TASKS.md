@@ -1,7 +1,8 @@
-<!-- VERSION: 1.76 -->
+<!-- VERSION: 1.77 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v1.77 — 2026-11-15 — Session wrap-up (task 046 session): 3 lesson candidates and more evidence for 2 others; push of 92b7498..f35c491 done.
 v1.76 — 2026-11-15 — Task 046 Karashop settlement worker: QA scenario (feature-ON run done by the implementer, awaiting operator) and follow-ups added.
 v1.75 — 2026-11-15 — Task 013 follow-up: the tracing of all endpoints is now task 047 (conventions § 17).
 v1.74 — 2026-11-15 — Task 045 Parsian status worker: QA scenario (feature-ON run done by the implementer, awaiting operator) and follow-ups added; the task 044 follow-up (e) names task 045 as done.
@@ -448,3 +449,12 @@ Found in the 2026-11-14 session wrap-up (task 041 session):
 - **A bulk rename also changes quotes of the other system.** `sed s/paymentServer/payment_server/` also changed the `bill` key names in task 039 and in a `config.go` comment; the agent restored them. Candidate: after a bulk rename of a name that `bill` also uses, grep the result for `bill:` quotes and the other task files before the review.
 - **A text built at run time escapes a rename of literal paths.** The sed of `providers.<provider>` changed every literal path, but the warn line of `disabledNotice` (`"providers." + name + ".enabled ..."`) still named the old path; only the test run found it. Candidate: grep for `"providers." +` (string concatenation of a key path) in each config rename.
 - More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): two runs in task 041 found a hand-written key sort (conventions § 5) and an old test comment that the in-chat review did not see.
+
+Found in the 2026-11-15 session wrap-up (task 046 session):
+
+- **Check how bill stores a zero value before copying its query.** bill's settlement query asks `provider_confirmed is false`, but go-pg writes `DEFAULT` for a `false`, and the column has no default, so bill stores NULL and the query finds no row; the Qabz insert (task 044) wrote NULL too. Only the live test (`TestLiveConfirmCandidates`, 0 rows) found it; the code read of bill did not. The operator then made Qabz write `false` (task 046 D13). Candidate: when a task copies a bill query with `IS false`, `= 0` or `= ''`, check the stored value of each column in bill (go-pg zero value → `DEFAULT`, so NULL without a column default; bill's migrations) and in the Qabz insert, before the design. Recommendation: queue (one instance; a conventions or a memory entry when it repeats).
+- **Recheck an answer that rested on an option the operator did not pick.** The agent said that the `is_raw` NULL "does not affect task 046" because it assumed the query option `IS NOT TRUE`; the operator picked "write false", so the premise was false, and the agent had to ask again. Candidate: after each operator answer, recheck the earlier answers and recommendations of the same turn that depend on the option that was not picked. Recommendation: queue.
+- **Name the status in a design, not "a failed order".** The operator read "a failed order is sent again" as a failed (or pending) payment; the agent meant a paid order whose Karashop settlement failed. Candidate: in a design for the operator, name an order by its status and the step that failed (for example "a `success` order whose settlement failed"). Recommendation: queue.
+- More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): the agent ran before the task 046 commit and found a gofmt defect in a new live test that the in-chat checks did not run on (the `gofmt -l` of the agent covered new, untracked files). Recommendation: unchanged, queue; codify soon (many instances).
+- More evidence for **Shared local runtime** (2026-11-08): the operator's debug App was on 8080 / 8082 / 9090; the feature-ON run used App copies on 18080 / 18082 / 19090 and 28080 / 28082 / 29090, inserted its own QA rows (bill IDs `qa046-*`) in the dev database and deleted them after the run. Recommendation: unchanged.
+
