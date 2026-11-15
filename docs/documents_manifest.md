@@ -1,4 +1,4 @@
-<!-- VERSION: 2.34 -->
+<!-- VERSION: 2.35 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.33 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.34 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.34 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.35 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.47 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.72 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.73 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.22 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-15
-- **Change**: 2026-11-15 — Task 044 `tel_order_payment`: `POST /v2/tel/order` (the landline order through Parsian), `PaymentComplete/OrderComplete` on the new internal gRPC server (`server.internal_grpc.addr`), the Parsian payment and the Karashop settlement at once; new code files `src/core/order/complete.go`, `src/provider/karashop/settle.go`, `src/entry/grpc/tel_order.go`, `src/entry/grpc/payment.go` and their tests (Go files have no VERSION header, so no rows); `config.yml.example` and the Postman collection (no VERSION header, no row); the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.33, #5 manifest v2.34, #6 folder_structure v0.47, #21 system.html v2.15, #28 OPEN_TASKS v1.72, #30 conventions v0.22, #34 app README v0.35, #35 this_vs_bill v0.22.
-- **Previous change**: 2026-11-15 — Config comment: the `service.id` comment of `config.yml.example` names 108, the ID of the deployed `bill` (was 105); no runtime impact; `config.yml.example` has no VERSION header, no row. Bumped #3 CHANGELOG v3.32, #5 manifest v2.33.
+- **Change**: 2026-11-15 — Task 044 QA scenario passed (steps 1 and 2; a second run by the agent, the operator said to mark it passed): removed from the register; step 3 (the real end-to-end test, operator) stays as its own item; no code, no new files. Bumped #3 CHANGELOG v3.34, #5 manifest v2.35, #28 OPEN_TASKS v1.73.
+- **Previous change**: 2026-11-15 — Task 044 `tel_order_payment`: `POST /v2/tel/order` (the landline order through Parsian), `PaymentComplete/OrderComplete` on the new internal gRPC server (`server.internal_grpc.addr`), the Parsian payment and the Karashop settlement at once; new code files `src/core/order/complete.go`, `src/provider/karashop/settle.go`, `src/entry/grpc/tel_order.go`, `src/entry/grpc/payment.go` and their tests (Go files have no VERSION header, so no rows); `config.yml.example` and the Postman collection (no VERSION header, no row); the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.33, #5 manifest v2.34, #6 folder_structure v0.47, #21 system.html v2.15, #28 OPEN_TASKS v1.72, #30 conventions v0.22, #34 app README v0.35, #35 this_vs_bill v0.22.
+- **Earlier change**: 2026-11-15 — Config comment: the `service.id` comment of `config.yml.example` names 108, the ID of the deployed `bill` (was 105); no runtime impact; `config.yml.example` has no VERSION header, no row. Bumped #3 CHANGELOG v3.32, #5 manifest v2.33.
 - **Earlier change**: 2026-11-15 — Task 042 `order_token_kid`: new key `providers.internal.payment_server.kid`, the `kid` of the order token header (empty: `service.name`; `Config.OrderTokenKID`); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; the task file is in `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.31, #5 manifest v2.32, #21 system.html v2.14, #28 OPEN_TASKS v1.71, #34 app README v0.34, #35 this_vs_bill v0.21.
 - **Earlier change**: 2026-11-14 — Postman: one `BASE_URL` and the web client headers (operator request), with the task 039 requests Phone / Order V2 and Payment (external) / Invoice; the collection has no VERSION header, no row; conventions § 7 names `BASE_URL`. Bumped #3 CHANGELOG v3.30, #5 manifest v2.31, #30 conventions v0.21.
 - **Earlier change**: 2026-11-14 — Config `service.name`: the service name moves into the `service` block (was the top-level `service_name`; operator request); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; `src/app/README.md` names the key (no version bump: the key name only). Bumped #3 CHANGELOG v3.29, #5 manifest v2.30.
