@@ -30,8 +30,8 @@ func TestParseDefaults(t *testing.T) {
 
 const fullYAML = `
 mode: stage
-service_name: "svc"
 service:
+  name: "svc"
   id: 105
 hot_reload_interval: "5s"
 logs:
@@ -97,12 +97,12 @@ func TestParseEmptyFile(t *testing.T) {
 
 func TestParseWrongTypesAndBadYAML(t *testing.T) {
 	for name, doc := range map[string]string{
-		"string given a number":   "mode: dev\nservice_name: 5\ndatabase: {postgres: {password: pw}}",
+		"string given a number":   "mode: dev\nservice: {name: 5}\ndatabase: {postgres: {password: pw}}",
 		"int given a string":      "mode: dev\ndatabase: {postgres: {password: pw, port: \"5432\"}}",
 		"bool given a string":     "mode: dev\ndatabase: {postgres: {password: pw}, migration: {on_start: \"yes\"}}",
 		"duration given a number": "mode: dev\nhot_reload_interval: 30\ndatabase: {postgres: {password: pw}}",
 		"bad duration":            "mode: dev\nhot_reload_interval: soon\ndatabase: {postgres: {password: pw}}",
-		"null":                    "mode: dev\nservice_name:\ndatabase: {postgres: {password: pw}}",
+		"null":                    "mode: dev\nservice:\n  name:\ndatabase: {postgres: {password: pw}}",
 		"object given an array":   "mode: dev\ndatabase: [1, 2]",
 		"scalar in the path":      "mode: dev\ndatabase: {postgres: 5}",
 		"root is an array":        "- a\n- b",

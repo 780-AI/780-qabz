@@ -1,4 +1,4 @@
-<!-- VERSION: 2.29 -->
+<!-- VERSION: 2.30 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.28 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.29 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.29 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.30 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.46 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-14
-- **Change**: 2026-11-14 — Task 039 `mobile_irancell_order`: `POST /v2/mobile/order` for the Irancell operator on the new order flow (`src/core/order/`), fee resolver (`src/core/fee/`) and order token signer (`src/common/crypto/`); `src/entry/grpc/phone_order.go`; order and fee repositories; the devdb fees seed (`seed_fees.sql`, `unseed_fees.sql`); `providers.internal.payment_server.private_key_path` read at start; `config.yml.example` comments (no VERSION header, no row); the Postman requests are in the Postman commit; Go and SQL files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.28, #5 manifest v2.29, #6 folder_structure v0.46, #21 system.html v2.13, #28 OPEN_TASKS v1.70, #34 app README v0.33, #35 this_vs_bill v0.20.
-- **Previous change**: 2026-11-14 — Session wrap-up (task 041 session): 5 lesson candidates and more evidence for 1 in the register; push of ff29be7 to the wrap-up commit; no code, no new files. Bumped #3 CHANGELOG v3.27, #5 manifest v2.28, #28 OPEN_TASKS v1.69.
+- **Change**: 2026-11-14 — Config `service.name`: the service name moves into the `service` block (was the top-level `service_name`; operator request); `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; `src/app/README.md` names the key (no version bump: the key name only). Bumped #3 CHANGELOG v3.29, #5 manifest v2.30.
+- **Previous change**: 2026-11-14 — Task 039 `mobile_irancell_order`: `POST /v2/mobile/order` for the Irancell operator on the new order flow (`src/core/order/`), fee resolver (`src/core/fee/`) and order token signer (`src/common/crypto/`); `src/entry/grpc/phone_order.go`; order and fee repositories; the devdb fees seed (`seed_fees.sql`, `unseed_fees.sql`); `providers.internal.payment_server.private_key_path` read at start; `config.yml.example` comments (no VERSION header, no row); the Postman requests are in the Postman commit; Go and SQL files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.28, #5 manifest v2.29, #6 folder_structure v0.46, #21 system.html v2.13, #28 OPEN_TASKS v1.70, #34 app README v0.33, #35 this_vs_bill v0.20.
+- **Earlier change**: 2026-11-14 — Session wrap-up (task 041 session): 5 lesson candidates and more evidence for 1 in the register; push of ff29be7 to the wrap-up commit; no code, no new files. Bumped #3 CHANGELOG v3.27, #5 manifest v2.28, #28 OPEN_TASKS v1.69.
 - **Earlier change**: 2026-11-14 — Task 041 `providers_internal_external`: the provider config blocks are under `providers.internal` (irancell, jiring_switch, parsian, the new `payment_server`: address, private_key_path, not read yet) and `providers.external` (karashop, qabzino, tavanir); the old layout is not read; new test `TestProvidersGroups`; conventions § 8 rule; Go files and `config.yml.example` have no VERSION header, so no rows; the task file is in `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.26, #5 manifest v2.27, #6 folder_structure v0.45, #21 system.html v2.12, #28 OPEN_TASKS v1.68, #30 conventions v0.20, #34 app README v0.32, #35 this_vs_bill v0.19.
 - **Earlier change**: 2026-11-14 — Session wrap-up (tasks 025 and 040 session): 5 lesson candidates and more evidence for 2 in the register; push of 853d538..daf05f3 done; no code, no new files. Bumped #3 CHANGELOG v3.25, #5 manifest v2.26, #28 OPEN_TASKS v1.67.
 - **Earlier change**: 2026-11-14 — Task 025 QA scenario passed (operator confirmation, Postman, a real Karashop call): removed from the register, with follow-up (a) (the first real call); no code, no new files. Bumped #3 CHANGELOG v3.24, #5 manifest v2.25, #28 OPEN_TASKS v1.66.

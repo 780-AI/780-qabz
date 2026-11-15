@@ -5,11 +5,11 @@
 # into config.yml in the same change.
 
 mode: ""                     # required: dev, stage or prod; the devdb commands run only with dev
-service_name: "qabz"
 hot_reload_interval: "30s"
 
 service:
-  id: 0                      # ID in the payment flow (bill uses 105); sent as serviceId by GET /v1/services
+  name: "qabz"               # the name of the service: the log lines, tracing and the kid header of the order token
+  id: 0                      # ID in the payment flow (bill uses 105); sent as serviceId by GET /v1/services, GET /v1/mybill, the order answer and the order token
 
 logs:
   level: "info"

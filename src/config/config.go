@@ -35,8 +35,11 @@ type Config struct {
 	// Mode is the run environment: ModeDev, ModeStage or ModeProd. The key is required: a missing
 	// key or any other value stops the start. A mode other than ModeDev fully removes the debug
 	// section (task 020c). The development commands (devdb) run only in ModeDev.
-	Mode        string `path:"mode"`
-	ServiceName string `path:"service_name"`
+	Mode string `path:"mode"`
+	// ServiceName is the name of the service: the service field of every log line, the tracing
+	// service name and the kid header of the order token. In the service block with service.id
+	// (operator, 2026-11-14; it was the top-level key service_name).
+	ServiceName string `path:"service.name"`
 	// ServiceID is the ID of this service in the payment flow. GET /v1/services sends it as
 	// serviceId. The old bill service has the same key (service.id); qabz uses bill's ID.
 	// 0 to 2147483647 (int32 in the proto).

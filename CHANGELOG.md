@@ -1,7 +1,8 @@
-<!-- VERSION: 3.28 -->
+<!-- VERSION: 3.29 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.29 — 2026-11-14 — Added config-service-name entry.
 v3.28 — 2026-11-14 — Added 039-mobile-irancell-order entry.
 v3.27 — 2026-11-14 — Added session-wrap-up (task 041 session) entry.
 v3.26 — 2026-11-14 — Added 041-providers-internal-external entry.
@@ -144,6 +145,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Config: service.name in the service block (operator request)
+- **Type:** Major (a config key path changes).
+- **Files:** `src/config/config.go` (`ServiceName` is read from `service.name`, was `service_name`); `src/config/config_test.go` (test YAML); `config.yml.example` (`service.name` next to `service.id`); `src/app/README.md` (the key name; the Postman description names it in the commit of the Postman `BASE_URL` change); `CHANGELOG.md`; `docs/documents_manifest.md`. The local `config.yml` (git-ignored) has the block `service: {name: qabz, id: 149}` at the top (operator: `service.id` 149).
+- **Impact:** Yes, the config layout changes: the service name is `service.name` (the layout of `bill`: `service.name`, `service.id`); the top-level `service_name` is no longer read, and a config that still has it gets the default `qabz` with no error, so every stage or prod config moves the key with this release. The value is the `service` field of every log line, the tracing service name and the `kid` header of the order token. The env name of `scripts/yml_to_env` is `SERVICE_NAME` in both layouts. The local `service.id` is now 149, so `serviceId` of `GET /v1/services`, `GET /v1/mybill`, the order answer and the order token is 149 locally.
+- **QA scenarios:** none (Rule 11: the value is the same with the key moved; `TestLocalConfigInSync` checks that the local `config.yml` has the new key).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Task 039: POST /v2/mobile/order for the Irancell operator (order flow, fee, order token)
 - **Type:** Major (new endpoint, new packages `core/order`, `core/fee`, `common/crypto`; a config key is read at start; Critical File `system.html`).
