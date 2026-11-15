@@ -1,12 +1,13 @@
-<!-- VERSION: 0.2 -->
+<!-- VERSION: 1.0 -->
 <!--
 CHANGE LOG
+v1.0 — 2026-11-15 — Done (operator: "Set it as done"): tasks 044, 045 and 046 are done; the real end-to-end test is not run yet and stays open in `OPEN_TASKS.md` (operator decision: the close does not wait for it); moved to done_tasks.
 v0.2 — 2026-11-15 — Operator decisions A (as bill), B (no reject, as bill) and C (a Kafka client, the message of bill exactly) recorded.
 v0.1 — 2026-11-15 — Created (operator request): the supertask of the telephone payment; split into tasks 044, 045 and 046.
 -->
 # 043_tel_payment — telephone (landline) payment through Parsian (supertask)
 
-Status: pending
+Status: done (2026-11-15, operator decision; the real end-to-end test is still open in `OPEN_TASKS.md`)
 
 ## Description
 
@@ -51,4 +52,4 @@ Help:
 
 - Tasks 044, 045 and 046 are done.
 - Operator decisions A, B and C are applied, and each difference from `bill` is an item in `docs/this_vs_bill.md`.
-- The operator ran the real end-to-end test (a real tel payment through the payment service, Parsian and Karashop) and confirmed it.
+- The operator ran the real end-to-end test (a real tel payment through the payment service, Parsian and Karashop) and confirmed it. **Not done at the close:** the operator closed the task on 2026-11-15 ("Set it as done") before the test; the test stays ⏸ in `OPEN_TASKS.md` (the task 044 real end-to-end test).

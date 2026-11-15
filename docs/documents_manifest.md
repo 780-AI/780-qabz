@@ -1,4 +1,4 @@
-<!-- VERSION: 2.44 -->
+<!-- VERSION: 2.45 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.43 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.44 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.44 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.45 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.50 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.80 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.81 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.26 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-15
-- **Change**: 2026-11-15 — Task 051 tracing switch and `enabled` keys: `logs.tracing.enabled` and `logs.tracing.otlp_endpoint` (was `logs.otlp_endpoint`), `debug.mocks.<provider>.enabled` (was `.enable`), the renamed-key check, the § 8 rule and its test; `config.yml.example`, `docker-compose.yml` (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.43, #5 manifest v2.44, #21 system.html v2.19, #28 OPEN_TASKS v1.80, #30 conventions v0.26, #34 app README v0.39.
-- **Previous change**: 2026-11-15 — New task 051 `tracing_switch_and_enabled_keys` started with the approved design (D1 (a), D2 (a), D3 (a), D4 (a)); `task_counter.json` is 052; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.42, #5 manifest v2.43.
+- **Change**: 2026-11-15 — Supertask 043 `tel_payment` done (operator decision, before the real end-to-end test, which stays open in OPEN_TASKS); the task file moved to `done_tasks/` (not manifest-tracked); no code. Bumped #3 CHANGELOG v3.44, #5 manifest v2.45, #28 OPEN_TASKS v1.81.
+- **Previous change**: 2026-11-15 — Task 051 tracing switch and `enabled` keys: `logs.tracing.enabled` and `logs.tracing.otlp_endpoint` (was `logs.otlp_endpoint`), `debug.mocks.<provider>.enabled` (was `.enable`), the renamed-key check, the § 8 rule and its test; `config.yml.example`, `docker-compose.yml` (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.43, #5 manifest v2.44, #21 system.html v2.19, #28 OPEN_TASKS v1.80, #30 conventions v0.26, #34 app README v0.39.
+- **Earlier change**: 2026-11-15 — New task 051 `tracing_switch_and_enabled_keys` started with the approved design (D1 (a), D2 (a), D3 (a), D4 (a)); `task_counter.json` is 052; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.42, #5 manifest v2.43.
 - **Earlier change**: 2026-11-15 — New pending task 050 `irancell_status_worker` (the Irancell status worker on the shared status worker of task 045, with the defects of bill's worker fixed, every error logged and a metric of the statuses fixed in each run); `task_counter.json` is 051; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.41, #5 manifest v2.42.
 - **Earlier change**: 2026-11-15 — Task 047 shared tracing parts: the W3C propagator and `jaeger.Fail`, the test helper `src/common/monitoring/jaeger/jaegertest/`, the gRPC server and gateway client spans, the outbound gRPC and HTTP client spans (`src/provider/http.go`), the pgx tracer (`src/system/postgres/tracer.go`), `redisotel`, `kafka.Publish`, the roots `providers load`, `config reload` and the settlement root with a link, the cron root before the lock, the compose Jaeger; `docker-compose.yml`, `config.yml.example` (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.40, #5 manifest v2.41, #6 folder_structure v0.50, #21 system.html v2.18, #28 OPEN_TASKS v1.79, #30 conventions v0.25, #34 app README v0.38.
 - **Earlier change**: 2026-11-15 — Task 047 split (operator decision S1): task 047 (shared tracing parts) started with the approved design; new pending task `049_feature_spans` (the spans of each feature); task files not manifest-tracked; task counter 050. Bumped #3 CHANGELOG v3.39, #5 manifest v2.40, #28 OPEN_TASKS v1.78.

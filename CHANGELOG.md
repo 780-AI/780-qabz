@@ -1,7 +1,8 @@
-<!-- VERSION: 3.43 -->
+<!-- VERSION: 3.44 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.44 — 2026-11-15 — Added 043-supertask-done entry.
 v3.43 — 2026-11-15 — Added 051-tracing-switch-and-enabled-keys entry.
 v3.42 — 2026-11-15 — Added 051-task-started entry.
 v3.41 — 2026-11-15 — Added 050-task entry.
@@ -159,6 +160,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Supertask 043 `tel_payment` done (operator decision)
+- **Type:** Minor (governance: a task file and the register; no code).
+- **Files:** `docs/Plans/done_tasks/043_tel_payment.md` (moved from `pending_tasks/`, v1.0: tasks 044, 045 and 046 are done; the real end-to-end test is not run, so its DoD line says so; not manifest-tracked); `docs/Plans/OPEN_TASKS.md` (v1.81: the real end-to-end test item stays open and names the early close); `docs/documents_manifest.md`.
+- **Impact:** No runtime impact. The operator closed the supertask on 2026-11-15 ("Set it as done") before the real end-to-end test; the test stays ⏸ in `OPEN_TASKS.md`.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Task 051: the tracing switch and one name (`enabled`) for the on/off keys
 - **Type:** Major (config-key changes, a Critical File).
