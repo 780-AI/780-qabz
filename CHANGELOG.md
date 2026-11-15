@@ -1,7 +1,8 @@
-<!-- VERSION: 3.35 -->
+<!-- VERSION: 3.36 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.36 — 2026-11-15 — Added conventions-17-tracing entry.
 v3.35 — 2026-11-15 — Added 045-parsian-status-worker entry.
 v3.34 — 2026-11-15 — Added 044-qa-scenario-passed entry.
 v3.33 — 2026-11-15 — Added 044-tel-order-payment entry.
@@ -151,6 +152,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Conventions § 17: tracing for every feature; task 047 created
+- **Type:** Minor (governance: a new binding code rule and a new pending task; no code).
+- **Files:** `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.24: new § 17, every added or changed feature is traced with OpenTelemetry spans that go to Jaeger, one trace for each path of execution from the entry to the last dependency call: a root span for each request, tick or message, a child span for each Postgres, Redis, provider and Kafka call, `ctx` down the full path, W3C trace context on outbound calls, no trace header on the bill Kafka message (task 045 decision C), fixed span names, no personal or free input in attributes, the error status on failures, the no-op provider when `logs.otlp_endpoint` is empty, span-tree tests, `code-reviewer` enforcement); `docs/Plans/pending_tasks/047_tracing_backfill.md` (new: the shared tracing parts and the spans of every feature that exists, tasks 003 to 045; not manifest-tracked); `docs/Plans/pending_tasks/task_counter.json` (048); `docs/Plans/OPEN_TASKS.md` (v1.75: the task 013 follow-up names task 047); `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The rule binds new and changed code from now on; the features that exist get their spans in task 047. `docs/initial-discovery/system.html` still says that every request is a span; task 047 makes the code match it and updates the doc in the same commit.
+- **QA scenarios:** none (Rule 11: a governance edit with no behavior impact; task 047 brings its own scenario).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Task 045: the Parsian status worker, the shared worker runner and the Kafka producer
 - **Type:** Major (new modules, a background worker, a new external dependency, new config keys, a change of the `OrderComplete` answer, `system.html` and conventions §§ 15, 16).

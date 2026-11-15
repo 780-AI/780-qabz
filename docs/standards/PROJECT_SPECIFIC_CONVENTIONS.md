@@ -1,7 +1,8 @@
-<!-- VERSION: 0.23 -->
+<!-- VERSION: 0.24 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v0.24 — 2026-11-15 — New § 17 (operator): every added or changed feature is traced with OpenTelemetry spans sent to Jaeger, one trace for each path of execution, from the entry to the last dependency call; the features that exist get their spans in task 047.
 v0.23 — 2026-11-15 — Task 045: § 15 names `status_return_type` (`success`, `failed`, `pending`; fixture `provider.MockFixtures.Status`); new § 16 — every Redis key goes through `redis.Client.Key`, so it has `database.redis.prefix` (supertask 043 operator rule).
 v0.22 — 2026-11-15 — Task 044 (operator decision D14 (a)): § 15 — one return-type key for each provider method (`return_type` = the inquiry; `<method>_return_type` for another method, for example `pay_return_type` with `success`, `failed`, `pending`); the mock answers a method only when the adapter gives its fixture.
 v0.21 — 2026-11-14 — Section 7: the URL variable of the collection is `BASE_URL` (was `baseUrl`; operator); a request to another service (for example the payment service) uses `BASE_URL` with the path of that service; the collection pre-request script adds the web client headers.
@@ -399,3 +400,39 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator rule of supertask 043 (2026-11-15): the prefix is for every Redis key, not only for the worker locks.
 
 **Review.** The `code-reviewer` agent searches each change for go-redis commands outside `system/redis` and for a key in `system/redis` that is not built with `Key`. Either is a defect. The verdict is NOT READY.
+
+
+## 17. Tracing for every feature
+
+**Every added or changed feature MUST be traced with OpenTelemetry spans that go to Jaeger, and the spans MUST cover the full path of execution of the feature.** A feature is what § 12 calls a feature. One path of execution is one trace, from its entry to its last dependency call. No step of the path is without a span, and no step starts a new trace.
+
+**Root span.**
+- A gRPC method or an HTTP endpoint gets its server span from the tracing interceptor of the gRPC server. The HTTP gateway sends the trace context to the gRPC server, so the gateway call and the gRPC method are one trace. A new service is registered on a server that has this interceptor.
+- A run that no request starts (a cron tick, a consumer message) starts its own root span, named `<kind> <name>` (for example `cron parsian-getstatus`).
+- A background job that a request starts and that continues after the answer (for example the settlement of task 044) starts a new root span with a link to the span of the request. Thus the request trace ends with the answer, and the job can still be found from the request.
+
+**Child spans.** Each step of the path is a child of the span in `ctx`:
+- each Postgres query, each Redis command, each call to a provider or to another service (gRPC or HTTP) and each Kafka publish;
+- each core function that makes more than one dependency call (for example the pick of the provider and the provider call of an inquiry), so the trace shows the steps of the feature and not only a flat list of calls.
+
+**Context.**
+- `ctx` goes down the full path. A function on the path never makes a new root with `context.Background()` or `context.TODO()`. Where a step must outlive the request (`context.WithoutCancel`), the span context stays in it.
+- An outbound gRPC or HTTP call sends the W3C trace context, so a Qabz service that is traced too continues the same trace.
+- **Exception: the Kafka message of the payment service** must be the message of `bill`, byte for byte, with no headers (task 045, supertask 043 decision C). The publish has its span, but the message gets no trace header. A trace header on that message needs an operator decision.
+
+**Names, attributes and errors.**
+- A span name comes from a small fixed set: the full gRPC method, `<package>.<Function>`, or the name that the instrumentation gives (for example the SQL operation). Never put an ID or other free input in a span name.
+- An attribute uses a value from a small fixed set (the bill type, the provider name, the operator, the result of § 12) or the internal order ID (`order.id`, so one payment can be followed). Never put a phone number, a bill ID, a pay ID, a user ID, an amount, a token, a password, a key or a request or answer body in a span.
+- A failure on the path calls `span.RecordError(err)` and sets the status `codes.Error` on the span where it happens. The result of the span is the same result that the feature metric of § 12 counts.
+
+**Off switch.** Tracing is off when `logs.otlp_endpoint` is empty. Then the global tracer provider is the no-op provider of OpenTelemetry, and the spans cost almost nothing. Feature code always gets its tracer with `otel.Tracer(...)` and never checks whether tracing is on.
+
+**Libraries.** Use the OpenTelemetry API (`go.opentelemetry.io/otel`) and the official instrumentation for gRPC and HTTP. The Postgres, Redis and Kafka spans come from one shared hook of `system/postgres`, `system/redis` and `system/kafka`, so feature code does not make them by hand. A new module follows § 2 (Go modules) and § 5 (standard library first). Task 047 adds the interceptor, the hooks and a Jaeger service in `docker-compose.yml`. Until task 047 is done, a new feature adds the spans of its own code, and task 047 adds the spans of the shared parts.
+
+**Tests.** A test with the in-memory exporter (`go.opentelemetry.io/otel/sdk/trace/tracetest`) checks the span tree of each feature: the root span, a child span for each dependency call of the path, the parent of each span, and the `codes.Error` status on a failure path. A test also checks that no span has a forbidden attribute (above).
+
+**Design doc.** `docs/initial-discovery/system.html` (a Critical File, `CLAUDE.md` § 4) says how Qabz is traced. A change to the shape of the traces updates it in the same commit.
+
+**Why.** Operator decision, 2026-11-15. `system.html` says that every request and every call to a provider is a span, so one payment can be followed from the request of the app to the answer of the provider. The tracer setup exists since task 002 (`common/monitoring/jaeger`), but no code made a span, so a trace in Jaeger was empty. The features that exist get their spans in task 047.
+
+**Review.** The `code-reviewer` agent checks each feature of the change against this section, with § 12 (metrics). A step of the path with no span, a new root inside the path, a span name or attribute with free or personal input, a failure with no error status, or no span-tree test is a defect. The verdict is NOT READY.
