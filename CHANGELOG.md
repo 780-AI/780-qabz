@@ -1,7 +1,8 @@
-<!-- VERSION: 3.38 -->
+<!-- VERSION: 3.39 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.39 — 2026-11-15 — Added 047-split-design entry.
 v3.38 — 2026-11-15 — Added session-wrap-up (task 046 session) entry.
 v3.37 — 2026-11-15 — Added 046-karashop-settle-worker entry.
 v3.36 — 2026-11-15 — Added conventions-17-tracing entry.
@@ -154,6 +155,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 047 split (new task 049), task 047 started, design approved
+- **Type:** Minor (governance: task files and the register; no code).
+- **Files:** `docs/Plans/in-progress_tasks/047_tracing_backfill.md` (moved from `pending_tasks/`; now only the shared tracing parts; design D1 to D17 with the operator decisions of 2026-11-15: S1 two tasks, D4 (a) no HTTP span on the gateway, D7 (a) an own pgx tracer, D10 (a) a failed span carries the result and the error type, no error text; not manifest-tracked); `docs/Plans/pending_tasks/049_feature_spans.md` (new: the core spans, the error status and the span-tree test of each feature, Part 2 of the old task 047; not manifest-tracked); `docs/Plans/pending_tasks/task_counter.json` (050; ID 048 is taken by the uncommitted `048_water_payment.md` of another writer); `docs/Plans/OPEN_TASKS.md` (v1.78: the task 013 follow-up names tasks 047 and 049); `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior: docs only.
+- **QA scenarios:** none (Rule 11: no behavior impact; tasks 047 and 049 bring their own scenarios).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Session wrap-up (task 046 session)
 - **Type:** Minor (documentation; no code, no new files).

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.77 -->
+<!-- VERSION: 1.78 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v1.78 — 2026-11-15 — Task 047 split: the task 013 follow-up names tasks 047 (the shared parts) and 049 (the spans of each feature).
 v1.77 — 2026-11-15 — Session wrap-up (task 046 session): 3 lesson candidates and more evidence for 2 others; push of 92b7498..f35c491 done.
 v1.76 — 2026-11-15 — Task 046 Karashop settlement worker: QA scenario (feature-ON run done by the implementer, awaiting operator) and follow-ups added.
 v1.75 — 2026-11-15 — Task 013 follow-up: the tracing of all endpoints is now task 047 (conventions § 17).
@@ -299,7 +300,7 @@ v1.0 — 2026-10-28 — Register committed to git (project deviation from L046).
   Pass: dev logs `auth check disabled (debug.auth.disable): development only` and gives HTTP 200; stage and prod log no such warning and give HTTP 403 `{"code":7,"message":"unauthenticated",...}`; each copy starts (`app started`) and stops with exit 0.
   Done 2026-11-09 by the implementer (ports 18080 / 18082 / 19090, the compose dev database): all pass (awaiting operator confirmation).
 - ⏸ Task 020b follow-up (2026-11-09): `make help` prints the `test` line with the literal `$(GO_TEST_ARGS) $(GO_TEST_PKGS)` (the awk of `help` expands only `$(CONFIG)`, `$(ENV_OUT)` and `$(PB_DIR)`). Decide whether `help` shows the default values or the variable names in another form.
-- ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware: request metrics done in task 014; tracing for all endpoints is task 047 (conventions § 17); panic recovery still needs its own task.
+- ⏸ Task 013 follow-ups: confirm `service.id` (a key with default 0, or a hard-coded 105); check the real `bill` database for `inquiry IS NOT TRUE` rows (`docs/this_vs_bill.md` item 1); the Step 6 middleware: request metrics done in task 014; tracing for all endpoints is tasks 047 (the shared parts) and 049 (the spans of each feature; conventions § 17); panic recovery still needs its own task.
 - ⏸ Task 009/010/011 follow-ups: confirm the HMAC variant with the auth team; ask for a secret of at least 32 bytes (RFC 7518 § 3.2; the current one has 20); `system.html` plans the JWT keys in etcd with live reload (Critical File workflow).
 - ⏸ Task 033 Tavanir provider config (2026-11-10). In `src/` run `go test -race -count=1 -run TavanirProviderKeys ./config/`.
   Pass: the test passes (defaults, values read from YAML, `failure_ratio` 100 valid and 101 rejected, the password does not print). Feature ON is not possible: no code reads the keys yet.
