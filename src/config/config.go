@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"net/url"
@@ -92,8 +93,14 @@ type Config struct {
 	// MetricsEnabled is the Prometheus switch (Implementation_Plan Step 5). It is on by default and
 	// off only with an explicit false: then no metric is registered or recorded and the metrics
 	// endpoint does not listen.
-	MetricsEnabled bool   `path:"metrics.prometheus.enabled"`
-	OTLPEndpoint   string `path:"logs.otlp_endpoint"` // empty: tracing is off
+	MetricsEnabled bool `path:"metrics.prometheus.enabled"`
+	// TracingEnabled is the tracing switch (task 051; conventions § 17). False (the default): no
+	// span, no traceparent header, no connection, also when TracingOTLPEndpoint is set. True needs
+	// TracingOTLPEndpoint (validate). Read at start.
+	TracingEnabled bool `path:"logs.tracing.enabled"`
+	// TracingOTLPEndpoint is the host:port (no scheme) of the OTLP gRPC receiver of Jaeger, for
+	// example "localhost:4317" (task 051; was logs.otlp_endpoint). Read at start.
+	TracingOTLPEndpoint string `path:"logs.tracing.otlp_endpoint"`
 
 	// HotReloadInterval is how often the hot_reload:"true" fields are read again from Postgres.
 	HotReloadInterval time.Duration `path:"hot_reload_interval"`
@@ -327,35 +334,35 @@ type Config struct {
 	// every order asks the provider; a negative value is rejected. Read at start.
 	CachingPaidTel time.Duration `path:"caching.paid_tel"`
 
-	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
+	// DebugMockQabzinoEnabled makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
 	// the key is false there (and the app ignores it outside dev again). Not hot-reloadable.
-	DebugMockQabzinoEnable bool `path:"debug.mocks.qabzino.enable"`
+	DebugMockQabzinoEnabled bool `path:"debug.mocks.qabzino.enabled"`
 	// DebugMockQabzinoReturnType is the answer of the Qabzino mock: MockReturnSuccess or
 	// MockReturnError. It has no effect while the mock is off. Development only.
 	DebugMockQabzinoReturnType string `path:"debug.mocks.qabzino.return_type"`
 
-	// DebugMockTavanirEnable makes the Tavanir adapter answer with a fixed answer, with no call to
-	// the backend (task 022). Development only, as DebugMockQabzinoEnable. Not hot-reloadable.
-	DebugMockTavanirEnable bool `path:"debug.mocks.tavanir.enable"`
+	// DebugMockTavanirEnabled makes the Tavanir adapter answer with a fixed answer, with no call to
+	// the backend (task 022). Development only, as DebugMockQabzinoEnabled. Not hot-reloadable.
+	DebugMockTavanirEnabled bool `path:"debug.mocks.tavanir.enabled"`
 	// DebugMockTavanirReturnType is the answer of the Tavanir mock: MockReturnSuccess or
 	// MockReturnError. It has no effect while the mock is off. Development only.
 	DebugMockTavanirReturnType string `path:"debug.mocks.tavanir.return_type"`
 
-	// DebugMockIrancellEnable makes the Irancell adapter answer with a fixed answer, with no call to
-	// the irancell service (task 035). Development only, as DebugMockQabzinoEnable. Not hot-reloadable.
-	DebugMockIrancellEnable bool `path:"debug.mocks.irancell.enable"`
+	// DebugMockIrancellEnabled makes the Irancell adapter answer with a fixed answer, with no call to
+	// the irancell service (task 035). Development only, as DebugMockQabzinoEnabled. Not hot-reloadable.
+	DebugMockIrancellEnabled bool `path:"debug.mocks.irancell.enabled"`
 	// DebugMockIrancellReturnType is the answer of the Irancell mock: MockReturnSuccess or
 	// MockReturnError. It has no effect while the mock is off. Development only.
 	DebugMockIrancellReturnType string `path:"debug.mocks.irancell.return_type"`
 
-	// DebugMockJiringSwitchEnable and DebugMockParsianEnable make the Jiring Switch and the Parsian
+	// DebugMockJiringSwitchEnabled and DebugMockParsianEnabled make the Jiring Switch and the Parsian
 	// adapter answer with a fixed answer, with no call to the jiring-switch or the parsian-v2
-	// service (task 036). Development only, as DebugMockQabzinoEnable. Not hot-reloadable. The
+	// service (task 036). Development only, as DebugMockQabzinoEnabled. Not hot-reloadable. The
 	// return types are MockReturnSuccess or MockReturnError; no effect while the mock is off.
-	DebugMockJiringSwitchEnable     bool   `path:"debug.mocks.jiring_switch.enable"`
+	DebugMockJiringSwitchEnabled    bool   `path:"debug.mocks.jiring_switch.enabled"`
 	DebugMockJiringSwitchReturnType string `path:"debug.mocks.jiring_switch.return_type"`
-	DebugMockParsianEnable          bool   `path:"debug.mocks.parsian.enable"`
+	DebugMockParsianEnabled         bool   `path:"debug.mocks.parsian.enabled"`
 	DebugMockParsianReturnType      string `path:"debug.mocks.parsian.return_type"`
 	// DebugMockParsianPayReturnType is the answer of the Parsian mock to a payment (task 044,
 	// conventions § 15: one return-type key for each method): MockReturnSuccess, MockReturnFailed or
@@ -367,10 +374,10 @@ type Config struct {
 	// effect while the mock is off. Development only.
 	DebugMockParsianStatusReturnType string `path:"debug.mocks.parsian.status_return_type"`
 
-	// DebugMockKarashopEnable makes the Karashop adapter answer with a fixed answer, with no call to
-	// Karashop (task 025). Development only, as DebugMockQabzinoEnable. Not hot-reloadable. The
+	// DebugMockKarashopEnabled makes the Karashop adapter answer with a fixed answer, with no call to
+	// Karashop (task 025). Development only, as DebugMockQabzinoEnabled. Not hot-reloadable. The
 	// return type is MockReturnSuccess or MockReturnError; no effect while the mock is off.
-	DebugMockKarashopEnable     bool   `path:"debug.mocks.karashop.enable"`
+	DebugMockKarashopEnabled    bool   `path:"debug.mocks.karashop.enabled"`
 	DebugMockKarashopReturnType string `path:"debug.mocks.karashop.return_type"`
 	// DebugMockKarashopSettleReturnType is the answer of the Karashop mock to a settlement (task
 	// 044): MockReturnSuccess or MockReturnError. No effect while the mock is off. Development only.
@@ -520,11 +527,40 @@ func Parse(data []byte) (Config, error) {
 	if mode, _ := m["mode"].(string); mode != ModeDev {
 		delete(m, debugSection)
 	}
+	if err := checkRenamed(m); err != nil {
+		return Config{}, err
+	}
 	c := defaults()
 	if err := decodeStruct(m, reflect.ValueOf(&c).Elem(), ""); err != nil {
 		return Config{}, err
 	}
 	return c, c.validate()
+}
+
+// renamedKeys maps each config path that was renamed to its new path (task 051 decision D4). Parse
+// rejects a file that still has an old path, so a renamed switch is never dropped with no message.
+var renamedKeys = map[string]string{
+	"logs.otlp_endpoint":               "logs.tracing.otlp_endpoint",
+	"debug.mocks.qabzino.enable":       "debug.mocks.qabzino.enabled",
+	"debug.mocks.tavanir.enable":       "debug.mocks.tavanir.enabled",
+	"debug.mocks.irancell.enable":      "debug.mocks.irancell.enabled",
+	"debug.mocks.jiring_switch.enable": "debug.mocks.jiring_switch.enabled",
+	"debug.mocks.parsian.enable":       "debug.mocks.parsian.enabled",
+	"debug.mocks.karashop.enable":      "debug.mocks.karashop.enabled",
+}
+
+// checkRenamed returns one error for each old path of renamedKeys that m has, sorted by path. Parse
+// calls it after the debug section is removed outside dev, so an old debug key there is dropped as
+// every debug key is. A part of a path that is not an object stops that lookup with no error: the
+// decode reports the wrong kind of the new path.
+func checkRenamed(m map[string]any) error {
+	var errs []error
+	for _, old := range slices.Sorted(maps.Keys(renamedKeys)) {
+		if _, found, err := lookup(m, old, ""); err == nil && found {
+			errs = append(errs, fmt.Errorf("%s was renamed to %s", old, renamedKeys[old]))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (c Config) validate() error {
@@ -647,6 +683,9 @@ func (c Config) validate() error {
 	}
 	if !ValidMockReturnType(c.DebugMockTavanirReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.tavanir.return_type must be %q or %q", MockReturnSuccess, MockReturnError))
+	}
+	if c.TracingEnabled && strings.TrimSpace(c.TracingOTLPEndpoint) == "" {
+		errs = append(errs, errors.New("logs.tracing.otlp_endpoint is required while logs.tracing.enabled is true"))
 	}
 	if c.DebugAuthMockUserID != "" {
 		if u, err := uuid.Parse(c.DebugAuthMockUserID); err != nil || u.String() != c.DebugAuthMockUserID {

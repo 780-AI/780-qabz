@@ -1,7 +1,8 @@
-<!-- VERSION: 0.25 -->
+<!-- VERSION: 0.26 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v0.26 — 2026-11-15 — Task 051 (operator, decisions D1 to D4): § 8 — an on/off switch is a bool key named `enabled` (the one exception: `debug.auth.disable`), a renamed key goes in `renamedKeys`, checked by tests; § 15 — the mock switch is `debug.mocks.<provider>.enabled`; § 17 — the off switch is `logs.tracing.enabled` (with `logs.tracing.otlp_endpoint`).
 v0.25 — 2026-11-15 — Task 047 (operator decisions D4, D10): § 17 — a failed span uses `jaeger.Fail` (the result and the error type), never `span.RecordError`; the gateway makes no HTTP span; the shared hooks that task 047 added; the test helper `jaegertest`.
 v0.24 — 2026-11-15 — New § 17 (operator): every added or changed feature is traced with OpenTelemetry spans sent to Jaeger, one trace for each path of execution, from the entry to the last dependency call; the features that exist get their spans in task 047.
 v0.23 — 2026-11-15 — Task 045: § 15 names `status_return_type` (`success`, `failed`, `pending`; fixture `provider.MockFixtures.Status`); new § 16 — every Redis key goes through `redis.Client.Key`, so it has `database.redis.prefix` (supertask 043 operator rule).
@@ -220,6 +221,10 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 
 **Providers.** Each provider block is in one of two groups (task 041). `providers.internal.<provider>`: a provider that is one of our own services (for example `irancell`, `jiring_switch`, `parsian`, `payment_server`). `providers.external.<provider>`: a provider that is a third-party service (for example `karashop`, `qabzino`, `tavanir`). A new provider goes in the group of its kind. Only `providers.general` (the settings of `ProvidersService`) is outside the two groups. `TestProvidersGroups` in `src/config/example_test.go` checks it.
 
+**On/off switches (task 051, operator 2026-11-15).** A key that turns a feature on or off is a bool named `enabled` (for example `metrics.prometheus.enabled`, `providers.internal.parsian.enabled`, `debug.mocks.parsian.enabled`, `logs.tracing.enabled`). Never `enable`, `disable`, `is_<x>` or `<x>_enabled`. The one exception is `debug.auth.disable` (operator decision D3). The settings of the feature go next to the switch, in the same block. `TestOnOffKeysNamedEnabled` in `src/config/example_test.go` fails on a path that ends in `.enable`, or in `.disable` (but `debug.auth.disable`). (`is_lockable` is a bill key that Qabz does not read; it is not a switch of Qabz.)
+
+**A renamed key.** A rename adds the old path and the new path to `renamedKeys` in `src/config/config.go`. A config file that still has the old path does not load, and the error names the new path, so a renamed switch is never dropped with no message (task 051 decision D4). Outside `dev` the `debug` section is removed first, so an old `debug.*` key is dropped there as every `debug.*` key is.
+
 **Check.** The tests in `src/config/example_test.go` fail when:
 - `config.yml.example` and the `Config` path tags do not have the same keys.
 - A value in `config.yml.example` is not the default or zero value.
@@ -378,7 +383,7 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 
 **Every provider adapter has a mock.** The mock lets a developer run the whole flow (provider pick, cache lookup, request rows, saving the answer) with no call to the provider's backend.
 
-- **Config.** One block for each provider: `debug.mocks.<provider>.enable` (bool, default `false`) and `debug.mocks.<provider>.return_type` (`success` or `error`, default `success`). Both keys are in `config.yml.example` and `config.yml` (§ 8). The `debug` section is removed in every mode but `dev` (task 020c), so a mock key in another mode is dropped, not an error.
+- **Config.** One block for each provider: `debug.mocks.<provider>.enabled` (bool, default `false`) and `debug.mocks.<provider>.return_type` (`success` or `error`, default `success`). Both keys are in `config.yml.example` and `config.yml` (§ 8). The `debug` section is removed in every mode but `dev` (task 020c), so a mock key in another mode is dropped, not an error.
 - **Code.** The adapter package gives its fixed answers as `provider.MockFixtures` (for example `qabzino.MockFixtures()`); the composition root (`src/app/defaults.go`, `newProviderRegistry`) wraps the adapter with `provider.NewMock`. Do not write a second mock mechanism. With the mock off, `NewMock` returns the adapter itself (OFF is the same as no mock).
 - **Dev mode twice.** The composition root applies a mock only when `Config.Mode` is `dev`, and writes one warn line when it does. The mock never runs in `stage` or `prod`.
 - **`return_type: success`** is a valid answer with fixed values (the values are documented in the fixtures and in the Postman description of the endpoint). **`error`** is `provider.ErrProviderDown`, the same error as a failed call.
@@ -426,7 +431,7 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 - An attribute uses a value from a small fixed set (the bill type, the provider name, the operator, the result of § 12) or the internal order ID (`order.id`, so one payment can be followed). Never put a phone number, a bill ID, a pay ID, a user ID, an amount, a token, a password, a key or a request or answer body in a span.
 - A failure on the path calls `jaeger.Fail(span, result, err)` (`common/monitoring/jaeger`) on the span where it happens: the status `codes.Error` with the result as the description, and an event `exception` with only the Go type of `err`. Never call `span.RecordError(err)` in Qabz code: it writes the error text, and an error text can have a phone or a bill ID in it (task 047 decision D10). The log line has the text. The instrumentation libraries keep their own error data. The result of the span is the same result that the feature metric of § 12 counts.
 
-**Off switch.** Tracing is off when `logs.otlp_endpoint` is empty. Then the global tracer provider is the no-op provider of OpenTelemetry, and the spans cost almost nothing. Feature code always gets its tracer with `otel.Tracer(...)` and never checks whether tracing is on.
+**Off switch.** Tracing is off when `logs.tracing.enabled` is `false` (the default; task 051). When it is `true`, `logs.tracing.otlp_endpoint` (the `host:port` of the OTLP gRPC receiver) is required: an empty value is a config error at start. Then the global tracer provider is the no-op provider of OpenTelemetry, and the spans cost almost nothing. Feature code always gets its tracer with `otel.Tracer(...)` and never checks whether tracing is on.
 
 **Libraries.** Use the OpenTelemetry API (`go.opentelemetry.io/otel`) and the official instrumentation for gRPC and HTTP. The Postgres, Redis and Kafka spans come from one shared hook of `system/postgres`, `system/redis` and `system/kafka`, so feature code does not make them by hand. A new module follows § 2 (Go modules) and § 5 (standard library first). Task 047 added them: the `otelgrpc` server handler on both gRPC servers, the `otelgrpc` client handler on the gateway and on each gRPC provider client, `provider.NewHTTPClient` (`otelhttp`) for the HTTP adapters, the pgx tracer of `system/postgres` (the SQL operation only, no SQL text, no argument), `redisotel` (no argument) and `kafka.Publish`, and a Jaeger service in `docker-compose.yml` (profile `tracing`). A new client of a dependency uses these, not a client of its own.
 

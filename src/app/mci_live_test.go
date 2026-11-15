@@ -34,10 +34,10 @@ func newLiveMCI(t *testing.T, ctx context.Context, jiringReturn, parsianReturn, 
 	t.Helper()
 	return newLiveWaterCfg(t, ctx, config.MockReturnSuccess, setupSQL, func(c *config.Config) {
 		c.JiringSwitchEnabled = true
-		c.DebugMockJiringSwitchEnable = true
+		c.DebugMockJiringSwitchEnabled = true
 		c.DebugMockJiringSwitchReturnType = jiringReturn
 		c.ParsianEnabled = true
-		c.DebugMockParsianEnable = true
+		c.DebugMockParsianEnabled = true
 		c.DebugMockParsianReturnType = parsianReturn
 		c.CachingMobile = time.Hour
 	})

@@ -26,7 +26,7 @@ func newLiveTel(t *testing.T, ctx context.Context, pay, settle string) *liveWate
 	t.Helper()
 	return newLiveWaterCfg(t, ctx, config.MockReturnSuccess, enableTelOrderSQL, func(c *config.Config) {
 		c.ParsianEnabled = true
-		c.DebugMockParsianEnable = true
+		c.DebugMockParsianEnabled = true
 		c.DebugMockParsianReturnType = config.MockReturnSuccess
 		c.DebugMockParsianPayReturnType = pay
 		c.DebugMockKarashopSettleReturnType = settle

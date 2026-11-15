@@ -38,7 +38,7 @@ import (
 )
 
 // NewDefaultBuilder is the composition root: it creates the real zap logger, Postgres, Redis,
-// Prometheus, the gRPC server, the HTTP gateway and (when logs.otlp_endpoint is set) tracing from cfg.
+// Prometheus, the gRPC server, the HTTP gateway and (when logs.tracing.enabled is true) tracing from cfg.
 // The reloader runs only when Config has a hot_reload:"true" field.
 // Connections are lazy, so this does not need running servers; Start pings them.
 func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error) {
@@ -176,8 +176,8 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		logger.Warn("internal gRPC server off (server.internal_grpc.addr is empty): the payment service cannot call OrderComplete")
 	}
 
-	if cfg.OTLPEndpoint != "" {
-		tr, err := jaeger.New(ctx, cfg.OTLPEndpoint, cfg.ServiceName)
+	if cfg.TracingEnabled {
+		tr, err := jaeger.New(ctx, cfg.TracingOTLPEndpoint, cfg.ServiceName)
 		if err != nil {
 			db.Close()
 			return nil, err
@@ -416,7 +416,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 	}
 	// providers.external.qabzino.enabled: false wins over the mock. The adapter then fails every call as
 	// "provider down" and the mock must not answer instead of it (task 030).
-	qabzinoMock := provider.MockSettings{Enable: dev && cfg.DebugMockQabzinoEnable && cfg.QabzinoEnabled, ReturnType: cfg.DebugMockQabzinoReturnType}
+	qabzinoMock := provider.MockSettings{Enable: dev && cfg.DebugMockQabzinoEnabled && cfg.QabzinoEnabled, ReturnType: cfg.DebugMockQabzinoReturnType}
 	if err := registerAdapter(registry, qabzinoAdapter, "Qabzino", disabledNotice("external.qabzino", "Qabzino", cfg.QabzinoEnabled),
 		qabzinoMock, qabzino.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -434,7 +434,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	// providers.external.tavanir.enabled: false wins over the mock, as for Qabzino (task 034).
-	tavanirMock := provider.MockSettings{Enable: dev && cfg.DebugMockTavanirEnable && cfg.TavanirEnabled, ReturnType: cfg.DebugMockTavanirReturnType}
+	tavanirMock := provider.MockSettings{Enable: dev && cfg.DebugMockTavanirEnabled && cfg.TavanirEnabled, ReturnType: cfg.DebugMockTavanirReturnType}
 	if err := registerAdapter(registry, tavanirAdapter, "Tavanir", disabledNotice("external.tavanir", "Tavanir", cfg.TavanirEnabled),
 		tavanirMock, tavanir.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -455,7 +455,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	// providers.internal.irancell.enabled: false wins over the mock, as for Qabzino and Tavanir.
-	irancellMock := provider.MockSettings{Enable: dev && cfg.DebugMockIrancellEnable && cfg.IrancellEnabled, ReturnType: cfg.DebugMockIrancellReturnType}
+	irancellMock := provider.MockSettings{Enable: dev && cfg.DebugMockIrancellEnabled && cfg.IrancellEnabled, ReturnType: cfg.DebugMockIrancellReturnType}
 	if err := registerAdapter(registry, irancellAdapter, "Irancell", disabledNotice("internal.irancell", "Irancell", cfg.IrancellEnabled),
 		irancellMock, irancellproxy.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -476,7 +476,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	// providers.internal.jiring_switch.enabled: false wins over the mock, as for the other providers.
-	jiringMock := provider.MockSettings{Enable: dev && cfg.DebugMockJiringSwitchEnable && cfg.JiringSwitchEnabled, ReturnType: cfg.DebugMockJiringSwitchReturnType}
+	jiringMock := provider.MockSettings{Enable: dev && cfg.DebugMockJiringSwitchEnabled && cfg.JiringSwitchEnabled, ReturnType: cfg.DebugMockJiringSwitchReturnType}
 	if err := registerAdapter(registry, jiringAdapter, "Jiring Switch", disabledNotice("internal.jiring_switch", "Jiring Switch", cfg.JiringSwitchEnabled),
 		jiringMock, jiring.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -496,7 +496,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	// providers.internal.parsian.enabled: false wins over the mock, as for the other providers.
-	parsianMock := provider.MockSettings{Enable: dev && cfg.DebugMockParsianEnable && cfg.ParsianEnabled, ReturnType: cfg.DebugMockParsianReturnType,
+	parsianMock := provider.MockSettings{Enable: dev && cfg.DebugMockParsianEnabled && cfg.ParsianEnabled, ReturnType: cfg.DebugMockParsianReturnType,
 		PayReturnType: cfg.DebugMockParsianPayReturnType, StatusReturnType: cfg.DebugMockParsianStatusReturnType}
 	if err := registerAdapter(registry, parsianAdapter, "Parsian", disabledNotice("internal.parsian", "Parsian", cfg.ParsianEnabled),
 		parsianMock, parsianproxy.MockFixtures(), logger); err != nil {
@@ -516,7 +516,7 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	// providers.external.karashop.enabled: false wins over the mock, as for the other providers.
-	karashopMock := provider.MockSettings{Enable: dev && cfg.DebugMockKarashopEnable && cfg.KarashopEnabled, ReturnType: cfg.DebugMockKarashopReturnType,
+	karashopMock := provider.MockSettings{Enable: dev && cfg.DebugMockKarashopEnabled && cfg.KarashopEnabled, ReturnType: cfg.DebugMockKarashopReturnType,
 		SettleReturnType: cfg.DebugMockKarashopSettleReturnType}
 	if err := registerAdapter(registry, karashopAdapter, "Karashop", disabledNotice("external.karashop", "Karashop", cfg.KarashopEnabled),
 		karashopMock, karashop.MockFixtures(), logger); err != nil {

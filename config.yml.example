@@ -14,7 +14,9 @@ service:
 
 logs:
   level: "info"
-  otlp_endpoint: ""          # host:port of the OTLP gRPC receiver of Jaeger (the compose jaeger: "localhost:4317"); empty: tracing is off (no span, no traceparent header, no connection)
+  tracing:
+    enabled: false           # false: tracing is off (no span, no traceparent header, no connection); true needs otlp_endpoint
+    otlp_endpoint: ""        # host:port of the OTLP gRPC receiver of Jaeger, no scheme (the compose jaeger: "localhost:4317"; the prod Jaeger: its OTLP gRPC port, not the agent port 6831)
 
 server:
   grpc:
@@ -189,24 +191,24 @@ debug:
     mock_user_id: ""  # fake user: with disable: true, the user (token sub) of every call; a lower-case UUID, or "" for none
   mocks:                     # provider mocks: the adapter answers a fixed answer, with no call to the backend
     qabzino:
-      enable: false
+      enabled: false
       return_type: "success" # "success" or "error"
     tavanir:
-      enable: false
+      enabled: false
       return_type: "success" # "success" or "error"
     irancell:                # the Irancell mock: a fixed answer, no call to the irancell service
-      enable: false
+      enabled: false
       return_type: "success" # "success" or "error"
     jiring_switch:           # the Jiring Switch mock: a fixed answer, no call to the jiring-switch service
-      enable: false
+      enabled: false
       return_type: "success" # "success" or "error"
     parsian:                 # the Parsian mock: a fixed answer, no call to the parsian-v2 service
-      enable: false
+      enabled: false
       return_type: "success" # inquiry: "success" or "error"
       pay_return_type: "success" # payment: "success", "failed" or "pending" (the answer of a timeout)
       status_return_type: "success" # status of an order (the status worker): "success", "failed" or "pending" (the answer of a timeout)
     karashop:                # the Karashop mock: a fixed answer, no call to Karashop
-      enable: false
+      enabled: false
       return_type: "success" # inquiry: "success" or "error"
       settle_return_type: "success" # settlement (SendPaymentInfo): "success" or "error"
   cache_inquiries: true      # development only: false = the inquiry flow does not read or write bill_inquiries / bill_inquiry_requests (every inquiry calls the provider)

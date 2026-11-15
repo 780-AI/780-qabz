@@ -22,7 +22,8 @@ func TestParseDefaults(t *testing.T) {
 	assert.Equal(t, "localhost:6379", c.RedisAddr())
 	assert.Equal(t, ":9090", c.MetricsAddr)
 	assert.True(t, c.MetricsEnabled)
-	assert.Empty(t, c.OTLPEndpoint)
+	assert.False(t, c.TracingEnabled, "tracing is off by default")
+	assert.Empty(t, c.TracingOTLPEndpoint)
 	assert.Equal(t, 30*time.Second, c.HotReloadInterval)
 	assert.True(t, c.MigrateOnStart)
 	assert.Equal(t, 60*time.Second, c.MigrateTimeout)
@@ -36,7 +37,9 @@ service:
 hot_reload_interval: "5s"
 logs:
   level: "debug"
-  otlp_endpoint: "jaeger:4317"
+  tracing:
+    enabled: true
+    otlp_endpoint: "jaeger:4317"
 metrics:
   prometheus:
     addr: ":9191"
@@ -63,7 +66,8 @@ func TestParseAllKeys(t *testing.T) {
 	assert.Equal(t, "svc", c.ServiceName)
 	assert.Equal(t, 105, c.ServiceID)
 	assert.Equal(t, "debug", c.LogLevel)
-	assert.Equal(t, "jaeger:4317", c.OTLPEndpoint)
+	assert.True(t, c.TracingEnabled)
+	assert.Equal(t, "jaeger:4317", c.TracingOTLPEndpoint)
 	assert.Equal(t, ":9191", c.MetricsAddr)
 	assert.Equal(t, "db:6000/d", c.PostgresTarget())
 	assert.Equal(t, "u", c.PostgresUser)
@@ -374,27 +378,27 @@ func TestParseWaterInquiryKeys(t *testing.T) {
 	assert.Equal(t, "", c.QabzinoGRPCAddress, "default address")
 	assert.Equal(t, 10*time.Second, c.QabzinoTimeout, "default timeout")
 	assert.Equal(t, time.Hour, c.CachingWater, "default cache TTL (bill: caching.water 1h)")
-	assert.False(t, c.DebugMockQabzinoEnable, "the mock is off by default")
+	assert.False(t, c.DebugMockQabzinoEnabled, "the mock is off by default")
 	assert.Equal(t, MockReturnSuccess, c.DebugMockQabzinoReturnType)
 
 	c, err = Parse([]byte(base + `providers: {external: {qabzino: {grpc_address: "q:9", timeout: "2s"}}}
 caching: {water: "0s"}
-debug: {mocks: {qabzino: {enable: true, return_type: error}}}
+debug: {mocks: {qabzino: {enabled: true, return_type: error}}}
 `))
 	if assert.NoError(t, err) {
 		assert.Equal(t, "q:9", c.QabzinoGRPCAddress)
 		assert.Equal(t, 2*time.Second, c.QabzinoTimeout)
 		assert.Equal(t, time.Duration(0), c.CachingWater, "0 turns the cache off")
-		assert.True(t, c.DebugMockQabzinoEnable)
+		assert.True(t, c.DebugMockQabzinoEnabled)
 		assert.Equal(t, MockReturnError, c.DebugMockQabzinoReturnType)
 	}
 
 	for yml, want := range map[string]string{
-		"providers: {external: {qabzino: {timeout: \"0s\"}}}":          "providers.external.qabzino.timeout must be a positive duration",
-		"providers: {external: {qabzino: {timeout: \"-1s\"}}}":         "providers.external.qabzino.timeout must be a positive duration",
-		"caching: {water: \"-1s\"}":                                    "caching.water must not be negative",
-		"debug: {mocks: {qabzino: {return_type: \"maybe\"}}}":          "debug.mocks.qabzino.return_type must be",
-		"debug: {mocks: {qabzino: {enable: true, return_type: \"\"}}}": "debug.mocks.qabzino.return_type must be",
+		"providers: {external: {qabzino: {timeout: \"0s\"}}}":           "providers.external.qabzino.timeout must be a positive duration",
+		"providers: {external: {qabzino: {timeout: \"-1s\"}}}":          "providers.external.qabzino.timeout must be a positive duration",
+		"caching: {water: \"-1s\"}":                                     "caching.water must not be negative",
+		"debug: {mocks: {qabzino: {return_type: \"maybe\"}}}":           "debug.mocks.qabzino.return_type must be",
+		"debug: {mocks: {qabzino: {enabled: true, return_type: \"\"}}}": "debug.mocks.qabzino.return_type must be",
 	} {
 		_, err := Parse([]byte(base + yml))
 		assert.ErrorContains(t, err, want, yml)
@@ -402,20 +406,20 @@ debug: {mocks: {qabzino: {enable: true, return_type: error}}}
 }
 
 // TestMockSectionOnlyInDev (task 021, decision 4): a mode other than dev removes the debug section
-// (task 020c), so debug.mocks.qabzino.enable: true is ignored there: the mock is off and the real
+// (task 020c), so debug.mocks.qabzino.enabled: true is ignored there: the mock is off and the real
 // provider is used. It is not an error at start.
 func TestMockSectionOnlyInDev(t *testing.T) {
-	const base = "database: {postgres: {password: pw}}\ndebug: {mocks: {qabzino: {enable: true, return_type: error}}}\n"
+	const base = "database: {postgres: {password: pw}}\ndebug: {mocks: {qabzino: {enabled: true, return_type: error}}}\n"
 	for _, mode := range []string{ModeStage, ModeProd} {
 		c, err := Parse([]byte("mode: " + mode + "\n" + base))
 		if assert.NoError(t, err, mode) {
-			assert.False(t, c.DebugMockQabzinoEnable, mode)
+			assert.False(t, c.DebugMockQabzinoEnabled, mode)
 			assert.Equal(t, MockReturnSuccess, c.DebugMockQabzinoReturnType, mode)
 		}
 	}
 	c, err := Parse([]byte("mode: dev\n" + base))
 	if assert.NoError(t, err) {
-		assert.True(t, c.DebugMockQabzinoEnable)
+		assert.True(t, c.DebugMockQabzinoEnabled)
 	}
 }
 
@@ -437,23 +441,23 @@ func TestParseElectricityInquiryKeys(t *testing.T) {
 	assert.False(t, c.TavanirEnabled, "Tavanir is off by default (task 034)")
 	assert.Equal(t, 10*time.Second, c.TavanirTimeout, "default timeout")
 	assert.Equal(t, time.Hour, c.CachingElectricity, "default cache TTL (bill: caching.electricity 1h)")
-	assert.False(t, c.DebugMockTavanirEnable, "the mock is off by default")
+	assert.False(t, c.DebugMockTavanirEnabled, "the mock is off by default")
 	assert.Equal(t, MockReturnSuccess, c.DebugMockTavanirReturnType)
 
 	c, err = Parse([]byte(base + `providers: {external: {tavanir: {enabled: true, timeout: "3s"}}}
 caching: {electricity: "0s"}
-debug: {mocks: {tavanir: {enable: true, return_type: error}}}
+debug: {mocks: {tavanir: {enabled: true, return_type: error}}}
 `))
 	if assert.NoError(t, err) {
 		assert.True(t, c.TavanirEnabled)
 		assert.Equal(t, 3*time.Second, c.TavanirTimeout)
 		assert.Equal(t, time.Duration(0), c.CachingElectricity, "0 turns the cache off")
-		assert.True(t, c.DebugMockTavanirEnable)
+		assert.True(t, c.DebugMockTavanirEnabled)
 		assert.Equal(t, MockReturnError, c.DebugMockTavanirReturnType)
 		assert.Equal(t, "", c.QabzinoGRPCAddress, "the Qabzino keys keep their defaults")
 		assert.Equal(t, 10*time.Second, c.QabzinoTimeout)
 		assert.Equal(t, time.Hour, c.CachingWater)
-		assert.False(t, c.DebugMockQabzinoEnable)
+		assert.False(t, c.DebugMockQabzinoEnabled)
 	}
 	c, err = Parse([]byte(base + "caching: {electricity: \"90m\", water: \"5m\"}\n"))
 	if assert.NoError(t, err) {
@@ -462,11 +466,11 @@ debug: {mocks: {tavanir: {enable: true, return_type: error}}}
 	}
 
 	for yml, want := range map[string]string{
-		"providers: {external: {tavanir: {timeout: \"0s\"}}}":          "providers.external.tavanir.timeout must be a positive duration",
-		"providers: {external: {tavanir: {timeout: \"-1s\"}}}":         "providers.external.tavanir.timeout must be a positive duration",
-		"caching: {electricity: \"-1s\"}":                              "caching.electricity must not be negative",
-		"debug: {mocks: {tavanir: {return_type: \"maybe\"}}}":          "debug.mocks.tavanir.return_type must be",
-		"debug: {mocks: {tavanir: {enable: true, return_type: \"\"}}}": "debug.mocks.tavanir.return_type must be",
+		"providers: {external: {tavanir: {timeout: \"0s\"}}}":           "providers.external.tavanir.timeout must be a positive duration",
+		"providers: {external: {tavanir: {timeout: \"-1s\"}}}":          "providers.external.tavanir.timeout must be a positive duration",
+		"caching: {electricity: \"-1s\"}":                               "caching.electricity must not be negative",
+		"debug: {mocks: {tavanir: {return_type: \"maybe\"}}}":           "debug.mocks.tavanir.return_type must be",
+		"debug: {mocks: {tavanir: {enabled: true, return_type: \"\"}}}": "debug.mocks.tavanir.return_type must be",
 	} {
 		_, err := Parse([]byte(base + yml))
 		assert.ErrorContains(t, err, want, yml)
@@ -474,13 +478,13 @@ debug: {mocks: {tavanir: {enable: true, return_type: error}}}
 }
 
 // TestTavanirMockSectionOnlyInDev (task 022): a mode other than dev removes the debug section (task
-// 020c), so debug.mocks.tavanir.enable: true is ignored there and a bad return type is not checked.
+// 020c), so debug.mocks.tavanir.enabled: true is ignored there and a bad return type is not checked.
 func TestTavanirMockSectionOnlyInDev(t *testing.T) {
-	const base = "database: {postgres: {password: pw}}\ndebug: {mocks: {tavanir: {enable: true, return_type: error}}}\n"
+	const base = "database: {postgres: {password: pw}}\ndebug: {mocks: {tavanir: {enabled: true, return_type: error}}}\n"
 	for _, mode := range []string{"stage", "prod"} {
 		c, err := Parse([]byte("mode: " + mode + "\n" + base))
 		if assert.NoError(t, err, mode) {
-			assert.False(t, c.DebugMockTavanirEnable, mode)
+			assert.False(t, c.DebugMockTavanirEnabled, mode)
 			assert.Equal(t, MockReturnSuccess, c.DebugMockTavanirReturnType, mode)
 		}
 		_, err = Parse([]byte("mode: " + mode + "\ndatabase: {postgres: {password: pw}}\ndebug: {mocks: {tavanir: {return_type: maybe}}}\n"))
@@ -488,7 +492,7 @@ func TestTavanirMockSectionOnlyInDev(t *testing.T) {
 	}
 	c, err := Parse([]byte("mode: dev\n" + base))
 	if assert.NoError(t, err) {
-		assert.True(t, c.DebugMockTavanirEnable)
+		assert.True(t, c.DebugMockTavanirEnabled)
 		assert.Equal(t, MockReturnError, c.DebugMockTavanirReturnType)
 	}
 }
@@ -634,13 +638,13 @@ func TestParseMCIProviderKeys(t *testing.T) {
 	assert.Equal(t, []time.Duration{10 * time.Second, 10 * time.Second, 5 * time.Hour},
 		[]time.Duration{c.JiringSwitchTimeout, c.ParsianTimeout, c.CachingMobile}, "defaults (bill: caching.mobile 5h)")
 	assert.Equal(t, []string{"", ""}, []string{c.JiringSwitchGRPCAddress, c.ParsianGRPCAddress})
-	assert.False(t, c.DebugMockJiringSwitchEnable)
-	assert.False(t, c.DebugMockParsianEnable)
+	assert.False(t, c.DebugMockJiringSwitchEnabled)
+	assert.False(t, c.DebugMockParsianEnabled)
 	assert.Equal(t, []string{MockReturnSuccess, MockReturnSuccess}, []string{c.DebugMockJiringSwitchReturnType, c.DebugMockParsianReturnType})
 
 	c, err = Parse([]byte(base + `providers: {internal: {jiring_switch: {enabled: true, timeout: "3s", grpc_address: "jiring-switch:8082"}, parsian: {enabled: true, timeout: "4s", grpc_address: "parsian-v2:8083"}}}
 caching: {mobile: "0s"}
-debug: {mocks: {jiring_switch: {enable: true, return_type: error}, parsian: {enable: true, return_type: success}}}
+debug: {mocks: {jiring_switch: {enabled: true, return_type: error}, parsian: {enabled: true, return_type: success}}}
 `))
 	if assert.NoError(t, err) {
 		assert.True(t, c.JiringSwitchEnabled)
@@ -648,8 +652,8 @@ debug: {mocks: {jiring_switch: {enable: true, return_type: error}, parsian: {ena
 		assert.Equal(t, []time.Duration{3 * time.Second, 4 * time.Second, 0},
 			[]time.Duration{c.JiringSwitchTimeout, c.ParsianTimeout, c.CachingMobile}, "0 turns the cache off")
 		assert.Equal(t, []string{"jiring-switch:8082", "parsian-v2:8083"}, []string{c.JiringSwitchGRPCAddress, c.ParsianGRPCAddress})
-		assert.True(t, c.DebugMockJiringSwitchEnable)
-		assert.True(t, c.DebugMockParsianEnable)
+		assert.True(t, c.DebugMockJiringSwitchEnabled)
+		assert.True(t, c.DebugMockParsianEnabled)
 		assert.Equal(t, []string{MockReturnError, MockReturnSuccess}, []string{c.DebugMockJiringSwitchReturnType, c.DebugMockParsianReturnType})
 		assert.Equal(t, time.Hour, c.CachingWater, "the other cache keys keep their defaults")
 	}
@@ -679,12 +683,12 @@ func TestParseKarashopKeys(t *testing.T) {
 		"defaults (bill: karashop.timeout 30s, caching.tel 1h)")
 	assert.Equal(t, []string{"", "", "", ""},
 		[]string{c.KarashopCode, c.KarashopPassword.Reveal(), c.KarashopBillInquiryURL, c.KarashopBillPaymentInfoURL})
-	assert.False(t, c.DebugMockKarashopEnable)
+	assert.False(t, c.DebugMockKarashopEnabled)
 	assert.Equal(t, MockReturnSuccess, c.DebugMockKarashopReturnType)
 
 	c, err = Parse([]byte(base + `providers: {external: {karashop: {enabled: true, timeout: "5s", code: "c1", password: "p@ss", bill_inquiry_url: "https://127.0.0.1:1/in", bill_payment_info_url: "https://127.0.0.1:1/pay"}}}
 caching: {tel: "0s"}
-debug: {mocks: {karashop: {enable: true, return_type: error}}}
+debug: {mocks: {karashop: {enabled: true, return_type: error}}}
 `))
 	if assert.NoError(t, err) {
 		assert.True(t, c.KarashopEnabled)
@@ -692,7 +696,7 @@ debug: {mocks: {karashop: {enable: true, return_type: error}}}
 		assert.Equal(t, []string{"c1", "p@ss", "https://127.0.0.1:1/in", "https://127.0.0.1:1/pay"},
 			[]string{c.KarashopCode, c.KarashopPassword.Reveal(), c.KarashopBillInquiryURL, c.KarashopBillPaymentInfoURL})
 		assert.NotContains(t, fmt.Sprint(c.KarashopPassword), "p@ss", "the password never prints")
-		assert.True(t, c.DebugMockKarashopEnable)
+		assert.True(t, c.DebugMockKarashopEnabled)
 		assert.Equal(t, MockReturnError, c.DebugMockKarashopReturnType)
 		assert.Equal(t, []time.Duration{time.Hour, 5 * time.Hour}, []time.Duration{c.CachingWater, c.CachingMobile}, "the other cache keys keep their defaults")
 	}
@@ -977,4 +981,57 @@ func TestParseConfirmPaymentTelephone(t *testing.T) {
 	}
 	_, err = Parse([]byte(base + `confirm_payment: {telephone: {name: "", every: "0s", chunk: 0, end: "100h"}}` + "\n"))
 	assert.NoError(t, err, "the worker off: its keys are not checked")
+}
+
+// TestTracingSwitch (task 051 D2): the switch on needs an endpoint; the switch off with an endpoint
+// is valid (tracing stays off: the App reads only the switch).
+func TestTracingSwitch(t *testing.T) {
+	const base = "{mode: dev, database: {postgres: {password: pw}}, logs: {tracing: "
+	for yml, wantErr := range map[string]bool{
+		base + "{enabled: true, otlp_endpoint: \"jaeger:4317\"}}}":  false,
+		base + "{enabled: false, otlp_endpoint: \"jaeger:4317\"}}}": false,
+		base + "{enabled: true}}}":                                  true,
+		base + "{enabled: true, otlp_endpoint: \"  \"}}}":           true,
+	} {
+		_, err := Parse([]byte(yml))
+		if wantErr {
+			assert.ErrorContains(t, err, "logs.tracing.otlp_endpoint is required while logs.tracing.enabled is true", yml)
+		} else {
+			assert.NoError(t, err, yml)
+		}
+	}
+}
+
+// TestRenamedKeys (task 051 D4): a file with an old path does not parse, and the error names the new
+// path; outside dev an old debug key is dropped with the debug section, as every debug key is.
+func TestRenamedKeys(t *testing.T) {
+	const pw = "database: {postgres: {password: pw}}\n"
+	_, err := Parse([]byte("mode: dev\n" + pw + "logs: {otlp_endpoint: \"jaeger:4317\"}\ndebug: {mocks: {parsian: {enable: true}, karashop: {enable: false}}}\n"))
+	if assert.Error(t, err) {
+		assert.Equal(t, "debug.mocks.karashop.enable was renamed to debug.mocks.karashop.enabled\n"+
+			"debug.mocks.parsian.enable was renamed to debug.mocks.parsian.enabled\n"+
+			"logs.otlp_endpoint was renamed to logs.tracing.otlp_endpoint", err.Error())
+	}
+	for _, mode := range []string{ModeStage, ModeProd} {
+		_, err := Parse([]byte("mode: " + mode + "\n" + pw + "debug: {mocks: {parsian: {enable: true}}}\n"))
+		assert.NoError(t, err, mode)
+		_, err = Parse([]byte("mode: " + mode + "\n" + pw + "logs: {otlp_endpoint: \"jaeger:4317\"}\n"))
+		assert.ErrorContains(t, err, "logs.otlp_endpoint was renamed to logs.tracing.otlp_endpoint", mode)
+	}
+	// A part of an old path that is not an object is not an old key: no rename error.
+	_, err = Parse([]byte("mode: dev\n" + pw + "debug: {mocks: {parsian: 1}}\n"))
+	assert.NotContains(t, errText(err), "was renamed")
+	// Every new path of the table is a Config path, and no old path is.
+	paths := configPaths()
+	for old, nu := range renamedKeys {
+		assert.Contains(t, paths, nu)
+		assert.NotContains(t, paths, old)
+	}
+}
+
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

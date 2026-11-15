@@ -1,7 +1,8 @@
-<!-- VERSION: 3.42 -->
+<!-- VERSION: 3.43 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.43 — 2026-11-15 — Added 051-tracing-switch-and-enabled-keys entry.
 v3.42 — 2026-11-15 — Added 051-task-started entry.
 v3.41 — 2026-11-15 — Added 050-task entry.
 v3.40 — 2026-11-15 — Added 047-tracing-backfill entry.
@@ -158,6 +159,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 051: the tracing switch and one name (`enabled`) for the on/off keys
+- **Type:** Major (config-key changes, a Critical File).
+- **Files:** `src/config/config.go` (`logs.tracing.enabled` and `logs.tracing.otlp_endpoint` replace `logs.otlp_endpoint`; `debug.mocks.<provider>.enable` becomes `.enabled` for the six mocks, Go fields `DebugMock<Provider>Enabled`; `renamedKeys` and `checkRenamed`; the rule "on with no endpoint is an error"); `src/config/config_test.go`, `src/config/example_test.go` (`TestTracingSwitch`, `TestRenamedKeys`, `TestOnOffKeysNamedEnabled`); `src/app/defaults.go` (tracing starts only with the switch) and the app tests; `src/common/monitoring/jaeger/jaeger.go` (comment); `config.yml.example`; `docker-compose.yml` (comments); `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.26: § 8 on/off switches are `enabled`, the renamed-key table; § 15; § 17); `docs/initial-discovery/system.html` (v2.19); `src/app/README.md` (v0.39); `docs/Plans/OPEN_TASKS.md` (v1.80); `docs/Plans/done_tasks/051_tracing_switch_and_enabled_keys.md` (moved from `in-progress_tasks/`; not manifest-tracked); `docs/documents_manifest.md`.
+- **Impact:** **Breaking config change.** A config file with `logs.otlp_endpoint` (any mode) or `debug.mocks.<provider>.enable` (mode `dev`) no longer loads: the App does not start, and the error names each old key and its new key. Tracing is now on only with `logs.tracing.enabled: true`, and then `logs.tracing.otlp_endpoint` is required (else the App does not start). The env names from `yml_to_env` change to `LOGS_TRACING_ENABLED` and `LOGS_TRACING_OTLP_ENDPOINT`. With the switch off (the default) the behavior is the same as before with an empty endpoint. No API, metric or database change.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 051 tracing switch and `enabled` keys" (Go tests; feature ON and OFF with the compose Jaeger; the two start errors). Feature-ON run done by the implementer, awaiting operator.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — New task 051 `tracing_switch_and_enabled_keys`, started, design approved
 - **Type:** Minor (governance: a task file; no code).

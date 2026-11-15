@@ -14,7 +14,7 @@
 # The `jaeger` service has the profile `tracing` (task 047: the traces of conventions § 17); `make compose up`
 # does not start it:
 #   COMPOSE_PROFILES=tracing make compose up ARGS="-d --wait"  (both: COMPOSE_PROFILES=tracing,kafka)
-# Set logs.otlp_endpoint: "localhost:4317" in config.yml and open the UI at http://localhost:16686.
+# Set logs.tracing.enabled: true and logs.tracing.otlp_endpoint: "localhost:4317" in config.yml and open the UI at http://localhost:16686.
 # The store is in memory: a restart of the container drops the traces.
 
 services:
@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${JAEGER_UI_PORT:-16686}:16686"   # the UI and the query API
-      - "127.0.0.1:${JAEGER_OTLP_PORT:-4317}:4317"   # OTLP gRPC: logs.otlp_endpoint
+      - "127.0.0.1:${JAEGER_OTLP_PORT:-4317}:4317"   # OTLP gRPC: logs.tracing.otlp_endpoint
 
   qabz:
     profiles: ["app"]

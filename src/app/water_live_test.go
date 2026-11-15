@@ -65,20 +65,20 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 	}
 	cfg := testConfig(t)
 	cfg.QabzinoEnabled = true
-	cfg.DebugMockQabzinoEnable = true
+	cfg.DebugMockQabzinoEnabled = true
 	cfg.DebugMockQabzinoReturnType = returnType
 	cfg.TavanirEnabled = true
-	cfg.DebugMockTavanirEnable = true
+	cfg.DebugMockTavanirEnabled = true
 	cfg.DebugMockTavanirReturnType = returnType
 	cfg.CachingWater = time.Hour
 	cfg.CachingElectricity = time.Hour
 	cfg.CachingGas = time.Hour
 	cfg.IrancellEnabled = true
-	cfg.DebugMockIrancellEnable = true
+	cfg.DebugMockIrancellEnabled = true
 	cfg.DebugMockIrancellReturnType = returnType
 	cfg.CachingIrancell = time.Hour
 	cfg.KarashopEnabled = true
-	cfg.DebugMockKarashopEnable = true
+	cfg.DebugMockKarashopEnabled = true
 	cfg.DebugMockKarashopReturnType = returnType
 	cfg.CachingTel = time.Hour
 	if change != nil {

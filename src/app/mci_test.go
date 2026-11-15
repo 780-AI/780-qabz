@@ -47,12 +47,12 @@ func TestNewProviderRegistryMCI(t *testing.T) {
 			wantErr  bool // a mock error answer
 			wantWarn string
 		}{
-			{"dev, mock success", "mode: dev\n" + on + "debug: {mocks: {" + a.key + ": {enable: true, return_type: success}}}", true, false, a.mockWarn},
-			{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {" + a.key + ": {enable: true, return_type: error}}}", true, true, a.mockWarn},
-			{"dev, mock on, disabled", "mode: dev\ndebug: {mocks: {" + a.key + ": {enable: true}}}", false, false, a.disWarn},
+			{"dev, mock success", "mode: dev\n" + on + "debug: {mocks: {" + a.key + ": {enabled: true, return_type: success}}}", true, false, a.mockWarn},
+			{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {" + a.key + ": {enabled: true, return_type: error}}}", true, true, a.mockWarn},
+			{"dev, mock on, disabled", "mode: dev\ndebug: {mocks: {" + a.key + ": {enabled: true}}}", false, false, a.disWarn},
 			{"dev, mock off, disabled", "mode: dev\n", false, false, a.disWarn},
-			{"stage, enable ignored, disabled", "mode: stage\ndebug: {mocks: {" + a.key + ": {enable: true}}}", false, false, a.disWarn},
-			{"prod, mock ignored, enabled, no address", "mode: prod\n" + on + "debug: {mocks: {" + a.key + ": {enable: true}}}", false, false, ""},
+			{"stage, enable ignored, disabled", "mode: stage\ndebug: {mocks: {" + a.key + ": {enabled: true}}}", false, false, a.disWarn},
+			{"prod, mock ignored, enabled, no address", "mode: prod\n" + on + "debug: {mocks: {" + a.key + ": {enabled: true}}}", false, false, ""},
 			{"prod, enabled, local address (nothing listens)", "mode: prod\nproviders: {internal: {" + a.key + ": {enabled: true, grpc_address: \"127.0.0.1:1\", timeout: 2s}}}", false, false, ""},
 		}
 		for _, c := range cases {

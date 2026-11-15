@@ -20,7 +20,7 @@ const (
 
 // TestNewProviderRegistryKarashop (task 025): the Karashop adapter is registered under the name of
 // the seed rows 123456 and 124325 and inquires only the bill type tel. Its mock applies only in dev
-// mode, with debug.mocks.karashop.enable and providers.external.karashop.enabled true; enabled false wins
+// mode, with debug.mocks.karashop.enabled and providers.external.karashop.enabled true; enabled false wins
 // over the mock (one warn line).
 func TestNewProviderRegistryKarashop(t *testing.T) {
 	req := provider.InquiryRequest{BillType: provider.BillTypeTel, UserID: "u", Dialer: "989121234567", InquiryID: "982188776655"}
@@ -32,12 +32,12 @@ func TestNewProviderRegistryKarashop(t *testing.T) {
 		wantErr  bool // a mock error answer
 		wantWarn string
 	}{
-		{"dev, mock success", "mode: dev\n" + on + "debug: {mocks: {karashop: {enable: true, return_type: success}}}", true, false, karashopMockWarn},
-		{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {karashop: {enable: true, return_type: error}}}", true, true, karashopMockWarn},
-		{"dev, mock on, disabled", "mode: dev\ndebug: {mocks: {karashop: {enable: true}}}", false, false, karashopDisabledWarn},
+		{"dev, mock success", "mode: dev\n" + on + "debug: {mocks: {karashop: {enabled: true, return_type: success}}}", true, false, karashopMockWarn},
+		{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {karashop: {enabled: true, return_type: error}}}", true, true, karashopMockWarn},
+		{"dev, mock on, disabled", "mode: dev\ndebug: {mocks: {karashop: {enabled: true}}}", false, false, karashopDisabledWarn},
 		{"dev, mock off, disabled", "mode: dev\n", false, false, karashopDisabledWarn},
-		{"stage, enable ignored, disabled", "mode: stage\ndebug: {mocks: {karashop: {enable: true}}}", false, false, karashopDisabledWarn},
-		{"prod, mock ignored, enabled, no credential", "mode: prod\n" + on + "debug: {mocks: {karashop: {enable: true}}}", false, false, ""},
+		{"stage, enable ignored, disabled", "mode: stage\ndebug: {mocks: {karashop: {enabled: true}}}", false, false, karashopDisabledWarn},
+		{"prod, mock ignored, enabled, no credential", "mode: prod\n" + on + "debug: {mocks: {karashop: {enabled: true}}}", false, false, ""},
 		{"prod, enabled, local URL (nothing listens)", "mode: prod\nproviders: {external: {karashop: {enabled: true, code: c, password: p, bill_inquiry_url: \"http://127.0.0.1:1/k\", timeout: 2s}}}", false, false, ""},
 	}
 	for _, c := range cases {

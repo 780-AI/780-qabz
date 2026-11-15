@@ -41,12 +41,12 @@ func TestNewProviderRegistryIrancell(t *testing.T) {
 		wantErr  bool // a mock error answer
 		wantWarn string
 	}{
-		{"dev, mock success", "mode: dev\n" + on + "debug: {mocks: {irancell: {enable: true, return_type: success}}}", true, false, irancellMockWarn},
-		{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {irancell: {enable: true, return_type: error}}}", true, true, irancellMockWarn},
-		{"dev, mock on, irancell disabled", "mode: dev\ndebug: {mocks: {irancell: {enable: true}}}", false, false, irancellDisabledWarn},
+		{"dev, mock success", "mode: dev\n" + on + "debug: {mocks: {irancell: {enabled: true, return_type: success}}}", true, false, irancellMockWarn},
+		{"dev, mock error", "mode: dev\n" + on + "debug: {mocks: {irancell: {enabled: true, return_type: error}}}", true, true, irancellMockWarn},
+		{"dev, mock on, irancell disabled", "mode: dev\ndebug: {mocks: {irancell: {enabled: true}}}", false, false, irancellDisabledWarn},
 		{"dev, mock off, irancell disabled", "mode: dev\n", false, false, irancellDisabledWarn},
-		{"stage, enable ignored, irancell disabled", "mode: stage\ndebug: {mocks: {irancell: {enable: true}}}", false, false, irancellDisabledWarn},
-		{"prod, mock ignored, enabled, no address", "mode: prod\n" + on + "debug: {mocks: {irancell: {enable: true}}}", false, false, ""},
+		{"stage, enable ignored, irancell disabled", "mode: stage\ndebug: {mocks: {irancell: {enabled: true}}}", false, false, irancellDisabledWarn},
+		{"prod, mock ignored, enabled, no address", "mode: prod\n" + on + "debug: {mocks: {irancell: {enabled: true}}}", false, false, ""},
 		{"prod, enabled, local address (nothing listens)", "mode: prod\nproviders: {internal: {irancell: {enabled: true, grpc_address: \"127.0.0.1:1\", timeout: 2s}}}", false, false, ""},
 	}
 	for _, c := range cases {

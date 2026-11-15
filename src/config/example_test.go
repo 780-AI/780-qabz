@@ -144,3 +144,23 @@ func TestProvidersGroups(t *testing.T) {
 		assert.Contains(t, []string{"general", "internal", "external"}, parts[1], "path %s is outside the providers groups", p)
 	}
 }
+
+// offSwitchViolations returns the paths that break the rule of conventions § 8 (task 051 D6): an
+// on/off switch is named enabled, so no path ends in .enable, and none ends in .disable except
+// debug.auth.disable (operator decision D3).
+func offSwitchViolations(paths []string) []string {
+	var bad []string
+	for _, p := range paths {
+		if strings.HasSuffix(p, ".enable") || (strings.HasSuffix(p, ".disable") && p != "debug.auth.disable") {
+			bad = append(bad, p)
+		}
+	}
+	return bad
+}
+
+func TestOnOffKeysNamedEnabled(t *testing.T) {
+	assert.Empty(t, offSwitchViolations(configPaths()), "an on/off key is named enabled (conventions § 8)")
+	// The positive control: the check finds each kind of wrong name.
+	assert.Equal(t, []string{"debug.mocks.x.enable", "a.disable"},
+		offSwitchViolations([]string{"debug.mocks.x.enable", "debug.mocks.x.enabled", "a.disable", "debug.auth.disable"}))
+}

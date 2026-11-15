@@ -29,7 +29,7 @@ var gasRegistryReq = provider.InquiryRequest{BillType: "gas", UserID: "u", Inqui
 // water endpoint. providers.external.qabzino.enabled false: provider down, no call.
 func TestProviderRegistryServesGas(t *testing.T) {
 	log := &liveLogger{}
-	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\nproviders: {external: {qabzino: {enabled: true}}}\ndebug: {mocks: {qabzino: {enable: true, return_type: success}}}"), log)
+	reg, err := newProviderRegistry(registryConfig(t, "mode: dev\nproviders: {external: {qabzino: {enabled: true}}}\ndebug: {mocks: {qabzino: {enabled: true, return_type: success}}}"), log)
 	if !assert.NoError(t, err) || !assert.NotNil(t, reg) {
 		return
 	}

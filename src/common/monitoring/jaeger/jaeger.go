@@ -21,8 +21,8 @@ type Tracer struct{ tp *sdktrace.TracerProvider }
 
 // New creates the provider and sets it as the global one. The exporter connects lazily. It also sets
 // the global propagator to the W3C trace context only (no baggage: baggage can carry free input), so
-// the servers read traceparent and the outbound clients send it. Without New (logs.otlp_endpoint
-// empty) both globals stay the no-op ones: no span, no header, no connection.
+// the servers read traceparent and the outbound clients send it. Without New (logs.tracing.enabled
+// false) both globals stay the no-op ones: no span, no header, no connection.
 func New(ctx context.Context, endpoint, service string) (*Tracer, error) {
 	exp, err := otlptracegrpc.New(ctx, otlptracegrpc.WithEndpoint(endpoint), otlptracegrpc.WithInsecure())
 	if err != nil {

@@ -1,12 +1,13 @@
-<!-- VERSION: 0.2 -->
+<!-- VERSION: 1.0 -->
 <!--
 CHANGE LOG
+v1.0 — 2026-11-15 — Done: implemented as designed, with the implementation notes I1 to I3; the feature-ON evidence added; moved to done_tasks.
 v0.2 — 2026-11-15 — Started (operator: "add an enable [bool] config key"): moved to in-progress_tasks; operator decisions 2026-11-15, all recommended: D1 (a), D2 (a), D3 (a), D4 (a); design D5 to D8 written.
 v0.1 — 2026-11-15 — Created (operator request): a bool switch for tracing, and one name (`enabled`) for every on/off config key.
 -->
 # 051_tracing_switch_and_enabled_keys — the tracing switch and one name for the on/off keys
 
-Status: in-progress (design approved 2026-11-15)
+Status: done (2026-11-15; the operator QA confirmation is open in `OPEN_TASKS.md`)
 
 ## Description
 
@@ -24,7 +25,7 @@ Operator request, 2026-11-15: "add an enable [bool] config key" for tracing, and
 
 **An old key in a local config.** The loader does not reject a key that it does not know, so an old `debug.mocks.<provider>.enable: true` in a `config.yml` is dropped with no message, and the mock goes off. The design step decides how a renamed key is handled (D4).
 
-**Conventions.** § 8 gets the rule: an on/off switch is a bool key named `enabled` (not `enable`, not `disable`, not `is_<x>`), default `false` unless the operator decides otherwise. § 15 (`debug.mocks.<provider>.enable`) changes to `enabled`. A test in `src/config/example_test.go` fails on a path that ends in `.enable` or `.disable`.
+**Conventions.** § 8 gets the rule: an on/off switch is a bool key named `enabled` (not `enable`, not `disable`, not `is_<x>`), default `false` unless the operator decides otherwise. § 15 (`debug.mocks.<provider>.enable`) changes to `enabled`. A test in `src/config/example_test.go` fails on a path that ends in `.enable`, or in `.disable` but `debug.auth.disable` (D3).
 
 **Decisions for the operator (the design step).**
 - **D1. The tracing keys.** (a) `logs.tracing.enabled` and `logs.tracing.otlp_endpoint` (the endpoint moves into the block). (b) `logs.otlp_enabled` next to `logs.otlp_endpoint`. (c) bill's names in snake case: `jaeger.enabled`, `jaeger.host_port` (still the OTLP gRPC address, port 4317, not bill's agent port 6831) and `jaeger.log_spans`.
@@ -54,3 +55,22 @@ Operator request, 2026-11-15: "add an enable [bool] config key" for tracing, and
 ## Verification
 
 Feature ON (Rule 15): the compose Jaeger, the switch `true` with `localhost:4317`: one request shows as one trace in Jaeger. The switch `false` with the endpoint still set: no connection to port 4317 (`lsof`) and no trace. A mock with `enabled: true` answers; a config with the old `enable` key gives the result of D4.
+
+## Implementation
+
+- `src/config/config.go`: `TracingEnabled` (`logs.tracing.enabled`) and `TracingOTLPEndpoint` (`logs.tracing.otlp_endpoint`) replace `OTLPEndpoint`; the six `DebugMock<Provider>Enable` fields are `...Enabled` with the paths `debug.mocks.<provider>.enabled`; `renamedKeys` and `checkRenamed` (called in `Parse` after the debug section is removed, before the decode); the D2 rule in `validate`.
+- `src/app/defaults.go`: tracing starts only with `TracingEnabled`; the mock fields renamed. `src/common/monitoring/jaeger/jaeger.go`: comment only.
+- Tests: `TestTracingSwitch`, `TestRenamedKeys` (`config_test.go`), `TestOnOffKeysNamedEnabled` with a positive control (`example_test.go`); the YAML of the config and app tests uses `enabled`.
+- `config.yml.example`, the local `config.yml` (key names only; the values kept), `docker-compose.yml` (comments), conventions §§ 8, 15, 17, `system.html`, `src/app/README.md`, `OPEN_TASKS.md`.
+- **I1.** The rename error has no `config` prefix: `Boot` adds `config: ` (seen in the first live run as `config: config ...`).
+- **I2.** `debug.auth.disable` stays (D3); `TestOnOffKeysNamedEnabled` names it as the one exception.
+- **I3.** The `yml_to_env` test fixture keeps `otlp_endpoint`: it is sample data of the generic generator, not a Qabz key.
+
+## Verification record
+
+`make test` (with `-race`): every package `ok`. Feature ON (Rule 15), 2026-11-15: an App copy (`go build`, run from `src/`) on the ports 18080 / 18082 / 19090 with copies of the local config, the compose Jaeger 2.23.0. The operator's debug App on 8080 / 8082 / 9090 was not touched.
+- On (`enabled: true`, `localhost:4317`): `GET /v1/services` with the `traceparent` `00-0511aaaabbbbccccddddeeeeffff0051-1111222233334444-01` answered HTTP 200; the App had an ESTABLISHED connection to `127.0.0.1:4317`; the Jaeger API gave the trace: `haf80.api.bill.Service/Get` (parent `1111222233334444`, the gateway client span), `haf80.api.bill.Service/Get` (the server span, a child of it), `SELECT` (a child of the server span).
+- Off (`enabled: false`, the endpoint still `localhost:4317`): HTTP 200; no connection to port 4317; the Jaeger API answered `trace not found` for the trace ID of the request.
+- On with no endpoint: the App did not start: `panic: config: logs.tracing.otlp_endpoint is required while logs.tracing.enabled is true`.
+- Old keys (`logs.otlp_endpoint`, `debug.mocks.karashop.enable`, mode `dev`): the App did not start; the panic named both old keys and their new keys.
+- Verdict: the evidence matches D1, D2 and D4.
