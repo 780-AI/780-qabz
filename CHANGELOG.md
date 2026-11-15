@@ -1,7 +1,8 @@
-<!-- VERSION: 3.40 -->
+<!-- VERSION: 3.41 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.41 — 2026-11-15 — Added 050-task entry.
 v3.40 — 2026-11-15 — Added 047-tracing-backfill entry.
 v3.39 — 2026-11-15 — Added 047-split-design entry.
 v3.38 — 2026-11-15 — Added session-wrap-up (task 046 session) entry.
@@ -156,6 +157,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — New pending task 050 `irancell_status_worker`
+- **Type:** Minor (governance: a task file; no code).
+- **Files:** `docs/Plans/pending_tasks/050_irancell_status_worker.md` (new: the Irancell status worker as a second instance of the shared `reconcile.StatusWorker` of task 045, `irancellproxy.Adapter.Status` with `GetStatus` and `PurchaseType: "charge"`, `providers.internal.irancell.get_status.*` with `enabled: false`; the five defects of bill's `InquiryCron` to fix (pages with `OFFSET` skip orders, the Kafka report before the save, the 48 h read and 24 h save windows, no timeout and no stop, errors with no log line); every error writes a log line; a metric of the statuses fixed in each run; not manifest-tracked); `docs/Plans/pending_tasks/task_counter.json` (051); `docs/documents_manifest.md`.
+- **Impact:** No runtime impact (a pending task only).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Task 047: the shared tracing parts (conventions § 17)
 - **Type:** Major (new module dependencies, a behavior change of the spans and the outbound headers, a Critical File).
