@@ -1,7 +1,8 @@
-<!-- VERSION: 0.21 -->
-<!-- Last Updated: 2026-11-14 -->
+<!-- VERSION: 0.22 -->
+<!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v0.22 — 2026-11-15 — Task 044 (operator decision D14 (a)): § 15 — one return-type key for each provider method (`return_type` = the inquiry; `<method>_return_type` for another method, for example `pay_return_type` with `success`, `failed`, `pending`); the mock answers a method only when the adapter gives its fixture.
 v0.21 — 2026-11-14 — Section 7: the URL variable of the collection is `BASE_URL` (was `baseUrl`; operator); a request to another service (for example the payment service) uses `BASE_URL` with the path of that service; the collection pre-request script adds the web client headers.
 v0.20 — 2026-11-14 — Section 8: the provider blocks are in `providers.internal` (our own services) or `providers.external` (third-party services); a new provider goes in the group of its kind (task 041).
 v0.19 — 2026-11-11 — Section 13: one request calls one provider; what it returns (also an error or an answer that cannot be used) is the answer; only the circuit breaker of a provider starts a switch (the Provider Switcher), the same for every bill type, with no rule special to a bill type or a provider (operator, task 036).
@@ -378,6 +379,7 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 - **Code.** The adapter package gives its fixed answers as `provider.MockFixtures` (for example `qabzino.MockFixtures()`); the composition root (`src/app/defaults.go`, `newProviderRegistry`) wraps the adapter with `provider.NewMock`. Do not write a second mock mechanism. With the mock off, `NewMock` returns the adapter itself (OFF is the same as no mock).
 - **Dev mode twice.** The composition root applies a mock only when `Config.Mode` is `dev`, and writes one warn line when it does. The mock never runs in `stage` or `prod`.
 - **`return_type: success`** is a valid answer with fixed values (the values are documented in the fixtures and in the Postman description of the endpoint). **`error`** is `provider.ErrProviderDown`, the same error as a failed call.
+- **One return-type key for each method** (task 044, operator decision). `return_type` is the answer of `Inquiry`. Each other method that the mock answers has its own key, `debug.mocks.<provider>.<method>_return_type`, default `success`: `pay_return_type` (`success`, `failed`: a failed answer of the provider, `pending`: `provider.ErrProviderDown`, the answer of a timeout) and `settle_return_type` (`success`, `error`). The mock answers a method only when the adapter gives a fixture for it (`provider.MockFixtures.Pay`, `.Settle`); every other method goes to the adapter. A new method adds its key, its values and its fixture the same way; do not add values to `return_type`.
 - **Settings are read at start.** A mock is not hot-reloadable.
 - **Tests.** A test of the mock for each return type, with the mock off, and with the mode that is not dev.
 

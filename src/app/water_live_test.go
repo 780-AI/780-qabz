@@ -14,6 +14,7 @@ import (
 	"qabz/common/crypto"
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
+	"qabz/core/order"
 	grpcserver "qabz/entry/grpc"
 	"qabz/system/postgres"
 	"qabz/system/postgres/postgrestest"
@@ -40,6 +41,7 @@ type liveWaterStack struct {
 	signer      *crypto.Signer // the order token key of phone (task 039)
 	metrics     *prometheus.Server
 	log         *liveLogger
+	payments    *order.Payments // the payment step (task 044)
 }
 
 func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string) *liveWaterStack {
@@ -97,16 +99,22 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 	if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 		t.FailNow()
 	}
-	orders, err := newOrders(db, providers, flow, metrics, log)
+	orders, err := newOrders(cfg, db, providers, flow, metrics, log)
 	if !assert.NoError(t, err) || !assert.NotNil(t, orders) {
 		t.FailNow()
 	}
+	payments, err := newPayments(db, registry, metrics, log)
+	if !assert.NoError(t, err) || !assert.NotNil(t, payments) {
+		t.FailNow()
+	}
+	t.Cleanup(func() { assert.NoError(t, payments.Stop(context.Background())) })
 	signer, err := crypto.LoadSigner(cfg.PaymentServerPrivateKeyPath, cfg.OrderTokenKID())
 	if !assert.NoError(t, err) || !assert.NotNil(t, signer) {
 		t.FailNow()
 	}
 	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log),
-		phone: newPhone(flow, orders, signer, 105, log), tel: newTel(flow, log), signer: signer, metrics: metrics, log: log}
+		phone: newPhone(flow, orders, signer, 105, log), tel: newTel(flow, orders, signer, 105, log), signer: signer, metrics: metrics, log: log,
+		payments: payments}
 }
 
 func (s *liveWaterStack) ask(user, bill string) (*pb.InquiryBillPayResponse, error) {

@@ -733,6 +733,62 @@
               }
             }
           ]
+        },
+        {
+          "name": "Order V2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"02188776655\",\n  \"type\": \"midTerm\",\n  \"paymentType\": \"direct\",\n  \"billId\": \"\",\n  \"payId\": \"\",\n  \"price\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/v2/tel/order",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "v2",
+                "tel",
+                "order"
+              ]
+            },
+            "description": "haf80.api.bill.Tel/NewOrderV2 (task 044: the landline bill, paid through Parsian). Saves an order of a landline bill and answers the signed order token. The request and the answer are those of bill (NewOrderTelRequest, NewOrderResponse), unchanged; price is not read. The steps are those of bill: (1) the phone is converted to the 98 form (bill's NormalizePhoneNumber); the request needs billId or phone, and paymentType must be 0 or 1 (bill checks it against the names of the type enum); else HTTP 400. (2) type midTerm gives the bill type telmidterm, fullTerm gives tel; another type: HTTP 400. (3) the order provider of (telmidterm or tel, order) is picked with ProvidersService: Parsian (dev seed: row 51 telmidterm enabled, row 50 tel disabled, so fullTerm is HTTP 503 with the seed). (4) bill already paid: a pending or success order of the billId and payId of the request in providers.internal.parsian.settlement_inquiry_telephone (default 360h): HTTP 400 with bill's text. (5) the price: the Karashop inquiry of the number first (saved inquiries for caching.paid_tel, default 72h), its mid-term (midTerm) or final-term (fullTerm) inquiry; with the Karashop mock: 120000 or 350000. (6) the Karashop provider fee: 21000 when the line is connected (as bill), providers.provider_fee of the inquiry provider when it is disconnected. (7) the fee (fees table; no row: 9000). (8) one orders row with the status initial. (9) the token (RS256): payload serviceId, orderId, provider, price, userId and data (type, phone, billId, payId, payAmount, rawAmount, about, aboutIcon, invoicePhone, receiptPhone; feeAmount (fee + provider fee), feeDescription and hafhashtadFee when the fee is above 0; providerFee when it is above 0). Expected with the dev seed and the Karashop mock, type midTerm: HTTP 200, price 150000 (120000 + 9000 + 21000). Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. The payment step (PaymentComplete/OrderComplete) is gRPC only, on the internal server server.internal_grpc.addr, called by the payment service; it has no HTTP route. POST /v1/tel/order stays HTTP 501. After a 200 answer, the test script saves orderId and price in order_token and order_price, for Payment (external) / Invoice."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('answer has serviceId, orderId and price', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.orderId).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.price).to.be.above(0);",
+                  "    pm.expect(body).to.have.property('serviceId');",
+                  "});",
+                  "// Saves the order token and the total of the answer for Payment (external) / Invoice.",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('order_token', body.orderId);",
+                  "    pm.collectionVariables.set('order_price', String(body.price));",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

@@ -32,6 +32,14 @@ const zeroPriceText = "مبلغ قبض صفر میباشد"
 // @todo bill answers gRPC Unknown (HTTP 500). See docs/this_vs_bill.md, item 38.
 var errZeroPrice = status.Error(codes.FailedPrecondition, zeroPriceText)
 
+// alreadyPaidText is bill's text of a bill that is paid already (BillAlreadyPaidErrorType, task 044).
+const alreadyPaidText = "قبض وارد شده قبلاً پرداخت شده است، لطفا تا تسویه شدن قبض صبر کنید"
+
+// errAlreadyPaid is the answer of an order of a bill with a pending or successful order (task 044):
+// FailedPrecondition (HTTP 400) with bill's text. @todo bill answers gRPC Unknown (HTTP 500). See
+// docs/this_vs_bill.md, item 38.
+var errAlreadyPaid = status.Error(codes.FailedPrecondition, alreadyPaidText)
+
 // orderOperators gives the bill type of each operator and payment term of a mobile order (bill:
 // controller/phone phoneBillTypeMapper). It is the one table of the endpoint: task 039 filled the
 // entry of Irancell. An operator with a nil map is known but not available yet (Unimplemented: mci
@@ -149,21 +157,29 @@ func (p *Phone) NewOrderV2(ctx context.Context, req *pb.NewOrderPhoneRequest) (*
 
 // answerOrderError is the answer of a failed order.Service.Create (see NewOrderV2).
 func (p *Phone) answerOrderError(ctx context.Context, billType string, err error) error {
+	return answerOrderError(ctx, p.logger, billType, err)
+}
+
+// answerOrderError maps an error of order.Service.Create to the answer of the order endpoints
+// (task 039 design decision 2; task 044: ErrAlreadyPaid is FailedPrecondition with bill's text).
+func answerOrderError(ctx context.Context, logger ErrorLogger, billType string, err error) error {
 	logError := func(msg string) {
-		if p.logger != nil {
-			p.logger.Error(billType+": "+msg, "error", err)
+		if logger != nil {
+			logger.Error(billType+": "+msg, "error", err)
 		}
 	}
 	var inqErr *order.InquiryError
 	switch {
 	case errors.As(err, &inqErr) && inqErr != nil:
-		return answerInquiryError(ctx, p.logger, billType, inqErr.Err)
+		return answerInquiryError(ctx, logger, billType, inqErr.Err)
 	case ctx.Err() != nil:
 		return status.FromContextError(ctx.Err()).Err() // the client left: not a server error
 	case errors.Is(err, order.ErrTotalTooLarge):
 		return errInvalidParameter
 	case errors.Is(err, order.ErrZeroPrice):
 		return errZeroPrice
+	case errors.Is(err, order.ErrAlreadyPaid):
+		return errAlreadyPaid
 	case errors.Is(err, provider.ErrNoProvider):
 		logError("no enabled provider for order")
 		return errProviderDown

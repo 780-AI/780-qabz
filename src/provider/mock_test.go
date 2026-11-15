@@ -115,3 +115,77 @@ func TestMockCanceledContext(t *testing.T) {
 	_, err = m.Inquiry(ctx, InquiryRequest{})
 	assert.ErrorIs(t, err, context.Canceled)
 }
+
+// payFixtures have Pay and Settle (task 044).
+var payFixtures = MockFixtures{
+	Inquiry: testFixtures.Inquiry,
+	Pay: func(req PaymentRequest) *PaymentResponse {
+		return &PaymentResponse{Status: StatusSuccess, Code: 200, ProviderTraceID: "mock-" + req.OrderID}
+	},
+	Settle: func(SettleRequest) *SettleResponse { return &SettleResponse{Status: StatusSuccess, Code: 200} },
+}
+
+// TestMockPay (task 044): success gives the fixture, failed a failed answer, pending an error that
+// wraps ErrProviderDown; empty is success; no call to the adapter; a done context is its error.
+func TestMockPay(t *testing.T) {
+	for rt, want := range map[string]string{MockReturnSuccess: StatusSuccess, MockReturnFailed: StatusFailed, "": StatusSuccess} {
+		real := &stubAdapter{name: "parsian"}
+		log := &infoLog{}
+		m, err := NewMock(real, MockSettings{Enable: true, ReturnType: MockReturnSuccess, PayReturnType: rt}, payFixtures, log)
+		if !assert.NoError(t, err, rt) {
+			continue
+		}
+		resp, err := m.Pay(context.Background(), PaymentRequest{OrderID: "o1"})
+		if assert.NoError(t, err, rt) && assert.NotNil(t, resp, rt) {
+			assert.Equal(t, want, resp.Status, rt)
+		}
+		assert.Len(t, log.lines, 1, rt)
+	}
+	m, _ := NewMock(&stubAdapter{name: "parsian"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, PayReturnType: MockReturnPending}, payFixtures, nil)
+	_, err := m.Pay(context.Background(), PaymentRequest{})
+	assert.ErrorIs(t, err, ErrProviderDown)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = m.Pay(ctx, PaymentRequest{})
+	assert.ErrorIs(t, err, context.Canceled)
+
+	// No Pay fixture: the adapter answers.
+	m, _ = NewMock(&stubAdapter{name: "x"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, PayReturnType: "nonsense"}, testFixtures, nil)
+	_, err = m.Pay(context.Background(), PaymentRequest{})
+	assert.ErrorIs(t, err, ErrNotSupported, "the pay return type is not checked with no Pay fixture")
+	_, err = NewMock(&stubAdapter{name: "x"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, PayReturnType: MockReturnError}, payFixtures, nil)
+	assert.Error(t, err, "error is not a pay return type")
+}
+
+// TestMockSettle (task 044): success gives the fixture, error an error that wraps ErrProviderDown;
+// with no Settle fixture the adapter answers; an unknown settle return type is rejected.
+func TestMockSettle(t *testing.T) {
+	m, err := NewMock(&stubAdapter{name: "karashop"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess}, payFixtures, nil)
+	if assert.NoError(t, err) {
+		resp, err := m.Settle(context.Background(), SettleRequest{})
+		assert.NoError(t, err)
+		assert.Equal(t, StatusSuccess, resp.Status)
+	}
+	m, _ = NewMock(&stubAdapter{name: "karashop"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, SettleReturnType: MockReturnError}, payFixtures, nil)
+	_, err = m.Settle(context.Background(), SettleRequest{})
+	assert.ErrorIs(t, err, ErrProviderDown)
+	m, _ = NewMock(&stubAdapter{name: "x"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess}, testFixtures, nil)
+	_, err = m.Settle(context.Background(), SettleRequest{})
+	assert.ErrorIs(t, err, ErrNotSupported)
+	_, err = NewMock(&stubAdapter{name: "x"}, MockSettings{Enable: true, ReturnType: MockReturnSuccess, SettleReturnType: MockReturnPending}, payFixtures, nil)
+	assert.Error(t, err)
+	// The inquiry return type error does not change Pay and Settle.
+	m, _ = NewMock(&stubAdapter{name: "x"}, MockSettings{Enable: true, ReturnType: MockReturnError}, payFixtures, nil)
+	resp, err := m.Settle(context.Background(), SettleRequest{})
+	assert.NoError(t, err)
+	assert.Equal(t, StatusSuccess, resp.Status)
+}
+
+// TestTelServiceStatus: bill's map of the three Karashop texts; any other text gives "".
+func TestTelServiceStatus(t *testing.T) {
+	assert.Equal(t, TelServiceActive, TelServiceStatus("وصل"))
+	assert.Equal(t, TelServicePartiallyDisconnected, TelServiceStatus("قطع یکطرفه"))
+	assert.Equal(t, TelServiceFullyDisconnected, TelServiceStatus("قطع دوطرفه"))
+	assert.Empty(t, TelServiceStatus("other"))
+	assert.Empty(t, TelServiceStatus(""))
+}

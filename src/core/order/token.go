@@ -26,6 +26,18 @@ var metadata = map[string]Metadata{
 		Icon:           "https://public.780.ir/dl/Operator/logOirancell2.svg",
 		FeeDescription: "کارمزد",
 	},
+	// bill: case entity.TEL: TelIcon, AboutIconTel, FeeDescriptionTel (task 044).
+	provider.BillTypeTel: {
+		About:          "قبض تلفن ثابت-پایان دوره",
+		Icon:           "https://public.780.ir/dl/Operator/mokhaberat.svg",
+		FeeDescription: "تسویه آنی",
+	},
+	// bill: case entity.TELMIDTERM: TelIcon, AboutIconTelMidterm, FeeDescriptionTel (task 044).
+	provider.BillTypeTelMidterm: {
+		About:          "قبض تلفن ثابت-میان دوره",
+		Icon:           "https://public.780.ir/dl/Operator/mokhaberat.svg",
+		FeeDescription: "تسویه آنی",
+	},
 }
 
 // MetadataOf gives the Metadata of the bill type.
@@ -63,6 +75,36 @@ func PhoneData(o Order, phone, operator string) map[string]string {
 	if o.Fee > 0 {
 		data["feeAmount"] = strconv.FormatInt(o.Fee, 10)
 		data["feeDescription"] = meta.FeeDescription
+	}
+	return data
+}
+
+// TelData is the data map of the order token of a landline bill (task 044; bill:
+// controller/telephone NewOrderV2). phone is the phone of the request after the normalization. When
+// the fee is above 0: feeAmount (the fee and the provider fee), feeDescription and hafhashtadFee
+// (the fee); when the provider fee is above 0: providerFee. As in bill, feeAmount does not have the
+// provider fee when the fee is 0.
+func TelData(o Order, phone string) map[string]string {
+	meta := MetadataOf(o.BillType)
+	data := map[string]string{
+		"type":         o.BillType,
+		"phone":        phone,
+		"billId":       o.BillID,
+		"payId":        o.PayID,
+		"payAmount":    strconv.FormatUint(uint64(o.Price), 10),
+		"rawAmount":    strconv.FormatInt(o.BasePrice, 10),
+		"about":        meta.About,
+		"aboutIcon":    meta.Icon,
+		"invoicePhone": replace98(phone),
+		"receiptPhone": replace98(phone),
+	}
+	if o.Fee > 0 {
+		data["feeAmount"] = strconv.FormatUint(uint64(o.Fee)+o.ProviderFee, 10)
+		data["feeDescription"] = meta.FeeDescription
+		data["hafhashtadFee"] = strconv.FormatInt(o.Fee, 10)
+	}
+	if o.ProviderFee > 0 {
+		data["providerFee"] = strconv.FormatUint(o.ProviderFee, 10)
 	}
 	return data
 }

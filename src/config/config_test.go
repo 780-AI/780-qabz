@@ -722,10 +722,11 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 		c.ParsianGetStatusStart, c.ParsianGetStatusEnd, c.ParsianGetStatusCronTime, c.ParsianGetStatusLockTime,
 		c.ParsianGetStatusReverseDeadline, c.ParsianGetStatusSyncAPICall, c.ParsianGetStatusSyncGetOrder, c.ParsianGetStatusSyncInsertOrder,
 		c.ParsianSettlementInquiryWater, c.ParsianSettlementInquiryElectricity, c.ParsianSettlementInquiryGas,
-		c.ParsianSettlementInquiryTelephone, c.ParsianSettlementInquiryMCIMobile, c.ParsianSettlementInquiryRightelMobile,
+		c.ParsianSettlementInquiryMCIMobile, c.ParsianSettlementInquiryRightelMobile,
 	} {
 		assert.Zero(t, d)
 	}
+	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryTelephone, "task 044: bill's default")
 	assert.Zero(t, c.JiringSwitchGetStatusChunk)
 	assert.Zero(t, c.ParsianGetStatusChunk)
 	assert.False(t, c.JiringSwitchGetStatusIsLockable)
@@ -818,4 +819,55 @@ func TestOrderTokenKID(t *testing.T) {
 	assert.Equal(t, "svc", Config{ServiceName: "svc"}.OrderTokenKID())
 	assert.Equal(t, "bill", Config{ServiceName: "svc", PaymentServerKID: "bill"}.OrderTokenKID())
 	assert.Equal(t, "", Config{}.OrderTokenKID())
+}
+
+// TestParseTelOrderKeys (task 044): the keys of the landline order and payment, their defaults and
+// their rules.
+func TestParseTelOrderKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Empty(t, c.InternalGRPCAddr, "no internal server by default")
+	assert.Equal(t, 72*time.Hour, c.CachingPaidTel)
+	assert.Equal(t, MockReturnSuccess, c.DebugMockParsianPayReturnType)
+	assert.Equal(t, MockReturnSuccess, c.DebugMockKarashopSettleReturnType)
+
+	c, err = Parse([]byte(base + "server: {internal_grpc: {addr: \":8083\"}}\ncaching: {paid_tel: \"1h\"}\n" +
+		"providers: {internal: {parsian: {settlement_inquiry_telephone: \"0s\"}}}\n" +
+		"debug: {mocks: {parsian: {pay_return_type: pending}, karashop: {settle_return_type: error}}}\n"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, ":8083", c.InternalGRPCAddr)
+	assert.Equal(t, time.Hour, c.CachingPaidTel)
+	assert.Zero(t, c.ParsianSettlementInquiryTelephone)
+	assert.Equal(t, MockReturnPending, c.DebugMockParsianPayReturnType)
+	assert.Equal(t, MockReturnError, c.DebugMockKarashopSettleReturnType)
+
+	for yml, want := range map[string]string{
+		"server: {internal_grpc: {addr: \"nope\"}}\n":                                 "server.internal_grpc.addr",
+		"server: {internal_grpc: {addr: \":8082\"}}\n":                                "server.internal_grpc.addr must not be",
+		"server: {internal_grpc: {addr: \":8080\"}}\n":                                "server.internal_grpc.addr must not be",
+		"caching: {paid_tel: \"-1s\"}\n":                                              "caching.paid_tel",
+		"providers: {internal: {parsian: {settlement_inquiry_telephone: \"-1h\"}}}\n": "settlement_inquiry_telephone",
+		"debug: {mocks: {parsian: {pay_return_type: error}}}\n":                       "debug.mocks.parsian.pay_return_type",
+		"debug: {mocks: {karashop: {settle_return_type: pending}}}\n":                 "debug.mocks.karashop.settle_return_type",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+	// The mock keys are dropped outside dev (task 020c): a wrong value is not an error there.
+	_, err = Parse([]byte("mode: prod\ndatabase: {postgres: {password: pw}}\ndebug: {mocks: {parsian: {pay_return_type: nope}}}\n"))
+	assert.NoError(t, err)
+}
+
+func TestValidMockPayReturnType(t *testing.T) {
+	for _, v := range []string{MockReturnSuccess, MockReturnFailed, MockReturnPending} {
+		assert.True(t, ValidMockPayReturnType(v), v)
+	}
+	for _, v := range []string{"", MockReturnError, "Success", "timeout"} {
+		assert.False(t, ValidMockPayReturnType(v), v)
+	}
 }

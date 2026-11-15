@@ -349,3 +349,39 @@ func TestStartLogsMetricsSwitch(t *testing.T) {
 		})
 	}
 }
+
+// fakeBackground records its Stop (task 044).
+type fakeBackground struct {
+	c       *calls
+	stopErr error
+}
+
+func (f *fakeBackground) Stop(context.Context) error { f.c.add("background.stop"); return f.stopErr }
+
+// TestInternalServerAndBackgroundOrder (task 044): the internal gRPC server starts after the gRPC
+// server and stops before it; the background jobs stop after the servers and before the database
+// closes. A failed internal start stops the gRPC server and waits for the background jobs.
+func TestInternalServerAndBackgroundOrder(t *testing.T) {
+	r := newRig()
+	grpcSrv := &fakeServer{name: "grpc", c: r.c}
+	internal := &fakeServer{name: "internal", c: r.c}
+	httpSrv := &fakeServer{name: "http", c: r.c}
+	bg := &fakeBackground{c: r.c}
+	a := build(t, r.builder().WithGRPCServer(grpcSrv).WithInternalGRPCServer(internal).WithHTTPServer(httpSrv).WithBackground(bg))
+	assert.NoError(t, a.Start(context.Background()))
+	assert.Equal(t, []string{"db.ping", "cache.ping", "grpc.start", "internal.start", "http.start", "metrics.start"}, r.c.order)
+	assert.Contains(t, r.log.logs, "internal grpc started")
+	r.c.order = nil
+	assert.NoError(t, a.Stop(context.Background()))
+	assert.Equal(t, []string{"metrics.stop", "http.stop", "internal.stop", "grpc.stop", "background.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+
+	r = newRig()
+	grpcSrv = &fakeServer{name: "grpc", c: r.c}
+	internal = &fakeServer{name: "internal", c: r.c, startErr: errors.New("port in use")}
+	bg = &fakeBackground{c: r.c, stopErr: errors.New("jobs still running")}
+	a = build(t, r.builder().WithGRPCServer(grpcSrv).WithInternalGRPCServer(internal).WithBackground(bg))
+	err := a.Start(context.Background())
+	assert.ErrorContains(t, err, "internal grpc: port in use")
+	assert.ErrorContains(t, err, "jobs still running")
+	assert.Equal(t, []string{"db.ping", "cache.ping", "grpc.start", "internal.start", "grpc.stop", "background.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
+}

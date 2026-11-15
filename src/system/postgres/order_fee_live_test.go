@@ -11,6 +11,7 @@ import (
 	"qabz/core/fee"
 	"qabz/core/inquiry"
 	"qabz/core/order"
+	"qabz/provider"
 	"qabz/system/postgres"
 )
 
@@ -89,7 +90,7 @@ func TestLiveOrderInsert(t *testing.T) {
 }
 
 // TestLiveInquiryProvider reads the provider and the bill type of a saved inquiry; no row is
-// pgx.ErrNoRows.
+// pgx.ErrNoRows. A landline row gives its service status (task 044).
 func TestLiveInquiryProvider(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -101,11 +102,27 @@ func TestLiveInquiryProvider(t *testing.T) {
 		return
 	}
 	r := postgres.NewOrderRepository(c)
-	name, billType, err := r.InquiryProvider(ctx, id)
+	got, err := r.InquiryFee(ctx, id)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"irancell", "irancell"}, []string{name, billType})
-	_, _, err = r.InquiryProvider(ctx, "dddddddd-0000-4000-8000-000000000002")
+	assert.Equal(t, order.InquiryFee{ProviderName: "irancell", ProviderID: 38, BillType: "irancell"}, got)
+	_, err = r.InquiryFee(ctx, "dddddddd-0000-4000-8000-000000000002")
 	assert.ErrorIs(t, err, pgx.ErrNoRows)
+
+	tel := inquiry.Row{ID: "dddddddd-0000-4000-8000-000000000003", UserID: inqUser1, InquiryID: "982188776655", ProviderID: 124325,
+		ProviderName: "karashop", BillType: "tel", InquiryType: "midterm", Amount: 120000,
+		Details: &provider.Details{Tel: &provider.TelDetails{ServiceStatus: provider.TelServiceFullyDisconnected}}}
+	if !assert.NoError(t, postgres.NewInquiryRepository(c).SaveInquiries(ctx, []inquiry.Row{tel})) {
+		return
+	}
+	got, err = r.InquiryFee(ctx, tel.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, order.InquiryFee{ProviderName: "karashop", ProviderID: 124325, BillType: "tel", ServiceStatus: "fullyDisconnected"}, got)
+	// A service_status that is not a string reads as "".
+	_, err = c.Pool().Exec(ctx, `UPDATE bill_inquiries SET extra_data = '{"service_status": 3}' WHERE id = $1`, tel.ID)
+	assert.NoError(t, err)
+	got, err = r.InquiryFee(ctx, tel.ID)
+	assert.NoError(t, err)
+	assert.Empty(t, got.ServiceStatus)
 }
 
 // TestLiveFeeLookups: each query of bill on the real table: the newest row that is not deleted,
@@ -176,8 +193,19 @@ func TestNoPoolRepositories(t *testing.T) {
 	ctx := context.Background()
 	o := postgres.NewOrderRepository(nil)
 	assert.Error(t, o.Insert(ctx, order.Order{}))
-	_, _, err := o.InquiryProvider(ctx, "x")
+	_, err := o.InquiryFee(ctx, "x")
 	assert.Error(t, err)
+	_, err = o.ProviderFee(ctx, 1)
+	assert.Error(t, err)
+	_, err = o.ProviderName(ctx, 1)
+	assert.Error(t, err)
+	_, err = o.LastStatus(ctx, "b", "p", time.Hour)
+	assert.Error(t, err)
+	_, err = o.Latest(ctx, "x", time.Hour)
+	assert.Error(t, err)
+	assert.Error(t, o.ConfirmProvider(ctx, "x"))
+	assert.Error(t, o.MarkInquiryPaid(ctx, "x", "y"))
+	assert.Error(t, o.SetLastOrderDate(ctx, "x", "y", "z"))
 	f := postgres.NewFeeRepository(nil)
 	_, err = f.UserIDs(ctx)
 	assert.Error(t, err)

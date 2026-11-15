@@ -29,3 +29,15 @@ const (
 
 // ValidMockReturnType reports whether v is a value of a provider mock return_type.
 func ValidMockReturnType(v string) bool { return v == MockReturnSuccess || v == MockReturnError }
+
+// The values of the pay_return_type key of a provider mock (debug.mocks.<provider>.pay_return_type,
+// task 044): MockReturnSuccess, or one of these.
+const (
+	MockReturnFailed  = "failed"  // the provider answers the payment as failed
+	MockReturnPending = "pending" // the answer of a timeout: no final status
+)
+
+// ValidMockPayReturnType reports whether v is a value of a provider mock pay_return_type.
+func ValidMockPayReturnType(v string) bool {
+	return v == MockReturnSuccess || v == MockReturnFailed || v == MockReturnPending
+}

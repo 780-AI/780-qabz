@@ -156,6 +156,9 @@ type Request struct {
 	// the action order reads the cache TTL of the order action, and the irancell bill type has no
 	// TTL there).
 	NoCache bool
+	// CacheTTL, when positive, replaces the cache TTL of the bill type (Options.CacheTTL) for this
+	// request: the order flow gives the TTL of the order action (task 044; bill: caching.paidTel).
+	CacheTTL time.Duration
 }
 
 // Inquiry is one inquiry of the answer.
@@ -405,6 +408,9 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 	var ttl time.Duration
 	if s.cacheTTL != nil {
 		ttl = s.cacheTTL(req.BillType)
+	}
+	if req.CacheTTL > 0 {
+		ttl = req.CacheTTL
 	}
 	if ttl <= 0 {
 		return Result{}, false

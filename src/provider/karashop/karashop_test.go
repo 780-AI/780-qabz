@@ -144,7 +144,7 @@ func TestInquirySuccess(t *testing.T) {
 		{BillID: "2101234560040", PayID: "12000035", Amount: 120000, InquiryType: provider.InquiryTypeMidterm},
 		{BillID: "2101234560041", PayID: "35000042", Amount: 350000, InquiryType: provider.InquiryTypeFinalTerm},
 	}, resp.Inquiries)
-	assert.Nil(t, resp.Details)
+	assert.Equal(t, &provider.Details{Tel: &provider.TelDetails{ServiceStatus: provider.TelServiceActive}}, resp.Details, "task 044: the service status")
 }
 
 // TestInquiryTelStatusMap: telStatus 1, 3 and 4 are a success (4: no debt, a null amount is 0);

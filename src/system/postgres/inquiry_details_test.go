@@ -183,3 +183,34 @@ func TestGasExtraData(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"city":"e"}`, s)
 }
+
+// TestTelExtraData (task 044): the landline details are bill's {"service_status": ...}; empty is {};
+// a saved tel row gives the details back; a status that is not a string is an error.
+func TestTelExtraData(t *testing.T) {
+	var p fastjson.Parser
+	s, err := inquiryExtraData(&provider.Details{Tel: &provider.TelDetails{ServiceStatus: provider.TelServicePartiallyDisconnected}})
+	assert.NoError(t, err)
+	assert.Equal(t, `{"service_status":"partiallyDisconnected"}`, s, "what bill writes")
+	s, err = inquiryExtraData(&provider.Details{Tel: &provider.TelDetails{}})
+	assert.NoError(t, err)
+	assert.Equal(t, "{}", s)
+
+	for raw, want := range map[string]*provider.TelDetails{
+		`{"service_status":"active"}`:            {ServiceStatus: "active"},
+		`{"service_status":null,"other":1}`:      {},
+		`{}`:                                     {},
+		`{"service_status":"fullyDisconnected"}`: {ServiceStatus: "fullyDisconnected"},
+	} {
+		got, err := inquiryDetails(&p, provider.BillTypeTel, raw)
+		if assert.NoError(t, err, raw) && assert.NotNil(t, got, raw) {
+			assert.Equal(t, want, got.Tel, raw)
+		}
+	}
+	got, err := inquiryDetails(&p, provider.BillTypeTel, "")
+	assert.NoError(t, err)
+	assert.Nil(t, got, "NULL: no details")
+	_, err = inquiryDetails(&p, provider.BillTypeTel, `{"service_status":3}`)
+	assert.Error(t, err)
+	_, err = inquiryDetails(&p, provider.BillTypeTel, `[1]`)
+	assert.Error(t, err)
+}

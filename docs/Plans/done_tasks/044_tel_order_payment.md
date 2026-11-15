@@ -1,12 +1,13 @@
-<!-- VERSION: 0.2 -->
+<!-- VERSION: 0.3 -->
 <!--
 CHANGE LOG
+v0.3 — 2026-11-15 — Done: implementation and verification record; D5 corrected (a visible difference, `docs/this_vs_bill.md` item 42, and the second inquiry found in the feature-ON run); the QA scenario waits for the operator.
 v0.2 — 2026-11-15 — Started (operator: "Yes, start 044"): moved to in-progress_tasks; design written (corrections C1 to C4, D1 to D17; operator approval "Approve, all (a)": D6 (a), D8 (a), D14 (a)).
 v0.1 — 2026-11-15 — Created (operator request): part 1 of supertask 043.
 -->
 # 044_tel_order_payment — tel order and payment through Parsian, Karashop settlement at once
 
-Status: in-progress (design approved 2026-11-15; implementation next)
+Status: done (2026-11-15; the QA scenario and the real end-to-end test wait for the operator)
 
 ## Description
 
@@ -63,7 +64,7 @@ Read on 2026-11-15 from `bill` commit `ff98e25` (not run) and from the Qabz sour
 - **D2. The "bill already paid" check (`shouldSkipNewOrder`).** The order provider is Parsian, so Qabz reads the newest `orders` row with the `billId` and `payId` of the request, created in the last `providers.internal.parsian.settlement_inquiry_telephone`. The key exists and is not read yet; `bill` has `360h`, and Qabz gets the same default. A last status of `pending` or `success` gives `bill`'s error code 8 with the text `قبض وارد شده قبلاً پرداخت شده است، لطفا تا تسویه شدن قبض صبر کنید`. Qabz answers it as `FailedPrecondition` (HTTP 400), with the same rule as task 039 D2. A failed read does not stop the order.
 - **D3. The price: the inquiry comes first.** For `tel` and `telmidterm`, `bill` makes the provider inquiry before the raw-inquiry rule (`AvailableBillTypes`: the inquiry provider is Karashop, which has a provider fee). `core/order` gets the flag `inquiryFirst`. The inquiry type is `final_term` for `tel` and `midterm` for `telmidterm`.
 - **D4. Saved inquiries for an order.** `bill` reads saved inquiries for an order for `caching.paidTel: 72h`. Qabz adds `caching.paid_tel: "72h"`. The order flow passes this TTL, in place of `NoCache` (task 039 D4).
-- **D5. The `telmidterm` inquiry.** Qabz has one inquiry bill type, `tel`: one Karashop answer has the mid-term and the full-term inquiry (task 025). A `telmidterm` order makes the inquiry of `tel` and takes the `midterm` inquiry. The rows, the price and the provider are the same as in `bill`. This is not a `this_vs_bill.md` item.
+- **D5. The `telmidterm` inquiry.** Qabz has one inquiry bill type, `tel`: one Karashop answer has the mid-term and the full-term inquiry (task 025). A `telmidterm` order makes the inquiry of `tel` and takes the `midterm` inquiry. **Corrected in the implementation:** this is a visible difference, `docs/this_vs_bill.md` item 42: `bill` asks the inquiry provider of the order bill type (row 123456 for `telmidterm`) for one term and saves one row with that provider; Qabz makes two Karashop calls and saves two rows with row 124325. The feature-ON run found its effect: after a paid mid term the saved rows have only the final term, so a new mid-term order failed (HTTP 500). Fix: when the saved answer has no inquiry of the term, the order asks Karashop again (`bill` has no saved row of its provider then and asks Karashop too).
 - **D6. The Karashop provider fee (`feeableBillType`) (decision).** `bill` reads the `bill_inquiries` row of the price. For the provider Karashop and the bill types `tel` and `telmidterm`, `bill` does this:
   - `extra_data.service_status` is `partiallyDisconnected` or `fullyDisconnected` (Karashop `serviceStatus` `قطع یکطرفه` or `قطع دوطرفه`): the fee is `providers.provider_fee` of the inquiry provider row. The seed has NULL there, so the fee is 0.
   - Any other status: a fixed **21000**, with the comment `todo: we have to remove that, tis so wrong`.
@@ -114,3 +115,18 @@ Read on 2026-11-15 from `bill` commit `ff98e25` (not run) and from the Qabz sour
 ### Risk check (supertask 043)
 
 - **D17. A separate database.** `config.yml.example` has `database.postgres.db: qabz`, so the `bill` workers do not read the Qabz `orders` rows. The operator confirms that stage and prod also use their own database.
+
+## Verification record (implementer, 2026-11-15)
+
+- **Build and tests:** `go build ./...`, `go vet ./...`; `make test GO_TEST_ARGS="-race -count=1"`: every package passes (the live tests on the run database). `TestInquiryOneCallFails` (`provider/karashop`, task 025) failed 1 time in 5 runs once more (the known flaky test, task 039 follow-up (d)); not changed by this task.
+- **Positive controls:** (a) `KarashopProviderFee` set to 0 in an overlay copy: `TestCreateTel` and `TestCreateTelProviderFee` fail (the first control passed, because the tests read the same constant; the tests now have the literal 21000); (b) `confirmProviderSQL` with `status = 'failed'`: `TestLiveTelOrderAndPayment` fails (`provider_confirmed`); (c) the second inquiry turned off: `TestLiveTelOrderAndPayment` fails.
+- **Feature ON (Rule 15):** the App binary on the compose dev database, with a copy of the local config (ports 18080 / 18082 / 18083 / 19090, `server.internal_grpc.addr` set, the Parsian and Karashop mocks), a scratch gRPC client for `OrderComplete`:
+  1. `success` / `success`: order `price` 150000, token `data` `providerFee` 21000, `feeAmount` 30000, `hafhashtadFee` 9000; `OrderComplete` → `status=success`, `data.refID` 9900000044, `version` 2, `currentStep` `qabz`; rows `initial`, `in-progress` (RRN 778899), `success` (ref_id 9900000044, status_code 200, `provider_confirmed = true`); the mid-term inquiry row `is_paid`; log `settle: karashop confirmed`; metrics `qabz_order_payment_total{status="success"}` 1, `qabz_order_settle_total{result="success"}` 1.
+  2. `success` / `error`: `status=success`; `provider_confirmed` NULL; one error line `settle: karashop failed`; `qabz_order_settle_total{result="error"}` 1.
+  3. `failed`: gRPC `Unknown`, message `mock: the payment failed`; last row `failed` (400); no settlement.
+  4. `pending`: `status=pending`; last row `pending` (500); no settlement.
+  5. The second call of each order: `status=pending`, no new row (`processed` 1); a wrong price: `pending`, only the `initial` row (`wrong_price` 1); a wrong `serviceId`: gRPC `Unknown` `خطای داخلی رخ داده است`, one error line.
+  - `fullTerm` with the seed: HTTP 503 (row 50 is disabled, C4).
+  - The first run of scenarios 2 to 4 found the D5 defect (`inquiry_failed`); fixed, rebuilt, run again: all pass as above (scenario 3 shows the second Karashop inquiry).
+  - The test rows (1 + earlier `orders` rows, 13 `bill_inquiries`, 3 `bill_inquiry_requests` of `982188776655` since the run start) were deleted.
+- **Not done:** the real payment through the payment service, Parsian and Karashop (operator, verification step 6).

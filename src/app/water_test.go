@@ -25,6 +25,8 @@ import (
 func TestMockConstantsMatchConfig(t *testing.T) {
 	assert.Equal(t, config.MockReturnSuccess, provider.MockReturnSuccess)
 	assert.Equal(t, config.MockReturnError, provider.MockReturnError)
+	assert.Equal(t, config.MockReturnFailed, provider.MockReturnFailed)
+	assert.Equal(t, config.MockReturnPending, provider.MockReturnPending)
 }
 
 func registryConfig(t *testing.T, yml string) config.Config {

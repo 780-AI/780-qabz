@@ -1,7 +1,8 @@
-<!-- VERSION: 3.32 -->
+<!-- VERSION: 3.33 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.33 — 2026-11-15 — Added 044-tel-order-payment entry.
 v3.32 — 2026-11-15 — Added config-example-service-id-comment entry.
 v3.31 — 2026-11-15 — Added 042-order-token-kid entry.
 v3.30 — 2026-11-14 — Added postman-base-url-and-client-headers entry.
@@ -148,6 +149,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 044: POST /v2/tel/order, the Parsian payment (OrderComplete) and the Karashop settlement
+- **Type:** Major (a new endpoint, a new internal gRPC server, a payment flow, new config keys, a change of conventions § 15 and of `system.html`).
+- **Files:** `src/core/order/order.go` (the bill types `tel` and `telmidterm`, the "bill already paid" check, the Karashop provider fee, the order cache TTL, the second inquiry when a saved answer has no inquiry of the term), `src/core/order/complete.go` (new: `Payments`, the payment step and the background settlement), `src/core/order/token.go` (`TelData`, the tel metadata), `src/core/inquiry/inquiry.go` (`Request.CacheTTL`), `src/provider/provider.go` (`PaymentRequest`, `PaymentResponse`, `SettleRequest`, `SettleResponse`, `TelDetails`, the statuses), `src/provider/mock.go` (the mock of `Pay` and `Settle`), `src/provider/parsianproxy/parsianproxy.go` (`Pay` = `TopBill/Pay`), `src/provider/karashop/karashop.go` and `settle.go` (new: `Settle` = `SendPaymentInfo`; the service status), `src/system/postgres/order_repository.go` (the status rows and the payment queries), `src/system/postgres/inquiry_details.go` (the tel `extra_data`), `src/entry/grpc/tel.go`, `tel_order.go` (new: `Tel.NewOrderV2`), `payment.go` (new: `PaymentComplete.OrderComplete`), `phone_order.go` (the shared `answerOrderError`, `errAlreadyPaid`), `src/app/app.go`, `builder.go`, `defaults.go` (the internal server, the background jobs, the wiring), `src/config/config.go`, `constants.go`; tests: `src/core/order/tel_test.go`, `complete_test.go`, `order_test.go`, `src/provider/karashop/settle_test.go`, `karashop_test.go`, `src/provider/parsianproxy/pay_test.go`, `parsianproxy_test.go`, `src/provider/mock_test.go`, `src/system/postgres/order_payment_live_test.go`, `order_fee_live_test.go`, `inquiry_details_test.go`, `src/entry/grpc/tel_order_test.go`, `payment_test.go`, `src/app/tel_order_live_test.go`, `app_test.go`, `tel_test.go`, `water_live_test.go`, `water_test.go`, `src/config/config_test.go`; `config.yml.example`; `qabz.postman_collection.json` (new request Tel / Order V2); `docs/initial-discovery/system.html` (v2.15); `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.22, § 15); `docs/this_vs_bill.md` (v0.22, items 36, 38, 40, 41, 42); `src/app/README.md` (v0.35); `docs/folder_structure.md` (v0.47); `docs/Plans/OPEN_TASKS.md` (v1.72); `docs/Plans/done_tasks/044_tel_order_payment.md`; `docs/documents_manifest.md` (v2.34); `CHANGELOG.md`.
+- **Impact:** Yes. `POST /v2/tel/order` answers (it was HTTP 501): an order of a landline bill through Parsian, as bill. A new internal gRPC server serves `PaymentComplete/OrderComplete` when `server.internal_grpc.addr` is set; with the key empty (the default) no server starts and nothing else changes. On `OrderComplete` Qabz saves `in-progress`, pays through Parsian (`TopBill/Pay`) and saves `success`, `failed` or `pending` (one `orders` row each); after a success it settles with Karashop in the background (`provider_confirmed`) and marks the inquiry rows paid. New keys: `server.internal_grpc.addr`, `caching.paid_tel` (72h), `debug.mocks.parsian.pay_return_type`, `debug.mocks.karashop.settle_return_type`; read now: `providers.internal.parsian.settlement_inquiry_telephone` (default 360h, was not read, the default was 0) and `providers.external.karashop.bill_payment_info_url`. The Karashop inquiry saves the service status in `extra_data`. The irancell order is unchanged (its saved inquiries are still off). New metrics `qabz_order_payment_total`, `qabz_provider_pay_duration_ms`, `qabz_order_settle_total`; `qabz_order_create_total` has the result `already_paid`. The App stop waits for the running settlements.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, task 044 (⏸).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Config: the service.id comment names 108, the ID of the deployed bill
 - **Type:** Minor (a comment only).

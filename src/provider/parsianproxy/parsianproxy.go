@@ -1,7 +1,8 @@
 // Package parsianproxy is the Parsian adapter (task 036): it calls the parsian-v2 service, one of
-// our own services, over gRPC (TopBill/Inquiry, pb/proto/parsian-v2). The parsian-v2 service calls
-// Parsian (TOP); Qabz does not. Only Inquiry of an MCI mobile bill (the bill type "mobile") is
-// implemented; every other method returns provider.ErrNotSupported. The rules copy the old bill
+// our own services, over gRPC (TopBill/Inquiry and TopBill/Pay, pb/proto/parsian-v2). The parsian-v2
+// service calls Parsian (TOP); Qabz does not. Inquiry of an MCI mobile bill (the bill type "mobile")
+// and Pay of a landline bill (the bill types tel and telmidterm, task 044) are implemented; every
+// other method returns provider.ErrNotSupported. The rules copy the old bill
 // service (gateway/inquiry/mobile_mci.go, ParsianMCIMobile, and base.go
 // handlePhoneResponseWithoutInquiry).
 package parsianproxy
@@ -11,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"net/http"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
@@ -45,6 +48,7 @@ var (
 // give a fake.
 type Client interface {
 	Inquiry(ctx context.Context, in *pb.BillInquiryRequest, opts ...grpc.CallOption) (*pb.BillInquiryResponse, error)
+	Pay(ctx context.Context, in *pb.PayRequest, opts ...grpc.CallOption) (*pb.PayResponse, error)
 }
 
 // Options configure New.
@@ -105,6 +109,10 @@ func Dial(addr string) (Client, error) {
 type noClient struct{}
 
 func (noClient) Inquiry(context.Context, *pb.BillInquiryRequest, ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
+	return nil, errNoAddress
+}
+
+func (noClient) Pay(context.Context, *pb.PayRequest, ...grpc.CallOption) (*pb.PayResponse, error) {
 	return nil, errNoAddress
 }
 
@@ -196,9 +204,70 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	return out, nil
 }
 
-// Pay is not supported yet.
-func (*Adapter) Pay(context.Context, provider.PaymentRequest) (*provider.PaymentResponse, error) {
-	return nil, provider.ErrNotSupported
+// payBillTypes are the bill types that Pay pays (task 044; bill: ParsianTelephone for TEL and
+// TELMIDTERM).
+var payBillTypes = map[string]bool{provider.BillTypeTel: true, provider.BillTypeTelMidterm: true}
+
+// SupportsPay reports whether Pay pays the bill type: tel and telmidterm.
+func SupportsPay(billType string) bool { return payBillTypes[billType] }
+
+// Pay pays a landline bill through the parsian-v2 service (TopBill/Pay; bill: ParsianTelephone.Execute
+// of gateway/payment/telephone.go). The request has the fields of bill: provider_order_id is the RRN
+// as an integer, payment_rrn the RRN, amount the base price, inquiry_id the landline number and
+// bill_type the order bill type.
+//   - An RRN that is not an integer (strconv.Atoi, as bill) is a failed answer (code 400, the
+//     error text as the message) with no call.
+//   - A call that fails (the switch is off, no address, a connection error, a timeout, a nil answer)
+//     returns an error that wraps provider.ErrProviderDown: the status is not known (bill: pending,
+//     code 500, the error text).
+//   - Else the answer of the service as it came (code, status, message, provider_trace_id as text).
+//
+// @todo bill sets no timeout of its own (the deadline of the payment service applies); Qabz limits
+// the call with providers.internal.parsian.timeout. See docs/this_vs_bill.md, item 40.
+func (a *Adapter) Pay(ctx context.Context, req provider.PaymentRequest) (*provider.PaymentResponse, error) {
+	if a == nil || a.client == nil {
+		return nil, errors.New("parsianproxy: adapter not created with New")
+	}
+	if !SupportsPay(req.BillType) {
+		return nil, fmt.Errorf("parsianproxy: pay of %q: %w", req.BillType, provider.ErrNotSupported)
+	}
+	tid, err := strconv.Atoi(req.RRN)
+	if err != nil {
+		return &provider.PaymentResponse{Code: http.StatusBadRequest, Status: provider.StatusFailed, Message: err.Error()}, nil
+	}
+	if !a.enabled {
+		return nil, fmt.Errorf("parsianproxy: pay: %w: %w", provider.ErrProviderDown, errDisabled)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
+	defer cancel()
+	resp, err := a.client.Pay(ctx, &pb.PayRequest{
+		UserId:          req.UserID,
+		Dialer:          req.Dialer,
+		OrderId:         req.OrderID,
+		ProviderOrderId: int64(tid),
+		InquiryId:       req.InquiryID,
+		BillType:        req.BillType,
+		InquiryType:     req.InquiryType,
+		BillId:          req.BillID,
+		PayId:           req.PayID,
+		Amount:          req.Amount,
+		PaymentRrn:      req.RRN,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("parsianproxy: pay: %w: %w", provider.ErrProviderDown, err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("parsianproxy: pay: %w: empty answer", provider.ErrProviderDown)
+	}
+	return &provider.PaymentResponse{
+		Code:            resp.GetCode(),
+		Status:          resp.GetStatus(),
+		Message:         resp.GetMessage(),
+		ProviderTraceID: strconv.FormatUint(resp.GetProviderTraceId(), 10),
+	}, nil
 }
 
 // Status is not supported yet.
@@ -229,10 +298,14 @@ const (
 	MockTrace           = "mock-parsian-0001"
 )
 
+// MockPayTrace is the provider trace ID of a payment that the Parsian mock answers as a success
+// (task 044).
+const MockPayTrace = "9900000044"
+
 // MockFixtures returns the fixed answers of the Parsian mock (debug.mocks.parsian): Inquiry answers
-// with the two inquiries above.
+// with the two inquiries above; Pay (task 044) answers a success with the trace ID MockPayTrace.
 func MockFixtures() provider.MockFixtures {
-	return provider.MockFixtures{Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
+	return provider.MockFixtures{Pay: mockPay, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
 		return &provider.InquiryResponse{
 			Status:          provider.ResponseSuccess,
 			Code:            200,
@@ -245,4 +318,9 @@ func MockFixtures() provider.MockFixtures {
 			},
 		}
 	}}
+}
+
+// mockPay is the success answer of the Parsian mock to a payment.
+func mockPay(provider.PaymentRequest) *provider.PaymentResponse {
+	return &provider.PaymentResponse{Code: http.StatusOK, Status: provider.StatusSuccess, Message: successMessage, ProviderTraceID: MockPayTrace}
 }

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -25,8 +26,16 @@ import (
 // entity.OrderAction).
 const ActionOrder = "order"
 
-// StatusInitial is orders.status of a new order (bill: entity.INITIAL).
-const StatusInitial = "initial"
+// The orders.status values (bill: entity.INITIAL, PROGRESS, SUCCESS, FAILED, PENDING). Each status
+// change is a new orders row (bill: order.Repository.NewOrder); the newest row of an order ID is its
+// status.
+const (
+	StatusInitial    = "initial"
+	StatusInProgress = "in-progress"
+	StatusSuccess    = provider.StatusSuccess
+	StatusFailed     = provider.StatusFailed
+	StatusPending    = provider.StatusPending
+)
 
 // Results of one Create call, for Options.OnOrder (a fixed set: metric labels).
 const (
@@ -35,6 +44,7 @@ const (
 	ResultNoProvider    = "no_provider"    // no enabled order provider for the bill type
 	ResultZeroPrice     = "zero_price"     // the price is 0
 	ResultInquiryFailed = "inquiry_failed" // the inquiry for the price failed, or has no inquiry of the type
+	ResultAlreadyPaid   = "already_paid"   // the bill ID and pay ID have a pending or successful order (task 044)
 	ResultError         = "error"          // a failed read or write, or a fault of the code
 )
 
@@ -51,19 +61,37 @@ type billType struct {
 	// entity.BillTypeInquiryType; a bill type that is not in the map there gives
 	// provider.InquiryTypeRegular).
 	inquiryType string
+	// inquiryFirst makes the provider inquiry the price rule before the raw inquiry (bill: NewOrder,
+	// provider_fee_gateway AvailableBillTypes: the inquiry provider of the bill type has a provider
+	// fee; task 044).
+	inquiryFirst bool
+	// inquiryBillType is the bill type of the inquiry for the price. Empty: the order bill type.
+	inquiryBillType string
 }
 
 // billTypes are the bill types that the flow supports, by the bill type that the handler gives.
+//
 //   - irancell (task 039): the direct price rule, and the final-term inquiry (bill:
 //     BillTypeInquiryType[Irancell] is final_term; the request type midTerm or fullTerm does not
 //     change it). bill's order cache has no TTL for irancell, so the inquiry never answers from
 //     saved inquiries (inquiry.Request.NoCache).
 //
-// A later bill type that has an order cache TTL in bill (caching.paid* for gas, water, electricity,
-// tel, mobile) needs that TTL in place of NoCache.
+//   - tel and telmidterm (task 044): the inquiry first (Karashop has a provider fee), the
+//     final-term or the mid-term inquiry of the inquiry of tel (one Karashop answer has both terms).
+//     @todo bill asks the inquiry provider of the order bill type for one term. See
+//     docs/this_vs_bill.md, item 42. The saved inquiries answer for Options.OrderCacheTTL (caching.paid_tel).
+//
+// A bill type with no order cache TTL (Options.OrderCacheTTL gives 0) never answers from saved
+// inquiries (inquiry.Request.NoCache).
 var billTypes = map[string]billType{
-	provider.BillTypeIrancell: {directPrice: true, inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeIrancell:   {directPrice: true, inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeTel:        {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeTelMidterm: {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeMidterm},
 }
+
+// InquiryTypeOf gives the inquiry type of an order bill type (bill: entity.BillTypeInquiryType), ""
+// for a bill type that the flow does not know.
+func InquiryTypeOf(billType string) string { return billTypes[billType].inquiryType }
 
 var (
 	// ErrZeroPrice is the error of an order whose price is 0 (bill: AmountEqualToZero).
@@ -76,7 +104,24 @@ var (
 	ErrNoInquiry = errors.New("order: no inquiry of the bill type in the answer")
 	// ErrUnsupported is the error of a bill type that the flow does not know.
 	ErrUnsupported = errors.New("order: unsupported bill type")
+	// ErrAlreadyPaid is the error of an order whose bill ID and pay ID have a pending or successful
+	// order in the window of the order provider (bill: shouldSkipNewOrder, BillAlreadyPaidErrorType;
+	// task 044).
+	ErrAlreadyPaid = errors.New("order: the bill is paid already")
 )
+
+// KarashopProviderFee is the provider fee of a Karashop landline inquiry when the line is not
+// disconnected (bill: feeableBillType, defaultFee). @todo bill marks it "todo: we have to remove
+// that, tis so wrong"; Qabz keeps it as bill (task 044, operator decision D6 (a)).
+const KarashopProviderFee = 21000
+
+// karashopName is the providers.name of Karashop (provider/karashop.Name; core does not import an
+// adapter).
+const karashopName = "karashop"
+
+// karashopFeeBillTypes are the bill types of a Karashop inquiry that has a provider fee (bill:
+// app/providerFeeGateway.go: tel, telmidterm, telephone).
+var karashopFeeBillTypes = map[string]bool{provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, "telephone": true}
 
 // InquiryError is the error of a failed inquiry for the price (the third price rule). Err is the
 // error of inquiry.Service.Inquire, so the handler answers as the inquiry endpoint. Test it with
@@ -109,6 +154,14 @@ type Request struct {
 	Price     uint64 // the price of the request (bill: uint64(request.Price))
 }
 
+// InquiryFee is what the provider fee reads of a bill_inquiries row (bill: bill_inquiry GetById).
+type InquiryFee struct {
+	ProviderName  string
+	ProviderID    int64
+	BillType      string
+	ServiceStatus string // extra_data.service_status of a landline row, "" for none
+}
+
 // Order is one row of the orders table. An empty string, a 0 and a nil are stored as NULL, as bill
 // (go-pg stores a zero value as NULL).
 type Order struct {
@@ -132,6 +185,15 @@ type Order struct {
 	IsRaw         bool
 	ProviderFee   uint64
 	BillInquiryID string
+	// The columns of a status change (task 044; bill: CompleteOrder). Empty on a new order.
+	RRN               string
+	RefID             string // orders.ref_id: the trace ID of the provider
+	Message           string
+	StatusCode        int32
+	ProviderConfirmed bool
+	// CreatedAt is orders.created_at of a row that was read. Insert does not write it: the
+	// database sets it (bill sets the zero value).
+	CreatedAt time.Time
 	// FeeSource is how the fee was found (fee.Source values). Not a column.
 	FeeSource string
 }
@@ -160,9 +222,14 @@ type FeeResolver interface {
 type Repository interface {
 	// Insert adds the orders row.
 	Insert(ctx context.Context, o Order) error
-	// InquiryProvider gives provider_name and bill_type of the bill_inquiries row with the id (bill:
+	// InquiryFee reads the bill_inquiries row with the id for the provider fee (bill:
 	// bill_inquiry.Repository.GetById). No row is an error.
-	InquiryProvider(ctx context.Context, billInquiryID string) (providerName, billType string, err error)
+	InquiryFee(ctx context.Context, billInquiryID string) (InquiryFee, error)
+	// ProviderFee gives providers.provider_fee of the provider row (NULL is 0). No row is an error.
+	ProviderFee(ctx context.Context, providerID int64) (uint64, error)
+	// LastStatus gives the status of the newest orders row with the bill ID and the pay ID, created
+	// in the last window (0: any time); "" when there is none (bill: GetLastStatusByBillIDPayID).
+	LastStatus(ctx context.Context, billID, payID string, window time.Duration) (string, error)
 }
 
 // Logger writes the errors that the flow handles itself (the App logger has it).
@@ -178,8 +245,16 @@ type Options struct {
 	Raw        RawInquirer
 	Fees       FeeResolver
 	Repository Repository
-	// Logger gets one error line for a failed fee (the order goes on, as bill). Nil: no line.
+	// Logger gets one error line for a failed fee and for a failed "already paid" read (the order
+	// goes on, as bill). Nil: no line.
 	Logger Logger
+	// OrderCacheTTL gives how long saved inquiries give the price of an order of the bill type
+	// (bill: the caching TTL of the order action, caching.paid*). Nil or 0: no saved inquiry.
+	OrderCacheTTL func(billType string) time.Duration
+	// AlreadyPaidWindows are the windows of the "bill already paid" check, by order provider name
+	// and bill type (bill: getNewOrderConflictProviders; task 044: parsian, tel and telmidterm,
+	// providers.internal.parsian.settlement_inquiry_telephone). No entry: no check. Read-only.
+	AlreadyPaidWindows map[string]map[string]time.Duration
 	// OnOrder is called once per Create call of a known bill type, with the bill type, the
 	// provider name (NoProviderLabel when none was picked) and one of the Result values. Nil: no
 	// call.
@@ -195,6 +270,8 @@ type Service struct {
 	repo      Repository
 	log       Logger
 	onOrder   func(billType, providerName, result string)
+	cacheTTL  func(billType string) time.Duration
+	paidWin   map[string]map[string]time.Duration
 
 	newID func() string // replaced by tests
 }
@@ -215,7 +292,7 @@ func NewService(o Options) (*Service, error) {
 	}
 	return &Service{
 		providers: o.Providers, inquiry: o.Inquiry, raw: o.Raw, fees: o.Fees, repo: o.Repository,
-		log: o.Logger, onOrder: o.OnOrder, newID: uuid.NewString,
+		log: o.Logger, onOrder: o.OnOrder, cacheTTL: o.OrderCacheTTL, paidWin: o.AlreadyPaidWindows, newID: uuid.NewString,
 	}, nil
 }
 
@@ -228,22 +305,25 @@ type price struct {
 // Create saves a new order (bill: payment_service.NewOrder, the same steps in the same order):
 //  1. It picks the order provider of the bill type (ActionOrder): an error that wraps
 //     provider.ErrNoProvider when none is enabled.
-//  2. The price, by the first rule that applies:
+//  2. The "bill already paid" check, when AlreadyPaidWindows has the provider and the bill type:
+//     the newest order of the bill ID and the pay ID of the request in the window is pending or
+//     success: ErrAlreadyPaid. A failed read is logged and the order goes on (bill).
+//  3. The price, by the first rule that applies:
 //     a. directPrice of the bill type, no pay ID and a price that is not 0: the price of the
 //     request, the pay ID is the bill type text, no bill ID;
-//     b. a bill ID and a pay ID that are both numeric (strconv.Atoi, as bill): the raw inquiry; a
-//     failed raw inquiry goes on to rule c, as bill;
-//     c. the inquiry of the bill type with no saved inquiry (NoCache): the first inquiry of the
-//     answer with the inquiry type of the bill type; its ID is bill_inquiry_id (none when the
-//     answer was not saved: inquiry.Result.Unsaved). A failed inquiry is *InquiryError, an answer
-//     with no such inquiry is ErrNoInquiry.
-//  3. A price of 0 is ErrZeroPrice.
-//  4. The provider fee: when the price came from an inquiry row, the row is read
-//     (Repository.InquiryProvider; a failed read is an error). The provider fee of every provider
-//     and bill type of the flow is 0 (bill: only Karashop has a provider fee, for tel).
-//  5. The fee (FeeResolver). A failed fee does not stop the order: it is logged (one error line).
-//  6. The total = price + fee + provider fee; below 0 or above math.MaxUint32 is ErrTotalTooLarge.
-//  7. The orders row with StatusInitial and a new order ID. A failed write is an error.
+//     b. (not for inquiryFirst) a bill ID and a pay ID that are both numeric (strconv.Atoi, as
+//     bill): the raw inquiry; a failed raw inquiry goes on to rule c, as bill;
+//     c. the inquiry of the inquiry bill type, with saved inquiries for OrderCacheTTL (none: NoCache):
+//     the first inquiry of the answer with the inquiry type of the bill type; its ID is
+//     bill_inquiry_id (none when the answer was not saved: inquiry.Result.Unsaved). A failed
+//     inquiry is *InquiryError, an answer with no such inquiry is ErrNoInquiry.
+//  4. A price of 0 is ErrZeroPrice.
+//  5. The provider fee: when the price came from an inquiry row, the row is read
+//     (Repository.InquiryFee; a failed read is an error). A Karashop landline row has a provider
+//     fee (providerFee); every other row has none.
+//  6. The fee (FeeResolver). A failed fee does not stop the order: it is logged (one error line).
+//  7. The total = price + fee + provider fee; below 0 or above math.MaxUint32 is ErrTotalTooLarge.
+//  8. The orders row with StatusInitial and a new order ID. A failed write is an error.
 func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 	if s == nil || s.providers == nil || s.inquiry == nil || s.raw == nil || s.fees == nil || s.repo == nil {
 		return Order{}, errors.New("order: service not created with NewService")
@@ -266,6 +346,11 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 		return Order{}, fmt.Errorf("pick provider for %s %s: %w", req.BillType, ActionOrder, err)
 	}
 
+	if s.alreadyPaid(ctx, req, pro.Name) {
+		s.count(req.BillType, pro.Name, ResultAlreadyPaid)
+		return Order{}, ErrAlreadyPaid
+	}
+
 	p, err := s.price(ctx, req, bt)
 	if err != nil {
 		result := ResultError
@@ -283,11 +368,11 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 
 	providerFee := uint64(0)
 	if p.billInquiryID != "" {
-		// bill reads the row for its provider fee (feeableBillType). No provider of the flow has
-		// one: the fee is 0, but a failed read fails the order, as bill.
-		if _, _, err := s.repo.InquiryProvider(ctx, p.billInquiryID); err != nil {
+		// bill reads the row for its provider fee (feeableBillType); a failed read fails the order.
+		providerFee, err = s.providerFee(ctx, p.billInquiryID)
+		if err != nil {
 			s.count(req.BillType, pro.Name, ResultError)
-			return Order{}, fmt.Errorf("order: read the inquiry %s for the provider fee: %w", p.billInquiryID, err)
+			return Order{}, err
 		}
 	}
 
@@ -297,7 +382,7 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 	}
 
 	total := int64(p.amount) + f.Fee + int64(providerFee)
-	if total < 0 || total > math.MaxUint32 {
+	if providerFee > math.MaxInt64 || total < 0 || total > math.MaxUint32 {
 		s.count(req.BillType, pro.Name, ResultInvalid)
 		return Order{}, fmt.Errorf("%w: %d", ErrTotalTooLarge, total)
 	}
@@ -316,22 +401,79 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 	return o, nil
 }
 
-// price is step 2 of Create.
+// alreadyPaid is step 2 of Create (bill: shouldSkipNewOrder).
+func (s *Service) alreadyPaid(ctx context.Context, req Request, providerName string) bool {
+	window, ok := s.paidWin[providerName][req.BillType]
+	if !ok {
+		return false
+	}
+	status, err := s.repo.LastStatus(ctx, req.BillID, req.PayID, window)
+	if err != nil {
+		if ctx.Err() == nil && s.log != nil {
+			s.log.Error(req.BillType+": order already-paid check failed", "provider", providerName, "error", err)
+		}
+		return false
+	}
+	return status == StatusPending || status == StatusSuccess
+}
+
+// providerFee is step 5 of Create (bill: feeableBillType): a Karashop row of a landline bill type
+// has the provider fee providers.provider_fee of its provider when the line is partially or fully
+// disconnected, else KarashopProviderFee. Every other row has none.
+func (s *Service) providerFee(ctx context.Context, billInquiryID string) (uint64, error) {
+	row, err := s.repo.InquiryFee(ctx, billInquiryID)
+	if err != nil {
+		return 0, fmt.Errorf("order: read the inquiry %s for the provider fee: %w", billInquiryID, err)
+	}
+	if row.ProviderName != karashopName || !karashopFeeBillTypes[row.BillType] {
+		return 0, nil
+	}
+	if row.ServiceStatus != provider.TelServicePartiallyDisconnected && row.ServiceStatus != provider.TelServiceFullyDisconnected {
+		return KarashopProviderFee, nil
+	}
+	fee, err := s.repo.ProviderFee(ctx, row.ProviderID)
+	if err != nil {
+		return 0, fmt.Errorf("order: read the provider fee of provider %d: %w", row.ProviderID, err)
+	}
+	return fee, nil
+}
+
+// price is step 3 of Create.
 func (s *Service) price(ctx context.Context, req Request, bt billType) (price, error) {
 	if bt.directPrice && req.PayID == "" && req.Price != 0 {
 		return price{payID: req.BillType, amount: req.Price}, nil
 	}
-	if numeric(req.BillID) && numeric(req.PayID) {
+	if !bt.inquiryFirst && numeric(req.BillID) && numeric(req.PayID) {
 		// bill ignores the error of the raw inquiry and goes on to the provider inquiry.
 		if raw, err := s.raw.RawInquiry(req.BillType, req.BillID, req.PayID); err == nil {
 			return price{billID: raw.BillID, payID: raw.PayID, amount: raw.Amount}, nil
 		}
 	}
-	res, err := s.inquiry.Inquire(ctx, inquiry.Request{
-		BillType: req.BillType, InquiryID: req.InquiryID, UserID: req.UserID, Dialer: req.Dialer, NoCache: true,
-	})
+	inquiryBillType := bt.inquiryBillType
+	if inquiryBillType == "" {
+		inquiryBillType = req.BillType
+	}
+	var ttl time.Duration
+	if s.cacheTTL != nil {
+		ttl = s.cacheTTL(req.BillType)
+	}
+	ireq := inquiry.Request{
+		BillType: inquiryBillType, InquiryID: req.InquiryID, UserID: req.UserID, Dialer: req.Dialer,
+		NoCache: ttl <= 0, CacheTTL: ttl,
+	}
+	res, err := s.inquiry.Inquire(ctx, ireq)
 	if err != nil {
 		return price{}, &InquiryError{Err: err}
+	}
+	if res.FromDatabase && !hasInquiryType(res, bt.inquiryType) {
+		// The saved inquiries of the number have no unpaid inquiry of the term (the other term was
+		// paid, so only its row is still valid): ask the provider. bill asks the inquiry provider
+		// of the order bill type, whose saved rows have only that term, so it gets no saved answer
+		// and calls the provider too (docs/this_vs_bill.md, item 42).
+		ireq.NoCache, ireq.CacheTTL = true, 0
+		if res, err = s.inquiry.Inquire(ctx, ireq); err != nil {
+			return price{}, &InquiryError{Err: err}
+		}
 	}
 	for _, in := range res.Inquiries {
 		if in.InquiryType == bt.inquiryType {
@@ -346,6 +488,16 @@ func (s *Service) price(ctx context.Context, req Request, bt billType) (price, e
 		}
 	}
 	return price{}, ErrNoInquiry
+}
+
+// hasInquiryType reports whether the answer has an inquiry of the type.
+func hasInquiryType(res inquiry.Result, inquiryType string) bool {
+	for _, in := range res.Inquiries {
+		if in.InquiryType == inquiryType {
+			return true
+		}
+	}
+	return false
 }
 
 // numeric is bill's utils.IsNumericOnly: the text is an int for strconv.Atoi (a sign is accepted,

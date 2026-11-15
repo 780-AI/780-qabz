@@ -104,7 +104,12 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	orders, err := newOrders(db, providers, flow, metrics, logger)
+	orders, err := newOrders(cfg, db, providers, flow, metrics, logger)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	payments, err := newPayments(db, registry, metrics, logger)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -120,15 +125,16 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	water, electricity, gas, tel := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger), newTel(flow, logger)
+	water, electricity, gas := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger)
+	tel := newTel(flow, orders, signer, uint32(serviceID), logger)
 	phone := newPhone(flow, orders, signer, uint32(serviceID), logger)
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
-	opts, err := newRequestMetrics(metrics)
+	metricOpts, err := newRequestMetrics(metrics)
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
-	opts = append(opts, authCheck.ServerOptions()...)
+	opts := append(append([]grpc.ServerOption(nil), metricOpts...), authCheck.ServerOptions()...)
 	gs, err := grpcserver.NewWithOptions(cfg.GRPCAddr, opts, grpcserver.RegisterService(svc), grpcserver.RegisterMyBills(myBills), grpcserver.RegisterWater(water), grpcserver.RegisterElectricity(electricity), grpcserver.RegisterGas(gas), grpcserver.RegisterPhone(phone), grpcserver.RegisterTel(tel))
 	if err == nil && gs == nil {
 		err = errors.New("grpc server: New returned nil")
@@ -145,7 +151,25 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	b.WithGRPCServer(gs).WithHTTPServer(gw)
+	b.WithGRPCServer(gs).WithHTTPServer(gw).WithBackground(payments)
+
+	// The internal gRPC server (task 044; bill: service.internalGrpc): PaymentComplete only, with the
+	// request metrics and no auth check, as bill. Off while server.internal_grpc.addr is empty.
+	if cfg.InternalGRPCAddr != "" {
+		internal, err := grpcserver.NewWithOptions(cfg.InternalGRPCAddr, metricOpts, grpcserver.RegisterPaymentComplete(grpcserver.NewPaymentComplete(grpcserver.PaymentCompleteDeps{
+			Payments: payments, ServiceID: uint32(serviceID), ServiceName: cfg.ServiceName, Logger: logger,
+		})))
+		if err == nil && internal == nil {
+			err = errors.New("internal grpc server: New returned nil")
+		}
+		if err != nil {
+			db.Close()
+			return nil, err
+		}
+		b.WithInternalGRPCServer(internal)
+	} else {
+		logger.Warn("internal gRPC server off (server.internal_grpc.addr is empty): the payment service cannot call OrderComplete")
+	}
 
 	if cfg.OTLPEndpoint != "" {
 		tr, err := jaeger.New(ctx, cfg.OTLPEndpoint, cfg.ServiceName)
@@ -440,7 +464,8 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	// providers.internal.parsian.enabled: false wins over the mock, as for the other providers.
-	parsianMock := provider.MockSettings{Enable: dev && cfg.DebugMockParsianEnable && cfg.ParsianEnabled, ReturnType: cfg.DebugMockParsianReturnType}
+	parsianMock := provider.MockSettings{Enable: dev && cfg.DebugMockParsianEnable && cfg.ParsianEnabled, ReturnType: cfg.DebugMockParsianReturnType,
+		PayReturnType: cfg.DebugMockParsianPayReturnType}
 	if err := registerAdapter(registry, parsianAdapter, "Parsian", disabledNotice("internal.parsian", "Parsian", cfg.ParsianEnabled),
 		parsianMock, parsianproxy.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -448,17 +473,19 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 
 	// Karashop (task 025): a direct HTTPS client of the Karashop API, as Qabzino and Tavanir.
 	karashopAdapter, err := karashop.New(karashop.Options{
-		Enabled:    cfg.KarashopEnabled,
-		Code:       cfg.KarashopCode,
-		Password:   cfg.KarashopPassword.Reveal(),
-		InquiryURL: cfg.KarashopBillInquiryURL,
-		Timeout:    cfg.KarashopTimeout,
+		Enabled:        cfg.KarashopEnabled,
+		Code:           cfg.KarashopCode,
+		Password:       cfg.KarashopPassword.Reveal(),
+		InquiryURL:     cfg.KarashopBillInquiryURL,
+		PaymentInfoURL: cfg.KarashopBillPaymentInfoURL, // task 044: the settlement
+		Timeout:        cfg.KarashopTimeout,
 	})
 	if err != nil {
 		return nil, err
 	}
 	// providers.external.karashop.enabled: false wins over the mock, as for the other providers.
-	karashopMock := provider.MockSettings{Enable: dev && cfg.DebugMockKarashopEnable && cfg.KarashopEnabled, ReturnType: cfg.DebugMockKarashopReturnType}
+	karashopMock := provider.MockSettings{Enable: dev && cfg.DebugMockKarashopEnable && cfg.KarashopEnabled, ReturnType: cfg.DebugMockKarashopReturnType,
+		SettleReturnType: cfg.DebugMockKarashopSettleReturnType}
 	if err := registerAdapter(registry, karashopAdapter, "Karashop", disabledNotice("external.karashop", "Karashop", cfg.KarashopEnabled),
 		karashopMock, karashop.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -482,7 +509,8 @@ func registerAdapter(registry *provider.Registry, adapter provider.ProviderInter
 		name := strings.ReplaceAll(adapter.Name(), "-", "_")
 		switch {
 		case mock.Enable:
-			logger.Warn("provider mock enabled (debug.mocks."+name+"): development only, no call to the "+title+" backend", "return_type", mock.ReturnType)
+			logger.Warn("provider mock enabled (debug.mocks."+name+"): development only, no call to the "+title+" backend", "return_type", mock.ReturnType,
+				"pay_return_type", mock.PayReturnType, "settle_return_type", mock.SettleReturnType)
 		case notice != "":
 			logger.Warn(notice)
 		}
@@ -650,7 +678,11 @@ func newPhone(flow *inquiry.Service, orders *order.Service, signer *crypto.Signe
 // default, lookup_error, calc_error). A failed fee writes one error log line and the order goes on
 // (bill gives the default fee for a failed read and 0 for a failed calculation); a failed read of
 // the users with a fee writes one error line too.
-func newOrders(db *postgres.Client, providers order.Selector, flow *inquiry.Service, metrics *prometheus.Server, logger Logger) (*order.Service, error) {
+//
+// Task 044: the landline bill types tel and telmidterm. Their saved inquiries give the price for
+// caching.paid_tel; the "bill already paid" check of the order provider parsian uses
+// providers.internal.parsian.settlement_inquiry_telephone; result already_paid.
+func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector, flow *inquiry.Service, metrics *prometheus.Server, logger Logger) (*order.Service, error) {
 	if flow == nil {
 		return nil, errors.New("order: inquiry flow is required")
 	}
@@ -659,7 +691,7 @@ func newOrders(db *postgres.Client, providers order.Selector, flow *inquiry.Serv
 	if reg := metrics.Registry(); reg != nil {
 		orders := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_order_create_total",
-			Help: "New orders (POST /v2/mobile/order) by bill type (irancell), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; error).",
+			Help: "New orders (POST /v2/mobile/order, POST /v2/tel/order) by bill type (irancell, tel, telmidterm), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; already_paid: the bill ID and pay ID have a pending or successful order; error).",
 		}, []string{"bill_type", "provider", "result"})
 		fees := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_fee_resolve_total",
@@ -684,26 +716,100 @@ func newOrders(db *postgres.Client, providers order.Selector, flow *inquiry.Serv
 	if err != nil {
 		return nil, err
 	}
+	orderTTL := map[string]time.Duration{provider.BillTypeTel: cfg.CachingPaidTel, provider.BillTypeTelMidterm: cfg.CachingPaidTel}
+	telWindow := cfg.ParsianSettlementInquiryTelephone
 	return order.NewService(order.Options{
-		Providers:  providers,
-		Inquiry:    flow,
-		Raw:        flow,
-		Fees:       resolver,
+		Providers:     providers,
+		Inquiry:       flow,
+		Raw:           flow,
+		Fees:          resolver,
+		Repository:    postgres.NewOrderRepository(db),
+		Logger:        orderLog,
+		OnOrder:       onOrder,
+		OrderCacheTTL: func(billType string) time.Duration { return orderTTL[billType] }, // read-only map; no entry: no saved inquiry
+		AlreadyPaidWindows: map[string]map[string]time.Duration{
+			parsianproxy.Name: {provider.BillTypeTel: telWindow, provider.BillTypeTelMidterm: telWindow},
+		},
+	})
+}
+
+// newPayments builds the payment step of the orders (order.Payments, task 044): the payment
+// service calls OrderComplete on the internal gRPC server. The order provider parsian pays the
+// bill types tel and telmidterm (parsianproxy.Pay); after a success the Karashop settlement runs in
+// the background (karashop.Settle) for the order providers parsian, eways and eways2, as bill. With
+// metrics on:
+//   - qabz_order_payment_total{bill_type,provider,status}: each OrderComplete call (success, failed,
+//     pending, processed, wrong_price, error; provider "none" when the order was not read);
+//   - qabz_provider_pay_duration_ms{provider,status}: each payment call to a provider;
+//   - qabz_order_settle_total{bill_type,provider,result}: each settlement (success, failed,
+//     pending, error, confirm_error, no_data).
+func newPayments(db *postgres.Client, adapters order.Adapters, metrics *prometheus.Server, logger Logger) (*order.Payments, error) {
+	var onPayment, onSettle func(billType, providerName, result string)
+	var onPay func(providerName, status string, d time.Duration)
+	if reg := metrics.Registry(); reg != nil {
+		payments := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_order_payment_total",
+			Help: "OrderComplete calls of the payment service by bill type, order provider (none when the order was not read) and result (success, failed, pending: the status of the payment; processed: the order is not initial; wrong_price; error: a failed read or write, or the provider does not pay the bill type).",
+		}, []string{"bill_type", "provider", "status"})
+		duration := promclient.NewHistogramVec(promclient.HistogramOpts{
+			Name:    "qabz_provider_pay_duration_ms",
+			Help:    "Duration of each payment call to a provider in milliseconds, by provider and the status of the payment (success, failed, pending).",
+			Buckets: []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000},
+		}, []string{"provider", "status"})
+		settles := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_order_settle_total",
+			Help: "Settlements after a successful payment by bill type, settlement provider (karashop) and result (success: confirmed and saved; failed, pending: the answer of the provider; error: the call failed; confirm_error: provider_confirmed was not saved; no_data: the order has no number).",
+		}, []string{"bill_type", "provider", "result"})
+		for _, c := range []promclient.Collector{payments, duration, settles} {
+			if err := reg.Register(c); err != nil {
+				return nil, fmt.Errorf("payment: register metric: %w", err)
+			}
+		}
+		onPayment = func(billType, providerName, result string) {
+			payments.WithLabelValues(billType, providerName, result).Inc()
+		}
+		onPay = func(providerName, status string, d time.Duration) {
+			duration.WithLabelValues(providerName, status).Observe(float64(d) / float64(time.Millisecond))
+		}
+		onSettle = func(billType, providerName, result string) {
+			settles.WithLabelValues(billType, providerName, result).Inc()
+		}
+	}
+	var payLog order.PaymentLogger // nil: no line
+	if logger != nil {
+		payLog = logger
+	}
+	settle := map[string]string{parsianproxy.Name: karashop.Name, "eways": karashop.Name, "eways2": karashop.Name}
+	return order.NewPayments(order.PaymentOptions{
 		Repository: postgres.NewOrderRepository(db),
-		Logger:     orderLog,
-		OnOrder:    onOrder,
+		Adapters:   adapters,
+		PayRoutes: map[string]map[string]bool{
+			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true},
+		},
+		SettleRoutes: map[string]map[string]string{provider.BillTypeTel: settle, provider.BillTypeTelMidterm: settle},
+		Logger:       payLog,
+		OnPayment:    onPayment,
+		OnPay:        onPay,
+		OnSettle:     onSettle,
 	})
 }
 
 // newTel builds the gRPC Tel service: POST /v1/tel/inquiry (task 025, the landline bill) on the same
-// inquiry flow as Water; the flow also answers the raw inquiry (a request with billId and payId). A
-// server fault writes one error log line (grpcserver.Tel). A nil flow gives a service whose Inquiry
-// answers Unimplemented.
-func newTel(flow *inquiry.Service, logger Logger) *grpcserver.Tel {
-	deps := grpcserver.TelDeps{}
+// inquiry flow as Water; the flow also answers the raw inquiry (a request with billId and payId).
+// POST /v2/tel/order (task 044) on the order flow, with the token signed by signer. A server fault
+// writes one error log line (grpcserver.Tel). A nil flow gives a service whose Inquiry answers
+// Unimplemented; a nil orders or signer gives a service whose NewOrderV2 answers Unimplemented.
+func newTel(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Tel {
+	deps := grpcserver.TelDeps{ServiceID: serviceID}
 	if flow != nil {
 		deps.Inquiry = flow
 		deps.Raw = flow
+	}
+	if orders != nil {
+		deps.Orders = orders
+	}
+	if signer != nil {
+		deps.Signer = signer
 	}
 	if logger != nil {
 		deps.Logger = logger

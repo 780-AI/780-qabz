@@ -38,6 +38,14 @@ type gasExtra struct {
 	Kind string `json:"kind,omitzero"`
 }
 
+// telExtra is the extra_data of a landline inquiry (task 044): bill's TelephoneDetails
+// (gateway/inquiry), {"service_status": "active"}. An empty status is not written (omitempty), so
+// details with no status are the object {}. The order flow reads service_status for the Karashop
+// provider fee (bill: feeableBillType).
+type telExtra struct {
+	ServiceStatus string `json:"service_status,omitzero"`
+}
+
 // inquiryExtraData returns the JSON text of the extra_data column for the details of an inquiry,
 // or "" (NULL) when there are none. Details have the field of one bill type; with more than one,
 // electricity wins. Writing JSON is not covered by conventions § 1.
@@ -55,6 +63,8 @@ func inquiryExtraData(d *provider.Details) (string, error) {
 		}
 	case d.Gas != nil:
 		extra = gasExtra{City: d.Gas.City, Kind: d.Gas.Kind}
+	case d.Tel != nil:
+		extra = telExtra{ServiceStatus: d.Tel.ServiceStatus}
 	default:
 		return "", nil
 	}
@@ -75,7 +85,7 @@ func inquiryExtraData(d *provider.Details) (string, error) {
 //
 // The returned strings are copies: nothing refers to the parser after it goes back to the pool.
 func inquiryDetails(p *fastjson.Parser, billType, raw string) (*provider.Details, error) {
-	if (billType != provider.BillTypeElectricity && billType != provider.BillTypeGas) || raw == "" {
+	if (billType != provider.BillTypeElectricity && billType != provider.BillTypeGas && billType != provider.BillTypeTel) || raw == "" {
 		return nil, nil
 	}
 	if p == nil {
@@ -101,6 +111,19 @@ func inquiryDetails(p *fastjson.Parser, billType, raw string) (*provider.Details
 	}
 	if o == nil {
 		return nil, errors.New("extra_data: no object")
+	}
+	if billType == provider.BillTypeTel {
+		tel := &provider.TelDetails{}
+		if val := o.Get("service_status"); val != nil {
+			s, ok, e2 := jsonString(val)
+			if e2 != nil {
+				return nil, fmt.Errorf("extra_data service_status: %w", e2)
+			}
+			if ok {
+				tel.ServiceStatus = s
+			}
+		}
+		return &provider.Details{Tel: tel}, nil
 	}
 	if billType == provider.BillTypeGas {
 		g := &provider.GasDetails{}

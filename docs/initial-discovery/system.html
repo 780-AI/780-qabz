@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.14 -->
+<!-- VERSION: 2.15 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.15 — 2026-11-15 — Task 044 landline order and payment: `POST /v2/tel/order` (`Tel.NewOrderV2`, bill types `tel` and `telmidterm`, order provider Parsian, the "bill already paid" check, the Karashop provider fee 21000 or `providers.provider_fee`); `PaymentComplete/OrderComplete` on a new internal gRPC server (`server.internal_grpc.addr`, empty: off; no auth check); the Parsian payment (`TopBill/Pay`), the statuses `in-progress`, `success`, `failed`, `pending` (one `orders` row each); the Karashop settlement at once after a success (`SendPaymentInfo`, `provider_confirmed`); new keys `caching.paid_tel`, `debug.mocks.parsian.pay_return_type`, `debug.mocks.karashop.settle_return_type`; `providers.internal.parsian.settlement_inquiry_telephone` (default 360h) and `providers.external.karashop.bill_payment_info_url` are read; new metrics `qabz_order_payment_total`, `qabz_provider_pay_duration_ms`, `qabz_order_settle_total`.
 v2.14 — 2026-11-15 — Task 042: new key `providers.internal.payment_server.kid`, the `kid` of the order token header (empty: `service.name`); read at start.
 v2.13 — 2026-11-14 — Task 039 Irancell mobile order: `POST /v2/mobile/order` for the Irancell operator on the shared order flow (`core/order`), the fee resolver (`core/fee`, the `fees` table, read on each order) and the order token signer (`common/crypto`, RS256 with the general private key); `providers.internal.payment_server.private_key_path` is read at start (a missing or bad key stops the App); new metrics `qabz_order_create_total` and `qabz_fee_resolve_total`.
 v2.12 — 2026-11-14 — Task 041: the `providers` section has two groups, `providers.internal` (our own services: irancell, jiring_switch, parsian, the new payment_server) and `providers.external` (karashop, qabzino, tavanir); every key path in this document uses the new layout; the config example has the `payment_server` block (address, private_key_path; not read yet).
@@ -179,7 +180,7 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 | `bill` | REST | `POST /v1/mybill/inquiry` | `POST /v3/mybill/inquiry` | Inquiry | Saved bills |
 | `bill` | REST | `POST /v1/mybill/order` | `POST /v3/mybill/order` | Order | Saved bills |
 | `bill` | REST | `POST /v2/mybill/order` | `POST /v3/mybill/order` | Order | Saved bills |
-| `bill` | gRPC | `haf80.api.bill.PaymentComplete/OrderComplete` | unchanged (the payment service is the client) | Order | All (called by the payment service, port 8082) |
+| `bill` | gRPC | `haf80.api.bill.PaymentComplete/OrderComplete` | unchanged (the payment service is the client); in Qabz on the internal gRPC server `server.internal_grpc.addr` (task 044; bill: `service.internalGrpc`, port 8082), no auth check | Order | Landline since task 044 (called by the payment service) |
 | `parsian-v2` | gRPC | `haf80.api.parsian_v2.TopBill/Inquiry` | internal | Inquiry | Water, Electricity, Gas, Landline, MCI mobile |
 | `parsian-v2` | gRPC | `haf80.api.parsian_v2.TopBill/Pay` | internal | Order | Water, Electricity, Gas, Landline, MCI mobile, Rightel mobile, Bill ID + pay ID |
 | `parsian-v2` | gRPC | `haf80.api.parsian_v2.TopBill/OrderInquiry` | internal | Order | Water, Electricity, Gas, Landline, MCI mobile, Rightel mobile, Bill ID + pay ID |
@@ -193,7 +194,7 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 | `tavanir` | HTTPS (Tavanir SAAPA, direct since task 034; Qabz does not call the `tavanir` microservice) | `providers.external.tavanir.auth_endpoint` (login), `providers.external.tavanir.basic_branch_endpoint` (inquiry) | user name and password, then a Bearer token kept in memory | Inquiry | Electricity |
 | `tavanir` | HTTPS (not implemented yet) | `providers.external.tavanir.bill_document_endpoint`, `providers.external.tavanir.branch_debit_endpoint` | the same token | Inquiry (bill document, debit) | Electricity |
 | `Karashab` (outside our projects) | HTTPS (direct from Qabz since task 025: `provider/karashop`) | `providers.external.karashop.bill_inquiry_url`, called by `bill` (`BillInquiry`) and by Qabz (two calls per inquiry: `tci-end-getBillAccInfo`, `tci-mid-getBillAccInfo`) | code and password in the body (`providers.external.karashop.code`, `password`) | Inquiry (task 025; only Karashop answers the bill type `tel`) | Landline |
-| `Karashab` (outside our projects) | HTTP | payment URL (`providers.external.karashop.bill_payment_info_url`, not read yet), called by `bill` (`SendPaymentInfo`) | internal | Order | Landline |
+| `Karashab` (outside our projects) | HTTP | payment URL (`providers.external.karashop.bill_payment_info_url`), called by `bill` and by Qabz (task 044: `SendPaymentInfo`, `tci-SendPaymentInfo-1`, at once after a successful landline payment) | internal | Order | Landline |
 
 `Parsian` and `Irancell`: from the app's perspective, the call is internal. Inside `qabz`, `Parsian` proxies the call to its current microservice, and so does `Irancell`.
 
@@ -227,13 +228,13 @@ providers:
       enabled: false
       timeout: 10s
       grpc_address: ""             # host:port of the internal gRPC server of the parsian-v2 service (no TLS)
-      name: ""                     # bill's keys (parsian.name, getStatus, settlementInquiry*); no default; not read yet (order flow, settlement)
+      name: ""                     # bill's keys (parsian.name, getStatus, settlementInquiry*); no default; not read yet (order flow, settlement), but settlement_inquiry_telephone (task 044)
       get_status: {name: "", chunk: 0, start: 0s, end: 0s, cron_time: 0s, lock_time: 0s, is_lockable: false, reverse_deadline: 0s,
                    sync_operations: {api_call_get_status: 0s, get_order_query: 0s, insert_order_query: 0s}}
       settlement_inquiry_water: 0s
       settlement_inquiry_electricity: 0s
       settlement_inquiry_gas: 0s
-      settlement_inquiry_telephone: 0s
+      settlement_inquiry_telephone: 360h # read (task 044): the "bill already paid" window of a landline order paid through Parsian; default 360h, as bill; 0: no window
       settlement_inquiry_mci_mobile: 0s
       settlement_inquiry_rightel_mobile: 0s
     payment_server:          # the payment service (our own service; bill: paymentServer)
@@ -247,7 +248,7 @@ providers:
       code: ""                     # no default: the real values only in config.yml
       password: ""                 # a Secret, never printed
       bill_inquiry_url: ""         # empty: every call fails as "provider down"
-      bill_payment_info_url: ""    # not read yet (the landline order flow)
+      bill_payment_info_url: ""    # the settlement URL (SendPaymentInfo) after a landline payment (task 044); empty: every settlement fails, nothing is sent
     qabzino:
       grpc_address: qabzino:9000   # host:port of the old qabzino service; read only by QabzinoProxy (not used since task 030)
       timeout: 10s                 # limit of each call to Ayantech; positive
@@ -274,6 +275,15 @@ caching:
   irancell: 0s                   # the same for an Irancell mobile inquiry; default 0: no cache, as bill (task 035); the key is the phone
   mobile: 5h                     # the same for an MCI mobile inquiry (bill type mobile) and a Rightel mobile inquiry (bill type mobilemidtermRightel, task 037); default 5h, as bill (task 036); the key is the phone
   tel: 1h                        # the same for a landline inquiry (bill type tel, task 025); default 1h, as bill; the key is the number in the 98 form
+  paid_tel: 72h                  # how long a saved landline inquiry gives the price of a landline order (tel, telmidterm; task 044); default 72h, as bill (caching.paidTel); 0: every order asks the provider
+```
+
+Internal gRPC server (task 044):
+
+```yaml
+server:
+  internal_grpc:
+    addr: ""                     # empty (default): no internal server; host:port: PaymentComplete/OrderComplete for the payment service, with no auth check and no HTTP gateway (bill: service.internalGrpc)
 ```
 
 Provider mocks (task 021). Development only: the `debug` section is removed in every mode but `dev` (task 020c). One block per provider, `debug.mocks.<provider>`; the mechanism is generic (`provider.NewMock`, `src/provider/mock.go`) and every later provider follows it:
@@ -296,10 +306,14 @@ debug:
     parsian:                 # task 036
       enable: true
       return_type: success   # success or error
+      pay_return_type: success # task 044: the payment answer: success, failed or pending (the answer of a timeout)
     karashop:                # task 025
       enable: true
       return_type: success   # success or error
+      settle_return_type: success # task 044: the settlement answer: success or error
 ```
+
+One return-type key for each provider method (task 044): `return_type` is the inquiry; `<method>_return_type` is another method (`pay_return_type`, `settle_return_type`). The mock answers a method only when the provider gives a fixture for it (Parsian: `Pay`, the trace ID `9900000044`; Karashop: `Settle`, the status code 200); every other method goes to the adapter.
 
 With `enable: true` the adapter does not call the backend (only when `providers.external.qabzino.enabled` / `providers.external.tavanir.enabled` / `providers.internal.irancell.enabled` / `providers.internal.jiring_switch.enabled` / `providers.internal.parsian.enabled` / `providers.external.karashop.enabled` is `true`; `enabled: false` wins over the mock, tasks 030, 034, 035, 036 and 025). `return_type: success` gives a fixed valid answer (for Qabzino water: pay ID `2500012345`, 25 000 000 rials, deadline `2030-01-01`; for Qabzino gas: bill ID `1234567890125`, pay ID `3200012345`, 32 000 000 rials, deadline `2030-01-01`; for Tavanir electricity: pay ID `1800012345`, 18 000 000 rials, deadline `2030-01-01` and all details, the values are the `Mock...` constants of `src/provider/tavanir/tavanir.go`; for Irancell mobile: a mid-term inquiry of 150 000 rials and a final-term inquiry of 450 000 rials, no bill ID, no pay ID, no deadline, the `Mock...` constants of `src/provider/irancellproxy/irancellproxy.go`; for Jiring Switch (MCI mobile): bill ID `9120000036`, a mid-term inquiry of 210 000 rials and a final-term inquiry of 610 000 rials, no deadline; for Parsian (MCI mobile): bill ID `9120000039`, 220 000 and 620 000 rials, deadline `2026-12-20`; for Qabzino Rightel mobile (task 037): bill ID `9200000034`, a mid-term inquiry of 230 000 rials (pay ID `23000341`) and a final-term inquiry of 630 000 rials (pay ID `63000342`), no deadline, the `MockRightel...` constants of `src/provider/qabzino/qabzino.go`; for Karashop landline (task 025): bill ID `2101234560040`, a mid-term inquiry of 120 000 rials (pay ID `12000035`) and a final-term inquiry of 350 000 rials (pay ID `35000042`), no deadline, the `Mock...` constants of `src/provider/karashop/karashop.go`; the `Mock...` constants of `src/provider/jiring/jiring.go` and `src/provider/parsianproxy/parsianproxy.go`); `error` gives the provider-down error. Everything before the provider call (provider pick, cache lookup, request rows, saving the answer) runs as in production. The app applies a mock only when `mode` is `dev`; `enable: true` in another mode is dropped with the section (the real provider is called) and is not an error.
 
@@ -367,7 +381,9 @@ type ProviderRegistry interface {
 
 **Bill types of an adapter (task 036).** `SupportsInquiry` reports whether `Inquiry` answers a bill type. A `providers` row can name a provider for a bill type that its adapter does not inquire (the seed has `parsian` for water and gas; ParsianProxy answers only the MCI mobile bill). The inquiry flow then does not call the adapter: no saved-inquiry read, no request row, and the answer of a provider with no adapter (HTTP 503, one error log line). A provider mock wraps the adapter and has the same bill types.
 
-**Details of an inquiry (task 022).** The interface has no separate method for details. `InquiryResponse` has the field `Details *Details`, with one field for each bill type that has details (`Details.Electricity`: phase, company name, tariff type, customer type, serial number, service address, service post code, customer name, and the `city` and `region` that the order flow of `bill` reads; `Details.Gas` (task 023): `city` and `kind`, the two keys that `bill` saves for a Qabzino gas answer; the client does not get them). An adapter with no details (Qabzino water) leaves it nil. The inquiry flow (`core/inquiry`) saves the details with each inquiry in `bill_inquiries.extra_data` (one JSON object; `bill` writes only `city` and `region` there) and reads them back when saved inquiries answer the call, so the answer from the database has the same details as the answer of the provider.
+**Payment and settlement (task 044).** `Pay` pays a bill through the order provider: `PaymentRequest` has the order bill type and inquiry type, the order ID, the user, the dialer, the inquiry ID (the landline number), the bill ID, the pay ID, the base price and the RRN; `PaymentResponse` is the answer of the provider as it came (status, code, message, trace ID). An error that wraps `ErrProviderDown` means that the status is not known (`pending`). ParsianProxy pays `tel` and `telmidterm` (`TopBill/Pay`). `Settle` reports a paid bill to the provider of the bill: `SettleRequest` has the bill type, the number, the base price, the bill ID, the pay ID, the RRN, the time of the order and the paid provider; `SettleResponse` has `success`, `failed` or `pending`. The Karashop adapter settles `tel` and `telmidterm` (`SendPaymentInfo`). The payment step (`core/order.Payments`, called by `OrderComplete`) saves one `orders` row for each status (`in-progress` with the RRN, then the status of the answer), and after a `success` runs the settlement in the background (`provider_confirmed` on a Karashop success; `is_paid` of the inquiry rows; `last_order_date` of the saved bills); the App stop waits for the running settlements. The landline order (`POST /v2/tel/order`) uses the shared order flow: the order provider of (`tel` or `telmidterm`, `order`) (Parsian; the seed has row 50 `tel` disabled and row 51 `telmidterm` enabled), the "bill already paid" check (a `pending` or `success` order of the request bill ID and pay ID in `providers.internal.parsian.settlement_inquiry_telephone`), the inquiry of `tel` first (saved inquiries for `caching.paid_tel`; a saved answer with no unpaid inquiry of the term asks Karashop again), and the Karashop provider fee (`providers.provider_fee` of the inquiry provider when the line is partially or fully disconnected, else 21000, as bill). The differences from `bill` are items 38, 40, 41 and 42 of `docs/this_vs_bill.md`.
+
+**Details of an inquiry (task 022).** The interface has no separate method for details. `InquiryResponse` has the field `Details *Details`, with one field for each bill type that has details (`Details.Electricity`: phase, company name, tariff type, customer type, serial number, service address, service post code, customer name, and the `city` and `region` that the order flow of `bill` reads; `Details.Gas` (task 023): `city` and `kind`, the two keys that `bill` saves for a Qabzino gas answer; the client does not get them; `Details.Tel` (task 044): the service status of the line, saved as bill's `{"service_status": ...}`, read by the Karashop provider fee). An adapter with no details (Qabzino water) leaves it nil. The inquiry flow (`core/inquiry`) saves the details with each inquiry in `bill_inquiries.extra_data` (one JSON object; `bill` writes only `city` and `region` there) and reads them back when saved inquiries answer the call, so the answer from the database has the same details as the answer of the provider.
 
 **Inquiry ID of a bill type (task 023).** `InquiryRequest.InquiryID` is the bill ID for water and electricity, and the participate code for gas (`bill`: `SetInquiryID`). The handler of each endpoint gives the bill type; the inquiry flow has one table of bill types (`billTypes` in `core/inquiry`: the `tid` prefix and the rule of the inquiry ID) and does not read the type from the ID. The inquiry ID is the key of the saved inquiries (`bill_inquiries.inquiry_id`), so two participate codes are two keys. A gas request with both `billId` and `payId` is the raw inquiry of `bill`: no provider and no saved inquiry; the price is read from the pay ID and the answer has `price`, `payId` and `billId` (`inquiry.Service.RawInquiry`, `docs/this_vs_bill.md` item 28).
 
@@ -536,8 +552,11 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 |---|---|---|
 | `qabz_request_duration_ms` | histogram | Duration of every incoming request (gRPC and HTTP gateway) in milliseconds, by `path` (the gRPC method, for example `/haf80.api.bill.Service/Get`) and `code` (the gRPC code); buckets 5 ms to 10 000 ms. Its `_count` series is the request counter. A call that the auth check rejects is counted. An unknown HTTP route is not counted |
 | `qabz_inquiries_total` | counter | Inquiries by `bill_type`, `provider` (`none` when no provider was picked) and `result`: `db_hit` (answered from saved inquiries, no provider call), `provider_ok`, `provider_refused` (the provider has no inquiry), `provider_down` (the call failed), `no_provider`, `canceled` (the client left during the provider call), `error`, `raw` (a gas or a landline request with `billId` and `payId`, answered from the two IDs, provider `none`). Implemented for water (task 021), electricity (task 022), gas (task 023) the Irancell mobile bill (task 035, `bill_type="irancell"`), the MCI mobile bill (task 036, `bill_type="mobile"`) the Rightel mobile bill (task 037, `bill_type="mobilemidtermRightel"`) and the landline bill (task 025, `bill_type="tel"`) |
-| `qabz_order_create_total` | counter | New orders (`POST /v2/mobile/order`) by `bill_type` (`irancell`), `provider` (the order provider; `none` when no provider was picked) and `result`: `created` (the `orders` row is saved), `invalid` (the total does not fit the price field), `no_provider`, `zero_price`, `inquiry_failed` (the inquiry for the price failed or has no inquiry of the bill type), `error`. A rejected request (no user, an invalid request, an operator that is not available) is not counted here: it is in the `code` label of `qabz_request_duration_ms`. Implemented in task 039 |
+| `qabz_order_create_total` | counter | New orders (`POST /v2/mobile/order`, `POST /v2/tel/order` since task 044) by `bill_type` (`irancell`, `tel`, `telmidterm`), `provider` (the order provider; `none` when no provider was picked) and `result`: `created` (the `orders` row is saved), `invalid` (the total does not fit the price field), `no_provider`, `zero_price`, `inquiry_failed` (the inquiry for the price failed or has no inquiry of the bill type), `error`. A rejected request (no user, an invalid request, an operator that is not available) is not counted here: it is in the `code` label of `qabz_request_duration_ms`. Implemented in task 039 |
 | `qabz_fee_resolve_total` | counter | Fees of new orders by `source`: `user_provider`, `user`, `provider` (the `fees` row that was used), `default` (no row: the default fee 9000), `lookup_error` (the read failed: the default fee, one error log line), `calc_error` (the row gives no fee: 0, one error log line). A rise of the two error sources means wrong fees. Implemented in task 039 |
+| `qabz_order_payment_total` | counter | `OrderComplete` calls of the payment service (task 044) by `bill_type`, `provider` (the order provider; `none` when the order was not read) and `status`: `success`, `failed`, `pending` (the status of the payment), `processed` (the order is not `initial`: answered `pending`, nothing saved), `wrong_price` (answered `pending`, nothing saved), `error` (a failed read or write, or the provider does not pay the bill type). Alert on a rise of `failed`, `pending` or `error` |
+| `qabz_provider_pay_duration_ms` | histogram | Duration of each payment call to a provider in milliseconds (task 044), by `provider` and `status` (`success`, `failed`, `pending`); buckets 5 ms to 30 000 ms |
+| `qabz_order_settle_total` | counter | Settlements after a successful payment (task 044) by `bill_type`, `provider` (the settlement provider: `karashop`) and `result`: `success` (confirmed, `provider_confirmed` saved), `failed`, `pending` (the answer of the provider), `error` (the call failed), `confirm_error` (`provider_confirmed` was not saved), `no_data` (the order has no number). Each result but `success` writes one error line; the worker of task 046 settles the order later |
 | `qabz_orders_total` | counter | Every order status change (the state machine) |
 | `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |
 | `qabz_order_complete_duration_ms` | histogram | How long `OrderComplete` takes |

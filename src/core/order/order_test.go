@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -71,6 +72,14 @@ type stubRepo struct {
 	readIDs    []string
 	readErr    error
 	insertHook func()
+	// Task 044.
+	feeRow         *InquiryFee
+	providerFee    uint64
+	providerFeeErr error
+	feeProviderIDs []int64
+	lastStatus     string
+	lastStatusErr  error
+	lastStatusArgs []string
 }
 
 func (s *stubRepo) Insert(_ context.Context, o Order) error {
@@ -84,9 +93,22 @@ func (s *stubRepo) Insert(_ context.Context, o Order) error {
 	return nil
 }
 
-func (s *stubRepo) InquiryProvider(_ context.Context, id string) (string, string, error) {
+func (s *stubRepo) InquiryFee(_ context.Context, id string) (InquiryFee, error) {
 	s.readIDs = append(s.readIDs, id)
-	return "irancell", "irancell", s.readErr
+	if s.feeRow != nil {
+		return *s.feeRow, s.readErr
+	}
+	return InquiryFee{ProviderName: "irancell", ProviderID: 7, BillType: "irancell"}, s.readErr
+}
+
+func (s *stubRepo) ProviderFee(_ context.Context, providerID int64) (uint64, error) {
+	s.feeProviderIDs = append(s.feeProviderIDs, providerID)
+	return s.providerFee, s.providerFeeErr
+}
+
+func (s *stubRepo) LastStatus(_ context.Context, billID, payID string, window time.Duration) (string, error) {
+	s.lastStatusArgs = append(s.lastStatusArgs, fmt.Sprintf("%s/%s/%s", billID, payID, window))
+	return s.lastStatus, s.lastStatusErr
 }
 
 type recLogger struct{ lines []string }

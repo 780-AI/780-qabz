@@ -1,8 +1,9 @@
 // Package karashop is the adapter of the Karashop provider (task 025). It calls the Karashop
 // (digitalport) HTTPS API with the code, the password and the inquiry URL of providers.external.karashop, as
 // bill does (thirdparty/karashop, gateway/inquiry/telephone.go KarashopTelephone and
-// karashopTranslator.go). Only the inquiry of a landline bill (the bill type tel) is implemented;
-// every other method and bill type returns provider.ErrNotSupported.
+// karashopTranslator.go). The inquiry of a landline bill (the bill type tel) and the settlement of a
+// paid landline bill (Settle, the bill types tel and telmidterm; task 044, settle.go) are
+// implemented; every other method and bill type returns provider.ErrNotSupported.
 //
 // The password is a secret: it is only in the request body, and no error text has the body. Tests
 // use a local httptest server; no test calls Karashop.
@@ -78,6 +79,9 @@ type Options struct {
 	Code, Password string
 	// InquiryURL is providers.external.karashop.bill_inquiry_url. Empty: every Inquiry fails as provider down.
 	InquiryURL string
+	// PaymentInfoURL is providers.external.karashop.bill_payment_info_url (task 044). Empty: every
+	// Settle fails, nothing is sent.
+	PaymentInfoURL string
 	// Timeout limits each of the two calls of an Inquiry. Required, positive.
 	Timeout time.Duration
 	// HTTPClient sends the requests. Nil: a client with Timeout (the system TLS roots; bill skips the
@@ -87,12 +91,13 @@ type Options struct {
 
 // Adapter implements provider.ProviderInterface for Karashop. It is safe for concurrent use.
 type Adapter struct {
-	enabled    bool
-	code       string
-	password   string
-	inquiryURL string
-	timeout    time.Duration
-	client     Doer
+	enabled        bool
+	code           string
+	password       string
+	inquiryURL     string
+	paymentInfoURL string
+	timeout        time.Duration
+	client         Doer
 }
 
 var _ provider.ProviderInterface = (*Adapter)(nil)
@@ -107,12 +112,13 @@ func New(opts Options) (*Adapter, error) {
 		client = &http.Client{Timeout: opts.Timeout}
 	}
 	return &Adapter{
-		enabled:    opts.Enabled,
-		code:       opts.Code,
-		password:   opts.Password,
-		inquiryURL: opts.InquiryURL,
-		timeout:    opts.Timeout,
-		client:     client,
+		enabled:        opts.Enabled,
+		code:           opts.Code,
+		password:       opts.Password,
+		inquiryURL:     opts.InquiryURL,
+		paymentInfoURL: opts.PaymentInfoURL,
+		timeout:        opts.Timeout,
+		client:         client,
 	}, nil
 }
 
@@ -181,6 +187,8 @@ type part struct {
 	payID   string
 	amount  uint64
 	trace   string
+	// service is the provider.TelService value of result.data.serviceStatus (task 044).
+	service string
 }
 
 // Inquiry asks Karashop for the inquiry of a landline bill. One inquiry is two Karashop calls, sent
@@ -202,7 +210,9 @@ type part struct {
 // answer is a success with a mid-term and a final-term inquiry. Each inquiry has the bill ID of its
 // own call; the bill ID of the answer is the full-term one (the mid-term one when it is empty). The
 // trace ID is the transaction ID of the full-term call and of the mid-term call, joined with ","
-// (only the full-term one when the two are the same or the join is longer than 100 bytes).
+// (only the full-term one when the two are the same or the join is longer than 100 bytes). The
+// details (task 044) have the service status of the full-term call (the mid-term one when the
+// full-term one is not known); bill saves the status of each call with its own row.
 // @todo bill answers every code of its tables with a text, the pending codes as pending, and keeps
 // the inquiry of one call when the other fails. See docs/this_vs_bill.md, item 37.
 func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*provider.InquiryResponse, error) {
@@ -259,6 +269,10 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	if billID == "" {
 		billID = mid.billID
 	}
+	service := full.service
+	if service == "" {
+		service = mid.service
+	}
 	return &provider.InquiryResponse{
 		Status:          provider.ResponseSuccess,
 		Code:            http.StatusOK,
@@ -269,6 +283,7 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 			{BillID: mid.billID, PayID: mid.payID, Amount: mid.amount, InquiryType: provider.InquiryTypeMidterm},
 			{BillID: full.billID, PayID: full.payID, Amount: full.amount, InquiryType: provider.InquiryTypeFinalTerm},
 		},
+		Details: &provider.Details{Tel: &provider.TelDetails{ServiceStatus: service}},
 	}, nil
 }
 
@@ -355,6 +370,7 @@ func readAnswer(raw []byte) (part, error) {
 			payID:   digitsOf(data.Get("paymentId")),
 			amount:  amount,
 			trace:   trace,
+			service: provider.TelServiceStatus(string(data.GetStringBytes("serviceStatus"))),
 		}, nil
 	}
 	if telStatus == telStatusInvalid {
@@ -431,11 +447,6 @@ func (*Adapter) GetDocument(context.Context, provider.DocumentRequest) (*provide
 	return nil, provider.ErrNotSupported
 }
 
-// Settle is not supported yet.
-func (*Adapter) Settle(context.Context, provider.SettleRequest) (*provider.SettleResponse, error) {
-	return nil, provider.ErrNotSupported
-}
-
 // The mock answer (debug.mocks.karashop). The values are fixed, not read from the number: a valid
 // landline bill ID (helpers.ValidBillID, the bill type tel of helpers.BillTypeOfBillID) and two
 // valid pay IDs (helpers.ValidPayID) whose amount rule (helpers.PayIDAmount) gives the amount. Tests
@@ -450,11 +461,12 @@ const (
 	mockMessage         = "تلفن معتبر است"
 )
 
-// MockFixtures returns the fixed answer of the Karashop mock: the bill ID MockBillID with a mid-term
-// inquiry of 120 000 rials (pay ID 12000035) and a final-term inquiry of 350 000 rials (pay ID
-// 35000042), no deadline (Karashop sends none).
+// MockFixtures returns the fixed answers of the Karashop mock: Inquiry gives the bill ID MockBillID
+// with a mid-term inquiry of 120 000 rials (pay ID 12000035) and a final-term inquiry of 350 000
+// rials (pay ID 35000042), no deadline (Karashop sends none), and the service status active; Settle
+// (task 044) gives the success answer (status code 200).
 func MockFixtures() provider.MockFixtures {
-	return provider.MockFixtures{Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
+	return provider.MockFixtures{Settle: mockSettle, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
 		return &provider.InquiryResponse{
 			Status:          provider.ResponseSuccess,
 			Code:            http.StatusOK,
@@ -465,6 +477,7 @@ func MockFixtures() provider.MockFixtures {
 				{PayID: MockMidTermPayID, Amount: MockMidTermAmount, InquiryType: provider.InquiryTypeMidterm},
 				{PayID: MockFinalTermPayID, Amount: MockFinalTermAmount, InquiryType: provider.InquiryTypeFinalTerm},
 			},
+			Details: &provider.Details{Tel: &provider.TelDetails{ServiceStatus: provider.TelServiceActive}},
 		}
 	}}
 }

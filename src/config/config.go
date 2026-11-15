@@ -60,6 +60,11 @@ type Config struct {
 	GRPCAddr string `path:"server.grpc.addr"`
 	// HTTPAddr is the listen address of the grpc-gateway HTTP server (host:port; port 0 picks a free port).
 	HTTPAddr string `path:"server.http.addr"`
+	// InternalGRPCAddr is the listen address of the internal gRPC server (task 044; bill:
+	// service.internalGrpc): the payment service calls PaymentComplete/OrderComplete on it. It has
+	// no auth check and no HTTP gateway, as in bill. Empty (the default): no internal server, so
+	// OrderComplete is not served. host:port (port 0 picks a free port). Not hot-reloadable.
+	InternalGRPCAddr string `path:"server.internal_grpc.addr"`
 
 	// JWTHMACSecret is the secret that the auth service signs the user JWT with (HS256, HS384 or
 	// HS512). The raw string is the key. It sits in the main config with the other auth secrets
@@ -215,21 +220,25 @@ type Config struct {
 	JiringSwitchGetStatusSyncGetOrder    time.Duration `path:"providers.internal.jiring_switch.get_status.sync_operations.get_order_query"`
 	JiringSwitchGetStatusSyncInsertOrder time.Duration `path:"providers.internal.jiring_switch.get_status.sync_operations.insert_order_query"`
 
-	ParsianName                           string        `path:"providers.internal.parsian.name"`
-	ParsianGetStatusName                  string        `path:"providers.internal.parsian.get_status.name"`
-	ParsianGetStatusChunk                 int           `path:"providers.internal.parsian.get_status.chunk"`
-	ParsianGetStatusStart                 time.Duration `path:"providers.internal.parsian.get_status.start"`
-	ParsianGetStatusEnd                   time.Duration `path:"providers.internal.parsian.get_status.end"`
-	ParsianGetStatusCronTime              time.Duration `path:"providers.internal.parsian.get_status.cron_time"`
-	ParsianGetStatusLockTime              time.Duration `path:"providers.internal.parsian.get_status.lock_time"`
-	ParsianGetStatusIsLockable            bool          `path:"providers.internal.parsian.get_status.is_lockable"`
-	ParsianGetStatusReverseDeadline       time.Duration `path:"providers.internal.parsian.get_status.reverse_deadline"`
-	ParsianGetStatusSyncAPICall           time.Duration `path:"providers.internal.parsian.get_status.sync_operations.api_call_get_status"`
-	ParsianGetStatusSyncGetOrder          time.Duration `path:"providers.internal.parsian.get_status.sync_operations.get_order_query"`
-	ParsianGetStatusSyncInsertOrder       time.Duration `path:"providers.internal.parsian.get_status.sync_operations.insert_order_query"`
-	ParsianSettlementInquiryWater         time.Duration `path:"providers.internal.parsian.settlement_inquiry_water"`
-	ParsianSettlementInquiryElectricity   time.Duration `path:"providers.internal.parsian.settlement_inquiry_electricity"`
-	ParsianSettlementInquiryGas           time.Duration `path:"providers.internal.parsian.settlement_inquiry_gas"`
+	ParsianName                         string        `path:"providers.internal.parsian.name"`
+	ParsianGetStatusName                string        `path:"providers.internal.parsian.get_status.name"`
+	ParsianGetStatusChunk               int           `path:"providers.internal.parsian.get_status.chunk"`
+	ParsianGetStatusStart               time.Duration `path:"providers.internal.parsian.get_status.start"`
+	ParsianGetStatusEnd                 time.Duration `path:"providers.internal.parsian.get_status.end"`
+	ParsianGetStatusCronTime            time.Duration `path:"providers.internal.parsian.get_status.cron_time"`
+	ParsianGetStatusLockTime            time.Duration `path:"providers.internal.parsian.get_status.lock_time"`
+	ParsianGetStatusIsLockable          bool          `path:"providers.internal.parsian.get_status.is_lockable"`
+	ParsianGetStatusReverseDeadline     time.Duration `path:"providers.internal.parsian.get_status.reverse_deadline"`
+	ParsianGetStatusSyncAPICall         time.Duration `path:"providers.internal.parsian.get_status.sync_operations.api_call_get_status"`
+	ParsianGetStatusSyncGetOrder        time.Duration `path:"providers.internal.parsian.get_status.sync_operations.get_order_query"`
+	ParsianGetStatusSyncInsertOrder     time.Duration `path:"providers.internal.parsian.get_status.sync_operations.insert_order_query"`
+	ParsianSettlementInquiryWater       time.Duration `path:"providers.internal.parsian.settlement_inquiry_water"`
+	ParsianSettlementInquiryElectricity time.Duration `path:"providers.internal.parsian.settlement_inquiry_electricity"`
+	ParsianSettlementInquiryGas         time.Duration `path:"providers.internal.parsian.settlement_inquiry_gas"`
+	// ParsianSettlementInquiryTelephone is read since task 044: the "bill already paid" check of a
+	// landline order paid through Parsian (bill: shouldSkipNewOrder) looks at the orders created in
+	// this window. Default 360h (bill: parsian.settlementInquiryTelephone). 0: no window (every
+	// order of the bill ID and pay ID); a negative value is rejected.
 	ParsianSettlementInquiryTelephone     time.Duration `path:"providers.internal.parsian.settlement_inquiry_telephone"`
 	ParsianSettlementInquiryMCIMobile     time.Duration `path:"providers.internal.parsian.settlement_inquiry_mci_mobile"`
 	ParsianSettlementInquiryRightelMobile time.Duration `path:"providers.internal.parsian.settlement_inquiry_rightel_mobile"`
@@ -255,8 +264,9 @@ type Config struct {
 	//   - KarashopCode and KarashopPassword are the credential of every call; the password is a
 	//     Secret (never printed). KarashopBillInquiryURL is the inquiry URL. They have no default:
 	//     the real values are only in config.yml. An empty one makes every call fail as "provider down".
-	//   - KarashopBillPaymentInfoURL (bill: billPaymentInfoURL) is not read yet: it belongs to the
-	//     landline order flow (SendPaymentInfo).
+	//   - KarashopBillPaymentInfoURL (bill: billPaymentInfoURL) is the URL of the settlement call
+	//     (SendPaymentInfo) after a landline payment (task 044). No default; empty: every settlement
+	//     fails, nothing is sent.
 	// Not hot-reloadable.
 	KarashopEnabled            bool          `path:"providers.external.karashop.enabled"`
 	KarashopTimeout            time.Duration `path:"providers.external.karashop.timeout"`
@@ -291,6 +301,10 @@ type Config struct {
 	// number again with no provider call (bill: caching.tel, 1h). 0 turns the cache off; a negative
 	// value is rejected. Not hot-reloadable (as caching.water): read at start.
 	CachingTel time.Duration `path:"caching.tel"`
+	// CachingPaidTel is how long a saved landline inquiry gives the price of a landline order (the
+	// bill types tel and telmidterm, task 044) with no provider call (bill: caching.paidTel, 72h). 0:
+	// every order asks the provider; a negative value is rejected. Read at start.
+	CachingPaidTel time.Duration `path:"caching.paid_tel"`
 
 	// DebugMockQabzinoEnable makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -322,12 +336,19 @@ type Config struct {
 	DebugMockJiringSwitchReturnType string `path:"debug.mocks.jiring_switch.return_type"`
 	DebugMockParsianEnable          bool   `path:"debug.mocks.parsian.enable"`
 	DebugMockParsianReturnType      string `path:"debug.mocks.parsian.return_type"`
+	// DebugMockParsianPayReturnType is the answer of the Parsian mock to a payment (task 044,
+	// conventions § 15: one return-type key for each method): MockReturnSuccess, MockReturnFailed or
+	// MockReturnPending (the answer of a timeout). No effect while the mock is off. Development only.
+	DebugMockParsianPayReturnType string `path:"debug.mocks.parsian.pay_return_type"`
 
 	// DebugMockKarashopEnable makes the Karashop adapter answer with a fixed answer, with no call to
 	// Karashop (task 025). Development only, as DebugMockQabzinoEnable. Not hot-reloadable. The
 	// return type is MockReturnSuccess or MockReturnError; no effect while the mock is off.
 	DebugMockKarashopEnable     bool   `path:"debug.mocks.karashop.enable"`
 	DebugMockKarashopReturnType string `path:"debug.mocks.karashop.return_type"`
+	// DebugMockKarashopSettleReturnType is the answer of the Karashop mock to a settlement (task
+	// 044): MockReturnSuccess or MockReturnError. No effect while the mock is off. Development only.
+	DebugMockKarashopSettleReturnType string `path:"debug.mocks.karashop.settle_return_type"`
 
 	// DebugCacheInquiries is the switch of every use of the inquiry tables (bill_inquiries,
 	// bill_inquiry_requests) by the inquiry flow (task 031). True (the default): the flow reads the
@@ -365,18 +386,22 @@ func defaults() Config {
 		ParsianTimeout:      10 * time.Second,
 		KarashopTimeout:     30 * time.Second,
 
-		CachingWater:                    time.Hour,
-		CachingElectricity:              time.Hour,
-		CachingGas:                      time.Hour,
-		CachingMobile:                   5 * time.Hour,
-		CachingTel:                      time.Hour,
-		DebugMockQabzinoReturnType:      MockReturnSuccess,
-		DebugMockTavanirReturnType:      MockReturnSuccess,
-		DebugMockIrancellReturnType:     MockReturnSuccess,
-		DebugMockJiringSwitchReturnType: MockReturnSuccess,
-		DebugMockParsianReturnType:      MockReturnSuccess,
-		DebugMockKarashopReturnType:     MockReturnSuccess,
-		DebugCacheInquiries:             true,
+		CachingWater:                      time.Hour,
+		CachingElectricity:                time.Hour,
+		CachingGas:                        time.Hour,
+		CachingMobile:                     5 * time.Hour,
+		CachingTel:                        time.Hour,
+		CachingPaidTel:                    72 * time.Hour,
+		ParsianSettlementInquiryTelephone: 360 * time.Hour,
+		DebugMockQabzinoReturnType:        MockReturnSuccess,
+		DebugMockTavanirReturnType:        MockReturnSuccess,
+		DebugMockIrancellReturnType:       MockReturnSuccess,
+		DebugMockJiringSwitchReturnType:   MockReturnSuccess,
+		DebugMockParsianReturnType:        MockReturnSuccess,
+		DebugMockParsianPayReturnType:     MockReturnSuccess,
+		DebugMockKarashopReturnType:       MockReturnSuccess,
+		DebugMockKarashopSettleReturnType: MockReturnSuccess,
+		DebugCacheInquiries:               true,
 	}
 }
 
@@ -445,6 +470,13 @@ func (c Config) validate() error {
 	if c.GRPCAddr == c.HTTPAddr && checkListenAddr(c.GRPCAddr) == nil && !strings.HasSuffix(c.GRPCAddr, ":0") {
 		errs = append(errs, errors.New("server.grpc.addr and server.http.addr must not be the same address"))
 	}
+	if c.InternalGRPCAddr != "" {
+		if err := checkListenAddr(c.InternalGRPCAddr); err != nil {
+			errs = append(errs, fmt.Errorf("server.internal_grpc.addr %w", err))
+		} else if !strings.HasSuffix(c.InternalGRPCAddr, ":0") && (c.InternalGRPCAddr == c.GRPCAddr || c.InternalGRPCAddr == c.HTTPAddr) {
+			errs = append(errs, errors.New("server.internal_grpc.addr must not be the address of server.grpc.addr or server.http.addr"))
+		}
+	}
 	for path, d := range map[string]time.Duration{"hot_reload_interval": c.HotReloadInterval, "database.migration.timeout": c.MigrateTimeout} {
 		if d <= 0 {
 			errs = append(errs, fmt.Errorf("%s must be a positive duration (for example 30s)", path))
@@ -488,6 +520,18 @@ func (c Config) validate() error {
 	}
 	if c.CachingTel < 0 {
 		errs = append(errs, errors.New("caching.tel must not be negative (0 turns the cache off)"))
+	}
+	if c.CachingPaidTel < 0 {
+		errs = append(errs, errors.New("caching.paid_tel must not be negative (0: every order asks the provider)"))
+	}
+	if c.ParsianSettlementInquiryTelephone < 0 {
+		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_telephone must not be negative (0: no window)"))
+	}
+	if !ValidMockPayReturnType(c.DebugMockParsianPayReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.parsian.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
+	}
+	if !ValidMockReturnType(c.DebugMockKarashopSettleReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.karashop.settle_return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
 	if !ValidMockReturnType(c.DebugMockKarashopReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.karashop.return_type must be %q or %q", MockReturnSuccess, MockReturnError))

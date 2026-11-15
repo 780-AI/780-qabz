@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // Bill types and actions that adapters and the flow use (providers.bill_type, providers.action).
@@ -19,6 +20,9 @@ const (
 	BillTypeMobileMidTermRightel = "mobilemidtermRightel"
 	// BillTypeTel is the bill type of a landline (telephone) bill (bill: entity.TEL; task 025).
 	BillTypeTel = "tel"
+	// BillTypeTelMidterm is the bill type of the mid term of a landline bill (bill: entity.TELMIDTERM;
+	// task 044). It is an order bill type: its inquiry is the inquiry of BillTypeTel.
+	BillTypeTelMidterm = "telmidterm"
 
 	ActionInquiry = "inquiry"
 
@@ -29,6 +33,11 @@ const (
 	// FinalTermInquiryType): one answer has a mid-term and a final-term (full-term) inquiry.
 	InquiryTypeMidterm   = "midterm"
 	InquiryTypeFinalTerm = "final_term"
+
+	// The statuses of a payment and of a settlement (bill: entity.SUCCESS, FAILED, PENDING; task 044).
+	StatusSuccess = "success"
+	StatusFailed  = "failed"
+	StatusPending = "pending"
 )
 
 var (
@@ -89,6 +98,34 @@ type ElectricityDetails struct {
 	Region string
 }
 
+// The service status of a landline (bill: gateway/inquiry ServiceStatus; task 044): Karashop sends
+// it as a text (TelServiceStatus maps it). The order flow reads it for the provider fee.
+const (
+	TelServiceActive                = "active"
+	TelServicePartiallyDisconnected = "partiallyDisconnected"
+	TelServiceFullyDisconnected     = "fullyDisconnected"
+)
+
+// TelServiceStatus maps the Karashop serviceStatus text to a TelService value (bill:
+// ServiceStatusMap). Any other text gives "", as in bill.
+func TelServiceStatus(text string) string {
+	switch text {
+	case "وصل":
+		return TelServiceActive
+	case "قطع یکطرفه":
+		return TelServicePartiallyDisconnected
+	case "قطع دوطرفه":
+		return TelServiceFullyDisconnected
+	}
+	return ""
+}
+
+// TelDetails are the details of a landline inquiry (bill: gateway/inquiry TelephoneDetails; task
+// 044). The client does not see them; the flow saves them with the inquiry (extra_data).
+type TelDetails struct {
+	ServiceStatus string // a TelService value, or "" when Karashop sent an unknown text
+}
+
 // GasDetails are the details of a gas inquiry (bill: gateway/inquiry GasDetails). The client does
 // not see them (InquiryBillPayResponse has no field for them); the flow saves them with the inquiry
 // (bill_inquiries.extra_data), as bill does (task 023).
@@ -103,6 +140,7 @@ type GasDetails struct {
 type Details struct {
 	Electricity *ElectricityDetails
 	Gas         *GasDetails
+	Tel         *TelDetails
 }
 
 // InquiryResponse is the answer of ProviderInterface.Inquiry. A provider that answers "no
@@ -119,17 +157,59 @@ type InquiryResponse struct {
 	Details         *Details
 }
 
+// PaymentRequest is the input of ProviderInterface.Pay (task 044; bill: payment_gateway.PaymentRequest).
+type PaymentRequest struct {
+	BillType    string // the order bill type, for example BillTypeTel
+	InquiryType string // the inquiry type of the bill type (InquiryTypeFinalTerm, InquiryTypeMidterm)
+	OrderID     string // orders.order_id
+	UserID      string
+	Dialer      string
+	InquiryID   string // orders.data: the inquiry ID (the landline number)
+	BillID      string
+	PayID       string
+	Amount      uint64 // rials: the base price (no fee)
+	RRN         string // the reference of the payment service
+}
+
+// PaymentResponse is the answer of ProviderInterface.Pay: the answer of the provider as it came.
+// Status is the status of the provider; the order flow keeps it when it is StatusSuccess,
+// StatusFailed or StatusPending, and treats any other value as StatusPending (bill: validStatuses).
+type PaymentResponse struct {
+	Status          string
+	Code            int32
+	Message         string
+	ProviderTraceID string
+}
+
+// SettleRequest is the input of ProviderInterface.Settle: the report of a payment to the provider
+// of the bill (task 044; bill: confirm_payment_gateway.ConfirmPaymentRequest).
+type SettleRequest struct {
+	BillType        string
+	TelephoneNumber string // orders.data: the landline number
+	Amount          uint64 // rials: the base price
+	BillID          string
+	PayID           string
+	RRN             string
+	PaidAt          time.Time // created_at of the order (bill: the order CreatedAt)
+	PaymentProvider string    // the provider that was paid (orders.provider_name)
+}
+
+// SettleResponse is the answer of ProviderInterface.Settle. Status is StatusSuccess, StatusFailed or
+// StatusPending (bill: the code tables of the provider); only StatusSuccess confirms the payment.
+type SettleResponse struct {
+	Status          string
+	Code            int32
+	Message         string
+	ProviderTraceID string
+}
+
 // The request and response types of the methods that no adapter implements yet. Each later task
 // that implements one of them gives its type the fields it needs.
 type (
-	PaymentRequest   struct{}
-	PaymentResponse  struct{}
 	StatusRequest    struct{}
 	StatusResponse   struct{}
 	DocumentRequest  struct{}
 	DocumentResponse struct{}
-	SettleRequest    struct{}
-	SettleResponse   struct{}
 )
 
 // ProviderInterface is what every provider adapter implements (system.html, Provider Adapter
@@ -144,8 +224,12 @@ type ProviderInterface interface {
 	// does not call Inquiry and answers as for a provider with no adapter (task 036).
 	SupportsInquiry(billType string) bool
 	Inquiry(ctx context.Context, req InquiryRequest) (*InquiryResponse, error)
+	// Pay pays a bill. An error that wraps ErrProviderDown means that the provider gave no answer
+	// (a timeout too): the payment status is not known (pending). Other errors: ErrNotSupported.
 	Pay(ctx context.Context, req PaymentRequest) (*PaymentResponse, error)
 	Status(ctx context.Context, req StatusRequest) (*StatusResponse, error)
 	GetDocument(ctx context.Context, req DocumentRequest) (*DocumentResponse, error)
+	// Settle reports a payment to the provider of the bill. An error means that the provider gave no
+	// answer that can be read (bill: a failed settlement).
 	Settle(ctx context.Context, req SettleRequest) (*SettleResponse, error)
 }

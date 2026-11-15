@@ -75,11 +75,14 @@ func TestNewProviderRegistryKarashop(t *testing.T) {
 	}
 }
 
-// TestNewTel: a nil flow gives a Tel service whose Inquiry answers Unimplemented.
+// TestNewTel: a nil flow gives a Tel service whose Inquiry answers Unimplemented; no orders or no
+// signer gives a NewOrderV2 that answers Unimplemented (task 044).
 func TestNewTel(t *testing.T) {
-	tel := newTel(nil, nil)
+	tel := newTel(nil, nil, nil, 0, nil)
 	if assert.NotNil(t, tel) {
 		_, err := tel.Inquiry(context.Background(), &pb.InquiryTelRequest{Phone: "982188776655"})
+		assert.Equal(t, codes.Unimplemented, status.Code(err))
+		_, err = tel.NewOrderV2(context.Background(), &pb.NewOrderTelRequest{Phone: "982188776655"})
 		assert.Equal(t, codes.Unimplemented, status.Code(err))
 	}
 }

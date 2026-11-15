@@ -22,6 +22,10 @@ type fakeClient struct {
 	err   error
 	block bool // wait for the context
 	dl    bool // the context had a deadline
+	// The payment (task 044).
+	pays    []*pb.PayRequest
+	payResp *pb.PayResponse
+	payErr  error
 }
 
 func (f *fakeClient) Inquiry(ctx context.Context, in *pb.BillInquiryRequest, _ ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
@@ -34,6 +38,19 @@ func (f *fakeClient) Inquiry(ctx context.Context, in *pb.BillInquiryRequest, _ .
 		return nil, ctx.Err()
 	}
 	return f.resp, f.err
+}
+
+// Pay records the payment request (task 044) and gives payResp / payErr.
+func (f *fakeClient) Pay(ctx context.Context, in *pb.PayRequest, _ ...grpc.CallOption) (*pb.PayResponse, error) {
+	f.mu.Lock()
+	f.pays = append(f.pays, in)
+	_, f.dl = ctx.Deadline()
+	f.mu.Unlock()
+	if f.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return f.payResp, f.payErr
 }
 
 func (f *fakeClient) calls() int {

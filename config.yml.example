@@ -20,6 +20,8 @@ server:
     addr: ":8082"
   http:
     addr: ":8080"
+  internal_grpc:
+    addr: ""                 # internal gRPC server for the payment service (PaymentComplete/OrderComplete; no auth check, no HTTP gateway; bill: service.internalGrpc); empty: off
 
 metrics:
   prometheus:
@@ -104,7 +106,7 @@ providers:
       settlement_inquiry_water: "0s"       # not read yet (settlement)
       settlement_inquiry_electricity: "0s"
       settlement_inquiry_gas: "0s"
-      settlement_inquiry_telephone: "0s"
+      settlement_inquiry_telephone: "360h" # "bill already paid" window of a landline order paid through Parsian (bill: 360h); 0: no window
       settlement_inquiry_mci_mobile: "0s"
       settlement_inquiry_rightel_mobile: "0s"
     payment_server:          # the payment service (our own service; bill: paymentServer)
@@ -118,7 +120,7 @@ providers:
       code: ""                 # Karashop credential code; the real value only in config.yml
       password: ""             # Karashop credential password (secret); the real value only in config.yml
       bill_inquiry_url: ""     # the real URL only in config.yml; empty: every Karashop call fails as "provider down"
-      bill_payment_info_url: "" # not read yet (landline order flow); the real URL only in config.yml
+      bill_payment_info_url: "" # URL of the settlement (SendPaymentInfo) after a landline payment; empty: every settlement fails; the real URL only in config.yml
     qabzino:
       grpc_address: ""         # host:port of the Qabzino backend (gRPC, no TLS); empty: every Qabzino call fails as "provider down"
       timeout: "10s"           # limit of each call to the Qabzino backend; positive
@@ -145,6 +147,7 @@ caching:
   irancell: "0s"             # how long a saved Irancell mobile inquiry answers the same phone with no provider call; 0: cache off (as bill)
   mobile: "5h"               # how long a saved MCI or Rightel mobile inquiry (bill types mobile, mobilemidtermRightel) answers the same phone with no provider call; 0: cache off
   tel: "1h"                  # how long a saved landline inquiry (bill type tel) answers the same number with no provider call; 0: cache off
+  paid_tel: "72h"            # how long a saved landline inquiry gives the price of a landline order (tel, telmidterm) with no provider call (bill: paidTel); 0: every order asks the provider
 
 auth:
   secrets:
@@ -170,8 +173,10 @@ debug:
       return_type: "success" # "success" or "error"
     parsian:                 # the Parsian mock: a fixed answer, no call to the parsian-v2 service
       enable: false
-      return_type: "success" # "success" or "error"
+      return_type: "success" # inquiry: "success" or "error"
+      pay_return_type: "success" # payment: "success", "failed" or "pending" (the answer of a timeout)
     karashop:                # the Karashop mock: a fixed answer, no call to Karashop
       enable: false
-      return_type: "success" # "success" or "error"
+      return_type: "success" # inquiry: "success" or "error"
+      settle_return_type: "success" # settlement (SendPaymentInfo): "success" or "error"
   cache_inquiries: true      # development only: false = the inquiry flow does not read or write bill_inquiries / bill_inquiry_requests (every inquiry calls the provider)

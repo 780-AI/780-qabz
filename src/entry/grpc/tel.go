@@ -23,21 +23,30 @@ type TelDeps struct {
 	Raw RawInquirer
 	// Logger gets one error line for each server fault. Nil: no log line.
 	Logger ErrorLogger
+	// Orders saves an order (order.Service; task 044). Nil: NewOrderV2 is not available.
+	Orders OrderCreator
+	// Signer signs the order token (crypto.Signer). Nil: NewOrderV2 is not available.
+	Signer TokenSigner
+	// ServiceID is serviceId of the order answer and of the token (config service.id).
+	ServiceID uint32
 }
 
 // Tel implements the gRPC service haf80.api.bill.Tel (the landline bill). Methods that are not
-// written yet (the order methods) return codes.Unimplemented through the embedded type.
+// written yet (NewOrder, CompleteOrder) return codes.Unimplemented through the embedded type.
 type Tel struct {
 	pb.UnimplementedTelServer // embedded by value, as protoc-gen-go-grpc requires
 
-	inquiry Inquirer
-	raw     RawInquirer
-	logger  ErrorLogger
+	inquiry   Inquirer
+	raw       RawInquirer
+	logger    ErrorLogger
+	orders    OrderCreator
+	signer    TokenSigner
+	serviceID uint32
 }
 
 // NewTel returns the Tel implementation.
 func NewTel(deps TelDeps) *Tel {
-	return &Tel{inquiry: deps.Inquiry, raw: deps.Raw, logger: deps.Logger}
+	return &Tel{inquiry: deps.Inquiry, raw: deps.Raw, logger: deps.Logger, orders: deps.Orders, signer: deps.Signer, serviceID: deps.ServiceID}
 }
 
 // RegisterTel returns a Register that adds svc to a gRPC server. For a nil svc it returns nil, so
