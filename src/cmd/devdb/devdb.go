@@ -73,11 +73,11 @@ func run(args []string, out, errOut io.Writer, open opener) int {
 		return 1
 	}
 	if rest[0] == "seed" {
-		fmt.Fprintf(out, "devdb seed: bill tables ready on %s; inserted services=%d providers=%d (rows that existed are unchanged)\n",
-			cfg.PostgresTarget(), n.Services, n.Providers)
+		fmt.Fprintf(out, "devdb seed: bill tables ready on %s; inserted services=%d providers=%d fees=%d (rows that existed are unchanged)\n",
+			cfg.PostgresTarget(), n.Services, n.Providers, n.Fees)
 	} else {
-		fmt.Fprintf(out, "devdb unseed: deleted services=%d providers=%d on %s (the tables stay)\n",
-			n.Services, n.Providers, cfg.PostgresTarget())
+		fmt.Fprintf(out, "devdb unseed: deleted services=%d providers=%d fees=%d on %s (the tables stay)\n",
+			n.Services, n.Providers, n.Fees, cfg.PostgresTarget())
 	}
 	return 0
 }

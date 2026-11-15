@@ -11,6 +11,7 @@ import (
 
 	pb "qabz/api/pb/qabz"
 	"qabz/common/auth"
+	"qabz/common/crypto"
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
 	grpcserver "qabz/entry/grpc"
@@ -36,6 +37,7 @@ type liveWaterStack struct {
 	gas         *grpcserver.Gas
 	phone       *grpcserver.Phone
 	tel         *grpcserver.Tel
+	signer      *crypto.Signer // the order token key of phone (task 039)
 	metrics     *prometheus.Server
 	log         *liveLogger
 }
@@ -95,7 +97,16 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 	if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 		t.FailNow()
 	}
-	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log), phone: newPhone(flow, log), tel: newTel(flow, log), metrics: metrics, log: log}
+	orders, err := newOrders(db, providers, flow, metrics, log)
+	if !assert.NoError(t, err) || !assert.NotNil(t, orders) {
+		t.FailNow()
+	}
+	signer, err := crypto.LoadSigner(cfg.PaymentServerPrivateKeyPath, cfg.ServiceName)
+	if !assert.NoError(t, err) || !assert.NotNil(t, signer) {
+		t.FailNow()
+	}
+	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log),
+		phone: newPhone(flow, orders, signer, 105, log), tel: newTel(flow, log), signer: signer, metrics: metrics, log: log}
 }
 
 func (s *liveWaterStack) ask(user, bill string) (*pb.InquiryBillPayResponse, error) {

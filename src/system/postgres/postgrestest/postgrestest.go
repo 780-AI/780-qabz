@@ -120,8 +120,8 @@ func EmptySchema(t testing.TB, ctx context.Context, dsn string) string {
 }
 
 // SeededSchema is EmptySchema with every bill table as the devdb command makes it (one definition
-// of the bill tables, task 015) and the devdb seed rows (45 providers, 5 services). For the
-// providers tests (task 020). For tests only.
+// of the bill tables, task 015) and the devdb seed rows (45 providers, 5 services, 1 fee: task 039).
+// For the providers, inquiry and order tests. For tests only.
 func SeededSchema(t testing.TB, ctx context.Context, dsn string) string {
 	t.Helper()
 	schemaDSN := newSchema(t, ctx, dsn, "")

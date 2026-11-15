@@ -151,6 +151,11 @@ type Request struct {
 	InquiryID string // the bill ID; for gas the participate code; for the mobile bill types the phone (billTypes)
 	UserID    string // a UUID
 	Dialer    string // the mobile of the user (bill_inquiry_requests.dialer)
+	// NoCache makes the flow skip the saved inquiries (step 3 of Inquire): the provider is always
+	// called. The answer is still saved. The order flow sets it (task 039; bill: the inquiry with
+	// the action order reads the cache TTL of the order action, and the irancell bill type has no
+	// TTL there).
+	NoCache bool
 }
 
 // Inquiry is one inquiry of the answer.
@@ -172,6 +177,9 @@ type Result struct {
 	Details *provider.Details
 	// FromDatabase is true when the answer came from saved inquiries (no provider call).
 	FromDatabase bool
+	// Unsaved is true when the answer was not written (Options.NoStore, a development switch): the
+	// ID of each inquiry names no bill_inquiries row.
+	Unsaved bool
 }
 
 // Row is one row of bill_inquiries. An empty string is a NULL column.
@@ -314,6 +322,7 @@ func generateTID(billType string) (string, error) {
 //     provider call, with the details that were saved with them; copies for the user are saved
 //     (is_cached true). For the bill types mobile and tel, two saved rows of the same inquiry type
 //     do not answer (bill: shouldSkipCache). A failed read or a failed copy write is logged and does not fail the call.
+//     With Request.NoCache this step is skipped.
 //  4. Else it writes the request row (RequestInitial), calls the provider, writes the final status
 //     and the provider trace ID, and saves each inquiry of the answer with the details (the bill ID
 //     of a row is the one of its inquiry when the adapter gives one, else the one of the answer). A call
@@ -372,7 +381,7 @@ func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 
 	// @todo this_vs_bill item 34: bill has no switch that turns off the inquiry tables (task 031,
 	// Options.NoStore).
-	if !s.noStore {
+	if !s.noStore && !req.NoCache {
 		if res, ok := s.fromDatabase(ctx, req, pro, bt.skipSameTypePair); ok {
 			s.countInquiry(req.BillType, pro.Name, ResultDBHit)
 			return res, nil
@@ -517,6 +526,7 @@ func (s *Service) fromProvider(ctx context.Context, req Request, pro provider.Pr
 		})
 	}
 	if s.noStore {
+		res.Unsaved = true
 		return res, ResultProviderOK, nil
 	}
 	// bill ignores the result of this write: the answer does not depend on it (a failed write only

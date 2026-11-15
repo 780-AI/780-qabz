@@ -167,6 +167,27 @@ func TestIrancellCacheOffAsksEveryTime(t *testing.T) {
 	assert.Len(t, r.repo.requests, 3)
 }
 
+// TestIrancellNoCacheAsksEveryTime: a request with NoCache (the order flow, task 039) asks the
+// provider also when saved inquiries are valid, and its answer is still saved; a request without it
+// is answered from the saved rows (positive control).
+func TestIrancellNoCacheAsksEveryTime(t *testing.T) {
+	r := newIrancellRig(t, time.Hour)
+	noCache := Request{BillType: provider.BillTypeIrancell, InquiryID: irPhone, UserID: userA, Dialer: "989121234567", NoCache: true}
+	for range 2 {
+		res, err := r.svc.Inquire(context.Background(), noCache)
+		assert.NoError(t, err)
+		assert.False(t, res.FromDatabase)
+		assert.False(t, res.Unsaved, "the answer is saved")
+	}
+	assert.Equal(t, 2, r.irancell.calls)
+	assert.Equal(t, 0, r.repo.findCalls, "the saved inquiries are not read")
+	assert.Len(t, r.repo.rows, 4, "each answer is saved")
+	res, err := r.ask(irPhone, userA)
+	assert.NoError(t, err)
+	assert.True(t, res.FromDatabase, "without NoCache the saved rows answer")
+	assert.Equal(t, 2, r.irancell.calls)
+}
+
 // TestIrancellNoDebt: a success answer of two inquiries of amount 0 is a normal answer.
 func TestIrancellNoDebt(t *testing.T) {
 	r := newIrancellRig(t, time.Hour)

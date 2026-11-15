@@ -12,12 +12,15 @@ import (
 
 	pb "qabz/api/pb/qabz"
 	"qabz/common/auth"
+	"qabz/common/crypto"
 	"qabz/common/logging/zap"
 	"qabz/common/monitoring/jaeger"
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
 	"qabz/core/billtype"
+	"qabz/core/fee"
 	"qabz/core/inquiry"
+	"qabz/core/order"
 	"qabz/core/savedbill"
 	grpcserver "qabz/entry/grpc"
 	httpserver "qabz/entry/http"
@@ -101,7 +104,24 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	water, electricity, gas, phone, tel := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger), newPhone(flow, logger), newTel(flow, logger)
+	orders, err := newOrders(db, providers, flow, metrics, logger)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	// A missing or bad key stops the start (task 039): every order needs the signature.
+	signer, err := crypto.LoadSigner(cfg.PaymentServerPrivateKeyPath, cfg.ServiceName)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("order token: %w (set providers.internal.payment_server.private_key_path)", err)
+	}
+	serviceID, err := grpcserver.ServiceIDFromConfig(cfg.ServiceID)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	water, electricity, gas, tel := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger), newTel(flow, logger)
+	phone := newPhone(flow, orders, signer, uint32(serviceID), logger)
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
 	opts, err := newRequestMetrics(metrics)
 	if err != nil {
@@ -600,17 +620,79 @@ func newGas(flow *inquiry.Service, logger Logger) *grpcserver.Gas {
 }
 
 // newPhone builds the gRPC Phone service: POST /v1/mobile/inquiry (task 035: the Irancell operator; task 036: the MCI operator)
-// on the same inquiry flow as Water. A server fault writes one error log line (grpcserver.Phone).
-// A nil flow gives a service whose Inquiry answers Unimplemented.
-func newPhone(flow *inquiry.Service, logger Logger) *grpcserver.Phone {
-	deps := grpcserver.PhoneDeps{}
+// on the same inquiry flow as Water, and POST /v2/mobile/order (task 039: the Irancell operator) on
+// the order flow, with the order token signed by signer and serviceId = service.id. A server fault
+// writes one error log line (grpcserver.Phone). A nil flow gives a service whose Inquiry answers
+// Unimplemented; a nil orders or signer gives a service whose NewOrderV2 answers Unimplemented.
+func newPhone(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Phone {
+	deps := grpcserver.PhoneDeps{ServiceID: serviceID}
 	if flow != nil {
 		deps.Inquiry = flow
+	}
+	if orders != nil {
+		deps.Orders = orders
+	}
+	if signer != nil {
+		deps.Signer = signer
 	}
 	if logger != nil {
 		deps.Logger = logger
 	}
 	return grpcserver.NewPhone(deps)
+}
+
+// newOrders builds the order flow (order.Service, task 039) that every order endpoint uses: the
+// order provider from ProvidersService, the price (the direct price, the raw inquiry or the inquiry
+// flow), the fee (fee.Resolver on the fees table, read on each order) and the orders row. With
+// metrics on, each order adds 1 to qabz_order_create_total{bill_type,provider,result} (result:
+// created, invalid, no_provider, zero_price, inquiry_failed, error; provider "none" when no provider
+// was picked) and each fee adds 1 to qabz_fee_resolve_total{source} (user_provider, user, provider,
+// default, lookup_error, calc_error). A failed fee writes one error log line and the order goes on
+// (bill gives the default fee for a failed read and 0 for a failed calculation); a failed read of
+// the users with a fee writes one error line too.
+func newOrders(db *postgres.Client, providers order.Selector, flow *inquiry.Service, metrics *prometheus.Server, logger Logger) (*order.Service, error) {
+	if flow == nil {
+		return nil, errors.New("order: inquiry flow is required")
+	}
+	var onOrder func(billType, providerName, result string) // nil: metrics are off, nothing is recorded
+	var onResolve func(source string)                       // nil: metrics are off, nothing is recorded
+	if reg := metrics.Registry(); reg != nil {
+		orders := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_order_create_total",
+			Help: "New orders (POST /v2/mobile/order) by bill type (irancell), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; error).",
+		}, []string{"bill_type", "provider", "result"})
+		fees := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_fee_resolve_total",
+			Help: "Fees of new orders by source (user_provider, user, provider: the fees row that was used; default: no row, the default fee; lookup_error: the read failed, the default fee; calc_error: the row gives no fee, 0).",
+		}, []string{"source"})
+		for _, c := range []promclient.Collector{orders, fees} {
+			if err := reg.Register(c); err != nil {
+				return nil, fmt.Errorf("order: register metric: %w", err)
+			}
+		}
+		onOrder = func(billType, providerName, result string) {
+			orders.WithLabelValues(billType, providerName, result).Inc()
+		}
+		onResolve = func(source string) { fees.WithLabelValues(source).Inc() }
+	}
+	var feeLog fee.Logger     // nil: no line
+	var orderLog order.Logger // nil: no line
+	if logger != nil {
+		feeLog, orderLog = logger, logger
+	}
+	resolver, err := fee.NewResolver(fee.Options{Repository: postgres.NewFeeRepository(db), Logger: feeLog, OnResolve: onResolve})
+	if err != nil {
+		return nil, err
+	}
+	return order.NewService(order.Options{
+		Providers:  providers,
+		Inquiry:    flow,
+		Raw:        flow,
+		Fees:       resolver,
+		Repository: postgres.NewOrderRepository(db),
+		Logger:     orderLog,
+		OnOrder:    onOrder,
+	})
 }
 
 // newTel builds the gRPC Tel service: POST /v1/tel/inquiry (task 025, the landline bill) on the same

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.12 -->
+<!-- VERSION: 2.13 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.13 — 2026-11-14 — Task 039 Irancell mobile order: `POST /v2/mobile/order` for the Irancell operator on the shared order flow (`core/order`), the fee resolver (`core/fee`, the `fees` table, read on each order) and the order token signer (`common/crypto`, RS256 with the general private key); `providers.internal.payment_server.private_key_path` is read at start (a missing or bad key stops the App); new metrics `qabz_order_create_total` and `qabz_fee_resolve_total`.
 v2.12 — 2026-11-14 — Task 041: the `providers` section has two groups, `providers.internal` (our own services: irancell, jiring_switch, parsian, the new payment_server) and `providers.external` (karashop, qabzino, tavanir); every key path in this document uses the new layout; the config example has the `payment_server` block (address, private_key_path; not read yet).
 v2.11 — 2026-11-14 — Task 040: the unused config keys `providers.tavanir.circuit_breaker.*` removed from the config example (the circuit breaker comes at the end of the project with its own keys; a `@todo` in `src/config/config.go`).
 v2.10 — 2026-11-14 — Task 025 landline inquiry: `POST /v1/tel/inquiry` (`Tel.Inquiry`, bill type `tel`, `tid` prefix 4; the inquiry ID is the number in the 98 form; a request with billId and payId is the raw inquiry); only the Karashop provider may answer (operator decision, `onlyProvider` in `billTypes`); the Karashop adapter (`provider/karashop`, direct HTTPS) sends two calls at the same time (full term, mid term) and the flow writes one request row; each inquiry can have its own bill ID (`InquiryItem.BillID`); `providers.karashop.*`, `caching.tel` (1h), `debug.mocks.karashop`. No new metric (`bill_type="tel"`, `provider="karashop"`).
@@ -234,9 +235,9 @@ providers:
       settlement_inquiry_telephone: 0s
       settlement_inquiry_mci_mobile: 0s
       settlement_inquiry_rightel_mobile: 0s
-    payment_server:          # the payment service (our own service; bill: paymentServer); not read yet (task 039 reads private_key_path)
-      address: ""            # address of the payment service; the real value only in config.yml
-      private_key_path: ""   # path of the general private key file (the order token signature); the real value only in config.yml
+    payment_server:          # the payment service (our own service; bill: paymentServer)
+      address: ""            # address of the payment service; not read yet; the real value only in config.yml
+      private_key_path: ""   # path of the general private key file (PKCS #1 PEM) that signs the order token; read at start, a missing or bad key stops the App (task 039); the real value only in config.yml
   external:                  # third-party services
     karashop:                      # the Karashop (digitalport) HTTPS API (task 025): the landline bill
       enabled: false               # false: every Karashop call fails as "provider down", the mock does not apply
@@ -533,6 +534,8 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 |---|---|---|
 | `qabz_request_duration_ms` | histogram | Duration of every incoming request (gRPC and HTTP gateway) in milliseconds, by `path` (the gRPC method, for example `/haf80.api.bill.Service/Get`) and `code` (the gRPC code); buckets 5 ms to 10 000 ms. Its `_count` series is the request counter. A call that the auth check rejects is counted. An unknown HTTP route is not counted |
 | `qabz_inquiries_total` | counter | Inquiries by `bill_type`, `provider` (`none` when no provider was picked) and `result`: `db_hit` (answered from saved inquiries, no provider call), `provider_ok`, `provider_refused` (the provider has no inquiry), `provider_down` (the call failed), `no_provider`, `canceled` (the client left during the provider call), `error`, `raw` (a gas or a landline request with `billId` and `payId`, answered from the two IDs, provider `none`). Implemented for water (task 021), electricity (task 022), gas (task 023) the Irancell mobile bill (task 035, `bill_type="irancell"`), the MCI mobile bill (task 036, `bill_type="mobile"`) the Rightel mobile bill (task 037, `bill_type="mobilemidtermRightel"`) and the landline bill (task 025, `bill_type="tel"`) |
+| `qabz_order_create_total` | counter | New orders (`POST /v2/mobile/order`) by `bill_type` (`irancell`), `provider` (the order provider; `none` when no provider was picked) and `result`: `created` (the `orders` row is saved), `invalid` (the total does not fit the price field), `no_provider`, `zero_price`, `inquiry_failed` (the inquiry for the price failed or has no inquiry of the bill type), `error`. A rejected request (no user, an invalid request, an operator that is not available) is not counted here: it is in the `code` label of `qabz_request_duration_ms`. Implemented in task 039 |
+| `qabz_fee_resolve_total` | counter | Fees of new orders by `source`: `user_provider`, `user`, `provider` (the `fees` row that was used), `default` (no row: the default fee 9000), `lookup_error` (the read failed: the default fee, one error log line), `calc_error` (the row gives no fee: 0, one error log line). A rise of the two error sources means wrong fees. Implemented in task 039 |
 | `qabz_orders_total` | counter | Every order status change (the state machine) |
 | `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |
 | `qabz_order_complete_duration_ms` | histogram | How long `OrderComplete` takes |

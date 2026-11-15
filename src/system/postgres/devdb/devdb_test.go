@@ -41,6 +41,7 @@ func TestUnseedDeletesTheSeedIDs(t *testing.T) {
 	}{
 		{"services", seedServicesSQL, unseedServicesSQL, 5},
 		{"providers", seedProvidersSQL, unseedProvidersSQL, 45},
+		{"fees", seedFeesSQL, unseedFeesSQL, 1},
 	} {
 		ids := seedIDs(tc.seed)
 		assert.Len(t, ids, tc.rows, tc.name)

@@ -234,8 +234,9 @@ type Config struct {
 	// The config of the payment service (task 041; bill: paymentServer.host, paymentServer.port,
 	// paymentServer.privateKeyPath). Operator decisions of task 041: snake_case names, as the other
 	// keys (payment_server, private_key_path); one key address in place of bill's host and port. No default:
-	// the real values are only in config.yml. Not read yet: task 039 reads
-	// PaymentServerPrivateKeyPath (the general private key that signs the order token). Not
+	// the real values are only in config.yml. PaymentServerPrivateKeyPath is the path of the general
+	// private key (a PKCS #1 PEM file) that signs the order token (task 039): the App reads it at
+	// start, and a missing or bad key stops the start. PaymentServerAddress is not read yet. Not
 	// hot-reloadable.
 	PaymentServerAddress        string `path:"providers.internal.payment_server.address"`
 	PaymentServerPrivateKeyPath string `path:"providers.internal.payment_server.private_key_path"`

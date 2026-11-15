@@ -49,8 +49,20 @@ func TestLiveSeedTwiceThenUnseed(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Equal(t, devdb.Counts{Services: 5, Providers: 45}, n)
+	assert.Equal(t, devdb.Counts{Services: 5, Providers: 45, Fees: 1}, n)
 	assert.Equal(t, 10, count(t, ctx, c, tables), "every bill table")
+	// The fee row (task 039): the fee of providers row 26, the order provider of irancell.
+	var feeTitle, feeType, feeConfig string
+	var feeProvider int64
+	var feeUser, feeDeleted *string
+	assert.NoError(t, c.Pool().QueryRow(ctx, `SELECT title, provider_id, type, config::text, user_id::text, deleted_at::text
+		FROM fees WHERE id = 900001`).Scan(&feeTitle, &feeProvider, &feeType, &feeConfig, &feeUser, &feeDeleted))
+	assert.Equal(t, []any{"irancell order (dev seed)", int64(26), "fixed", `{"amount": 9000}`}, []any{feeTitle, feeProvider, feeType, feeConfig})
+	assert.Nil(t, feeUser)
+	assert.Nil(t, feeDeleted)
+	assert.Equal(t, 1, count(t, ctx, c, `SELECT count(*) FROM providers WHERE id = 26 AND bill_type = 'irancell' AND action = 'order'`))
+	assert.Equal(t, 1, count(t, ctx, c, `INSERT INTO fees (title, type) VALUES ('extra', 'fixed') RETURNING id`),
+		"the fees sequence is not moved")
 	assert.Equal(t, 50, count(t, ctx, c, seeded))
 
 	// The rows as given: GET /v1/services reads them through this repository (all have order 0, so
@@ -96,10 +108,11 @@ func TestLiveSeedTwiceThenUnseed(t *testing.T) {
 	assert.Equal(t, 7, count(t, ctx, c, `INSERT INTO services (type) VALUES ('extra2') RETURNING id`),
 		"the second seed does not move the sequence back")
 
-	// Unseed deletes the 50 seed rows only; the tables and the other rows stay.
+	// Unseed deletes the 51 seed rows only; the tables and the other rows stay.
 	n, err = devdb.Unseed(ctx, c.Pool())
 	assert.NoError(t, err)
-	assert.Equal(t, devdb.Counts{Services: 5, Providers: 45}, n)
+	assert.Equal(t, devdb.Counts{Services: 5, Providers: 45, Fees: 1}, n)
+	assert.Equal(t, 1, count(t, ctx, c, `SELECT count(*) FROM fees`), "only the extra fee row stays")
 	assert.Equal(t, 3, count(t, ctx, c, seeded), "only the extra rows stay")
 	assert.Equal(t, 10, count(t, ctx, c, tables), "the tables stay")
 	n, err = devdb.Unseed(ctx, c.Pool())

@@ -2,7 +2,14 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,7 +47,33 @@ debug:
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
+	c.PaymentServerPrivateKeyPath = testKeyFile(t)
 	return c
+}
+
+var (
+	testKeyOnce sync.Once
+	testKeyPEM  []byte
+)
+
+// testKeyFile writes a generated RSA key (PKCS #1 PEM, made once per test run; no key is in git) to
+// a file of the test and returns its path: the order token key of the App (task 039).
+func testKeyFile(t *testing.T) string {
+	t.Helper()
+	testKeyOnce.Do(func() {
+		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err == nil {
+			testKeyPEM = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)})
+		}
+	})
+	if !assert.NotEmpty(t, testKeyPEM, "generate key") {
+		t.FailNow()
+	}
+	path := filepath.Join(t.TempDir(), "payment.pem")
+	if !assert.NoError(t, os.WriteFile(path, testKeyPEM, 0o600)) {
+		t.FailNow()
+	}
+	return path
 }
 
 // defaultApp builds the App from the real dependencies. It stops the test if a step fails.
@@ -161,6 +194,7 @@ var qabzMetrics = []string{
 	"qabz_providers_last_load_success_timestamp_ms", "qabz_providers_changes_total",
 	"qabz_providers_active_count",
 	"qabz_inquiries_total", "qabz_provider_calls_total", "qabz_provider_call_duration_ms",
+	"qabz_order_create_total", "qabz_fee_resolve_total",
 }
 
 // TestDefaultBuilderMetricsSwitch: with metrics on, the composition root registers every qabz

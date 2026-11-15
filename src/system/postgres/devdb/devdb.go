@@ -1,5 +1,5 @@
-// Package devdb creates the tables of the bill service database and seeds or unseeds the services
-// and providers rows. It is for development only: the devdb command calls it only with mode: dev.
+// Package devdb creates the tables of the bill service database and seeds or unseeds the services,
+// providers and fees rows. It is for development only: the devdb command calls it only with mode: dev.
 // It is not a qabz migration: qabz does not own the bill tables (system.html, Issue #2).
 package devdb
 
@@ -22,6 +22,10 @@ var (
 	unseedServicesSQL string
 	//go:embed unseed_providers.sql
 	unseedProvidersSQL string
+	//go:embed seed_fees.sql
+	seedFeesSQL string
+	//go:embed unseed_fees.sql
+	unseedFeesSQL string
 )
 
 // lockSQL serializes two devdb runs on one database: CREATE TABLE IF NOT EXISTS is not safe when two
@@ -45,12 +49,14 @@ type Beginner interface {
 type Counts struct {
 	Services  int64
 	Providers int64
+	Fees      int64
 }
 
 // Seed creates every bill table that does not exist, inserts the seed rows whose id does not exist
-// and moves the services and providers id sequences past the largest id. A table, an index or a row
-// that exists is not changed, so a second call inserts nothing. All steps run in one transaction:
-// on an error nothing is changed.
+// and moves the services and providers id sequences past the largest id. The fees sequence is not
+// moved: the seed fee id is high (seed_fees.sql), so a row added by hand keeps a small id. A table,
+// an index or a row that exists is not changed, so a second call inserts nothing. All steps run in
+// one transaction: on an error nothing is changed.
 func Seed(ctx context.Context, db Beginner) (Counts, error) {
 	var n Counts
 	err := inTx(ctx, db, func(tx pgx.Tx) error {
@@ -63,6 +69,9 @@ func Seed(ctx context.Context, db Beginner) (Counts, error) {
 		}
 		if n.Providers, err = exec(ctx, tx, seedProvidersSQL); err != nil {
 			return fmt.Errorf("seed providers: %w", err)
+		}
+		if n.Fees, err = exec(ctx, tx, seedFeesSQL); err != nil {
+			return fmt.Errorf("seed fees: %w", err)
 		}
 		for _, table := range []string{"services", "providers"} {
 			if _, err := tx.Exec(ctx, fmt.Sprintf(sequenceSQL, table)); err != nil {
@@ -77,8 +86,8 @@ func Seed(ctx context.Context, db Beginner) (Counts, error) {
 	return n, nil
 }
 
-// Unseed deletes the seed rows from services and providers by id. The tables stay. A second call
-// deletes nothing. Both deletes run in one transaction.
+// Unseed deletes the seed rows from services, providers and fees by id. The tables stay. A second
+// call deletes nothing. The deletes run in one transaction.
 func Unseed(ctx context.Context, db Beginner) (Counts, error) {
 	var n Counts
 	err := inTx(ctx, db, func(tx pgx.Tx) error {
@@ -88,6 +97,9 @@ func Unseed(ctx context.Context, db Beginner) (Counts, error) {
 		}
 		if n.Providers, err = exec(ctx, tx, unseedProvidersSQL); err != nil {
 			return fmt.Errorf("unseed providers: %w", err)
+		}
+		if n.Fees, err = exec(ctx, tx, unseedFeesSQL); err != nil {
+			return fmt.Errorf("unseed fees: %w", err)
 		}
 		return nil
 	})

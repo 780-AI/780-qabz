@@ -56,6 +56,7 @@ func TestNoStoreSuccessCallsProviderEveryTime(t *testing.T) {
 			return
 		}
 		assert.False(t, res.FromDatabase, i)
+		assert.True(t, res.Unsaved, "the answer was not written")
 		assert.Equal(t, validBill, res.BillID)
 		assert.Equal(t, "2500012345", res.Inquiries[0].PayID, "the provider answer, not the saved row")
 		assert.Equal(t, uint64(25000000), res.Inquiries[0].Amount)

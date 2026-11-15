@@ -11,3 +11,6 @@ src/vendor/
 config.yml
 config_generated.env
 .venv/
+
+# private keys (the order token key, task 039): never committed
+*.pem

@@ -1,7 +1,8 @@
-<!-- VERSION: 3.27 -->
+<!-- VERSION: 3.28 -->
 <!-- Last Updated: 2026-11-14 -->
 <!--
 CHANGE LOG
+v3.28 — 2026-11-14 — Added 039-mobile-irancell-order entry.
 v3.27 — 2026-11-14 — Added session-wrap-up (task 041 session) entry.
 v3.26 — 2026-11-14 — Added 041-providers-internal-external entry.
 v3.25 — 2026-11-14 — Added session-wrap-up (tasks 025 and 040 session) entry.
@@ -143,6 +144,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-14] — Task 039: POST /v2/mobile/order for the Irancell operator (order flow, fee, order token)
+- **Type:** Major (new endpoint, new packages `core/order`, `core/fee`, `common/crypto`; a config key is read at start; Critical File `system.html`).
+- **Files:** new `src/core/order/order.go`, `token.go` (the order flow of `bill` `NewOrder` and the token payload of `NewOrderV2`) and tests; new `src/core/fee/fee.go`, `calc.go` (the fee resolver and calculation of `bill`) and tests; new `src/common/crypto/signer.go` (RS256 signer) and test; new `src/entry/grpc/phone_order.go` (`Phone.NewOrderV2`) and test; `src/entry/grpc/phone.go` (`PhoneDeps.Orders`, `Signer`, `ServiceID`); `src/core/inquiry/inquiry.go` (`Request.NoCache`, `Result.Unsaved`) and tests; new `src/system/postgres/order_repository.go`, `fee_repository.go` and live test; `src/system/postgres/devdb/devdb.go`, new `seed_fees.sql`, `unseed_fees.sql` and tests; `src/system/postgres/postgrestest/postgrestest.go` (comment: the seed has 1 fee); `src/cmd/devdb/devdb.go` (`fees=` count); `src/app/defaults.go` (`newOrders`, the key read at start, `newPhone`) and tests, new `src/app/order_live_test.go`; `src/config/config.go` (comment); `config.yml.example` (comments); the Postman requests of this task (Phone / Order V2, Payment (external) / Invoice) are in the commit of the Postman `BASE_URL` change (one file, not split); `docs/initial-discovery/system.html` (v2.13); `docs/this_vs_bill.md` (v0.20, items 38 and 39, items 34 and 35); `docs/folder_structure.md` (v0.46); `src/app/README.md` (v0.33); `docs/Plans/OPEN_TASKS.md` (v1.70); `docs/Plans/done_tasks/039_mobile_irancell_order.md` (moved from `pending_tasks/`, v0.2, not manifest-tracked); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** Yes. (1) `POST /v2/mobile/order` with the operator `irancell` saves one `orders` row (`initial`) and answers the signed order token and the total, with the steps and the price rules of `bill`; `mci` and `rightel` are HTTP 501, `unknown` HTTP 400, `POST /v1/mobile/order` stays HTTP 501. (2) **The App does not start without the order key:** `providers.internal.payment_server.private_key_path` must name a PKCS #1 PEM key file (the general private key of `bill`; a generated key in development); no path, a missing file or a bad key stops the start. The local `config.yml` names `paymentPrivateKey.pem`, which does not exist on this machine yet. (3) The `fees` table is read on each order (no cache, `bill` caches in Redis). (4) `devdb seed` inserts one `fees` row (id 900001, provider 26, 9000 fixed) and `unseed` deletes it. (5) New metrics `qabz_order_create_total` and `qabz_fee_resolve_total`. (6) The inquiry flow is unchanged for every inquiry endpoint (`NoCache` and `Unsaved` are used only by the order). Corrections of the task file: in `bill` an Irancell order with no price takes the final-term inquiry and succeeds (`BillTypeInquiryType[irancell]` is `final_term`).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, "Task 039 `POST /v2/mobile/order` for the Irancell operator" (⏸; the implementer feature-ON run passed, awaiting operator confirmation).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-14] — Session wrap-up (task 041 session)
 - **Type:** Minor (documentation; no code, no new files).

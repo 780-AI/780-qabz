@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -136,14 +138,41 @@ func TestProviderRegistryIrancellRealCall(t *testing.T) {
 	}
 }
 
-// TestNewPhoneWithoutFlow: no flow gives a service whose Inquiry is not available (no typed nil in
-// the interface).
+// TestNewPhoneWithoutFlow: no flow, no order flow and no signer give a service whose Inquiry and
+// NewOrderV2 are not available (no typed nil in the interface).
 func TestNewPhoneWithoutFlow(t *testing.T) {
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"})
-	svc := newPhone(nil, nil)
+	svc := newPhone(nil, nil, nil, 0, nil)
 	if assert.NotNil(t, svc) {
 		_, err := svc.Inquiry(ctx, &pb.InquiryPhoneRequest{Phone: "989351234567", Operator: pb.InquiryPhoneRequest_irancell})
 		assert.Equal(t, codes.Unimplemented, status.Code(err))
+		_, err = svc.NewOrderV2(ctx, &pb.NewOrderPhoneRequest{Phone: "989351234567", Operator: pb.NewOrderPhoneRequest_irancell})
+		assert.Equal(t, codes.Unimplemented, status.Code(err))
+	}
+}
+
+// TestDefaultBuilderNeedsTheOrderKey: a missing or bad key file stops the start with an error that
+// names the config key (task 039).
+func TestDefaultBuilderNeedsTheOrderKey(t *testing.T) {
+	bad := filepath.Join(t.TempDir(), "bad.pem")
+	if !assert.NoError(t, os.WriteFile(bad, []byte("not a key"), 0o600)) {
+		return
+	}
+	for _, tc := range []struct{ name, path, want string }{
+		{"no path", "", "crypto: no private key path"},
+		{"missing file", filepath.Join(t.TempDir(), "missing.pem"), "crypto: read private key"},
+		{"bad key", bad, "crypto: nil private key"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig(t)
+			cfg.PaymentServerPrivateKeyPath = tc.path
+			b, err := NewDefaultBuilder(context.Background(), cfg)
+			assert.Nil(t, b)
+			if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), tc.want)
+				assert.Contains(t, err.Error(), "providers.internal.payment_server.private_key_path")
+			}
+		})
 	}
 }
 
@@ -173,6 +202,8 @@ func TestDefaultBuilderServesPhone(t *testing.T) {
 	c := pb.NewPhoneClient(conn)
 	_, err = c.Inquiry(ctx, &pb.InquiryPhoneRequest{Phone: "989351234567", Operator: pb.InquiryPhoneRequest_irancell})
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	_, err = c.NewOrderV2(ctx, &pb.NewOrderPhoneRequest{Phone: "989351234567", Operator: pb.NewOrderPhoneRequest_irancell})
+	assert.Equal(t, codes.PermissionDenied, status.Code(err), "NewOrderV2 is served")
 	_, err = c.NewOrder(ctx, &pb.NewOrderPhoneRequest{}) // positive control: a method that is not written yet
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }
