@@ -10,6 +10,7 @@ import (
 
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
+	"qabz/core/order"
 	"qabz/core/reconcile"
 	"qabz/entry/cron"
 	"qabz/provider/parsianproxy"
@@ -26,6 +27,9 @@ type cronMetrics struct {
 	onOrder    func(name, result string)
 	onCall     func(providerName, action, result string, d time.Duration)
 	onPublish  func(result string, d time.Duration)
+	// onSettle counts a settlement of the settlement worker on qabz_order_settle_total (source
+	// worker; task 046).
+	onSettle func(billType, providerName, result string)
 }
 
 // newCronMetrics registers the metrics of the workers (conventions § 12; the names of system.html):
@@ -33,6 +37,7 @@ type cronMetrics struct {
 //   - qabz_cron_duration_ms{cron}: each run that took the lock;
 //   - qabz_cron_orders_processed_total{cron,result}: each order of a run (reconcile.Result*);
 //   - qabz_kafka_publish_total{result} (ok, error) and qabz_kafka_publish_duration_ms;
+//   - the settlements of the settlement worker on qabz_order_settle_total (source worker; task 046);
 //   - the status calls on qabz_provider_calls_total and qabz_provider_call_duration_ms (action
 //     status), the collectors that newInquiryFlow registered (call it after newInquiryFlow).
 func newCronMetrics(metrics *prometheus.Server) (cronMetrics, error) {
@@ -52,7 +57,7 @@ func newCronMetrics(metrics *prometheus.Server) (cronMetrics, error) {
 	}, []string{"cron"})
 	orders := promclient.NewCounterVec(promclient.CounterOpts{
 		Name: "qabz_cron_orders_processed_total",
-		Help: "Orders of the status worker by worker (cron) and result (success, failed: reported and saved; pending: no final status; late: after the reverse deadline, saved and not reported; skipped: final already; report_error; save_error; read_error).",
+		Help: "Orders of a worker run by worker (cron) and result. The status worker: success, failed (reported and saved); pending (no final status); late (after the reverse deadline, saved and not reported); skipped (final already); report_error; save_error; read_error. The settlement worker: the result of the settlement (success, failed, pending, error, confirm_error, no_data, no_route; see qabz_order_settle_total).",
 	}, []string{"cron", "result"})
 	publishes := promclient.NewCounterVec(promclient.CounterOpts{
 		Name: "qabz_kafka_publish_total",
@@ -75,6 +80,13 @@ func newCronMetrics(metrics *prometheus.Server) (cronMetrics, error) {
 	callDuration, err := registerOrExisting[*promclient.HistogramVec](reg, promclient.NewHistogramVec(providerCallDurationOpts, providerCallDurationLabels))
 	if err != nil {
 		return m, err
+	}
+	settles, err := registerOrExisting[*promclient.CounterVec](reg, promclient.NewCounterVec(settleOpts, settleLabels))
+	if err != nil {
+		return m, err
+	}
+	m.onSettle = func(billType, providerName, result string) {
+		settles.WithLabelValues(billType, providerName, result, order.SettleSourceWorker).Inc()
 	}
 	m.onRun = func(name, result string) { runs.WithLabelValues(name, result).Inc() }
 	m.onDuration = func(name string, d time.Duration) {
@@ -108,8 +120,8 @@ func registerOrExisting[T promclient.Collector](reg promclient.Registerer, c T) 
 	return zero, fmt.Errorf("cron: register metric: %w", err)
 }
 
-// cronJobs are the runner and the Kafka producer that its worker uses. Stop ends the runs first,
-// then sends what the producer has left and closes it.
+// cronJobs are the runner and the Kafka producer of the status worker (nil while that worker is
+// off). Stop ends the runs first, then sends what the producer has left and closes it.
 type cronJobs struct {
 	runner   *cron.Runner
 	producer *kafka.Producer
@@ -143,60 +155,115 @@ func (l redisLocker) TryLock(ctx context.Context, key string, ttl time.Duration)
 	return lk, nil
 }
 
-// newStatusCrons builds the Parsian status worker (task 045; bill: ParsianGetStatusTask) and its
-// runner: the orders of the provider parsian from the get_status keys, the adapter of the registry
-// (the mock in dev mode), the reports on Kafka (kafka.brokers, kafka.topic.payment.write.subject,
-// the key and the client ID service.ecosystem_name) and the Redis lock.
-func newStatusCrons(cfg config.Config, db *postgres.Client, cache *redis.Client, adapters reconcile.Adapters, m cronMetrics, logger Logger) (*cronJobs, error) {
+// settleCron makes a reconcile.SettleWorker a cron.Cron. The lock has no sync operations, so its
+// TTL is bill's default (4 h + 5 min, 2 min per order; bill: GetSyncOperations gives nil).
+type settleCron struct{ *reconcile.SettleWorker }
+
+func (c settleCron) Lock() cron.LockPolicy { return cron.LockPolicy{Chunk: c.Chunk()} }
+
+func (c settleCron) Run(ctx context.Context, ext cron.Extender) error {
+	return c.SettleWorker.Run(ctx, ext)
+}
+
+// newCrons builds the enabled workers and one runner for them (the Redis lock):
+//   - the Parsian status worker (task 045; bill: ParsianGetStatusTask) with
+//     providers.internal.parsian.get_status.enabled: the orders of the provider parsian from the
+//     get_status keys, the adapter of the registry (the mock in dev mode), the reports on Kafka
+//     (kafka.brokers, kafka.topic.payment.write.subject, the key and the client ID
+//     service.ecosystem_name);
+//   - the settlement worker (task 046; bill: ConfirmPaymentTelephone) with
+//     confirm_payment.telephone.enabled: the paid landline orders that Karashop did not confirm,
+//     settled with the Karashop adapter of the registry (the mock in dev mode) by order.Settler.
+//
+// With no worker enabled: an error (the caller builds no runner then).
+func newCrons(cfg config.Config, db *postgres.Client, cache *redis.Client, adapters reconcile.Adapters, m cronMetrics, logger Logger) (*cronJobs, error) {
 	if cache == nil {
 		return nil, errors.New("cron: the Redis client is required")
 	}
-	producer, err := kafka.New(kafka.Options{Brokers: cfg.KafkaBrokers, ClientID: cfg.ServiceEcosystemName, OnPublish: m.onPublish})
-	if err != nil {
-		return nil, err
-	}
-	reporter, err := reconcile.NewPaymentReporter(producer, cfg.KafkaPaymentWriteSubject, cfg.ServiceEcosystemName)
-	if err != nil {
-		_ = producer.Close(context.Background())
-		return nil, err
-	}
 	var workerLog reconcile.Logger // nil: no line
 	var runnerLog cron.Logger      // nil: no line
+	var settleLog order.PaymentLogger
 	if logger != nil {
-		workerLog, runnerLog = logger, logger
+		workerLog, runnerLog, settleLog = logger, logger, logger
 	}
-	worker, err := reconcile.NewStatusWorker(reconcile.StatusOptions{
-		Name:            cfg.ParsianGetStatusName,
-		Provider:        parsianproxy.Name,
-		Interval:        cfg.ParsianGetStatusCronTime,
-		Start:           cfg.ParsianGetStatusStart,
-		End:             cfg.ParsianGetStatusEnd,
-		Chunk:           cfg.ParsianGetStatusChunk,
-		ReverseDeadline: cfg.ParsianGetStatusReverseDeadline,
-		SyncOperations:  []time.Duration{cfg.ParsianGetStatusSyncAPICall, cfg.ParsianGetStatusSyncGetOrder, cfg.ParsianGetStatusSyncInsertOrder},
-		Repository:      postgres.NewOrderRepository(db),
-		Adapters:        adapters,
-		Reporter:        reporter,
-		Logger:          workerLog,
-		OnOrder:         m.onOrder,
-		OnCall:          m.onCall,
-	})
-	if err != nil {
+	var crons []cron.Cron
+	lockTimes := map[string]time.Duration{}
+	var producer *kafka.Producer
+	fail := func(err error) (*cronJobs, error) {
 		_ = producer.Close(context.Background())
 		return nil, err
 	}
-	lockTime := cfg.ParsianGetStatusLockTime
+	if cfg.ParsianGetStatusEnabled {
+		var err error
+		producer, err = kafka.New(kafka.Options{Brokers: cfg.KafkaBrokers, ClientID: cfg.ServiceEcosystemName, OnPublish: m.onPublish})
+		if err != nil {
+			return nil, err
+		}
+		reporter, err := reconcile.NewPaymentReporter(producer, cfg.KafkaPaymentWriteSubject, cfg.ServiceEcosystemName)
+		if err != nil {
+			return fail(err)
+		}
+		worker, err := reconcile.NewStatusWorker(reconcile.StatusOptions{
+			Name:            cfg.ParsianGetStatusName,
+			Provider:        parsianproxy.Name,
+			Interval:        cfg.ParsianGetStatusCronTime,
+			Start:           cfg.ParsianGetStatusStart,
+			End:             cfg.ParsianGetStatusEnd,
+			Chunk:           cfg.ParsianGetStatusChunk,
+			ReverseDeadline: cfg.ParsianGetStatusReverseDeadline,
+			SyncOperations:  []time.Duration{cfg.ParsianGetStatusSyncAPICall, cfg.ParsianGetStatusSyncGetOrder, cfg.ParsianGetStatusSyncInsertOrder},
+			Repository:      postgres.NewOrderRepository(db),
+			Adapters:        adapters,
+			Reporter:        reporter,
+			Logger:          workerLog,
+			OnOrder:         m.onOrder,
+			OnCall:          m.onCall,
+		})
+		if err != nil {
+			return fail(err)
+		}
+		crons = append(crons, statusCron{worker})
+		lockTimes[worker.Name()] = cfg.ParsianGetStatusLockTime
+	}
+	if cfg.ConfirmPaymentTelephoneEnabled {
+		repo := postgres.NewOrderRepository(db)
+		settler, err := order.NewSettler(order.SettlerOptions{
+			Repository: repo, Adapters: adapters, Routes: settleRoutes(), Source: order.SettleSourceWorker,
+			Logger: settleLog, OnSettle: m.onSettle,
+		})
+		if err != nil {
+			return fail(err)
+		}
+		worker, err := reconcile.NewSettleWorker(reconcile.SettleOptions{
+			Name:       cfg.ConfirmPaymentTelephoneName,
+			Interval:   cfg.ConfirmPaymentTelephoneEvery,
+			Start:      cfg.ConfirmPaymentTelephoneStart,
+			End:        cfg.ConfirmPaymentTelephoneEnd,
+			Chunk:      cfg.ConfirmPaymentTelephoneChunk,
+			Repository: repo,
+			Settler:    settler,
+			Logger:     workerLog,
+			OnOrder:    m.onOrder,
+		})
+		if err != nil {
+			return fail(err)
+		}
+		crons = append(crons, settleCron{worker})
+		lockTimes[worker.Name()] = cfg.ConfirmPaymentTelephoneLockTime
+	}
+	if len(crons) == 0 {
+		return nil, errors.New("cron: no worker is enabled")
+	}
 	runner, err := cron.NewRunner(cron.Options{
-		Crons:      []cron.Cron{statusCron{worker}},
+		Crons:      crons,
 		Locker:     redisLocker{c: cache},
-		LockTime:   func(string) time.Duration { return lockTime }, // bill: only logged
+		LockTime:   func(name string) time.Duration { return lockTimes[name] }, // bill: only logged; read-only map
 		Logger:     runnerLog,
 		OnRun:      m.onRun,
 		OnDuration: m.onDuration,
 	})
 	if err != nil {
-		_ = producer.Close(context.Background())
-		return nil, err
+		return fail(err)
 	}
 	return &cronJobs{runner: runner, producer: producer}, nil
 }

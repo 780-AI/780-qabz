@@ -128,7 +128,7 @@ func TestLiveTwoRunnersOneLock(t *testing.T) {
 	for range 2 {
 		cache := redis.New(addr, password, prefix)
 		t.Cleanup(cache.Close)
-		j, err := newStatusCrons(cfg, db, cache, oneAdapter{adapter}, m, &liveLogger{})
+		j, err := newCrons(cfg, db, cache, oneAdapter{adapter}, m, &liveLogger{})
 		if !assert.NoError(t, err) || !assert.NotNil(t, j) {
 			return
 		}

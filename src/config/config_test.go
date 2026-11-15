@@ -938,3 +938,43 @@ debug: {mocks: {parsian: {status_return_type: failed}}}
 	_, err = Parse([]byte(base + "providers: {internal: {parsian: {get_status: {enabled: true, reverse_deadline: \"0s\"}}}}\n"))
 	assert.NoError(t, err)
 }
+
+// TestParseConfirmPaymentTelephone (task 046): the defaults (the operator's values), the keys read,
+// every start rule while the worker is on, and no rule while it is off.
+func TestParseConfirmPaymentTelephone(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.False(t, c.ConfirmPaymentTelephoneEnabled)
+	assert.Equal(t, "telephone-confirmpayment", c.ConfirmPaymentTelephoneName)
+	assert.Equal(t, 100, c.ConfirmPaymentTelephoneChunk)
+	assert.Equal(t, []time.Duration{15 * time.Minute, 30 * time.Minute, 5 * time.Minute, 24 * time.Hour},
+		[]time.Duration{c.ConfirmPaymentTelephoneEvery, c.ConfirmPaymentTelephoneLockTime, c.ConfirmPaymentTelephoneStart, c.ConfirmPaymentTelephoneEnd})
+
+	c, err = Parse([]byte(base + `confirm_payment: {telephone: {enabled: true, name: "n", every: "10s", lock_time: "1m", start: "0s", end: "48h", chunk: 7}}` + "\n"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.True(t, c.ConfirmPaymentTelephoneEnabled)
+	assert.Equal(t, "n", c.ConfirmPaymentTelephoneName)
+	assert.Equal(t, 7, c.ConfirmPaymentTelephoneChunk)
+	assert.Equal(t, []time.Duration{10 * time.Second, time.Minute, 0, 48 * time.Hour},
+		[]time.Duration{c.ConfirmPaymentTelephoneEvery, c.ConfirmPaymentTelephoneLockTime, c.ConfirmPaymentTelephoneStart, c.ConfirmPaymentTelephoneEnd})
+
+	for yml, want := range map[string]string{
+		`{enabled: true, name: ""}`:                 "confirm_payment.telephone.name must not be empty",
+		`{enabled: true, every: "0s"}`:              "confirm_payment.telephone.every must be a positive duration",
+		`{enabled: true, chunk: 0}`:                 "confirm_payment.telephone.chunk must be positive",
+		`{enabled: true, start: "-1s"}`:             "start must not be negative",
+		`{enabled: true, start: "24h"}`:             "end must be greater than start",
+		`{enabled: true, end: "48h1s"}`:             "end must not be greater than 48h",
+		`{enabled: true, start: "49h", end: "50h"}`: "end must not be greater than 48h",
+	} {
+		_, err := Parse([]byte(base + "confirm_payment: {telephone: " + yml + "}\n"))
+		assert.ErrorContains(t, err, want, yml)
+	}
+	_, err = Parse([]byte(base + `confirm_payment: {telephone: {name: "", every: "0s", chunk: 0, end: "100h"}}` + "\n"))
+	assert.NoError(t, err, "the worker off: its keys are not checked")
+}

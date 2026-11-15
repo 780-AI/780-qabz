@@ -168,6 +168,16 @@ kafka:                       # the Kafka client (bill: kafka); the producer exis
   auth: false                # not read yet (bill has it and does not use it)
   timeout: "5s"              # not read yet (bill has it and does not use it)
 
+confirm_payment:              # the settlement workers (task 046; bill: confirmPayment)
+  telephone:                 # the worker that settles again each paid landline order (tel, telmidterm) that Karashop did not confirm (bill: confirmPayment.telephone)
+    enabled: false           # false: no worker; true: the keys below are checked at start
+    name: "telephone-confirmpayment" # the lock key, the metric label cron and the log lines
+    every: "15m"             # the interval; positive
+    lock_time: "30m"         # only logged, as bill (the lock TTL is bill's default: 4h5m, 2m per order)
+    start: "5m"              # the window of the paid orders: created after now-end and before now-start; 0 or more
+    end: "24h"               # greater than start; not greater than 48h
+    chunk: 100               # orders in one page; positive
+
 auth:
   secrets:
     hmac: ""                 # the auth service JWT secret; required while the auth check is on

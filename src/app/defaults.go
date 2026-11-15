@@ -181,16 +181,23 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		b.WithTracer(tr)
 	}
 
-	// The workers (task 045): the metrics exist with metrics on; the Parsian status worker and its
-	// Kafka producer only with providers.internal.parsian.get_status.enabled. Built last, so no later
-	// failed step leaves the producer open.
+	// The workers (tasks 045 and 046): the metrics exist with metrics on; the Parsian status worker
+	// and its Kafka producer only with providers.internal.parsian.get_status.enabled; the settlement
+	// worker only with confirm_payment.telephone.enabled. Built last, so no later failed step leaves
+	// the producer open.
 	cronMetrics, err := newCronMetrics(metrics)
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
-	if cfg.ParsianGetStatusEnabled {
-		jobs, err := newStatusCrons(cfg, db, cache, registry, cronMetrics, logger)
+	if !cfg.ParsianGetStatusEnabled {
+		logger.Info("parsian status worker off (providers.internal.parsian.get_status.enabled: false)")
+	}
+	if !cfg.ConfirmPaymentTelephoneEnabled {
+		logger.Info("settlement worker off (confirm_payment.telephone.enabled: false)")
+	}
+	if cfg.ParsianGetStatusEnabled || cfg.ConfirmPaymentTelephoneEnabled {
+		jobs, err := newCrons(cfg, db, cache, registry, cronMetrics, logger)
 		if err != nil {
 			db.Close()
 			if b.tracer != nil {
@@ -199,8 +206,6 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 			return nil, err
 		}
 		b.WithCrons(jobs)
-	} else {
-		logger.Info("parsian status worker off (providers.internal.parsian.get_status.enabled: false)")
 	}
 	return b, nil
 }
@@ -773,8 +778,9 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 //   - qabz_order_payment_total{bill_type,provider,status}: each OrderComplete call (success, failed,
 //     pending, processed, wrong_price, error; provider "none" when the order was not read);
 //   - qabz_provider_pay_duration_ms{provider,status}: each payment call to a provider;
-//   - qabz_order_settle_total{bill_type,provider,result}: each settlement (success, failed,
-//     pending, error, confirm_error, no_data).
+//   - qabz_order_settle_total{bill_type,provider,result,source}: each settlement (success, failed,
+//     pending, error, confirm_error, no_data), source payment (the settlement worker of task 046
+//     counts on the same metric with source worker).
 func newPayments(db *postgres.Client, adapters order.Adapters, metrics *prometheus.Server, logger Logger) (*order.Payments, error) {
 	var onPayment, onSettle func(billType, providerName, result string)
 	var onPay func(providerName, status string, d time.Duration)
@@ -788,14 +794,14 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 			Help:    "Duration of each payment call to a provider in milliseconds, by provider and the status of the payment (success, failed, pending).",
 			Buckets: []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000},
 		}, []string{"provider", "status"})
-		settles := promclient.NewCounterVec(promclient.CounterOpts{
-			Name: "qabz_order_settle_total",
-			Help: "Settlements after a successful payment by bill type, settlement provider (karashop) and result (success: confirmed and saved; failed, pending: the answer of the provider; error: the call failed; confirm_error: provider_confirmed was not saved; no_data: the order has no number).",
-		}, []string{"bill_type", "provider", "result"})
-		for _, c := range []promclient.Collector{payments, duration, settles} {
+		for _, c := range []promclient.Collector{payments, duration} {
 			if err := reg.Register(c); err != nil {
 				return nil, fmt.Errorf("payment: register metric: %w", err)
 			}
+		}
+		settles, err := registerOrExisting[*promclient.CounterVec](reg, promclient.NewCounterVec(settleOpts, settleLabels))
+		if err != nil {
+			return nil, err
 		}
 		onPayment = func(billType, providerName, result string) {
 			payments.WithLabelValues(billType, providerName, result).Inc()
@@ -804,26 +810,45 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 			duration.WithLabelValues(providerName, status).Observe(float64(d) / float64(time.Millisecond))
 		}
 		onSettle = func(billType, providerName, result string) {
-			settles.WithLabelValues(billType, providerName, result).Inc()
+			settles.WithLabelValues(billType, providerName, result, order.SettleSourcePayment).Inc()
 		}
 	}
 	var payLog order.PaymentLogger // nil: no line
 	if logger != nil {
 		payLog = logger
 	}
-	settle := map[string]string{parsianproxy.Name: karashop.Name, "eways": karashop.Name, "eways2": karashop.Name}
 	return order.NewPayments(order.PaymentOptions{
 		Repository: postgres.NewOrderRepository(db),
 		Adapters:   adapters,
 		PayRoutes: map[string]map[string]bool{
 			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true},
 		},
-		SettleRoutes: map[string]map[string]string{provider.BillTypeTel: settle, provider.BillTypeTelMidterm: settle},
+		SettleRoutes: settleRoutes(),
 		Logger:       payLog,
 		OnPayment:    onPayment,
 		OnPay:        onPay,
 		OnSettle:     onSettle,
 	})
+}
+
+// settleOpts and settleLabels describe qabz_order_settle_total, which the payment step and the
+// settlement worker share (registerOrExisting).
+var (
+	settleOpts = promclient.CounterOpts{
+		Name: "qabz_order_settle_total",
+		Help: "Settlements of paid orders by bill type, settlement provider (karashop; empty for no_route), result (success: confirmed and saved; failed, pending: the answer of the provider; error: the call failed; confirm_error: provider_confirmed was not saved; no_data: the order has no number; no_route: no settlement provider) and source (payment: at once after OrderComplete; worker: the settlement worker).",
+	}
+	settleLabels = []string{"bill_type", "provider", "result", "source"}
+)
+
+// settleRoutes give the settlement provider by bill type and order provider (task 044; bill: the
+// confirm payment gateway map): tel and telmidterm, the order providers parsian, eways and eways2,
+// Karashop. A new map each call (read-only for the users).
+func settleRoutes() map[string]map[string]string {
+	settle := func() map[string]string {
+		return map[string]string{parsianproxy.Name: karashop.Name, "eways": karashop.Name, "eways2": karashop.Name}
+	}
+	return map[string]map[string]string{provider.BillTypeTel: settle(), provider.BillTypeTelMidterm: settle()}
 }
 
 // newTel builds the gRPC Tel service: POST /v1/tel/inquiry (task 025, the landline bill) on the same

@@ -1,13 +1,14 @@
-<!-- VERSION: 0.3 -->
+<!-- VERSION: 1.0 -->
 <!--
 CHANGE LOG
+v1.0 — 2026-11-15 — Done: implemented as designed; design change D13 (operator: "Qabz must not write NULL. It must write false", then "No NULL, if bill saves FALSE, then should Qabz"): the order insert writes is_raw and provider_confirmed as false; the implementation record and the feature-ON evidence added; moved to done_tasks.
 v0.3 — 2026-11-15 — Started (operator: "Do task 46"): moved to in-progress_tasks; design written (corrections C1 to C4, D1 to D12; operator approval 2026-11-15 "Approve, all recommended": D3 (a), D5 (a), D6 the recommended defaults, D9 (a)).
 v0.2 — 2026-11-15 — Operator decision B recorded: no reject, as bill.
 v0.1 — 2026-11-15 — Created (operator request): part 3 of supertask 043.
 -->
 # 046_karashop_settle_worker — the Karashop settlement worker
 
-Status: in-progress
+Status: done (2026-11-15; the operator QA confirmation is open in `OPEN_TASKS.md`)
 
 ## Description
 
@@ -106,6 +107,27 @@ Read on 2026-11-15 from `bill` commit `ff98e25` (not run) and from the Qabz sour
   - A test with `tracetest` checks the tree (root, one child per order, the error status, no forbidden attribute). New vendored package: `go.opentelemetry.io/otel/sdk/trace/tracetest` (the `sdk` module is a dependency already).
 - **D12. The differences from bill** (one `this_vs_bill.md` item 45): the pages (D3), the bill types one after the other (D1), the context of the run and the Karashop timeout (bill: `context.Background()`, the same adapter timeout), the lock deleted after each run (as item 43), the 48 h check (D6), the config path and the switch, the log lines and metrics. Operator decision B (no reject) is the same as bill: no item.
 
+### Design change (implementation, 2026-11-15)
+
+- **D13. The stored `false` (operator, 2026-11-15).** The live test found that bill's query never finds an order. bill writes DEFAULT for a `false` (go-pg `NullZero`, `insert.go`: zero value → `DEFAULT`): `is_raw` gets `FALSE` (bill migration 21), but `provider_confirmed` has no column default (bill migration 24), so it is NULL, and `provider_confirmed is false` does not match a NULL. The Qabz insert (task 044) wrote NULL for both. Operator: "Qabz must not write NULL. It must write false", and "No NULL, if bill saves FALSE, then should Qabz". The insert now writes both columns as they are (`false` too). The query is bill's query. Rows written before task 046 keep NULL (follow-up (b) in `OPEN_TASKS.md`). A `this_vs_bill.md` item 45 point.
+
 ### Files (planned)
 
 `src/core/reconcile/settle.go` (new) and its test, `src/core/order/complete.go` (`Settler`), `src/system/postgres/order_repository.go` (`ConfirmCandidates`), `src/entry/cron/cron.go` (the root span), `src/config/config.go`, `src/app/crons.go`, `src/app/defaults.go`, the tests of these packages and the live tests (real Postgres and Redis), `src/go.mod` / `vendor` (tracetest; `vendor/` is not committed), `config.yml`, `config.yml.example`, `docs/initial-discovery/system.html`, `docs/this_vs_bill.md`, `CHANGELOG.md`, `docs/documents_manifest.md`, `docs/Plans/OPEN_TASKS.md`, this task file.
+
+## Implementation (2026-11-15)
+
+Implemented as designed (D1 to D12, decisions D3 (a), D5 (a), D6 the recommended defaults, D9 (a)) with design change D13. What the design did not name, and how it was done:
+
+- **The Settler and the routes.** `Payments` keeps the task 044 rule "an order with no settlement route is not settled and not counted": it calls `Settler.Route` first. The worker calls `Settle` directly, so it counts `no_route`. The routes are one function `settleRoutes` in `app/defaults.go` for both.
+- **The metric.** `qabz_order_settle_total` is registered once with `registerOrExisting` by the payment step and by the worker metrics (the same description, the label `source`).
+- **A short page ends a bill type.** A page with fewer than `chunk` orders is the last one (one query less than bill). A page whose last `order_id` does not move forward ends the run with an error (a guard, never a loop).
+- **The root span** is in `Runner.tick` (`trace.WithNewRoot`), so the Parsian status worker gets its root span too. `go.opentelemetry.io/otel/trace` is now a direct dependency; `go.opentelemetry.io/otel/sdk/trace/tracetest` is used by tests only (vendored; `vendor/` is not committed).
+
+Verification:
+
+- **Tests:** `make test GO_TEST_ARGS="-race -count=1 -cover"`: every package passes; `app` 87.6 %, `config` 97.3 %, `core/order` 93.9 %, `core/reconcile` 98.3 %, `entry/cron` 98.1 %, `system/postgres` 90.4 %. The live tests ran (not skipped). Positive controls: bill's paging (the page after `""` each time) makes `TestSettleRunOncePerRun` time out; no error status fails `TestSettlerResults` (8 assertions); a `phone` attribute fails it (`attribute phone is not allowed`); with `is_raw` NULL `TestLiveConfirmCandidates` found 0 orders.
+- **Feature ON (Rule 15),** the compose Postgres and Redis, the Karashop mock, `every: 10s`, App copies on other ports (the operator's debug App on 8080 / 8082 / 9090 was not touched); six success rows in the dev database (A `tel` 1 h, B `telmidterm` 2 h, C raw, D confirmed, E 30 h, F 2 min):
+  - Mock `error`, 25 s: three runs; each run sent A and B once (one `settle: karashop failed` line each, `source` `worker`) and logged `settle worker: bill type done` with 1 order per bill type; no row changed; C, D, E and F never sent (steps 2, 3, 4).
+  - Mock `success`, two instances: at the first tick instance 2 ran and instance 1 counted `no_lock`; at the second tick instance 1 ran and found 0 orders; each instance `done` 1 and `no_lock` 1 (step 5); A and B `provider_confirmed = true`, `qabz_order_settle_total{bill_type="tel"|"telmidterm",provider="karashop",result="success",source="worker"}` 1 each, `qabz_cron_orders_processed_total{result="success"}` 2 (step 1).
+  - The QA rows were deleted from the dev database after the run.

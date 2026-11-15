@@ -118,7 +118,7 @@ func TestLiveTelOrderAndPayment(t *testing.T) {
 	assert.Equal(t, 1, s.count(t, `SELECT count(*) FROM orders WHERE order_id = $1 AND rrn = '778899' AND status = 'success' AND ref_id IS NOT NULL`, orderID))
 	assert.Positive(t, s.count(t, `SELECT count(*) FROM bill_inquiries WHERE inquiry_id = '982188776655' AND pay_id = $1 AND is_paid`, karashop.MockMidTermPayID))
 	assert.Equal(t, 1.0, s.metric(t, "qabz_order_payment_total", map[string]string{"bill_type": "telmidterm", "provider": "parsian", "status": "success"}))
-	assert.Equal(t, 1.0, s.metric(t, "qabz_order_settle_total", map[string]string{"bill_type": "telmidterm", "provider": "karashop", "result": "success"}))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_order_settle_total", map[string]string{"bill_type": "telmidterm", "provider": "karashop", "result": "success", "source": "payment"}))
 
 	// Step 5: a second call for the same order: pending, no new row.
 	o, err = s.payments.Complete(ctx, order.CompleteRequest{OrderID: orderID, RRN: "778899", Price: res.GetPrice()})
@@ -163,7 +163,7 @@ func TestLiveTelPaymentStatuses(t *testing.T) {
 	assert.Equal(t, []string{"initial", "in-progress", "success"}, st)
 	assert.False(t, confirmed, "the settlement failed")
 	assert.Equal(t, 1, s.log.count("error", "settle: karashop failed"))
-	assert.Equal(t, 1.0, s.metric(t, "qabz_order_settle_total", map[string]string{"bill_type": "tel", "provider": "karashop", "result": "error"}))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_order_settle_total", map[string]string{"bill_type": "tel", "provider": "karashop", "result": "error", "source": "payment"}))
 
 	for pay, want := range map[string]string{config.MockReturnFailed: order.StatusFailed, config.MockReturnPending: order.StatusPending} {
 		s := newLiveTel(t, ctx, pay, config.MockReturnSuccess)
@@ -178,7 +178,7 @@ func TestLiveTelPaymentStatuses(t *testing.T) {
 		st, confirmed := s.statuses(t, orderID)
 		assert.Equal(t, []string{"initial", "in-progress", want}, st, pay)
 		assert.False(t, confirmed, pay)
-		assert.Zero(t, s.metric(t, "qabz_order_settle_total", map[string]string{"bill_type": "telmidterm", "provider": "karashop", "result": "success"}), pay+": no settlement")
+		assert.Zero(t, s.metric(t, "qabz_order_settle_total", map[string]string{"bill_type": "telmidterm", "provider": "karashop", "result": "success", "source": "payment"}), pay+": no settlement")
 		assert.Zero(t, s.count(t, `SELECT count(*) FROM bill_inquiries WHERE is_paid`), pay+": not paid")
 	}
 

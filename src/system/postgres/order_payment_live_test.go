@@ -79,7 +79,7 @@ func TestLiveOrderPaymentRows(t *testing.T) {
 }
 
 // TestLiveOrderConfirmProvider: only the success row of the order in the last 48 h gets
-// provider_confirmed.
+// provider_confirmed; the other rows have false, not NULL (task 046).
 func TestLiveOrderConfirmProvider(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -103,7 +103,7 @@ func TestLiveOrderConfirmProvider(t *testing.T) {
 		got[s] = v
 	}
 	rows.Close()
-	assert.Equal(t, map[string]string{"initial": "<nil>", "in-progress": "<nil>", "success": "true"}, got)
+	assert.Equal(t, map[string]string{"initial": "false", "in-progress": "false", "success": "true"}, got, "false is written, not NULL (task 046)")
 	assert.NoError(t, r.ConfirmProvider(ctx, "bbbbbbbb-0000-4000-8000-000000000998"), "no row is not an error")
 }
 

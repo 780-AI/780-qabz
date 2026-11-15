@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"qabz/common/monitoring/prometheus"
+	"qabz/core/order"
 	"qabz/core/reconcile"
 	"qabz/entry/cron"
 	"qabz/system/kafka"
@@ -31,6 +32,7 @@ func TestCronMetrics(t *testing.T) {
 	assert.Nil(t, off.onOrder)
 	assert.Nil(t, off.onCall)
 	assert.Nil(t, off.onPublish)
+	assert.Nil(t, off.onSettle)
 
 	on := prometheus.New("127.0.0.1:0", true)
 	reg := on.Registry()
@@ -57,6 +59,8 @@ func TestCronMetrics(t *testing.T) {
 	m.onCall("parsian", "status", "ok", time.Millisecond)
 	m.onPublish(kafka.ResultOK, time.Millisecond)
 	m.onPublish(kafka.ResultError, time.Millisecond)
+	m.onSettle("tel", "karashop", "success")
+	m.onSettle("tel", "", order.SettleNoRoute)
 
 	families, err := reg.Gather()
 	if !assert.NoError(t, err) {
@@ -71,6 +75,10 @@ func TestCronMetrics(t *testing.T) {
 	assert.Equal(t, 8, got["qabz_cron_orders_processed_total"], "every result")
 	assert.Equal(t, 2, got["qabz_kafka_publish_total"], "ok, error")
 	assert.Equal(t, 1, got["qabz_kafka_publish_duration_ms"])
+	assert.Equal(t, 2, got["qabz_order_settle_total"], "task 046: the settlements of the worker")
+	v, ok := metricValue(t, reg, "qabz_order_settle_total", map[string]string{"bill_type": "tel", "provider": "karashop", "result": "success", "source": "worker"})
+	assert.True(t, ok)
+	assert.Equal(t, 1.0, v, "source worker")
 	var sample dto.Metric
 	if assert.NoError(t, calls.WithLabelValues("parsian", "status", "ok").Write(&sample)) {
 		assert.Equal(t, 1.0, sample.GetCounter().GetValue(), "the registered provider call counter")
@@ -119,37 +127,76 @@ func TestStatusCronAdapters(t *testing.T) {
 func TestNewStatusCronsRules(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.ParsianGetStatusEnabled = true
-	_, err := newStatusCrons(cfg, nil, nil, cacheTestAdapters{}, cronMetrics{}, nil)
+	_, err := newCrons(cfg, nil, nil, cacheTestAdapters{}, cronMetrics{}, nil)
 	assert.ErrorContains(t, err, "Redis client is required")
 
 	cache := redis.New("127.0.0.1:1", "", "p:")
 	defer cache.Close()
 	bad := cfg
 	bad.KafkaBrokers = nil
-	_, err = newStatusCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	_, err = newCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
 	assert.ErrorContains(t, err, "at least one broker")
 	bad = cfg
 	bad.KafkaPaymentWriteSubject = ""
-	_, err = newStatusCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	_, err = newCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
 	assert.ErrorContains(t, err, "topic")
 	bad = cfg
 	bad.ParsianGetStatusChunk = 0
-	_, err = newStatusCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	_, err = newCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
 	assert.ErrorContains(t, err, "chunk")
 
-	jobs, err := newStatusCrons(cfg, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	jobs, err := newCrons(cfg, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
 	if assert.NoError(t, err) && assert.NotNil(t, jobs) {
 		assert.NoError(t, jobs.Stop(context.Background()), "a stop before the start closes the producer")
 	}
+
+	// Task 046: no worker on is an error; the settlement worker alone has no Kafka producer and its
+	// bad options stop the build (and close a producer of the status worker).
+	none := cfg
+	none.ParsianGetStatusEnabled = false
+	_, err = newCrons(none, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	assert.ErrorContains(t, err, "no worker is enabled")
+	settle := none
+	settle.ConfirmPaymentTelephoneEnabled = true
+	jobs, err = newCrons(settle, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	if assert.NoError(t, err) && assert.NotNil(t, jobs) {
+		assert.Nil(t, jobs.producer)
+		assert.NoError(t, jobs.Stop(context.Background()))
+	}
+	both := cfg
+	both.ConfirmPaymentTelephoneEnabled = true
+	both.ConfirmPaymentTelephoneChunk = 0
+	_, err = newCrons(both, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	assert.ErrorContains(t, err, "chunk")
+	both.ConfirmPaymentTelephoneChunk = 100
+	both.ConfirmPaymentTelephoneName = cfg.ParsianGetStatusName
+	_, err = newCrons(both, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	assert.ErrorContains(t, err, "not unique")
 }
 
-// TestDefaultBuilderCrons (task 045): with the worker switch off (the default) the App has no
-// workers and one info line names the key; with it on, the App has the workers and the cron
-// metrics are registered in both cases (with metrics on).
+// TestSettleCronLock (task 046): the lock policy has the chunk and no sync operations, so the TTL
+// is bill's default (4 h + 5 min, 2 min per order).
+func TestSettleCronLock(t *testing.T) {
+	w, err := reconcile.NewSettleWorker(reconcile.SettleOptions{Name: "n", Interval: time.Minute, End: time.Hour, Chunk: 100,
+		Repository: postgres.NewOrderRepository(nil), Settler: &order.Settler{}})
+	if !assert.NoError(t, err) || !assert.NotNil(t, w) {
+		return
+	}
+	p := settleCron{w}.Lock()
+	assert.Equal(t, cron.LockPolicy{Chunk: 100}, p)
+	ttl, base := p.TTL()
+	assert.Equal(t, 4*time.Hour+5*time.Minute, ttl)
+	assert.Equal(t, 2*time.Minute, base)
+}
+
+// TestDefaultBuilderCrons (tasks 045 and 046): with both worker switches off (the default) the
+// App has no workers; with either one on, the App has the workers; the cron metrics are registered
+// in every case (with metrics on).
 func TestDefaultBuilderCrons(t *testing.T) {
-	for _, enabled := range []bool{false, true} {
+	for _, sw := range [][2]bool{{false, false}, {true, false}, {false, true}, {true, true}} {
 		cfg := testConfig(t)
-		cfg.ParsianGetStatusEnabled = enabled
+		cfg.ParsianGetStatusEnabled, cfg.ConfirmPaymentTelephoneEnabled = sw[0], sw[1]
+		enabled := sw[0] || sw[1]
 		b, err := NewDefaultBuilder(context.Background(), cfg)
 		if !assert.NoError(t, err) || !assert.NotNil(t, b) {
 			continue

@@ -70,7 +70,7 @@ func TestLiveIrancellOrderDirectPrice(t *testing.T) {
 	assert.Equal(t, 1, s.count(t, `SELECT count(*) FROM orders WHERE user_id = $1 AND status = 'initial' AND bill_type = 'irancell'
 		AND bill_id IS NULL AND pay_id = 'irancell' AND option = 'irancell' AND price = 459000 AND data = '989350000391'
 		AND provider_id = 26 AND provider_name = 'irancell' AND fee = 9000 AND fee_type = 'fixed' AND fee_config = '{"amount": 9000}'
-		AND fee_id = 900001 AND base_price = 450000 AND is_raw IS NULL AND provider_fee IS NULL AND bill_inquiry_id IS NULL`, liveUserOne))
+		AND fee_id = 900001 AND base_price = 450000 AND is_raw = false AND provider_confirmed = false AND provider_fee IS NULL AND bill_inquiry_id IS NULL`, liveUserOne))
 	assert.Equal(t, 0, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`), "no inquiry")
 
 	header, payload := s.tokenParts(t, res.GetOrderId())

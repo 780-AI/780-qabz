@@ -13,18 +13,23 @@ import (
 )
 
 // insertOrderSQL adds an orders row (bill: order.Repository.NewOrder, go-pg Insert). As go-pg, a
-// zero value is stored as NULL: an empty text, a 0, false and a nil config or fee ID. created_at and
+// zero value is stored as NULL: an empty text, a 0 and a nil config or fee ID. created_at and
 // updated_at get their column defaults (bill sets the zero value, so go-pg writes the default). A
 // status change of the payment step (task 044) is a new row with the same order_id and the columns
 // rrn, ref_id, message and status_code.
+//
+// @todo docs/this_vs_bill.md item 45: is_raw and provider_confirmed are written as they are, false
+// too, never NULL (task 046, operator 2026-11-15: "No NULL, if bill saves FALSE, then should
+// Qabz"). bill writes DEFAULT for a false (go-pg): is_raw gets FALSE (bill migration 21), the same;
+// provider_confirmed has no default, so bill stores NULL and its settlement query finds no order.
 const insertOrderSQL = `INSERT INTO orders (uuid, order_id, user_id, bill_type, bill_id, pay_id, option, price, data,
 	provider_id, provider_name, status, fee, fee_type, fee_config, fee_id, base_price, is_raw, provider_fee, bill_inquiry_id,
 	rrn, ref_id, message, status_code, provider_confirmed)
 VALUES ($1::uuid, $2::uuid, NULLIF($3, '')::uuid, NULLIF($4, ''), NULLIF($5, ''), NULLIF($6, ''), NULLIF($7, ''),
 	NULLIF($8::bigint, 0), NULLIF($9, ''), NULLIF($10::bigint, 0), NULLIF($11, ''), NULLIF($12, ''),
 	NULLIF($13::bigint, 0), NULLIF($14, ''), NULLIF($15::text, '')::jsonb, $16::integer, NULLIF($17::bigint, 0),
-	NULLIF($18::boolean, false), NULLIF($19::bigint, 0), NULLIF($20, ''),
-	NULLIF($21, ''), NULLIF($22, ''), NULLIF($23, ''), NULLIF($24::integer, 0), NULLIF($25::boolean, false))`
+	$18::boolean, NULLIF($19::bigint, 0), NULLIF($20, ''),
+	NULLIF($21, ''), NULLIF($22, ''), NULLIF($23, ''), NULLIF($24::integer, 0), $25::boolean)`
 
 // inquiryFeeSQL reads what the provider fee needs of a bill_inquiries row (bill:
 // bill_inquiry.Repository.GetById): the provider, the bill type and extra_data.service_status (a
@@ -94,6 +99,22 @@ SELECT order_id::text FROM ranked
 WHERE rn = 1 AND status IN ('pending', 'in-progress')
 ORDER BY created_at ASC
 LIMIT $4 OFFSET $5`
+
+// nilUUID is the order_id before every order (the first page of ConfirmCandidates).
+const nilUUID = "00000000-0000-0000-0000-000000000000"
+
+// confirmCandidatesSQL is bill's GetOrdersForConfirmPayment query (the filters are on each row
+// before DISTINCT ON, so it gives the newest success row of each order), with a keyset on order_id
+// in place of bill's repeated first page (task 046, design D3).
+const confirmCandidatesSQL = `SELECT DISTINCT ON (order_id) ` + orderColumns + ` FROM orders
+WHERE created_at > $2 AND created_at < $3
+  AND bill_type = $1
+  AND status = 'success'
+  AND is_raw IS false
+  AND provider_confirmed IS false
+  AND order_id > $4::uuid
+ORDER BY order_id, created_at DESC
+LIMIT $5`
 
 // lockLatestSQL reads the status of the newest row of an order of the last 24 h and locks it, in
 // the transaction of InsertFinal (bill: NewOrderWithFinalStatus, SELECT ... FOR UPDATE).
@@ -295,6 +316,20 @@ func (r *OrderRepository) Latest(ctx context.Context, orderID string, window tim
 	if row == nil {
 		return order.Order{}, errors.New("order repository: no row from QueryRow")
 	}
+	o, err := scanOrder(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return order.Order{}, fmt.Errorf("%w: %s", order.ErrNotFound, orderID)
+	}
+	return o, err
+}
+
+// rowScanner is a pgx.Row or pgx.Rows.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanOrder reads one row of orderColumns.
+func scanOrder(row rowScanner) (order.Order, error) {
 	var o order.Order
 	var price, statusCode int64
 	var feeConfig string
@@ -304,22 +339,52 @@ func (r *OrderRepository) Latest(ctx context.Context, orderID string, window tim
 		&o.ProviderID, &o.ProviderName, &o.RRN, &o.Message, &o.Status, &statusCode, &o.CreatedAt, &o.Fee, &o.FeeType,
 		&feeConfig, &feeID, &o.BasePrice, &o.IsRaw, &o.ProviderConfirmed, &providerFee, &o.BillInquiryID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return order.Order{}, fmt.Errorf("%w: %s", order.ErrNotFound, orderID)
-		}
 		return order.Order{}, err
 	}
 	if price < 0 || price > math.MaxUint32 {
-		return order.Order{}, fmt.Errorf("order repository: order %s has the price %d, out of the uint32 range", orderID, price)
+		return order.Order{}, fmt.Errorf("order repository: order %s has the price %d, out of the uint32 range", o.OrderID, price)
 	}
 	if statusCode < math.MinInt32 || statusCode > math.MaxInt32 || providerFee < 0 {
-		return order.Order{}, fmt.Errorf("order repository: order %s has a status_code or provider_fee out of range", orderID)
+		return order.Order{}, fmt.Errorf("order repository: order %s has a status_code or provider_fee out of range", o.OrderID)
 	}
 	o.Price, o.StatusCode, o.ProviderFee, o.FeeID = uint32(price), int32(statusCode), uint64(providerFee), feeID
 	if feeConfig != "" {
 		o.FeeConfig = []byte(feeConfig)
 	}
 	return o, nil
+}
+
+// ConfirmCandidates gives one page of the paid orders of the bill type that the provider did not
+// confirm (task 046; bill: GetOrdersForConfirmPayment): the newest success row of each order
+// created after from and before to (strict, as bill), not raw, provider_confirmed false, with an
+// order_id greater than after (keyset paging; "" is the first page), in order_id order.
+//
+// @todo docs/this_vs_bill.md item 45: bill reads the same query again with no offset, so a failed
+// settlement is read again at once and its run never ends; Qabz reads each order once per run.
+func (r *OrderRepository) ConfirmCandidates(ctx context.Context, billType, after string, limit int, from, to time.Time) ([]order.Order, error) {
+	if r == nil || r.db == nil {
+		return nil, errNoOrderPool
+	}
+	if after == "" {
+		after = nilUUID
+	}
+	rows, err := r.db.Query(ctx, confirmCandidatesSQL, billType, from, to, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return nil, errors.New("order repository: no rows from Query")
+	}
+	defer rows.Close()
+	var out []order.Order
+	for rows.Next() {
+		o, err := scanOrder(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
 }
 
 // ConfirmProvider sets provider_confirmed of the success row of the order (created in the last

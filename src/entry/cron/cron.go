@@ -11,6 +11,11 @@ import (
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Cron is one worker. Run gets an Extender: after each page of work it calls Charge with the
@@ -255,6 +260,17 @@ func (r *Runner) tick(ctx context.Context, c Cron) {
 		result = ResultNoLock
 		return
 	}
+	// The root span of the run (conventions § 17: a cron tick starts its own root, "cron <name>").
+	// The steps of the worker are its children.
+	ctx, span := otel.Tracer("qabz/entry/cron").Start(ctx, "cron "+name, trace.WithNewRoot(),
+		trace.WithAttributes(attribute.String("cron", name)))
+	defer func() {
+		span.SetAttributes(attribute.String("result", result))
+		if result != ResultDone {
+			span.SetStatus(codes.Error, result)
+		}
+		span.End()
+	}()
 	start := r.now()
 	defer func() {
 		if r.onDuration != nil {
@@ -267,6 +283,7 @@ func (r *Runner) tick(ctx context.Context, c Cron) {
 		}
 	}()
 	if err := c.Run(ctx, &extender{lock: lock, base: base}); err != nil {
+		span.RecordError(err)
 		if ctx.Err() == nil && r.log != nil {
 			r.log.Error("cron: run failed", "name", name, "error", err)
 		}

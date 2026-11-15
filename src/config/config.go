@@ -393,6 +393,22 @@ type Config struct {
 	KafkaAuth                bool          `path:"kafka.auth"`
 	KafkaTimeout             time.Duration `path:"kafka.timeout"`
 
+	// The settlement worker (task 046; bill: confirmPayment.telephone, ConfirmPaymentTelephone).
+	// bill's example config has no values; the defaults are the operator's (2026-11-15).
+	// ConfirmPaymentTelephoneEnabled (not a bill key) turns the worker on; false (the default): no
+	// worker, as before task 046. With the worker on: Name is the lock key and the metric label (not
+	// empty), Every is the interval (positive), Start and End give the window of the paid orders
+	// (created after now-End and before now-Start; 0 <= Start < End <= 48h, because the confirmation
+	// sets only the success rows of the last 48 h), Chunk is the page size (positive). LockTime is
+	// only logged (bill). Not hot-reloadable.
+	ConfirmPaymentTelephoneEnabled  bool          `path:"confirm_payment.telephone.enabled"`
+	ConfirmPaymentTelephoneName     string        `path:"confirm_payment.telephone.name"`
+	ConfirmPaymentTelephoneEvery    time.Duration `path:"confirm_payment.telephone.every"`
+	ConfirmPaymentTelephoneLockTime time.Duration `path:"confirm_payment.telephone.lock_time"`
+	ConfirmPaymentTelephoneStart    time.Duration `path:"confirm_payment.telephone.start"`
+	ConfirmPaymentTelephoneEnd      time.Duration `path:"confirm_payment.telephone.end"`
+	ConfirmPaymentTelephoneChunk    int           `path:"confirm_payment.telephone.chunk"`
+
 	// DebugCacheInquiries is the switch of every use of the inquiry tables (bill_inquiries,
 	// bill_inquiry_requests) by the inquiry flow (task 031). True (the default): the flow reads the
 	// saved inquiries first and saves the request row and the answer, as before. False: the flow
@@ -455,6 +471,12 @@ func defaults() Config {
 		KafkaPaymentReadSubject:           "payment",
 		KafkaPaymentReadGroup:             "paymentBill",
 		KafkaTimeout:                      5 * time.Second,
+		ConfirmPaymentTelephoneName:       "telephone-confirmpayment",
+		ConfirmPaymentTelephoneEvery:      15 * time.Minute,
+		ConfirmPaymentTelephoneLockTime:   30 * time.Minute,
+		ConfirmPaymentTelephoneStart:      5 * time.Minute,
+		ConfirmPaymentTelephoneEnd:        24 * time.Hour,
+		ConfirmPaymentTelephoneChunk:      100,
 		DebugMockParsianStatusReturnType:  MockReturnSuccess,
 		DebugMockQabzinoReturnType:        MockReturnSuccess,
 		DebugMockTavanirReturnType:        MockReturnSuccess,
@@ -602,6 +624,9 @@ func (c Config) validate() error {
 	if c.ParsianGetStatusEnabled {
 		errs = append(errs, c.validateParsianGetStatus()...)
 	}
+	if c.ConfirmPaymentTelephoneEnabled {
+		errs = append(errs, c.validateConfirmPaymentTelephone()...)
+	}
 	if !ValidMockReturnType(c.DebugMockKarashopSettleReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.karashop.settle_return_type must be %q or %q", MockReturnSuccess, MockReturnError))
 	}
@@ -659,6 +684,34 @@ func (c Config) validateParsianGetStatus() []error {
 	}
 	if c.KafkaPaymentWriteSubject == "" {
 		errs = append(errs, errors.New("kafka.topic.payment.write.subject must not be empty (the status worker reports on Kafka)"))
+	}
+	return errs
+}
+
+// ConfirmPaymentMaxEnd is the greatest confirm_payment.telephone.end: the confirmation of the
+// provider sets only the success rows of the last 48 h (order.LatestWindow; bill:
+// UpdateProviderConfirm), so an older order would be sent at each run and never marked.
+const ConfirmPaymentMaxEnd = 48 * time.Hour
+
+// validateConfirmPaymentTelephone checks the keys of the settlement worker (task 046). validate
+// calls it only while the worker is on.
+func (c Config) validateConfirmPaymentTelephone() []error {
+	const p = "confirm_payment.telephone."
+	var errs []error
+	if c.ConfirmPaymentTelephoneName == "" {
+		errs = append(errs, errors.New(p+"name must not be empty (the lock key and the metric label)"))
+	}
+	if c.ConfirmPaymentTelephoneEvery <= 0 {
+		errs = append(errs, errors.New(p+"every must be a positive duration (for example 15m)"))
+	}
+	if c.ConfirmPaymentTelephoneChunk <= 0 {
+		errs = append(errs, errors.New(p+"chunk must be positive (for example 100)"))
+	}
+	if c.ConfirmPaymentTelephoneStart < 0 || c.ConfirmPaymentTelephoneEnd <= c.ConfirmPaymentTelephoneStart {
+		errs = append(errs, errors.New(p+"start must not be negative and end must be greater than start (for example 5m and 24h)"))
+	}
+	if c.ConfirmPaymentTelephoneEnd > ConfirmPaymentMaxEnd {
+		errs = append(errs, errors.New(p+"end must not be greater than 48h (the confirmation sets only the rows of the last 48 h)"))
 	}
 	return errs
 }

@@ -132,12 +132,11 @@ type Payments struct {
 	repo          PaymentRepository
 	adapters      Adapters
 	payRoutes     map[string]map[string]bool
-	settleRoutes  map[string]map[string]string
+	settler       *Settler
 	settleTimeout time.Duration
 	log           PaymentLogger
 	onPayment     func(billType, providerName, result string)
 	onPay         func(providerName, status string, d time.Duration)
-	onSettle      func(billType, providerName, result string)
 
 	mu      sync.Mutex
 	jobs    sync.WaitGroup
@@ -162,9 +161,16 @@ func NewPayments(o PaymentOptions) (*Payments, error) {
 	if o.SettleTimeout == 0 {
 		o.SettleTimeout = 30 * time.Second
 	}
+	settler, err := NewSettler(SettlerOptions{
+		Repository: o.Repository, Adapters: o.Adapters, Routes: o.SettleRoutes, Source: SettleSourcePayment,
+		Logger: o.Logger, OnSettle: o.OnSettle,
+	})
+	if err != nil {
+		return nil, err
+	}
 	p := &Payments{
-		repo: o.Repository, adapters: o.Adapters, payRoutes: o.PayRoutes, settleRoutes: o.SettleRoutes,
-		settleTimeout: o.SettleTimeout, log: o.Logger, onPayment: o.OnPayment, onPay: o.OnPay, onSettle: o.OnSettle,
+		repo: o.Repository, adapters: o.Adapters, payRoutes: o.PayRoutes, settler: settler,
+		settleTimeout: o.SettleTimeout, log: o.Logger, onPayment: o.OnPayment, onPay: o.OnPay,
 		newID: uuid.NewString, now: time.Now,
 	}
 	p.spawn = func(job func()) { go job() }
@@ -345,63 +351,10 @@ func (p *Payments) settle(o Order) {
 		p.log.Error("settle: set the last order date failed", "order_id", o.OrderID, "error", err)
 	}
 
-	// bill: ConfirmPayment.
-	settler, ok := p.settleRoutes[o.BillType][o.ProviderName]
-	if !ok {
-		return
-	}
-	if o.Data == "" {
-		p.countSettle(o.BillType, settler, settleNoInquiryID)
-		return
-	}
-	adapter, ok := p.adapters.Get(settler)
-	if !ok || adapter == nil {
-		p.countSettle(o.BillType, settler, SettleError)
-		if p.log != nil {
-			p.log.Error("settle: "+settler+" failed", "order_id", o.OrderID, "error", "no adapter")
-		}
-		return
-	}
-	resp, err := adapter.Settle(ctx, provider.SettleRequest{
-		BillType: o.BillType, TelephoneNumber: o.Data, Amount: uint64(max(o.BasePrice, 0)), BillID: o.BillID,
-		PayID: o.PayID, RRN: o.RRN, PaidAt: o.CreatedAt, PaymentProvider: o.ProviderName,
-	})
-	switch {
-	case err != nil:
-		p.countSettle(o.BillType, settler, SettleError)
-		if p.log != nil {
-			p.log.Error("settle: "+settler+" failed", "order_id", o.OrderID, "error", err)
-		}
-		return
-	case resp == nil || resp.Status != provider.StatusSuccess:
-		status := SettleError
-		var code int32
-		var message string
-		if resp != nil {
-			status, code, message = resp.Status, resp.Code, resp.Message
-		}
-		p.countSettle(o.BillType, settler, status)
-		if p.log != nil {
-			p.log.Error("settle: "+settler+" failed", "order_id", o.OrderID, "status", status, "code", code, "message", message)
-		}
-		return
-	}
-	if err := p.repo.ConfirmProvider(ctx, o.OrderID); err != nil {
-		p.countSettle(o.BillType, settler, SettleMarkFailed)
-		if p.log != nil {
-			p.log.Error("settle: save provider_confirmed failed", "order_id", o.OrderID, "error", err)
-		}
-		return
-	}
-	p.countSettle(o.BillType, settler, provider.StatusSuccess)
-	if p.log != nil {
-		p.log.Info("settle: "+settler+" confirmed", "order_id", o.OrderID)
-	}
-}
-
-func (p *Payments) countSettle(billType, providerName, result string) {
-	if p.onSettle != nil {
-		p.onSettle(billType, providerName, result)
+	// bill: ConfirmPayment (the Settler, also used by the settlement worker of task 046). An order
+	// with no settlement route is not settled and not counted (task 044).
+	if _, ok := p.settler.Route(o.BillType, o.ProviderName); ok {
+		p.settler.Settle(ctx, o)
 	}
 }
 

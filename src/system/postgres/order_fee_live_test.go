@@ -70,7 +70,7 @@ func TestLiveOrderInsert(t *testing.T) {
 		"option": "irancell", "price": "459000", "data": "989350000391", "ref_id": "<nil>", "provider_id": "26",
 		"provider_name": "irancell", "rrn": "<nil>", "message": "<nil>", "status": "initial", "status_code": "<nil>",
 		"fee": "9000", "fee_type": "fixed", "fee_config": `{"amount": 9000}`, "fee_id": "900001", "base_price": "450000",
-		"is_raw": "true", "provider_confirmed": "<nil>", "provider_fee": "7", "bill_inquiry_id": full.BillInquiryID,
+		"is_raw": "true", "provider_confirmed": "false", "provider_fee": "7", "bill_inquiry_id": full.BillInquiryID,
 	}, orderRow(t, ctx, c, full.OrderID))
 
 	zero := order.Order{ID: "aaaaaaaa-0000-4000-8000-000000000002", OrderID: "bbbbbbbb-0000-4000-8000-000000000002", Status: order.StatusInitial}
@@ -79,7 +79,13 @@ func TestLiveOrderInsert(t *testing.T) {
 	}
 	got := orderRow(t, ctx, c, zero.OrderID)
 	for col, v := range got {
-		if col == "uuid" || col == "status" {
+		switch col {
+		case "uuid", "status":
+			continue
+		case "is_raw", "provider_confirmed":
+			// Task 046: false, not NULL (is_raw: bill's column default FALSE; provider_confirmed:
+			// operator decision, so the settlement worker finds the order).
+			assert.Equal(t, "false", v, col)
 			continue
 		}
 		assert.Equal(t, "<nil>", v, col+": a zero value is NULL")

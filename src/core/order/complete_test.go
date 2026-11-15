@@ -420,7 +420,7 @@ func (r *ctxCheckRepo) Insert(ctx context.Context, o Order) error {
 // settlement; the side effects still run.
 func TestCompleteNoSettleRoute(t *testing.T) {
 	f := newPayFixture(t)
-	f.p.settleRoutes = nil
+	f.p.settler.routes = nil
 	_, err := f.p.Complete(context.Background(), completeReq())
 	assert.NoError(t, err)
 	assert.Empty(t, f.karashop.settles)
@@ -464,7 +464,7 @@ func TestPaymentsStop(t *testing.T) {
 // TestSettlePanic: a panic in the job is recovered and logged.
 func TestSettlePanic(t *testing.T) {
 	f := newPayFixture(t)
-	f.p.adapters = adapters{"parsian": f.parsian, "karashop": panicAdapter{}}
+	f.p.settler.adapters = adapters{"parsian": f.parsian, "karashop": panicAdapter{}}
 	_, err := f.p.Complete(context.Background(), completeReq())
 	assert.NoError(t, err)
 	assert.Contains(t, f.log.lines, "error: order complete: settlement panic")

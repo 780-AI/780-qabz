@@ -1,7 +1,8 @@
-<!-- VERSION: 3.36 -->
+<!-- VERSION: 3.37 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.37 — 2026-11-15 — Added 046-karashop-settle-worker entry.
 v3.36 — 2026-11-15 — Added conventions-17-tracing entry.
 v3.35 — 2026-11-15 — Added 045-parsian-status-worker entry.
 v3.34 — 2026-11-15 — Added 044-qa-scenario-passed entry.
@@ -152,6 +153,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 046: the Karashop settlement worker
+- **Type:** Major (a new background worker, new config keys, a change of the stored orders rows, a metric label, the first spans, `system.html`).
+- **Files:** `src/core/reconcile/settle.go` (new: `SettleWorker`, keyset pages, `tel` then `telmidterm`), `src/core/order/settle.go` (new: `Settler`, the settlement code of task 044 moved out of `Payments.settle`, with the span `order.Settler.Settle`), `src/core/order/complete.go` (`Payments` uses the `Settler`), `src/system/postgres/order_repository.go` (`ConfirmCandidates` = bill's `GetOrdersForConfirmPayment` with a keyset on `order_id`; `scanOrder`; the insert writes `is_raw` and `provider_confirmed` as `false`, not NULL), `src/entry/cron/cron.go` (the root span `cron <name>` of each run), `src/config/config.go` (`confirm_payment.telephone.*`: `enabled`, `name`, `every`, `lock_time`, `start`, `end` with a 48 h limit, `chunk`), `src/app/crons.go` (`newCrons`: one runner for every enabled worker; the Kafka producer only with the status worker; `settleCron`), `src/app/defaults.go` (`settleRoutes`, the shared `qabz_order_settle_total` with the label `source`), the tests of these packages (unit, span tree with `tracetest`, live Postgres and Redis: `TestLiveConfirmCandidates`, `TestLiveSettleWorker`), `src/go.mod` (`go.opentelemetry.io/otel/trace` is now direct), `config.yml.example`, `docs/initial-discovery/system.html` (v2.17), `docs/this_vs_bill.md` (v0.24, item 45), `docs/folder_structure.md` (v0.49), `src/app/README.md` (v0.37), `docs/Plans/OPEN_TASKS.md` (v1.76), the task file (moved to `done_tasks/`).
+- **Impact:** Yes. (1) With `confirm_payment.telephone.enabled: true` (default `false`: no worker, as before) one instance at a time runs the settlement worker every `every` (15m): the paid, not raw, not confirmed `tel` and `telmidterm` orders created from `end` (24h) to `start` (5m) ago are sent to Karashop (`SendPaymentInfo`, the same call as task 044), each at most once per run; a success sets `provider_confirmed`; a failure changes nothing and the next run tries again; no reject. (2) Every new orders row (every order flow and every status row) stores `is_raw` and `provider_confirmed` as `false` in place of NULL (operator: as bill stores `FALSE`); rows written before stay NULL. (3) `qabz_order_settle_total` has the new label `source` (`payment`, `worker`) and the result `no_route`; the settlement log lines have the key `source`. (4) The first spans (conventions § 17): `cron <name>` and `order.Settler.Settle`, sent only with `logs.otlp_endpoint`. Differences from bill: `docs/this_vs_bill.md` item 45.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md`, task 046 (⏸): step 1 (the Go tests) and step 2 (feature ON with the Karashop mock and two instances) passed by the implementer on 2026-11-15; awaiting the operator.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Conventions § 17: tracing for every feature; task 047 created
 - **Type:** Minor (governance: a new binding code rule and a new pending task; no code).

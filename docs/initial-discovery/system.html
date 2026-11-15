@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.16 -->
+<!-- VERSION: 2.17 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.17 — 2026-11-15 — Task 046 settlement worker: `core/reconcile.SettleWorker` on the shared runner (`confirm_payment.telephone.*`, off by default): the paid, not raw, not confirmed `tel` and `telmidterm` orders of the window, each at most once per run (keyset paging on `order_id`), settled by the shared `order.Settler` (the code of the task 044 settlement); `orders.is_raw` and `provider_confirmed` are written as `false`, not NULL; `qabz_order_settle_total` gets the label `source` and the result `no_route`; the first spans (conventions § 17): the root span `cron <name>` of each run and `order.Settler.Settle`.
 v2.16 — 2026-11-15 — Task 045 Parsian status worker: the shared worker runner (`entry/cron`: the Cron interface, one goroutine and ticker per worker, the Redis lock with bill's TTL formula, the own lock deleted after each run, panic recovery, the App stop), the status worker (`core/reconcile`: `TopBill/OrderInquiry`, report on Kafka, then `InsertFinal`; the reverse deadline), the Kafka producer (`system/kafka`, confluent-kafka-go, bill's `LeastBytes` partition rule, the key and client ID `service.ecosystem_name`); new keys `providers.internal.parsian.get_status.enabled` (default false; the get_status keys are read, with defaults), `database.redis.prefix` (`qabz:`), `service.ecosystem_name` (`bill`; also `currentStep` of `OrderComplete`), the `kafka` block (bill's keys), `debug.mocks.parsian.status_return_type`; the metrics `qabz_cron_runs_total`, `qabz_cron_duration_ms`, `qabz_cron_orders_processed_total` are implemented, new `qabz_kafka_publish_total`, `qabz_kafka_publish_duration_ms`; `qabz_provider_calls_total` and `qabz_provider_call_duration_ms` count the action `status`.
 v2.15 — 2026-11-15 — Task 044 landline order and payment: `POST /v2/tel/order` (`Tel.NewOrderV2`, bill types `tel` and `telmidterm`, order provider Parsian, the "bill already paid" check, the Karashop provider fee 21000 or `providers.provider_fee`); `PaymentComplete/OrderComplete` on a new internal gRPC server (`server.internal_grpc.addr`, empty: off; no auth check); the Parsian payment (`TopBill/Pay`), the statuses `in-progress`, `success`, `failed`, `pending` (one `orders` row each); the Karashop settlement at once after a success (`SendPaymentInfo`, `provider_confirmed`); new keys `caching.paid_tel`, `debug.mocks.parsian.pay_return_type`, `debug.mocks.karashop.settle_return_type`; `providers.internal.parsian.settlement_inquiry_telephone` (default 360h) and `providers.external.karashop.bill_payment_info_url` are read; new metrics `qabz_order_payment_total`, `qabz_provider_pay_duration_ms`, `qabz_order_settle_total`.
 v2.14 — 2026-11-15 — Task 042: new key `providers.internal.payment_server.kid`, the `kid` of the order token header (empty: `service.name`); read at start.
@@ -299,6 +300,20 @@ kafka:                           # bill's kafka block; the producer exists only 
   timeout: 5s                    # not read
 ```
 
+The settlement worker (task 046; bill: `confirmPayment.telephone`; bill's example config has no values, the defaults are the operator's):
+
+```yaml
+confirm_payment:
+  telephone:
+    enabled: false                 # false: no worker (as before task 046); true: the keys below are checked at start
+    name: telephone-confirmpayment # the lock key <prefix>crons_<name>_lock1, the metric label cron, the log lines; not empty
+    every: 15m                     # the interval; positive
+    lock_time: 30m                 # only logged, as bill (the lock TTL is bill's default: 4h5m, 2m per order)
+    start: 5m                      # the window: created after now-end and before now-start; 0 or more
+    end: 24h                       # greater than start; not greater than 48h (the confirmation sets only the rows of the last 48 h)
+    chunk: 100                     # orders in one page; positive
+```
+
 Internal gRPC server (task 044):
 
 ```yaml
@@ -483,7 +498,9 @@ Crons:
 | `Jiring Switch` get-status | 5s | `pending` and `in-progress`, MCI | Asks `jiring-switch` for the status and saves `success` or `failed` |
 | `Parsian` get-status | 15m | `pending` and `in-progress`, all other bills paid via `Parsian` | Asks `parsian-v2` |
 | `Irancell` get-status | In config | `pending` and `in-progress`, `Irancell` | Asks `irancell` |
-| Landline confirm | In config | `success` landline orders `Karashab` hasn't confirmed | Sends `Karashab` the payment info and marks the order confirmed |
+| Landline confirm | In config | `success` landline orders `Karashab` hasn't confirmed | Sends `Karashab` the payment info and marks the order confirmed (implemented, task 046) |
+
+**The settlement worker (task 046).** `core/reconcile.SettleWorker`, on when `confirm_payment.telephone.enabled` is true, on the shared runner (one instance at a time; the lock policy has no sync operations, so the TTL is bill's default, 4 h + 5 min, charged 2 min per order). Each run computes the window once (created after `now − end` and before `now − start`, strict as bill), then for `tel` and then `telmidterm` reads pages of `chunk` orders with `OrderRepository.ConfirmCandidates` (bill's `GetOrdersForConfirmPayment`: the newest `success` row of each order, `is_raw` false, `provider_confirmed` false, `ORDER BY order_id`) with a keyset on `order_id`, so each order is sent at most once per run (bill reads its first page again, so its run never ends while one settlement fails). Each order goes to `order.Settler.Settle`, the same code as the at-once settlement of task 044 (`SendPaymentInfo` of Karashop, the routes `parsian`, `eways`, `eways2`; the mock `settle_return_type` in dev mode). A success sets `provider_confirmed`; every other result changes nothing, and the next run tries again until the order leaves the window. No reject (supertask 043 decision B). A failed page read or a lost lock ends the run. Lines: the task 044 settlement lines with the key `source` (`payment`, `worker`), and one info line `settle worker: bill type done` with the count. The order insert writes `is_raw` and `provider_confirmed` as `false`, not NULL (bill: `is_raw` gets its column default `FALSE`; `provider_confirmed` is NULL in bill, so bill's query finds no order). The differences from bill are item 45 of `docs/this_vs_bill.md`.
 
 ### Directory Structure
 
@@ -582,7 +599,7 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | `qabz_fee_resolve_total` | counter | Fees of new orders by `source`: `user_provider`, `user`, `provider` (the `fees` row that was used), `default` (no row: the default fee 9000), `lookup_error` (the read failed: the default fee, one error log line), `calc_error` (the row gives no fee: 0, one error log line). A rise of the two error sources means wrong fees. Implemented in task 039 |
 | `qabz_order_payment_total` | counter | `OrderComplete` calls of the payment service (task 044) by `bill_type`, `provider` (the order provider; `none` when the order was not read) and `status`: `success`, `failed`, `pending` (the status of the payment), `processed` (the order is not `initial`: answered `pending`, nothing saved), `wrong_price` (answered `pending`, nothing saved), `error` (a failed read or write, or the provider does not pay the bill type). Alert on a rise of `failed`, `pending` or `error` |
 | `qabz_provider_pay_duration_ms` | histogram | Duration of each payment call to a provider in milliseconds (task 044), by `provider` and `status` (`success`, `failed`, `pending`); buckets 5 ms to 30 000 ms |
-| `qabz_order_settle_total` | counter | Settlements after a successful payment (task 044) by `bill_type`, `provider` (the settlement provider: `karashop`) and `result`: `success` (confirmed, `provider_confirmed` saved), `failed`, `pending` (the answer of the provider), `error` (the call failed), `confirm_error` (`provider_confirmed` was not saved), `no_data` (the order has no number). Each result but `success` writes one error line; the worker of task 046 settles the order later |
+| `qabz_order_settle_total` | counter | Settlements of paid orders (tasks 044 and 046) by `bill_type`, `provider` (the settlement provider: `karashop`; empty for `no_route`), `result`: `success` (confirmed, `provider_confirmed` saved), `failed`, `pending` (the answer of the provider), `error` (the call failed), `confirm_error` (`provider_confirmed` was not saved), `no_data` (the order has no number), `no_route` (no settlement provider; only the worker), and `source`: `payment` (at once after `OrderComplete`) or `worker` (the settlement worker). Each failed call or answer writes one error line; the worker settles the order later |
 | `qabz_orders_total` | counter | Every order status change (the state machine) |
 | `qabz_order_amount_rials_total` | counter | Money paid, counted on `success` only |
 | `qabz_order_complete_duration_ms` | histogram | How long `OrderComplete` takes |
@@ -616,7 +633,7 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 |---|---|---|
 | `qabz_cron_runs_total` | counter | Worker ticks by `cron` (the worker name, for example `parsian-getstatus`) and `result`: `done`, `no_lock` (another instance holds the lock), `error` (a failed lock, a run error, a panic or the App stop during the run). Implemented (task 045) |
 | `qabz_cron_duration_ms` | histogram | Duration of each run that took the lock, in milliseconds, by `cron`; buckets 10 ms to 900 000 ms. Implemented (task 045) |
-| `qabz_cron_orders_processed_total` | counter | Orders of the status worker by `cron` and `result`: `success`, `failed` (reported and saved), `pending` (no final status), `late` (after the reverse deadline: saved, not reported), `skipped` (final already), `report_error`, `save_error`, `read_error`. Implemented (task 045) |
+| `qabz_cron_orders_processed_total` | counter | Orders of a worker run by `cron` and `result`. The status worker: `success`, `failed` (reported and saved), `pending` (no final status), `late` (after the reverse deadline: saved, not reported), `skipped` (final already), `report_error`, `save_error`, `read_error`. The settlement worker: the result of the settlement (the results of `qabz_order_settle_total`). Implemented (tasks 045, 046) |
 | `qabz_kafka_publish_total` | counter | Kafka messages of the status worker to the payment service by `result`: `ok` (delivered), `error` (not delivered, or the wait ended). Implemented (task 045) |
 | `qabz_kafka_publish_duration_ms` | histogram | Duration of each Kafka publish (metadata, produce and delivery report) in milliseconds; buckets 1 ms to 10 000 ms. Implemented (task 045) |
 | `qabz_pending_orders` | gauge | Orders waiting right now. Not implemented yet (task 045 decision D14 (a): it needs a count query; a later task) |
@@ -636,6 +653,8 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 `qabz` uses the same log packages as the `bill` service (`pkg/log` and `pkg/logger`), built on `zap`. Logs are shipped to Logstash, and the gRPC interceptor puts the logger into the request context.
 
 **Tracing is used.** Every request and every call to a provider is a span, sent to Jaeger. One payment can be followed from the request of the app to the answer of the provider.
+
+**As implemented so far (task 046; the rest is task 047, conventions § 17).** Each worker run that took the lock is one root span `cron <name>` (`entry/cron`, attributes `cron` and `result`; the status `Error` for every result but `done`). Each settlement is a span `order.Settler.Settle` (attributes `order.id`, `bill_type`, `provider`, `result`, `source`; the status `Error` for every result but `success`): a child of the run span in the worker, a root in the at-once settlement of task 044 (the request has no span yet; task 047 adds the link). The Postgres, Redis, Kafka and outbound HTTP and gRPC spans come with the shared hooks of task 047.
 
 ## Tests
 

@@ -8,6 +8,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 // fakeLock records the extends and the release of one lock.
@@ -360,4 +365,51 @@ func TestStartCtxDoesNotStopTheRuns(t *testing.T) {
 	assert.NoError(t, r.Stop(context.Background()))
 	never := &Runner{}
 	assert.NoError(t, never.Stop(context.Background()), "Stop before Start")
+}
+
+// TestRootSpan (conventions § 17): a run that took the lock is one root span "cron <name>" with the
+// attributes cron and result; a step of the run is its child; a failed run has the status Error;
+// a tick with no lock makes no span.
+func TestRootSpan(t *testing.T) {
+	sr := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() { otel.SetTracerProvider(prev) })
+
+	l, rec := &fakeLocker{}, &recorder{}
+	fail := false
+	c := &fakeCron{name: "a", interval: time.Hour, run: func(ctx context.Context, _ Extender) error {
+		_, child := otel.Tracer("test").Start(ctx, "step")
+		child.End()
+		if fail {
+			return errors.New("db down")
+		}
+		return nil
+	}}
+	r := newRunner(t, l, rec, c)
+	r.tick(context.Background(), c)
+	fail = true
+	r.tick(context.Background(), c)
+	l.mu.Lock()
+	l.none = true // another holder
+	l.mu.Unlock()
+	r.tick(context.Background(), c)
+
+	spans := sr.Ended()
+	if !assert.Len(t, spans, 4, "two runs, each a root and a step; no span with no lock") {
+		return
+	}
+	for i, want := range []struct {
+		result string
+		code   codes.Code
+	}{{ResultDone, codes.Unset}, {ResultError, codes.Error}} {
+		step, root := spans[2*i], spans[2*i+1]
+		assert.Equal(t, "step", step.Name())
+		assert.Equal(t, "cron a", root.Name())
+		assert.False(t, root.Parent().IsValid(), "a root span")
+		assert.Equal(t, root.SpanContext().SpanID(), step.Parent().SpanID(), "the step is a child of the root")
+		assert.Equal(t, want.code, root.Status().Code)
+		assert.ElementsMatch(t, []attribute.KeyValue{attribute.String("cron", "a"), attribute.String("result", want.result)}, root.Attributes())
+	}
 }
