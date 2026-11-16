@@ -107,6 +107,11 @@ type billType struct {
 //     inquiry rows). See docs/this_vs_bill.md, item 42. The saved inquiries answer for
 //     Options.OrderCacheTTL: caching.paid_mobile for mobile, none for mobilemidterm (bill).
 //
+//   - mobilemidtermRightel (task 055, the Rightel operator; bill has only the mid term): the raw
+//     inquiry first, as MCI, else the mid-term inquiry of the inquiry of mobilemidtermRightel itself
+//     (bill: BillTypeInquiryType[MOBILEMIDTERMRIGHTEL] midterm; only Qabzino answers, task 037). The
+//     saved inquiries answer for Options.OrderCacheTTL (caching.paid_mobile, as bill).
+//
 // A bill type with no order cache TTL (Options.OrderCacheTTL gives 0) never answers from saved
 // inquiries (inquiry.Request.NoCache).
 var billTypes = map[string]billType{
@@ -118,6 +123,8 @@ var billTypes = map[string]billType{
 	provider.BillTypeGas:           {inquiryType: provider.InquiryTypeRegular},
 	provider.BillTypeMobile:        {inquiryType: provider.InquiryTypeFinalTerm},
 	provider.BillTypeMobileMidterm: {inquiryBillType: provider.BillTypeMobile, inquiryType: provider.InquiryTypeMidterm},
+
+	provider.BillTypeMobileMidTermRightel: {inquiryType: provider.InquiryTypeMidterm},
 }
 
 // InquiryTypeOf gives the inquiry type of an order bill type (bill: entity.BillTypeInquiryType), ""

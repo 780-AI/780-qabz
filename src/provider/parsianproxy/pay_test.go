@@ -135,6 +135,30 @@ func TestPayMCI(t *testing.T) {
 	}
 }
 
+// TestPayRightel (task 055): a Rightel bill is paid with the fields of bill's ParsianRightelMobile
+// (the same as ParsianMCIMobile): the order bill type, the inquiry type midterm, the phone as the
+// inquiry ID.
+func TestPayRightel(t *testing.T) {
+	bt := provider.BillTypeMobileMidTermRightel
+	f := &fakeClient{payResp: &pb.PayResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceId: 81}}
+	req := provider.PaymentRequest{
+		BillType: bt, InquiryType: provider.InquiryTypeMidterm, OrderID: "o-6", UserID: "u-6", Dialer: "989121234567",
+		InquiryID: "989201234567", BillID: "9201234560817", PayID: "2300045678", Amount: 230000, RRN: "445580",
+	}
+	assert.True(t, SupportsPay(bt))
+	resp, err := newAdapter(t, f).Pay(context.Background(), req)
+	if !assert.NoError(t, err) || !assert.NotNil(t, resp) {
+		return
+	}
+	assert.Equal(t, &provider.PaymentResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceID: "81"}, resp)
+	if assert.Len(t, f.pays, 1) {
+		assert.Equal(t, &pb.PayRequest{
+			UserId: "u-6", Dialer: "989121234567", OrderId: "o-6", ProviderOrderId: 445580, InquiryId: "989201234567", BillType: "mobilemidtermRightel",
+			InquiryType: "midterm", BillId: "9201234560817", PayId: "2300045678", Amount: 230000, PaymentRrn: "445580",
+		}, f.pays[0])
+	}
+}
+
 // TestPayRRN: an RRN that is not an integer is failed (400) with the error text and no call, as bill.
 func TestPayRRN(t *testing.T) {
 	for _, rrn := range []string{"", "abc", "12.5", "99999999999999999999"} {
@@ -182,7 +206,9 @@ func TestPayDown(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 
 	f = &fakeClient{payResp: &pb.PayResponse{Status: "success"}}
-	for _, bt := range []string{provider.BillTypeMobileMidTermRightel, provider.BillTypeIrancell, ""} { // gas since task 053, mobile and mobilemidterm since task 054
+	// Not paid: gas since task 053, mobile and mobilemidterm since task 054, mobilemidtermRightel since
+	// task 055 are paid; "mobile_rightel" is bill's MOBILERIGHTEL, not an order bill type of Qabz.
+	for _, bt := range []string{provider.BillTypeIrancell, "mobile_rightel", ""} {
 		req := payRequest()
 		req.BillType = bt
 		_, err := newAdapter(t, f).Pay(context.Background(), req)

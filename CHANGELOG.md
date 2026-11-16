@@ -1,7 +1,8 @@
-<!-- VERSION: 3.56 -->
+<!-- VERSION: 3.57 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.57 — 2026-11-16 — Added 055-rightel-mobile-payment entry.
 v3.56 — 2026-11-16 — Added 054-mci-mobile-payment entry.
 v3.55 — 2026-11-16 — Added task-058-mci-jiring-fallback entry.
 v3.54 — 2026-11-16 — Added 053-gas-payment entry.
@@ -172,6 +173,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 055: the Rightel mobile bill payment through Parsian only
+- **Type:** Major (a public endpoint behavior, a config key read, seed data, a Critical File).
+- **Files:** `src/entry/grpc/phone_order.go` (`orderOperators` has `rightel`: `midTerm` → `mobilemidtermRightel`; no `fullTerm`, as bill) and its test; `src/core/order/order.go` (the `billTypes` entry `mobilemidtermRightel`), `src/core/order/token.go` (bill's Rightel texts), `src/core/order/rightel_test.go` (new), `complete_test.go`, `water_test.go`; `src/config/config.go` (`providers.internal.parsian.settlement_inquiry_rightel_mobile` read, default 360h; a negative value rejected) and its test; `src/provider/parsianproxy/parsianproxy.go` (`payBillTypes` has `mobilemidtermRightel`) and `pay_test.go`; `src/provider/selector_test.go`; `src/app/defaults.go` (the order TTL `caching.paid_mobile`, the already-paid window and the `PayRoutes` entry of Rightel; the metric help text), `src/app/rightel_order_live_test.go` (new); `src/system/postgres/devdb/seed_providers.sql` (row 500 `enable`); `config.yml.example`; `qabz.postman_collection.json` (Phone / Order Rightel and the variables `rightel_order_billId`, `rightel_order_payId`; the Phone / Order text); `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (item 38), `docs/folder_structure.md`, `src/app/README.md`, `docs/Plans/OPEN_TASKS.md`, `docs/tasks/done_tasks/055_rightel_mobile_payment.md`.
+- **Impact:** **Yes, behavior changes.** (1) `POST /v1/mobile/order` with `operator` `rightel` and `type` `midTerm` saves an order and answers the signed token (was HTTP 501); `fullTerm` is HTTP 400 (bill has no entry; bill answers HTTP 500); no operator answers HTTP 501 now. The order provider is Parsian only (operator decision; bill also has EWays through NATS, which Qabz does not have). The price is the raw inquiry of a numeric `billId` and `payId`, else the Qabzino inquiry of `mobilemidtermRightel` with the phone (the mid term), with saved inquiries for `caching.paid_mobile` (as bill). (2) The "already paid" check of a Rightel order uses `settlement_inquiry_rightel_mobile` (default 360h, bill's example; the example was `0s` and not read). (3) `OrderComplete` pays `mobilemidtermRightel` through Parsian (`inquiry_type` `midterm`); no settlement; the status worker finalizes it. (4) The dev seed row 500 (`parsian`, `mobilemidtermRightel`, `order`) is `enable` (a database seeded before keeps its row).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 055 Rightel payment through Parsian" (Go tests; feature ON with the Parsian and Qabzino mocks and the status worker; the operator QA on stage after the deploy). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 054: the MCI mobile bill payment through Parsian only
 - **Type:** Major (a public endpoint behavior, config keys, seed data, a Critical File).

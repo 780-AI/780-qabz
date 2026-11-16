@@ -65,6 +65,13 @@ var metadata = map[string]Metadata{
 		Icon:           "https://public.780.ir/dl/Operator/logOhamrahaval2.svg",
 		FeeDescription: "کارمزد",
 	},
+	// bill: case entity.MOBILEMIDTERMRIGHTEL: RightelIcon, AboutIconMobileMidterm, FeeDescriptionMobile
+	// (task 055).
+	provider.BillTypeMobileMidTermRightel: {
+		About:          "قبض موبایل",
+		Icon:           "https://public.780.ir/dl/Operator/logOrhightel2.svg",
+		FeeDescription: "کارمزد",
+	},
 	// bill: case entity.TELMIDTERM: TelIcon, AboutIconTelMidterm, FeeDescriptionTel (task 044).
 	provider.BillTypeTelMidterm: {
 		About:          "قبض تلفن ثابت-میان دوره",

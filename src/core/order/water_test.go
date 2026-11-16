@@ -201,7 +201,7 @@ func TestCompleteWaterNoRoute(t *testing.T) {
 // row is failed answers failed with the message of that row (MessageProcessed when it has none),
 // with no row and no provider call, for every bill type.
 func TestCompleteFailedOrderAnswersFailed(t *testing.T) {
-	for _, billType := range []string{provider.BillTypeWater, provider.BillTypeElectricity, provider.BillTypeGas, provider.BillTypeMobile, provider.BillTypeMobileMidterm, provider.BillTypeTel, provider.BillTypeTelMidterm} {
+	for _, billType := range []string{provider.BillTypeWater, provider.BillTypeElectricity, provider.BillTypeGas, provider.BillTypeMobile, provider.BillTypeMobileMidterm, provider.BillTypeMobileMidTermRightel, provider.BillTypeTel, provider.BillTypeTelMidterm} {
 		for message, want := range map[string]string{"mock: the payment failed": "mock: the payment failed", "": MessageProcessed} {
 			f := newWaterPayFixture(t)
 			f.repo.latest.BillType = billType

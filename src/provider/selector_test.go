@@ -90,6 +90,7 @@ func TestSeedOrder(t *testing.T) {
 		{"tel", "inquiry", []int64{40, 124325, 52}, 124325},
 		{"mobile", "order", []int64{48, 30}, 48}, // task 054: row 48 is enable; Parsian (priority 9) before Jiring Switch (10)
 		{"tel", "order", []int64{50, 21}, 0},
+		{"mobilemidtermRightel", "order", []int64{500, 37}, 500}, // task 055: row 500 is enable; Parsian (9) before eways2 (10)
 	} {
 		assert.Equal(t, c.order, ids(s.Group(c.billType, c.action)), c.billType+"/"+c.action)
 		p, err := s.PickProvider(c.billType, c.action)

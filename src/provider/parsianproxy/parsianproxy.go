@@ -2,8 +2,9 @@
 // our own services, over gRPC (TopBill/Inquiry and TopBill/Pay, pb/proto/parsian-v2). The parsian-v2
 // service calls Parsian (TOP); Qabz does not. Inquiry of an MCI mobile bill (the bill type "mobile")
 // and Pay of a landline bill (the bill types tel and telmidterm, task 044), of a water bill (task
-// 048), of an electricity bill (task 052), of a gas bill (task 053) and of an MCI mobile bill (the
-// bill types mobile and mobilemidterm, task 054) are implemented; every
+// 048), of an electricity bill (task 052), of a gas bill (task 053), of an MCI mobile bill (the
+// bill types mobile and mobilemidterm, task 054) and of a Rightel mobile bill (the bill type
+// mobilemidtermRightel, task 055) are implemented; every
 // other method returns provider.ErrNotSupported. The rules copy the old bill
 // service (gateway/inquiry/mobile_mci.go, ParsianMCIMobile, and base.go
 // handlePhoneResponseWithoutInquiry).
@@ -218,28 +219,31 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 // TELMIDTERM; task 048: ParsianWater for WATER, the same fields with the inquiry type regular; task
 // 052: ParsianElectricity for ELECTRICITY, the same fields as ParsianWater; task 053: ParsianGas for
 // GAS, the same fields as ParsianWater; task 054: ParsianMCIMobile for MOBILE and MOBILEMIDTERM, the
-// same fields as ParsianTelephone).
+// same fields as ParsianTelephone; task 055: ParsianRightelMobile for MOBILEMIDTERMRIGHTEL, the same
+// fields as ParsianMCIMobile).
 var payBillTypes = map[string]bool{
 	provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true,
 	provider.BillTypeElectricity: true, provider.BillTypeGas: true,
 	provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true,
+	provider.BillTypeMobileMidTermRightel: true,
 }
 
 // SupportsPay reports whether Pay pays the bill type: tel, telmidterm, water, electricity, gas,
-// mobile and mobilemidterm.
+// mobile, mobilemidterm and mobilemidtermRightel.
 func SupportsPay(billType string) bool { return payBillTypes[billType] }
 
-// Pay pays a landline, a water, an electricity, a gas or an MCI mobile bill through the parsian-v2
-// service (TopBill/Pay; bill: ParsianTelephone.Execute of gateway/payment/telephone.go,
+// Pay pays a landline, a water, an electricity, a gas, an MCI or a Rightel mobile bill through the
+// parsian-v2 service (TopBill/Pay; bill: ParsianTelephone.Execute of gateway/payment/telephone.go,
 // ParsianWater.Execute of gateway/payment/water.go, ParsianElectricity.Execute of
 // gateway/payment/electricity.go, ParsianGas.Execute of gateway/payment/gas.go,
-// ParsianMCIMobile.Execute of gateway/payment/mobile_mci.go). The
+// ParsianMCIMobile.Execute of gateway/payment/mobile_mci.go, ParsianRightelMobile.Execute of
+// gateway/payment/mobile_rightel.go). The
 // request has the fields of bill: provider_order_id is the RRN as an
 // integer, payment_rrn the RRN, amount the base price, inquiry_id the inquiry ID of the order (the
 // landline number; the bill ID or the participate code of a water, an electricity or a gas bill; the
-// phone of an MCI bill), bill_type the order bill type and inquiry_type the inquiry type of the order
-// (regular for water, electricity and gas; final_term or midterm for a landline or an MCI bill, as
-// bill writes it).
+// phone of an MCI or a Rightel bill), bill_type the order bill type and inquiry_type the inquiry type
+// of the order (regular for water, electricity and gas; final_term or midterm for a landline or an
+// MCI bill; midterm for a Rightel bill; as bill writes it).
 //   - An RRN that is not an integer (strconv.Atoi, as bill) is a failed answer (code 400, the
 //     error text as the message) with no call.
 //   - A call that fails (the switch is off, no address, a connection error, a timeout, a nil answer)

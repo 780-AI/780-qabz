@@ -108,7 +108,11 @@ func TestNewOrderRequest(t *testing.T) {
 		{"operator unknown", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_unknown }, codes.InvalidArgument, 0},
 		{"type out of the enum", func(r *pb.NewOrderPhoneRequest) { r.Type = 5 }, codes.InvalidArgument, 0},
 		{"mci (task 054)", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_mci }, codes.OK, 1},
-		{"rightel", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_rightel }, codes.Unimplemented, 0},
+		{"rightel midTerm (task 055)", func(r *pb.NewOrderPhoneRequest) {
+			r.Operator, r.Type = pb.NewOrderPhoneRequest_rightel, pb.NewOrderPhoneRequest_midTerm
+		}, codes.OK, 1},
+		// bill has no fullTerm entry for rightel either (gRPC Unknown there; this_vs_bill.md item 38).
+		{"rightel fullTerm", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_rightel }, codes.InvalidArgument, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			orders := &fakeOrders{o: savedOrder()}
@@ -124,6 +128,22 @@ func TestNewOrderRequest(t *testing.T) {
 	// A nil request is an empty phone.
 	_, err := newOrderPhone(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(waterCtx(), nil)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+// TestNewOrderOperatorNotAvailable: an operator with a nil map in orderOperators is Unimplemented
+// with no call and no log line (no operator has a nil map since task 055; the test sets one).
+func TestNewOrderOperatorNotAvailable(t *testing.T) {
+	old := orderOperators[pb.NewOrderPhoneRequest_rightel]
+	orderOperators[pb.NewOrderPhoneRequest_rightel] = nil
+	t.Cleanup(func() { orderOperators[pb.NewOrderPhoneRequest_rightel] = old })
+	orders := &fakeOrders{o: savedOrder()}
+	log := &errLog{}
+	req := orderReq()
+	req.Operator, req.Type = pb.NewOrderPhoneRequest_rightel, pb.NewOrderPhoneRequest_midTerm
+	_, err := newOrderPhone(orders, &fakeSigner{}, log).NewOrder(waterCtx(), req)
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+	assert.Empty(t, orders.reqs)
+	assert.Empty(t, log.lines)
 }
 
 // TestNewOrderNegativePrice: as bill, the price is converted with uint64 (a negative price is a
@@ -257,5 +277,28 @@ func TestNewOrderMCI(t *testing.T) {
 			assert.Contains(t, string(signer.payloads[0]), `"service":"mci"`, want)
 			assert.Contains(t, string(signer.payloads[0]), `"type":"`+want+`"`, want)
 		}
+	}
+}
+
+// TestNewOrderRightel (task 055): the Rightel operator with midTerm is the bill type
+// mobilemidtermRightel (bill: phoneBillTypeMapper); the phone in the 98 form is the inquiry ID, the
+// option and the token "service" are rightel.
+func TestNewOrderRightel(t *testing.T) {
+	saved := savedOrder()
+	saved.BillType = provider.BillTypeMobileMidTermRightel
+	orders := &fakeOrders{o: saved}
+	signer := &fakeSigner{}
+	req := orderReq()
+	req.Operator, req.Type, req.Phone = pb.NewOrderPhoneRequest_rightel, pb.NewOrderPhoneRequest_midTerm, "09201234567"
+	_, err := newOrderPhone(orders, signer, nil).NewOrder(waterCtx(), req)
+	if !assert.NoError(t, err) || !assert.Len(t, orders.reqs, 1) {
+		return
+	}
+	r := orders.reqs[0]
+	assert.Equal(t, []string{"mobilemidtermRightel", "989201234567", "rightel"}, []string{r.BillType, r.InquiryID, r.Option})
+	if assert.Len(t, signer.payloads, 1) {
+		assert.Contains(t, string(signer.payloads[0]), `"service":"rightel"`)
+		assert.Contains(t, string(signer.payloads[0]), `"type":"mobilemidtermRightel"`)
+		assert.Contains(t, string(signer.payloads[0]), `"aboutIcon":"https://public.780.ir/dl/Operator/logOrhightel2.svg"`)
 	}
 }

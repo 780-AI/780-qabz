@@ -4,6 +4,9 @@
 -- unseed_providers.sql deletes the same ids (a unit test checks it).
 -- Task 054 (operator, 2026-11-16): row 48 (parsian, mobile, order) is 'enable' (was 'disable'), so a
 -- full-term MCI order goes to Parsian. A dev database seeded before keeps its row (ON CONFLICT).
+-- Task 055 (operator, 2026-11-16): row 500 (parsian, mobilemidtermRightel, order) is 'enable' (was
+-- 'disable'), so a Rightel order goes to Parsian (priority 9, before row 37 eways2). A dev database
+-- seeded before keeps its row (ON CONFLICT).
 INSERT INTO providers ("id", "name", "subject", "bill_type", "action", "type", "priority", "timeout", "status", "updated_at", "use_nats") VALUES
 (2, 'tavanir', 'tavanir-inquiry', 'electricity', 'inquiry', 'retryable', 9, 100, 'enable', '2022-05-23T08:03:28.988789+04:30', true),
 (17, 'eways2', 'eways2-bill', 'electricity', 'order', 'retryable', 10, 500, 'disable', '2026-10-13T17:15:37.270428+03:30', true),
@@ -45,7 +48,7 @@ INSERT INTO providers ("id", "name", "subject", "bill_type", "action", "type", "
 (55, 'tavanir', 'tavanir-inquiry', 'electricitybillfile', 'inquiry', 'retryable', 9, 100, 'enable', '2022-05-23T08:03:28.988789+04:30', true),
 (99, 'gas-company', 'gas-company-inquiry', 'gas', 'inquiry', 'retryable', 4, 100, 'disable', '2026-10-11T16:54:04.730445+03:30', false),
 (149, 'parsian', 'parsian-bill-payment', 'mobilemidterm', 'order', 'retryable', 9, 100, 'enable', '2026-10-26T19:46:20.796405+03:30', false),
-(500, 'parsian', 'parsian-bill-payment', 'mobilemidtermRightel', 'order', 'retryable', 9, 100, 'disable', '2022-05-28T14:36:32.109064+04:30', false),
+(500, 'parsian', 'parsian-bill-payment', 'mobilemidtermRightel', 'order', 'retryable', 9, 100, 'enable', '2022-05-28T14:36:32.109064+04:30', false),
 (600, 'eways2', 'eways2-bill', 'telmidterm', 'order', 'retryable', 10, 500, 'disable', '2026-10-24T12:08:31.649964+03:30', true),
 (601, 'parsian', 'parsian-bill-payment', 'raw', 'order', 'retryable', 10, 500, 'disable', '2022-03-10T12:42:16.895653+03:30', true),
 (123456, 'karashop', 'karashop-inquiry', 'telmidterm', 'inquiry', NULL, 1, 500, 'enable', '2026-04-13T12:23:25.147376+03:30', false),

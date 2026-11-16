@@ -113,6 +113,14 @@
       "value": "45000080"
     },
     {
+      "key": "rightel_order_billId",
+      "value": "1234567892055"
+    },
+    {
+      "key": "rightel_order_payId",
+      "value": "23000870"
+    },
+    {
       "key": "rightel_mobile_billId",
       "value": "",
       "type": "string",
@@ -853,7 +861,7 @@
                 "order"
               ]
             },
-            "description": "haf80.api.bill.Phone/NewOrder (task 039: the Irancell operator). Saves an order of a mobile bill and answers the signed order token. The request and the answer are those of bill (NewOrderPhoneRequest, NewOrderResponse), unchanged. The steps are those of bill: (1) the phone is converted to the 98 form (as the inquiry, task 038) and checked: a mobile number; operator and paymentType values of the enum. (2) operator irancell gives the bill type irancell for type midTerm and fullTerm; operator mci gives mobile (fullTerm) or mobilemidterm (midTerm), see Order MCI (task 054); rightel is HTTP 501 (not available yet); unknown is HTTP 400. (3) the order provider of (irancell, order) (providers row 26 in the dev seed) is picked with ProvidersService; none enabled: HTTP 503. (4) the price, by the first rule that applies: a price that is not 0 and no payId: that price, the pay ID is the text irancell, no inquiry; a numeric billId and payId: the raw inquiry (the amount of the pay ID); else the Irancell inquiry (always a provider call, no saved inquiry; with the mock: final term 450000), whose final-term inquiry is the price also for midTerm (as bill). A price of 0: HTTP 400 with bill's text. (5) the fee from the fees table (the row of the user and the provider, else of the user, else of the provider; no row: 9000; the dev seed row 900001: 9000 fixed for provider 26); a fee row with a bad config gives 0 and the order goes on. (6) the total = price + fee; above 4294967295: HTTP 400. (7) one orders row with the status initial. (8) the token: a JWT signed RS256 with the key at providers.internal.payment_server.private_key_path (header kid = service.name, typ JWT); payload serviceId, orderId, provider, price, userId and data (type, phone, service, billId, payId, payAmount, rawAmount, about, aboutIcon, receiptMobile, invoiceMobile; feeAmount and feeDescription when the fee is above 0). Answer: serviceId (service.id), orderId = the token, price = the total. Expected with the dev seed and price 450000: HTTP 200, price 459000. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. After a 200 answer, the test script of this request saves orderId (the token) and price in the collection variables order_token and order_price, for the request Payment (external) / Invoice."
+            "description": "haf80.api.bill.Phone/NewOrder (task 039: the Irancell operator). Saves an order of a mobile bill and answers the signed order token. The request and the answer are those of bill (NewOrderPhoneRequest, NewOrderResponse), unchanged. The steps are those of bill: (1) the phone is converted to the 98 form (as the inquiry, task 038) and checked: a mobile number; operator and paymentType values of the enum. (2) operator irancell gives the bill type irancell for type midTerm and fullTerm; operator mci gives mobile (fullTerm) or mobilemidterm (midTerm), see Order MCI (task 054); operator rightel gives mobilemidtermRightel (midTerm only; fullTerm is HTTP 400), see Order Rightel (task 055); unknown is HTTP 400. (3) the order provider of (irancell, order) (providers row 26 in the dev seed) is picked with ProvidersService; none enabled: HTTP 503. (4) the price, by the first rule that applies: a price that is not 0 and no payId: that price, the pay ID is the text irancell, no inquiry; a numeric billId and payId: the raw inquiry (the amount of the pay ID); else the Irancell inquiry (always a provider call, no saved inquiry; with the mock: final term 450000), whose final-term inquiry is the price also for midTerm (as bill). A price of 0: HTTP 400 with bill's text. (5) the fee from the fees table (the row of the user and the provider, else of the user, else of the provider; no row: 9000; the dev seed row 900001: 9000 fixed for provider 26); a fee row with a bad config gives 0 and the order goes on. (6) the total = price + fee; above 4294967295: HTTP 400. (7) one orders row with the status initial. (8) the token: a JWT signed RS256 with the key at providers.internal.payment_server.private_key_path (header kid = service.name, typ JWT); payload serviceId, orderId, provider, price, userId and data (type, phone, service, billId, payId, payAmount, rawAmount, about, aboutIcon, receiptMobile, invoiceMobile; feeAmount and feeDescription when the fee is above 0). Answer: serviceId (service.id), orderId = the token, price = the total. Expected with the dev seed and price 450000: HTTP 200, price 459000. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. After a 200 answer, the test script of this request saves orderId (the token) and price in the collection variables order_token and order_price, for the request Payment (external) / Invoice."
           },
           "event": [
             {
@@ -903,6 +911,62 @@
               ]
             },
             "description": "haf80.api.bill.Phone/NewOrder with the operator mci (task 054: the MCI bill, paid through Parsian only). The request and the answer are those of bill (NewOrderPhoneRequest, NewOrderResponse), unchanged; price is not read for mci. The steps are those of bill: (1) the phone is converted to the 98 form and checked (a mobile number; operator and paymentType values of the enum): else HTTP 400. (2) type fullTerm gives the bill type mobile (final term), midTerm gives mobilemidterm (mid term). (3) the order provider of (bill type, order) is picked with ProvidersService: Parsian (dev seed row 48 for mobile, enable since task 054; row 149 for mobilemidterm); none enabled: HTTP 503. An enabled Jiring Switch row that the pick takes (the Parsian row off) has no payment route until task 058: the payment is saved failed. (4) bill already paid: a pending or success order of the billId and payId of the request at any time (providers.internal.parsian.settlement_inquiry_mci_mobile, default 0 = no time limit, as bill): HTTP 400 with bill's text; the check does not look at the term. (5) the price: a numeric billId and payId give the raw inquiry (the amount of the pay ID, no provider call); else the inquiry of mobile with the phone (dev seed: Parsian row 39), whose final-term (fullTerm) or mid-term (midTerm) inquiry is the price; saved inquiries for caching.paid_mobile (default 1h) only for fullTerm. A price of 0: HTTP 400 with bill's text. (6) no provider fee; the fee (fees table; no row: 9000). (7) one orders row with the status initial and option mci. (8) the token (RS256): payload serviceId, orderId, provider, price, userId and data (type, phone, service = mci, billId, payId, payAmount, rawAmount, about, aboutIcon, receiptMobile, invoiceMobile; feeAmount and feeDescription when the fee is above 0). Expected with the dev seed and the default variables (mci_order_payId 45000080: 450 000 rials): HTTP 200, price 459000. With empty billId and payId the price comes from the Parsian inquiry. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. The payment step (PaymentComplete/OrderComplete) is gRPC only, on the internal server server.internal_grpc.addr. After a 200 answer, the test script saves orderId and price in order_token and order_price, for Payment (external) / Invoice."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('answer has serviceId, orderId and price', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.orderId).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.price).to.be.above(0);",
+                  "    pm.expect(body).to.have.property('serviceId');",
+                  "});",
+                  "// Saves the order token and the total of the answer for Payment (external) / Invoice.",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('order_token', body.orderId);",
+                  "    pm.collectionVariables.set('order_price', String(body.price));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Order Rightel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{rightel_mobile_phone}}\",\n  \"operator\": \"rightel\",\n  \"type\": \"midTerm\",\n  \"paymentType\": \"direct\",\n  \"billId\": \"{{rightel_order_billId}}\",\n  \"payId\": \"{{rightel_order_payId}}\",\n  \"price\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/v1/mobile/order",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "v1",
+                "mobile",
+                "order"
+              ]
+            },
+            "description": "haf80.api.bill.Phone/NewOrder with the operator rightel (task 055: the Rightel bill, paid through Parsian only). The request and the answer are those of bill (NewOrderPhoneRequest, NewOrderResponse), unchanged; price is not read for rightel. The steps are those of bill: (1) the phone is converted to the 98 form and checked (a mobile number; operator and paymentType values of the enum): else HTTP 400. (2) type midTerm gives the bill type mobilemidtermRightel (mid term); fullTerm is HTTP 400 (bill has no entry; bill answers HTTP 500). (3) the order provider of (mobilemidtermRightel, order) is picked with ProvidersService: Parsian (dev seed row 500, enable since task 055); none enabled: HTTP 503. An enabled eways2 row that the pick takes (row 37, when the Parsian row is off) has no payment route: the payment is saved failed. (4) bill already paid: a pending or success order of the billId and payId of the request in the last 360 hours (providers.internal.parsian.settlement_inquiry_rightel_mobile, default 360h, as bill): HTTP 400 with bill's text. (5) the price: a numeric billId and payId give the raw inquiry (the amount of the pay ID, no provider call); else the inquiry of mobilemidtermRightel with the phone (only Qabzino; with the mock: mid term 230000), whose mid-term inquiry is the price; saved inquiries for caching.paid_mobile (default 1h). A price of 0: HTTP 400 with bill's text. (6) no provider fee; the fee (fees table; no row: 9000). (7) one orders row with the status initial and option rightel. (8) the token (RS256): payload serviceId, orderId, provider, price, userId and data (type, phone, service = rightel, billId, payId, payAmount, rawAmount, about, aboutIcon, receiptMobile, invoiceMobile; feeAmount and feeDescription when the fee is above 0). Expected with the dev seed and the default variables (rightel_order_payId 23000870: 230 000 rials): HTTP 200, price 239000. With empty billId and payId the price comes from the Qabzino inquiry. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. The payment step (PaymentComplete/OrderComplete) is gRPC only, on the internal server server.internal_grpc.addr. After a 200 answer, the test script saves orderId and price in order_token and order_price, for Payment (external) / Invoice."
           },
           "event": [
             {

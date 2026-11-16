@@ -288,7 +288,11 @@ type Config struct {
 	// MCI order (mobile, mobilemidterm) paid through Parsian (bill: shouldSkipNewOrder,
 	// parsian.settlementInquiryMCIMobile). Default 0 (bill's example). As bill, 0 is not "no check":
 	// the check looks at the orders of any time. A negative value is rejected.
-	ParsianSettlementInquiryMCIMobile     time.Duration `path:"providers.internal.parsian.settlement_inquiry_mci_mobile"`
+	ParsianSettlementInquiryMCIMobile time.Duration `path:"providers.internal.parsian.settlement_inquiry_mci_mobile"`
+	// ParsianSettlementInquiryRightelMobile is read since task 055: the "bill already paid" check of
+	// a Rightel order (mobilemidtermRightel) paid through Parsian (bill: shouldSkipNewOrder,
+	// parsian.settlementInquiryRightelMobile). Default 360h (bill's example). 0: no window (the
+	// orders of any time); a negative value is rejected.
 	ParsianSettlementInquiryRightelMobile time.Duration `path:"providers.internal.parsian.settlement_inquiry_rightel_mobile"`
 
 	// The config of the payment service (task 041; bill: paymentServer.host, paymentServer.port,
@@ -369,8 +373,9 @@ type Config struct {
 	// CachingPaidMobile is how long a saved MCI mobile inquiry gives the price of a full-term MCI
 	// order (the bill type mobile, task 054) with no provider call (bill: caching.paidMobile, 1h). It
 	// applies only when the raw inquiry of the order fails. A mid-term order (mobilemidterm) never
-	// uses saved inquiries (bill has no TTL for it). 0: every such order asks the provider; a negative
-	// value is rejected. Read at start.
+	// uses saved inquiries (bill has no TTL for it). Since task 055 it is also the TTL of a Rightel
+	// order (mobilemidtermRightel; bill: caching.paidMobile for MOBILEMIDTERMRIGHTEL). 0: every such
+	// order asks the provider; a negative value is rejected. Read at start.
 	CachingPaidMobile time.Duration `path:"caching.paid_mobile"`
 
 	// DebugMockQabzinoEnabled makes the Qabzino adapter answer with a fixed answer, with no call to
@@ -560,6 +565,9 @@ func defaults() Config {
 		DebugMockKarashopReturnType:       MockReturnSuccess,
 		DebugMockKarashopSettleReturnType: MockReturnSuccess,
 		DebugCacheInquiries:               true,
+
+		// Task 055: bill's example value.
+		ParsianSettlementInquiryRightelMobile: 360 * time.Hour,
 	}
 }
 
@@ -734,6 +742,9 @@ func (c Config) validate() error {
 	}
 	if c.CachingPaidMobile < 0 {
 		errs = append(errs, errors.New("caching.paid_mobile must not be negative (0: every order asks the provider)"))
+	}
+	if c.ParsianSettlementInquiryRightelMobile < 0 {
+		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_rightel_mobile must not be negative (0: no window)"))
 	}
 	if c.ParsianSettlementInquiryMCIMobile < 0 {
 		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_mci_mobile must not be negative (0: the orders of any time)"))

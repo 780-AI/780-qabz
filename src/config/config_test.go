@@ -734,7 +734,6 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 		c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
 		c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder,
 		c.ParsianSettlementInquiryMCIMobile, // task 054: read, bill's default 0
-		c.ParsianSettlementInquiryRightelMobile,
 	} {
 		assert.Zero(t, d)
 	}
@@ -742,6 +741,7 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryWater, "task 048: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryElectricity, "task 052: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryGas, "task 053: bill's default")
+	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryRightelMobile, "task 055: bill's default")
 	assert.Zero(t, c.JiringSwitchGetStatusChunk)
 	assert.False(t, c.JiringSwitchGetStatusIsLockable)
 	// Task 045: the defaults of the Parsian status worker.
@@ -990,6 +990,31 @@ func TestParseMCIOrderKeys(t *testing.T) {
 		_, err := Parse([]byte(base + yml))
 		assert.ErrorContains(t, err, want, yml)
 	}
+}
+
+// TestParseRightelOrderKeys (task 055): the "bill already paid" window of a Rightel order paid
+// through Parsian is read, default 360h (bill's example); a negative value is rejected. The saved
+// inquiries of a Rightel order use caching.paid_mobile (TestParseMCIOrderKeys).
+func TestParseRightelOrderKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryRightelMobile, "bill: parsian.settlementInquiryRightelMobile 360h")
+
+	for yml, want := range map[string]time.Duration{
+		"providers: {internal: {parsian: {settlement_inquiry_rightel_mobile: \"24h\"}}}\n": 24 * time.Hour,
+		"providers: {internal: {parsian: {settlement_inquiry_rightel_mobile: \"0s\"}}}\n":  0,
+	} {
+		c, err = Parse([]byte(base + yml))
+		if assert.NoError(t, err, yml) {
+			assert.Equal(t, want, c.ParsianSettlementInquiryRightelMobile, yml)
+		}
+	}
+
+	_, err = Parse([]byte(base + "providers: {internal: {parsian: {settlement_inquiry_rightel_mobile: \"-1h\"}}}\n"))
+	assert.ErrorContains(t, err, "settlement_inquiry_rightel_mobile must not be negative")
 }
 
 func TestValidMockPayReturnType(t *testing.T) {
