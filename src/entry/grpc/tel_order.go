@@ -31,7 +31,7 @@ func validTelOrder(req *pb.NewOrderTelRequest) bool {
 	return ok
 }
 
-// NewOrderV2 makes a landline order (POST /v2/tel/order, task 044; bill: controller/telephone
+// NewOrder makes a landline order (POST /v1/tel/order, task 044; bill: controller/telephone
 // NewOrderV2). The steps of bill:
 //   - The phone is converted to the 98 form (helpers.NormalizePhone, bill's NormalizePhoneNumber).
 //   - The request check is validTelOrder: InvalidArgument (HTTP 400), no log line.
@@ -43,9 +43,9 @@ func validTelOrder(req *pb.NewOrderTelRequest) bool {
 //     orders row with the status initial. The inquiry ID is the converted phone.
 //   - The token: the payload of bill with TelData, signed by the signer.
 //
-// The answers of each failure are those of POST /v2/mobile/order (answerOrderError); a bill that is
+// The answers of each failure are those of POST /v1/mobile/order (answerOrderError); a bill that is
 // paid already is FailedPrecondition with bill's text.
-func (t *Tel) NewOrderV2(ctx context.Context, req *pb.NewOrderTelRequest) (*pb.NewOrderResponse, error) {
+func (t *Tel) NewOrder(ctx context.Context, req *pb.NewOrderTelRequest) (*pb.NewOrderResponse, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -53,7 +53,7 @@ func (t *Tel) NewOrderV2(ctx context.Context, req *pb.NewOrderTelRequest) (*pb.N
 		return nil, status.FromContextError(err).Err()
 	}
 	if t.orders == nil || t.signer == nil {
-		return nil, status.Error(codes.Unimplemented, "method NewOrderV2 not available")
+		return nil, status.Error(codes.Unimplemented, "method NewOrder not available")
 	}
 	claims, ok := auth.ClaimsFrom(ctx)
 	if !ok || claims.UserID == "" {

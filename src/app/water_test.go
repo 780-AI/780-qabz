@@ -178,6 +178,6 @@ func TestDefaultBuilderServesWater(t *testing.T) {
 	c := pb.NewWaterClient(conn)
 	_, err = c.Inquiry(ctx, &pb.InquiryBillPayRequest{BillId: "1234567890125"})
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
-	_, err = c.NewOrder(ctx, &pb.NewOrderBillPayRequest{}) // positive control: a method that is not written yet
+	_, err = c.CompleteOrder(ctx, &pb.CompleteOrderRequest{}) // positive control: a method that is not written yet
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }

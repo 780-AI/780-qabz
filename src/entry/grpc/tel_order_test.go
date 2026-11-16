@@ -34,15 +34,15 @@ func newOrderTel(o *fakeOrders, s *fakeSigner, log *errLog) *Tel {
 	return NewTel(deps)
 }
 
-// TestTelNewOrderV2 (task 044): the order request of bill (the phone in the 98 form as the inquiry
+// TestTelNewOrder (task 044): the order request of bill (the phone in the 98 form as the inquiry
 // ID, the type midTerm as telmidterm, the IDs of the request, the user and the dialer), the token
 // payload with TelData, and the answer.
-func TestTelNewOrderV2(t *testing.T) {
+func TestTelNewOrder(t *testing.T) {
 	orders := &fakeOrders{o: savedTelOrder()}
 	signer := &fakeSigner{}
 	req := telOrderReq()
 	req.BillId, req.PayId = "2101234560040", "12000035"
-	res, err := newOrderTel(orders, signer, nil).NewOrderV2(waterCtx(), req)
+	res, err := newOrderTel(orders, signer, nil).NewOrder(waterCtx(), req)
 	if !assert.NoError(t, err) || !assert.NotNil(t, res) {
 		return
 	}
@@ -63,14 +63,14 @@ func TestTelNewOrderV2(t *testing.T) {
 	orders = &fakeOrders{o: savedTelOrder()}
 	req = telOrderReq()
 	req.Type = pb.NewOrderTelRequest_fullTerm
-	_, err = newOrderTel(orders, &fakeSigner{}, nil).NewOrderV2(waterCtx(), req)
+	_, err = newOrderTel(orders, &fakeSigner{}, nil).NewOrder(waterCtx(), req)
 	assert.NoError(t, err)
 	assert.Equal(t, provider.BillTypeTel, orders.reqs[0].BillType)
 }
 
-// TestTelNewOrderV2Request: bill's request check (billId or phone; paymentType of the PaymentTerms
+// TestTelNewOrderRequest: bill's request check (billId or phone; paymentType of the PaymentTerms
 // names, so 0 and 1); an unknown type is invalid. No order call; no log line.
-func TestTelNewOrderV2Request(t *testing.T) {
+func TestTelNewOrderRequest(t *testing.T) {
 	for name, mod := range map[string]func(r *pb.NewOrderTelRequest){
 		"no phone no billId": func(r *pb.NewOrderTelRequest) { r.Phone = "" },
 		"paymentType 2":      func(r *pb.NewOrderTelRequest) { r.PaymentType = 2 },
@@ -79,26 +79,26 @@ func TestTelNewOrderV2Request(t *testing.T) {
 		orders, log := &fakeOrders{o: savedTelOrder()}, &errLog{}
 		r := telOrderReq()
 		mod(r)
-		_, err := newOrderTel(orders, &fakeSigner{}, log).NewOrderV2(waterCtx(), r)
+		_, err := newOrderTel(orders, &fakeSigner{}, log).NewOrder(waterCtx(), r)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err), name)
 		assert.Empty(t, orders.reqs, name)
 		assert.Empty(t, log.lines, name)
 	}
-	_, err := newOrderTel(&fakeOrders{}, &fakeSigner{}, nil).NewOrderV2(waterCtx(), nil)
+	_, err := newOrderTel(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(waterCtx(), nil)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 
 	// Only billId passes the check (bill), with an empty inquiry ID.
 	orders := &fakeOrders{o: savedTelOrder()}
 	r := telOrderReq()
 	r.Phone, r.BillId = "", "2101234560040"
-	_, err = newOrderTel(orders, &fakeSigner{}, nil).NewOrderV2(waterCtx(), r)
+	_, err = newOrderTel(orders, &fakeSigner{}, nil).NewOrder(waterCtx(), r)
 	assert.NoError(t, err)
 	assert.Empty(t, orders.reqs[0].InquiryID)
 }
 
-// TestTelNewOrderV2Failures: the answers of the order errors; a bill that is paid already is
+// TestTelNewOrderFailures: the answers of the order errors; a bill that is paid already is
 // FailedPrecondition with bill's text, no log line.
-func TestTelNewOrderV2Failures(t *testing.T) {
+func TestTelNewOrderFailures(t *testing.T) {
 	cases := []struct {
 		err   error
 		code  codes.Code
@@ -115,22 +115,22 @@ func TestTelNewOrderV2Failures(t *testing.T) {
 	}
 	for _, c := range cases {
 		log := &errLog{}
-		_, err := newOrderTel(&fakeOrders{err: c.err}, &fakeSigner{}, log).NewOrderV2(waterCtx(), telOrderReq())
+		_, err := newOrderTel(&fakeOrders{err: c.err}, &fakeSigner{}, log).NewOrder(waterCtx(), telOrderReq())
 		assert.Equal(t, c.code, status.Code(err), c.err.Error())
 		assert.Len(t, log.lines, c.lines, c.err.Error())
 	}
-	_, err := newOrderTel(&fakeOrders{err: order.ErrAlreadyPaid}, &fakeSigner{}, nil).NewOrderV2(waterCtx(), telOrderReq())
+	_, err := newOrderTel(&fakeOrders{err: order.ErrAlreadyPaid}, &fakeSigner{}, nil).NewOrder(waterCtx(), telOrderReq())
 	assert.Equal(t, alreadyPaidText, status.Convert(err).Message())
 
 	log := &errLog{}
-	_, err = newOrderTel(&fakeOrders{o: savedTelOrder()}, &fakeSigner{err: errors.New("no key")}, log).NewOrderV2(waterCtx(), telOrderReq())
+	_, err = newOrderTel(&fakeOrders{o: savedTelOrder()}, &fakeSigner{err: errors.New("no key")}, log).NewOrder(waterCtx(), telOrderReq())
 	assert.Equal(t, codes.Internal, status.Code(err))
 	assert.Equal(t, []string{"telmidterm: order token failed"}, log.lines)
 
-	_, err = newOrderTel(&fakeOrders{}, &fakeSigner{}, nil).NewOrderV2(context.Background(), telOrderReq())
+	_, err = newOrderTel(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(context.Background(), telOrderReq())
 	assert.Equal(t, codes.PermissionDenied, status.Code(err), "no user")
 	ctx, cancel := context.WithCancel(waterCtx())
 	cancel()
-	_, err = newOrderTel(&fakeOrders{}, &fakeSigner{}, nil).NewOrderV2(ctx, telOrderReq())
+	_, err = newOrderTel(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(ctx, telOrderReq())
 	assert.Equal(t, codes.Canceled, status.Code(err))
 }

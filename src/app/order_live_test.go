@@ -24,7 +24,7 @@ func (s *liveWaterStack) order(user string, req *pb.NewOrderPhoneRequest) (*pb.N
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: user, Mobile: "989121234567"})
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	return s.phone.NewOrderV2(ctx, req)
+	return s.phone.NewOrder(ctx, req)
 }
 
 func irancellOrderReq(phone string, price int64) *pb.NewOrderPhoneRequest {

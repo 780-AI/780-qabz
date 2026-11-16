@@ -653,9 +653,9 @@ var (
 )
 
 // newWater builds the gRPC Water service: POST /v1/water/inquiry (task 021) on the inquiry flow and
-// POST /v2/water/order (task 048) on the order flow, with the token signed by signer. A server fault
+// POST /v1/water/order (task 048) on the order flow, with the token signed by signer. A server fault
 // writes one error log line (grpcserver.Water). A nil flow gives a service whose Inquiry answers
-// Unimplemented; a nil orders or signer gives a service whose NewOrderV2 answers Unimplemented.
+// Unimplemented; a nil orders or signer gives a service whose NewOrder answers Unimplemented.
 func newWater(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Water {
 	deps := grpcserver.WaterDeps{ServiceID: serviceID}
 	if flow != nil {
@@ -674,10 +674,10 @@ func newWater(flow *inquiry.Service, orders *order.Service, signer *crypto.Signe
 }
 
 // newElectricity builds the gRPC Electricity service: POST /v1/electricity/inquiry (task 022) on
-// the same inquiry flow as Water and POST /v2/electricity/order (task 052) on the order flow, with
+// the same inquiry flow as Water and POST /v1/electricity/order (task 052) on the order flow, with
 // the token signed by signer. A server fault writes one error log line (grpcserver.Electricity). A
 // nil flow gives a service whose Inquiry answers Unimplemented; a nil orders or signer gives a
-// service whose NewOrderV2 answers Unimplemented.
+// service whose NewOrder answers Unimplemented.
 func newElectricity(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Electricity {
 	deps := grpcserver.ElectricityDeps{ServiceID: serviceID}
 	if flow != nil {
@@ -711,10 +711,10 @@ func newGas(flow *inquiry.Service, logger Logger) *grpcserver.Gas {
 }
 
 // newPhone builds the gRPC Phone service: POST /v1/mobile/inquiry (task 035: the Irancell operator; task 036: the MCI operator)
-// on the same inquiry flow as Water, and POST /v2/mobile/order (task 039: the Irancell operator) on
+// on the same inquiry flow as Water, and POST /v1/mobile/order (task 039: the Irancell operator) on
 // the order flow, with the order token signed by signer and serviceId = service.id. A server fault
 // writes one error log line (grpcserver.Phone). A nil flow gives a service whose Inquiry answers
-// Unimplemented; a nil orders or signer gives a service whose NewOrderV2 answers Unimplemented.
+// Unimplemented; a nil orders or signer gives a service whose NewOrder answers Unimplemented.
 func newPhone(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Phone {
 	deps := grpcserver.PhoneDeps{ServiceID: serviceID}
 	if flow != nil {
@@ -754,7 +754,7 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 	if reg := metrics.Registry(); reg != nil {
 		orders := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_order_create_total",
-			Help: "New orders (POST /v2/mobile/order, POST /v2/tel/order, POST /v2/water/order, POST /v2/electricity/order) by bill type (irancell, tel, telmidterm, water, electricity), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; already_paid: the bill ID and pay ID have a pending or successful order; error).",
+			Help: "New orders (POST /v1/mobile/order, POST /v1/tel/order, POST /v1/water/order, POST /v1/electricity/order) by bill type (irancell, tel, telmidterm, water, electricity), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; already_paid: the bill ID and pay ID have a pending or successful order; error).",
 		}, []string{"bill_type", "provider", "result"})
 		fees := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_fee_resolve_total",
@@ -889,9 +889,9 @@ func settleRoutes() map[string]map[string]string {
 
 // newTel builds the gRPC Tel service: POST /v1/tel/inquiry (task 025, the landline bill) on the same
 // inquiry flow as Water; the flow also answers the raw inquiry (a request with billId and payId).
-// POST /v2/tel/order (task 044) on the order flow, with the token signed by signer. A server fault
+// POST /v1/tel/order (task 044) on the order flow, with the token signed by signer. A server fault
 // writes one error log line (grpcserver.Tel). A nil flow gives a service whose Inquiry answers
-// Unimplemented; a nil orders or signer gives a service whose NewOrderV2 answers Unimplemented.
+// Unimplemented; a nil orders or signer gives a service whose NewOrder answers Unimplemented.
 func newTel(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Tel {
 	deps := grpcserver.TelDeps{ServiceID: serviceID}
 	if flow != nil {

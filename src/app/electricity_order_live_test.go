@@ -31,7 +31,7 @@ func (s *liveWaterStack) electricityOrder(t *testing.T, billID, payID string) (*
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: liveUserOne, Mobile: "989121234567"})
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	return s.electricity.NewOrderV2(ctx, &pb.NewOrderBillPayRequest{BillId: billID, PayId: payID, PaymentType: pb.NewOrderBillPayRequest_direct})
+	return s.electricity.NewOrder(ctx, &pb.NewOrderBillPayRequest{BillId: billID, PayId: payID, PaymentType: pb.NewOrderBillPayRequest_direct})
 }
 
 // TestLiveElectricityOrderAndPayment is the feature-ON integration test of task 052: an electricity

@@ -15,23 +15,23 @@ import (
 	"qabz/provider"
 )
 
-// ElectricityDeps are the dependencies of Electricity. A zero value is valid: Inquiry and NewOrderV2
+// ElectricityDeps are the dependencies of Electricity. A zero value is valid: Inquiry and NewOrder
 // then answer codes.Unimplemented.
 type ElectricityDeps struct {
 	// Inquiry runs the flow (the same inquiry.Service as Water). Nil: Inquiry is not available.
 	Inquiry Inquirer
 	// Logger gets one error line for each server fault. Nil: no log line.
 	Logger ErrorLogger
-	// Orders saves an order (order.Service; task 052). Nil: NewOrderV2 is not available.
+	// Orders saves an order (order.Service; task 052). Nil: NewOrder is not available.
 	Orders OrderCreator
-	// Signer signs the order token (crypto.Signer). Nil: NewOrderV2 is not available.
+	// Signer signs the order token (crypto.Signer). Nil: NewOrder is not available.
 	Signer TokenSigner
 	// ServiceID is serviceId of the order answer and of the token (config service.id).
 	ServiceID uint32
 }
 
 // Electricity implements the gRPC service haf80.api.bill.Electricity. Methods that are not written
-// yet (InquiryDocument, NewOrder, CompleteOrder) return codes.Unimplemented through the embedded type.
+// yet (InquiryDocument, CompleteOrder) return codes.Unimplemented through the embedded type.
 type Electricity struct {
 	pb.UnimplementedElectricityServer // embedded by value, as protoc-gen-go-grpc requires
 

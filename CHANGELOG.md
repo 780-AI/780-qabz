@@ -1,7 +1,8 @@
-<!-- VERSION: 3.52 -->
+<!-- VERSION: 3.53 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.53 — 2026-11-16 — Added 057-no-v2-routes entry.
 v3.52 — 2026-11-16 — Added 052-electricity-payment entry.
 v3.51 — 2026-11-16 — Added payment-tasks-052-to-056 entry.
 v3.50 — 2026-11-16 — Added workers-follow-their-switch entry.
@@ -168,6 +169,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 057: every HTTP route is /v1 (no /v2)
+- **Type:** Major (public API: routes and rpc names; the `pb/proto/qabz/` proto; a new conventions section).
+- **Files:** `pb/proto/qabz/services.proto` (in the `pb` submodule: the V1 `NewOrder` rpc of the seven services is removed, `NewOrderV2` is renamed `NewOrder` with the `/v1` route), `src/entry/grpc/{phone,tel,water,electricity}.go`, `phone_order.go`, `tel_order.go`, `water_order.go`, `electricity_order.go`, `utility_order.go` (`NewOrderV2` → `NewOrder`, `newOrderV2` → `newOrder`), the tests of those files, `src/app/{defaults.go,README.md}` and the app tests (comments, names, and the positive controls now use `CompleteOrder`), `qabz.postman_collection.json` (the items "Order V2" are "Order", on `/v1`), `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (new § 18), `docs/this_vs_bill.md` (item 48), `docs/initial-discovery/system.html`, `docs/folder_structure.md`, `docs/Plans/OPEN_TASKS.md`, the pending tasks 053 to 056, `docs/tasks/done_tasks/057_no_v2_routes.md` (new), `docs/tasks/pending_tasks/task_counter.json` (058).
+- **Impact:** **Yes, the public routes change.** `POST /v2/{mobile,tel,water,electricity}/order` no longer exist (HTTP 404); the same behavior and the same token are on `POST /v1/{mobile,tel,water,electricity}/order`. The old V1 order methods, which answered `Unimplemented`, are gone, so no client loses a working call. A client that called a `/v2` route must call `/v1`. The `pb` commit must be pushed before the new pointer of `pb` is pushed. History (change logs, earlier entries, done tasks) keeps the routes of its time.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 057 no `/v2` routes" (the generated gateway and the tests: done by the implementer; Postman: operator).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 052: the electricity bill payment through Parsian
 - **Type:** Major (a new endpoint, config keys, a Critical File).

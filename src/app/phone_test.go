@@ -139,14 +139,14 @@ func TestProviderRegistryIrancellRealCall(t *testing.T) {
 }
 
 // TestNewPhoneWithoutFlow: no flow, no order flow and no signer give a service whose Inquiry and
-// NewOrderV2 are not available (no typed nil in the interface).
+// NewOrder are not available (no typed nil in the interface).
 func TestNewPhoneWithoutFlow(t *testing.T) {
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"})
 	svc := newPhone(nil, nil, nil, 0, nil)
 	if assert.NotNil(t, svc) {
 		_, err := svc.Inquiry(ctx, &pb.InquiryPhoneRequest{Phone: "989351234567", Operator: pb.InquiryPhoneRequest_irancell})
 		assert.Equal(t, codes.Unimplemented, status.Code(err))
-		_, err = svc.NewOrderV2(ctx, &pb.NewOrderPhoneRequest{Phone: "989351234567", Operator: pb.NewOrderPhoneRequest_irancell})
+		_, err = svc.NewOrder(ctx, &pb.NewOrderPhoneRequest{Phone: "989351234567", Operator: pb.NewOrderPhoneRequest_irancell})
 		assert.Equal(t, codes.Unimplemented, status.Code(err))
 	}
 }
@@ -202,8 +202,8 @@ func TestDefaultBuilderServesPhone(t *testing.T) {
 	c := pb.NewPhoneClient(conn)
 	_, err = c.Inquiry(ctx, &pb.InquiryPhoneRequest{Phone: "989351234567", Operator: pb.InquiryPhoneRequest_irancell})
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
-	_, err = c.NewOrderV2(ctx, &pb.NewOrderPhoneRequest{Phone: "989351234567", Operator: pb.NewOrderPhoneRequest_irancell})
-	assert.Equal(t, codes.PermissionDenied, status.Code(err), "NewOrderV2 is served")
-	_, err = c.NewOrder(ctx, &pb.NewOrderPhoneRequest{}) // positive control: a method that is not written yet
+	_, err = c.NewOrder(ctx, &pb.NewOrderPhoneRequest{Phone: "989351234567", Operator: pb.NewOrderPhoneRequest_irancell})
+	assert.Equal(t, codes.PermissionDenied, status.Code(err), "NewOrder is served")
+	_, err = c.CompleteOrder(ctx, &pb.CompleteOrderRequest{}) // positive control: a method that is not written yet
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }

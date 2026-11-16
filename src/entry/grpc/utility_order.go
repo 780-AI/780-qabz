@@ -20,7 +20,7 @@ func orderInquiryID(req *pb.NewOrderBillPayRequest) string {
 	return req.GetBillId()
 }
 
-// utilityOrder is what NewOrderV2 of a water and an electricity bill needs (bill: both are
+// utilityOrder is what NewOrder of a water and an electricity bill needs (bill: both are
 // controller.CreateNewOrder and the same token data keys; tasks 048 and 052).
 type utilityOrder struct {
 	orders    OrderCreator
@@ -29,7 +29,7 @@ type utilityOrder struct {
 	logger    ErrorLogger
 }
 
-// newOrderV2 makes an order of billType (POST /v2/water/order, task 048; POST /v2/electricity/order,
+// newOrder makes an order of billType (POST /v1/water/order, task 048; POST /v1/electricity/order,
 // task 052; bill: controller/water and controller/electricity NewOrderV2 and
 // controller.CreateNewOrder). The steps of bill:
 //   - The request check (bill: validateNewOrderRequest): billId or payId is set. Else
@@ -41,9 +41,9 @@ type utilityOrder struct {
 //     orderInquiryID.
 //   - The token: the payload of bill with order.UtilityData, signed by the signer.
 //
-// The answers of each failure are those of POST /v2/tel/order (answerOrderError); the log lines
+// The answers of each failure are those of POST /v1/tel/order (answerOrderError); the log lines
 // start with the bill type.
-func (u utilityOrder) newOrderV2(ctx context.Context, billType string, req *pb.NewOrderBillPayRequest) (*pb.NewOrderResponse, error) {
+func (u utilityOrder) newOrder(ctx context.Context, billType string, req *pb.NewOrderBillPayRequest) (*pb.NewOrderResponse, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -51,7 +51,7 @@ func (u utilityOrder) newOrderV2(ctx context.Context, billType string, req *pb.N
 		return nil, status.FromContextError(err).Err()
 	}
 	if u.orders == nil || u.signer == nil {
-		return nil, status.Error(codes.Unimplemented, "method NewOrderV2 not available")
+		return nil, status.Error(codes.Unimplemented, "method NewOrder not available")
 	}
 	claims, ok := auth.ClaimsFrom(ctx)
 	if !ok || claims.UserID == "" {

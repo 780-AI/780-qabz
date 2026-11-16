@@ -72,8 +72,8 @@ func validPhoneOrder(req *pb.NewOrderPhoneRequest, phone string) bool {
 	return okOperator && okPayment
 }
 
-// NewOrderV2 saves the order of a mobile bill and answers the signed order token (POST
-// /v2/mobile/order; task 039: the Irancell operator). The steps are those of bill
+// NewOrder saves the order of a mobile bill and answers the signed order token (POST
+// /v1/mobile/order; task 039: the Irancell operator). The steps are those of bill
 // (controller/phone NewOrderV2 and createNewOrderPhone):
 //  1. The phone is converted to the 98 form (helpers.NormalizeMobile, task 038) and the request is
 //     checked (validPhoneOrder): InvalidArgument, no log line.
@@ -97,7 +97,7 @@ func validPhoneOrder(req *pb.NewOrderPhoneRequest, phone string) bool {
 //     Internal, one log line.
 //
 // The log lines start with the bill type (for example "irancell: order failed").
-func (p *Phone) NewOrderV2(ctx context.Context, req *pb.NewOrderPhoneRequest) (*pb.NewOrderResponse, error) {
+func (p *Phone) NewOrder(ctx context.Context, req *pb.NewOrderPhoneRequest) (*pb.NewOrderResponse, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -105,7 +105,7 @@ func (p *Phone) NewOrderV2(ctx context.Context, req *pb.NewOrderPhoneRequest) (*
 		return nil, status.FromContextError(err).Err()
 	}
 	if p.orders == nil || p.signer == nil {
-		return nil, status.Error(codes.Unimplemented, "method NewOrderV2 not available")
+		return nil, status.Error(codes.Unimplemented, "method NewOrder not available")
 	}
 	claims, ok := auth.ClaimsFrom(ctx)
 	if !ok || claims.UserID == "" {
@@ -155,7 +155,7 @@ func (p *Phone) NewOrderV2(ctx context.Context, req *pb.NewOrderPhoneRequest) (*
 	return nil, errInternal
 }
 
-// answerOrderError is the answer of a failed order.Service.Create (see NewOrderV2).
+// answerOrderError is the answer of a failed order.Service.Create (see NewOrder).
 func (p *Phone) answerOrderError(ctx context.Context, billType string, err error) error {
 	return answerOrderError(ctx, p.logger, billType, err)
 }

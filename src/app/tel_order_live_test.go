@@ -38,7 +38,7 @@ func (s *liveWaterStack) telOrder(t *testing.T, typ pb.NewOrderTelRequest_Paymen
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: liveUserOne, Mobile: "989121234567"})
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	return s.tel.NewOrderV2(ctx, &pb.NewOrderTelRequest{Phone: "02188776655", Type: typ, PaymentType: pb.NewOrderTelRequest_direct, BillId: billID, PayId: payID})
+	return s.tel.NewOrder(ctx, &pb.NewOrderTelRequest{Phone: "02188776655", Type: typ, PaymentType: pb.NewOrderTelRequest_direct, BillId: billID, PayId: payID})
 }
 
 // orderIDOf reads the order ID of the token.

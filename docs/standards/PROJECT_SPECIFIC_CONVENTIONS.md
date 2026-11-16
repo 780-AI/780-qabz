@@ -1,7 +1,8 @@
-<!-- VERSION: 0.27 -->
+<!-- VERSION: 0.28 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v0.28 — 2026-11-16 — Task 057 (operator): new § 18 — every HTTP route of Qabz is `/v1`; no `/v2` and no `V2` method.
 v0.27 — 2026-11-16 — Task 050 (operator rule of 2026-11-15): § 10 — every failed step of a background worker writes one error line, also when the next run retries it (a failed read was "counted, no line"); the line has the worker name and the order ID when there is one; a call that the App stop canceled writes none.
 v0.26 — 2026-11-15 — Task 051 (operator, decisions D1 to D4): § 8 — an on/off switch is a bool key named `enabled` (the one exception: `debug.auth.disable`), a renamed key goes in `renamedKeys`, checked by tests; § 15 — the mock switch is `debug.mocks.<provider>.enabled`; § 17 — the off switch is `logs.tracing.enabled` (with `logs.tracing.otlp_endpoint`).
 v0.25 — 2026-11-15 — Task 047 (operator decisions D4, D10): § 17 — a failed span uses `jaeger.Fail` (the result and the error type), never `span.RecordError`; the gateway makes no HTTP span; the shared hooks that task 047 added; the test helper `jaegertest`.
@@ -444,3 +445,11 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 **Why.** Operator decision, 2026-11-15. `system.html` says that every request and every call to a provider is a span, so one payment can be followed from the request of the app to the answer of the provider. The tracer setup exists since task 002 (`common/monitoring/jaeger`), but no code made a span, so a trace in Jaeger was empty. The features that exist get the shared spans in task 047 and their own core-step spans in task 049.
 
 **Review.** The `code-reviewer` agent checks each feature of the change against this section, with § 12 (metrics). A step of the path with no span, a new root inside the path, a span name or attribute with free or personal input, a failure with no error status, or no span-tree test is a defect. The verdict is NOT READY.
+
+## 18. Every HTTP route is /v1
+
+**Every HTTP route of Qabz has the version `/v1`. No route has `/v2` (or any other version), and no gRPC method has a `V2` name.** Qabz is a new project, so it has one API version. `bill` has `/v2` routes only because it is old: its `/v1` routes keep a first behavior that its clients still use. Qabz copies the behavior of the newest `bill` route (for example the full order token of `NewOrderV2`) and serves it on `/v1` under the plain method name (`NewOrder`).
+
+- A new rpc in `pb/proto/qabz/` has a `/v1/...` route. A second version of a method is not added; a change of an answer is a change of the `/v1` method (a Major change with the operator's decision).
+- Names that only look like a version are not routes and stay: the Go module paths (`grpc-gateway/v2`, `confluent-kafka-go/v2`, `encoding/json/v2`) and the routes of other services that Qabz calls (for example the payment service).
+- The history (change logs, `CHANGELOG.md`, done tasks) keeps the routes of its time.

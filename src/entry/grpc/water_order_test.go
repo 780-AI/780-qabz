@@ -33,13 +33,13 @@ func newOrderWater(o *fakeOrders, s *fakeSigner, log *errLog) *Water {
 	return NewWater(deps)
 }
 
-// TestWaterNewOrderV2 (task 048): the order request of bill (the bill type water, the IDs of the
+// TestWaterNewOrder (task 048): the order request of bill (the bill type water, the IDs of the
 // request, the bill ID as the inquiry ID, the user and the dialer), the token payload with
 // UtilityData, and the answer.
-func TestWaterNewOrderV2(t *testing.T) {
+func TestWaterNewOrder(t *testing.T) {
 	orders := &fakeOrders{o: savedWaterOrder()}
 	signer := &fakeSigner{}
-	res, err := newOrderWater(orders, signer, nil).NewOrderV2(waterCtx(), waterOrderReq())
+	res, err := newOrderWater(orders, signer, nil).NewOrder(waterCtx(), waterOrderReq())
 	if !assert.NoError(t, err) || !assert.NotNil(t, res) {
 		return
 	}
@@ -59,28 +59,28 @@ func TestWaterNewOrderV2(t *testing.T) {
 	assert.NotEmpty(t, res.GetOrderId())
 }
 
-// TestWaterNewOrderV2InquiryID: bill's SetInquiryID: the participate code when it is set, else the
+// TestWaterNewOrderInquiryID: bill's SetInquiryID: the participate code when it is set, else the
 // bill ID.
-func TestWaterNewOrderV2InquiryID(t *testing.T) {
+func TestWaterNewOrderInquiryID(t *testing.T) {
 	orders := &fakeOrders{o: savedWaterOrder()}
 	req := waterOrderReq()
 	req.ParticipateCode = "7700112233"
-	_, err := newOrderWater(orders, &fakeSigner{}, nil).NewOrderV2(waterCtx(), req)
+	_, err := newOrderWater(orders, &fakeSigner{}, nil).NewOrder(waterCtx(), req)
 	if assert.NoError(t, err) && assert.Len(t, orders.reqs, 1) {
 		assert.Equal(t, "7700112233", orders.reqs[0].InquiryID)
 	}
 }
 
-// TestWaterNewOrderV2Request: bill's request check (billId or payId; no paymentType check). A failed
+// TestWaterNewOrderRequest: bill's request check (billId or payId; no paymentType check). A failed
 // check is InvalidArgument with no order call and no log line.
-func TestWaterNewOrderV2Request(t *testing.T) {
+func TestWaterNewOrderRequest(t *testing.T) {
 	for name, req := range map[string]*pb.NewOrderBillPayRequest{
 		"empty":                   {},
 		"nil":                     nil,
 		"only a participate code": {ParticipateCode: "7700112233"},
 	} {
 		orders, log := &fakeOrders{o: savedWaterOrder()}, &errLog{}
-		_, err := newOrderWater(orders, &fakeSigner{}, log).NewOrderV2(waterCtx(), req)
+		_, err := newOrderWater(orders, &fakeSigner{}, log).NewOrder(waterCtx(), req)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err), name)
 		assert.Empty(t, orders.reqs, name)
 		assert.Empty(t, log.lines, name)
@@ -91,15 +91,15 @@ func TestWaterNewOrderV2Request(t *testing.T) {
 		"paymentType 9": {BillId: "1234567890125", PaymentType: 9},
 	} {
 		orders := &fakeOrders{o: savedWaterOrder()}
-		_, err := newOrderWater(orders, &fakeSigner{}, nil).NewOrderV2(waterCtx(), req)
+		_, err := newOrderWater(orders, &fakeSigner{}, nil).NewOrder(waterCtx(), req)
 		assert.NoError(t, err, name)
 		assert.Len(t, orders.reqs, 1, name)
 	}
 }
 
-// TestWaterNewOrderV2Failures: the answers of the order errors are those of POST /v2/tel/order; the
+// TestWaterNewOrderFailures: the answers of the order errors are those of POST /v1/tel/order; the
 // log lines start with "water: ".
-func TestWaterNewOrderV2Failures(t *testing.T) {
+func TestWaterNewOrderFailures(t *testing.T) {
 	cases := []struct {
 		err   error
 		code  codes.Code
@@ -116,28 +116,26 @@ func TestWaterNewOrderV2Failures(t *testing.T) {
 	}
 	for _, c := range cases {
 		log := &errLog{}
-		_, err := newOrderWater(&fakeOrders{err: c.err}, &fakeSigner{}, log).NewOrderV2(waterCtx(), waterOrderReq())
+		_, err := newOrderWater(&fakeOrders{err: c.err}, &fakeSigner{}, log).NewOrder(waterCtx(), waterOrderReq())
 		assert.Equal(t, c.code, status.Code(err), c.err.Error())
 		assert.Len(t, log.lines, c.lines, c.err.Error())
 	}
 	log := &errLog{}
-	_, err := newOrderWater(&fakeOrders{err: fmt.Errorf("pick: %w", provider.ErrNoProvider)}, &fakeSigner{}, log).NewOrderV2(waterCtx(), waterOrderReq())
+	_, err := newOrderWater(&fakeOrders{err: fmt.Errorf("pick: %w", provider.ErrNoProvider)}, &fakeSigner{}, log).NewOrder(waterCtx(), waterOrderReq())
 	assert.Equal(t, codes.Unavailable, status.Code(err))
 	assert.Equal(t, []string{"water: no enabled provider for order"}, log.lines)
 
 	log = &errLog{}
-	_, err = newOrderWater(&fakeOrders{o: savedWaterOrder()}, &fakeSigner{err: errors.New("no key")}, log).NewOrderV2(waterCtx(), waterOrderReq())
+	_, err = newOrderWater(&fakeOrders{o: savedWaterOrder()}, &fakeSigner{err: errors.New("no key")}, log).NewOrder(waterCtx(), waterOrderReq())
 	assert.Equal(t, codes.Internal, status.Code(err))
 	assert.Equal(t, []string{"water: order token failed"}, log.lines)
 
-	_, err = newOrderWater(&fakeOrders{}, &fakeSigner{}, nil).NewOrderV2(context.Background(), waterOrderReq())
+	_, err = newOrderWater(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(context.Background(), waterOrderReq())
 	assert.Equal(t, codes.PermissionDenied, status.Code(err), "no user")
 	ctx, cancel := context.WithCancel(waterCtx())
 	cancel()
-	_, err = newOrderWater(&fakeOrders{}, &fakeSigner{}, nil).NewOrderV2(ctx, waterOrderReq())
+	_, err = newOrderWater(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(ctx, waterOrderReq())
 	assert.Equal(t, codes.Canceled, status.Code(err))
-	_, err = NewWater(WaterDeps{}).NewOrderV2(waterCtx(), waterOrderReq())
+	_, err = NewWater(WaterDeps{}).NewOrder(waterCtx(), waterOrderReq())
 	assert.Equal(t, codes.Unimplemented, status.Code(err), "no orders or signer")
-	_, err = newOrderWater(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(waterCtx(), waterOrderReq())
-	assert.Equal(t, codes.Unimplemented, status.Code(err), "POST /v1/water/order stays Unimplemented")
 }

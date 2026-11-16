@@ -63,13 +63,13 @@ func newOrderPhone(o *fakeOrders, s *fakeSigner, log *errLog) *Phone {
 	return NewPhone(deps)
 }
 
-// TestNewOrderV2MapsRequestAndAnswer: the order request of bill (the phone in the 98 form, the
+// TestNewOrderMapsRequestAndAnswer: the order request of bill (the phone in the 98 form, the
 // operator text as the option and the "service", the user and the dialer of the token), the token
 // payload of bill and the answer.
-func TestNewOrderV2MapsRequestAndAnswer(t *testing.T) {
+func TestNewOrderMapsRequestAndAnswer(t *testing.T) {
 	orders := &fakeOrders{o: savedOrder()}
 	signer := &fakeSigner{}
-	res, err := newOrderPhone(orders, signer, nil).NewOrderV2(waterCtx(), orderReq())
+	res, err := newOrderPhone(orders, signer, nil).NewOrder(waterCtx(), orderReq())
 	if !assert.NoError(t, err) || !assert.NotNil(t, res) {
 		return
 	}
@@ -88,9 +88,9 @@ func TestNewOrderV2MapsRequestAndAnswer(t *testing.T) {
 	assert.Equal(t, "h."+base64.RawURLEncoding.EncodeToString(want)+".s", res.GetOrderId())
 }
 
-// TestNewOrderV2Request: the request check of bill and the operator table. No call to the order
+// TestNewOrderRequest: the request check of bill and the operator table. No call to the order
 // flow for a rejected request; no log line.
-func TestNewOrderV2Request(t *testing.T) {
+func TestNewOrderRequest(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change func(r *pb.NewOrderPhoneRequest)
@@ -115,56 +115,56 @@ func TestNewOrderV2Request(t *testing.T) {
 			log := &errLog{}
 			req := orderReq()
 			tc.change(req)
-			_, err := newOrderPhone(orders, &fakeSigner{}, log).NewOrderV2(waterCtx(), req)
+			_, err := newOrderPhone(orders, &fakeSigner{}, log).NewOrder(waterCtx(), req)
 			assert.Equal(t, tc.code, status.Code(err))
 			assert.Len(t, orders.reqs, tc.calls)
 			assert.Empty(t, log.lines)
 		})
 	}
 	// A nil request is an empty phone.
-	_, err := newOrderPhone(&fakeOrders{}, &fakeSigner{}, nil).NewOrderV2(waterCtx(), nil)
+	_, err := newOrderPhone(&fakeOrders{}, &fakeSigner{}, nil).NewOrder(waterCtx(), nil)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
-// TestNewOrderV2NegativePrice: as bill, the price is converted with uint64 (a negative price is a
+// TestNewOrderNegativePrice: as bill, the price is converted with uint64 (a negative price is a
 // very large one).
-func TestNewOrderV2NegativePrice(t *testing.T) {
+func TestNewOrderNegativePrice(t *testing.T) {
 	orders := &fakeOrders{o: savedOrder()}
 	req := orderReq()
 	req.Price = -1
-	_, err := newOrderPhone(orders, &fakeSigner{}, nil).NewOrderV2(waterCtx(), req)
+	_, err := newOrderPhone(orders, &fakeSigner{}, nil).NewOrder(waterCtx(), req)
 	assert.NoError(t, err)
 	if assert.Len(t, orders.reqs, 1) {
 		assert.Equal(t, uint64(18446744073709551615), orders.reqs[0].Price)
 	}
 }
 
-func TestNewOrderV2NotAvailableAndNoUser(t *testing.T) {
-	_, err := NewPhone(PhoneDeps{Orders: &fakeOrders{}}).NewOrderV2(waterCtx(), orderReq())
+func TestNewOrderNotAvailableAndNoUser(t *testing.T) {
+	_, err := NewPhone(PhoneDeps{Orders: &fakeOrders{}}).NewOrder(waterCtx(), orderReq())
 	assert.Equal(t, codes.Unimplemented, status.Code(err), "no signer")
-	_, err = NewPhone(PhoneDeps{Signer: &fakeSigner{}}).NewOrderV2(waterCtx(), orderReq())
+	_, err = NewPhone(PhoneDeps{Signer: &fakeSigner{}}).NewOrder(waterCtx(), orderReq())
 	assert.Equal(t, codes.Unimplemented, status.Code(err), "no order flow")
 
 	orders := &fakeOrders{}
 	svc := newOrderPhone(orders, &fakeSigner{}, nil)
-	_, err = svc.NewOrderV2(context.Background(), orderReq())
+	_, err = svc.NewOrder(context.Background(), orderReq())
 	assert.Equal(t, codes.PermissionDenied, status.Code(err), "no claims")
-	_, err = svc.NewOrderV2(auth.WithClaims(context.Background(), auth.Claims{}), orderReq())
+	_, err = svc.NewOrder(auth.WithClaims(context.Background(), auth.Claims{}), orderReq())
 	assert.Equal(t, codes.PermissionDenied, status.Code(err), "no user")
 	assert.Empty(t, orders.reqs)
 
 	ctx, cancel := context.WithCancel(waterCtx())
 	cancel()
-	_, err = svc.NewOrderV2(ctx, orderReq())
+	_, err = svc.NewOrder(ctx, orderReq())
 	assert.Equal(t, codes.Canceled, status.Code(err))
 	//nolint:staticcheck // a nil context is the case under test
-	_, err = svc.NewOrderV2(nil, orderReq())
+	_, err = svc.NewOrder(nil, orderReq())
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 }
 
-// TestNewOrderV2Failures: each failure of the order flow and of the token gives its answer and,
+// TestNewOrderFailures: each failure of the order flow and of the token gives its answer and,
 // for a server fault, one error line with the cause (never sent to the client).
-func TestNewOrderV2Failures(t *testing.T) {
+func TestNewOrderFailures(t *testing.T) {
 	cause := errors.New("connection refused to 10.0.0.1:5432")
 	for _, tc := range []struct {
 		name     string
@@ -188,7 +188,7 @@ func TestNewOrderV2Failures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			log := &errLog{}
 			orders := &fakeOrders{o: savedOrder(), err: tc.err}
-			res, err := newOrderPhone(orders, &fakeSigner{err: tc.signErr}, log).NewOrderV2(waterCtx(), orderReq())
+			res, err := newOrderPhone(orders, &fakeSigner{err: tc.signErr}, log).NewOrder(waterCtx(), orderReq())
 			assert.Nil(t, res)
 			assert.Equal(t, tc.code, status.Code(err))
 			assert.Equal(t, tc.text, status.Convert(err).Message())
@@ -214,7 +214,7 @@ func TestNewOrderV2Failures(t *testing.T) {
 		})
 	}
 	// No logger: no panic.
-	_, err := newOrderPhone(&fakeOrders{err: cause}, &fakeSigner{}, nil).NewOrderV2(waterCtx(), orderReq())
+	_, err := newOrderPhone(&fakeOrders{err: cause}, &fakeSigner{}, nil).NewOrder(waterCtx(), orderReq())
 	assert.Equal(t, codes.Internal, status.Code(err))
 	// The client left during the order: not a server error.
 	ctx, cancel := context.WithCancel(waterCtx())

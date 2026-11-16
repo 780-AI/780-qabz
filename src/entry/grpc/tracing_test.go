@@ -65,7 +65,9 @@ func (c *spanCore) Delete(ctx context.Context, _, _ string) (string, bool, error
 // billLister adapts spanCore to BillLister (List has another signature than ServiceLister).
 type billLister struct{ c *spanCore }
 
-func (l billLister) List(ctx context.Context, _ string) ([]savedbill.Bill, error) { return nil, l.c.span(ctx) }
+func (l billLister) List(ctx context.Context, _ string) ([]savedbill.Bill, error) {
+	return nil, l.c.span(ctx)
+}
 
 // tracedServers starts the public server (the auth check) and the internal server, both with the
 // tracing handler, as app/defaults.go builds them, and returns a connection to each.
@@ -156,16 +158,16 @@ func tracedCalls() []tracedCall {
 			_, err := pb.NewPhoneClient(c).Inquiry(ctx, irancellReq())
 			return err
 		}},
-		{"haf80.api.bill.Phone/NewOrderV2", false, true, func(ctx context.Context, c, _ *grpc.ClientConn) error {
-			_, err := pb.NewPhoneClient(c).NewOrderV2(ctx, orderReq())
+		{"haf80.api.bill.Phone/NewOrder", false, true, func(ctx context.Context, c, _ *grpc.ClientConn) error {
+			_, err := pb.NewPhoneClient(c).NewOrder(ctx, orderReq())
 			return err
 		}},
-		{"haf80.api.bill.Tel/NewOrderV2", false, true, func(ctx context.Context, c, _ *grpc.ClientConn) error {
-			_, err := pb.NewTelClient(c).NewOrderV2(ctx, telOrderReq())
+		{"haf80.api.bill.Tel/NewOrder", false, true, func(ctx context.Context, c, _ *grpc.ClientConn) error {
+			_, err := pb.NewTelClient(c).NewOrder(ctx, telOrderReq())
 			return err
 		}},
-		{"haf80.api.bill.Water/NewOrderV2", false, true, func(ctx context.Context, c, _ *grpc.ClientConn) error {
-			_, err := pb.NewWaterClient(c).NewOrderV2(ctx, waterOrderReq())
+		{"haf80.api.bill.Water/NewOrder", false, true, func(ctx context.Context, c, _ *grpc.ClientConn) error {
+			_, err := pb.NewWaterClient(c).NewOrder(ctx, waterOrderReq())
 			return err
 		}},
 		{"haf80.api.bill.PaymentComplete/OrderComplete", true, true, func(ctx context.Context, _, c *grpc.ClientConn) error {

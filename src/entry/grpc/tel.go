@@ -23,16 +23,16 @@ type TelDeps struct {
 	Raw RawInquirer
 	// Logger gets one error line for each server fault. Nil: no log line.
 	Logger ErrorLogger
-	// Orders saves an order (order.Service; task 044). Nil: NewOrderV2 is not available.
+	// Orders saves an order (order.Service; task 044). Nil: NewOrder is not available.
 	Orders OrderCreator
-	// Signer signs the order token (crypto.Signer). Nil: NewOrderV2 is not available.
+	// Signer signs the order token (crypto.Signer). Nil: NewOrder is not available.
 	Signer TokenSigner
 	// ServiceID is serviceId of the order answer and of the token (config service.id).
 	ServiceID uint32
 }
 
 // Tel implements the gRPC service haf80.api.bill.Tel (the landline bill). Methods that are not
-// written yet (NewOrder, CompleteOrder) return codes.Unimplemented through the embedded type.
+// written yet (CompleteOrder) return codes.Unimplemented through the embedded type.
 type Tel struct {
 	pb.UnimplementedTelServer // embedded by value, as protoc-gen-go-grpc requires
 

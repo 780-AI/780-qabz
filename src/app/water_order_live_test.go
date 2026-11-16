@@ -50,7 +50,7 @@ func (s *liveWaterStack) waterOrder(t *testing.T, billID, payID string) (*pb.New
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: liveUserOne, Mobile: "989121234567"})
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	return s.water.NewOrderV2(ctx, &pb.NewOrderBillPayRequest{BillId: billID, PayId: payID, PaymentType: pb.NewOrderBillPayRequest_direct})
+	return s.water.NewOrder(ctx, &pb.NewOrderBillPayRequest{BillId: billID, PayId: payID, PaymentType: pb.NewOrderBillPayRequest_direct})
 }
 
 // TestLiveWaterOrderAndPayment is the feature-ON integration test of task 048: a water order (the
@@ -300,7 +300,7 @@ func TestLiveWaterSpans(t *testing.T) {
 
 	octx := auth.WithClaims(context.Background(), auth.Claims{UserID: liveUserOne, Mobile: "989121234567"})
 	octx, request := otel.Tracer("test").Start(octx, "request order")
-	res, err := s.water.NewOrderV2(octx, &pb.NewOrderBillPayRequest{BillId: liveWaterBill, PayId: liveWaterPay})
+	res, err := s.water.NewOrder(octx, &pb.NewOrderBillPayRequest{BillId: liveWaterBill, PayId: liveWaterPay})
 	request.End()
 	if !assert.NoError(t, err) {
 		return
