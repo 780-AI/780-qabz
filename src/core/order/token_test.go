@@ -33,7 +33,7 @@ func TestReplace98AndMetadata(t *testing.T) {
 	for in, want := range map[string]string{"989350000391": "09350000391", "09350000391": "09350000391", "98": "0", "": "", "1989": "1989"} {
 		assert.Equal(t, want, replace98(in), in)
 	}
-	assert.Equal(t, Metadata{}, MetadataOf("gas"), "bill's default case: empty texts")
+	assert.Equal(t, Metadata{}, MetadataOf("unknown"), "bill's default case: empty texts")
 }
 
 // TestMarshalPayload: the bytes of bill's json.Marshal of InitialOrderEnc: the fields in order,

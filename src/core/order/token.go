@@ -46,6 +46,12 @@ var metadata = map[string]Metadata{
 		Icon:           "https://public.780.ir/dl/Operator/Bargh.svg",
 		FeeDescription: "کارمزد",
 	},
+	// bill: case entity.GAS: GasIcon, AboutIconGas, FeeDescriptionGas (task 053).
+	provider.BillTypeGas: {
+		About:          "قبض گاز",
+		Icon:           "https://public.780.ir/dl/Operator/Gas.svg",
+		FeeDescription: "کارمزد",
+	},
 	// bill: case entity.TELMIDTERM: TelIcon, AboutIconTelMidterm, FeeDescriptionTel (task 044).
 	provider.BillTypeTelMidterm: {
 		About:          "قبض تلفن ثابت-میان دوره",
@@ -124,9 +130,10 @@ func TelData(o Order, phone string) map[string]string {
 }
 
 // UtilityData is the data map of the order token of a water bill (task 048; bill: controller/water
-// NewOrderV2) and of an electricity bill (task 052; bill: controller/electricity NewOrderV2): the two
-// maps of bill have the same keys, and the texts come from MetadataOf(o.BillType). feeAmount (the fee)
-// and feeDescription are there only when the fee is above 0.
+// NewOrderV2), of an electricity bill (task 052; bill: controller/electricity NewOrderV2) and of a
+// gas bill (task 053; bill: controller/gas NewOrderV2): the three maps of bill have the same keys,
+// and the texts come from MetadataOf(o.BillType). feeAmount (the fee) and feeDescription are there
+// only when the fee is above 0.
 func UtilityData(o Order) map[string]string {
 	meta := MetadataOf(o.BillType)
 	data := map[string]string{

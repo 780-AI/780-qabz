@@ -1,4 +1,4 @@
-<!-- VERSION: 2.54 -->
+<!-- VERSION: 2.55 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.8 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.53 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.54 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.54 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.55 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v2.55 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.56 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -36,27 +36,28 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v2.24 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v2.25 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.87 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.88 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.28 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/tasks/pending_tasks/task_template.md` |
-| 34 | App module README | v0.43 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.28 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.44 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.29 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-16
-- **Change**: 2026-11-16 — Task 057 `no_v2_routes`: no `/v2` route; the order rpc is `NewOrder` on `/v1` (the V1 and V2 methods of the proto merged, in the `pb` submodule; `NewOrderV2` → `NewOrder` in `src/entry/grpc/`); new conventions § 18; the Postman collection and the docs name `/v1`; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v3.53, #5 manifest v2.54, #6 folder_structure v0.55, #21 system.html v2.24, #28 OPEN_TASKS v1.87, #30 PROJECT_SPECIFIC_CONVENTIONS v0.28, #34 app README v0.43, #35 this_vs_bill v0.28.
-- **Previous change**: 2026-11-16 — Task 052 `electricity_payment`: `POST /v2/electricity/order` (`Electricity.NewOrderV2`, new `src/entry/grpc/electricity_order.go`; the shared handler of water and electricity, new `src/entry/grpc/utility_order.go`), ParsianProxy pays `electricity`, the `electricity` entry of the order flow, `caching.paid_electricity` (new) and `providers.internal.parsian.settlement_inquiry_electricity` (read, default 360h); new tests `src/core/order/electricity_test.go`, `src/entry/grpc/electricity_order_test.go`, `src/app/electricity_order_live_test.go`; `config.yml.example` and the Postman collection (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.52, #5 manifest v2.53, #6 folder_structure v0.54, #21 system.html v2.23, #28 OPEN_TASKS v1.86, #34 app README v0.42, #35 this_vs_bill v0.27.
+- **Change**: 2026-11-16 — Task 053 `gas_payment`: `POST /v1/gas/order` (`Gas.NewOrder`, new `src/entry/grpc/gas_order.go` on the shared handler), ParsianProxy pays `gas` (Parsian only), the `gas` entry of the order flow, `caching.paid_gas` (new) and `providers.internal.parsian.settlement_inquiry_gas` (read, default 360h); new tests `src/core/order/gas_test.go`, `src/entry/grpc/gas_order_test.go`, `src/app/gas_order_live_test.go`; `config.yml.example` and the Postman collection (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.54, #5 manifest v2.55, #6 folder_structure v0.56, #21 system.html v2.25, #28 OPEN_TASKS v1.88, #34 app README v0.44, #35 this_vs_bill v0.29.
+- **Previous change**: 2026-11-16 — Task 057 `no_v2_routes`: no `/v2` route; the order rpc is `NewOrder` on `/v1` (the V1 and V2 methods of the proto merged, in the `pb` submodule; `NewOrderV2` → `NewOrder` in `src/entry/grpc/`); new conventions § 18; the Postman collection and the docs name `/v1`; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v3.53, #5 manifest v2.54, #6 folder_structure v0.55, #21 system.html v2.24, #28 OPEN_TASKS v1.87, #30 PROJECT_SPECIFIC_CONVENTIONS v0.28, #34 app README v0.43, #35 this_vs_bill v0.28.
+- **Earlier change**: 2026-11-16 — Task 052 `electricity_payment`: `POST /v2/electricity/order` (`Electricity.NewOrderV2`, new `src/entry/grpc/electricity_order.go`; the shared handler of water and electricity, new `src/entry/grpc/utility_order.go`), ParsianProxy pays `electricity`, the `electricity` entry of the order flow, `caching.paid_electricity` (new) and `providers.internal.parsian.settlement_inquiry_electricity` (read, default 360h); new tests `src/core/order/electricity_test.go`, `src/entry/grpc/electricity_order_test.go`, `src/app/electricity_order_live_test.go`; `config.yml.example` and the Postman collection (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.52, #5 manifest v2.53, #6 folder_structure v0.54, #21 system.html v2.23, #28 OPEN_TASKS v1.86, #34 app README v0.42, #35 this_vs_bill v0.27.
 - **Earlier change**: 2026-11-16 — Five payment tasks (052 to 056: electricity, gas, MCI mobile, Rightel mobile, Irancell) created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 057; no code. Bumped #3 CHANGELOG v3.51, #5 manifest v2.52.
 - **Earlier change**: 2026-11-16 — A test proves that a worker with its switch off does not start: `Runner.Names()` (`src/entry/cron/cron.go`), `TestWorkersFollowTheirSwitch` and `TestRunnerNames`; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v3.50, #5 manifest v2.51.
 - **Earlier change**: 2026-11-16 — Task 050 `irancell_status_worker`: the Irancell status worker on the shared `reconcile.StatusWorker` (`providers.internal.irancell.get_status.enabled`, default false; IrancellProxy `Status`), the shared worker fixes (keyset pages, save-report-commit, the 48 h lock window, `kafka.timeout` read, one error line for each failed step, `qabz_cron_orders_fixed`), conventions § 10; new test `src/app/irancell_status_live_test.go`; `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.49, #5 manifest v2.50, #6 folder_structure v0.53, #21 system.html v2.22, #28 OPEN_TASKS v1.85, #30 conventions v0.27, #34 app README v0.41, #35 this_vs_bill v0.26.

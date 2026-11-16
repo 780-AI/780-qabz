@@ -1,7 +1,8 @@
-<!-- VERSION: 3.53 -->
+<!-- VERSION: 3.54 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.54 — 2026-11-16 — Added 053-gas-payment entry.
 v3.53 — 2026-11-16 — Added 057-no-v2-routes entry.
 v3.52 — 2026-11-16 — Added 052-electricity-payment entry.
 v3.51 — 2026-11-16 — Added payment-tasks-052-to-056 entry.
@@ -169,6 +170,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 053: the gas bill payment through Parsian only
+- **Type:** Major (a new endpoint, config keys, a Critical File).
+- **Files:** `src/entry/grpc/gas_order.go` (new: `Gas.NewOrder` = `POST /v1/gas/order` on the shared `utilityOrder.newOrder`) and its test, `src/entry/grpc/gas.go` (`GasDeps` gets `Orders`, `Signer`, `ServiceID`), `src/entry/grpc/utility_order.go` (comments), `src/core/order/order.go` (the `billTypes` entry `gas`: regular inquiry), `src/core/order/token.go` (the gas texts of bill), `src/core/order/gas_test.go` (new), `src/config/config.go` (`caching.paid_gas` new, `providers.internal.parsian.settlement_inquiry_gas` read, default 360h, negative values rejected) and its test, `src/provider/parsianproxy/parsianproxy.go` (`payBillTypes` has `gas`) and `pay_test.go`, `src/app/defaults.go` (`newGas` gets the order flow; the gas order TTL, the already-paid window and the `PayRoutes` entry of `gas`; metric help texts), `src/app/gas_order_live_test.go` (new) and the app tests that call `newGas`; the tests that used `gas` as an unknown bill type use `unknown`; `config.yml.example`; `qabz.postman_collection.json` (Gas / Order and the variables `gas_order_billId`, `gas_order_payId`); `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (item 38), `docs/folder_structure.md` (also the handler names that task 057 missed), `src/app/README.md`, `docs/Plans/OPEN_TASKS.md`, `docs/tasks/done_tasks/053_gas_payment.md`.
+- **Impact:** **Yes, behavior changes.** (1) New endpoint `POST /v1/gas/order` (was HTTP 501): an `orders` row `initial` and the signed token (the order provider Parsian, seed row 46; operator decision: Parsian only, no EWays); the price is the raw inquiry of a numeric `billId` and `payId`, else the regular gas inquiry of the participate code (else the bill ID) with saved inquiries for `caching.paid_gas`. (2) `OrderComplete` pays a gas order through Parsian; no settlement after a success; the status worker finalizes gas orders. (3) `providers.internal.parsian.settlement_inquiry_gas` defaults to 360h (was 0s and not read).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 053 gas payment through Parsian only" (Go tests; feature ON with the Parsian and Qabzino mocks and the status worker; the operator QA on stage after the deploy). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 057: every HTTP route is /v1 (no /v2)
 - **Type:** Major (public API: routes and rpc names; the `pb/proto/qabz/` proto; a new conventions section).

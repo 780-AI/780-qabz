@@ -33,7 +33,7 @@ type RawInquirer interface {
 	RawInquiry(endpointBillType, billID, payID string) (inquiry.RawResult, error)
 }
 
-// GasDeps are the dependencies of Gas. A zero value is valid: Inquiry then answers
+// GasDeps are the dependencies of Gas. A zero value is valid: Inquiry and NewOrder then answer
 // codes.Unimplemented.
 type GasDeps struct {
 	// Inquiry runs the flow (the same inquiry.Service as Water). Nil: Inquiry is not available.
@@ -42,21 +42,30 @@ type GasDeps struct {
 	Raw RawInquirer
 	// Logger gets one error line for each server fault. Nil: no log line.
 	Logger ErrorLogger
+	// Orders saves an order (order.Service; task 053). Nil: NewOrder is not available.
+	Orders OrderCreator
+	// Signer signs the order token (crypto.Signer). Nil: NewOrder is not available.
+	Signer TokenSigner
+	// ServiceID is serviceId of the order answer and of the token (config service.id).
+	ServiceID uint32
 }
 
-// Gas implements the gRPC service haf80.api.bill.Gas. Methods that are not written yet (the order
-// methods) return codes.Unimplemented through the embedded type.
+// Gas implements the gRPC service haf80.api.bill.Gas. Methods that are not written yet
+// (CompleteOrder) return codes.Unimplemented through the embedded type.
 type Gas struct {
 	pb.UnimplementedGasServer // embedded by value, as protoc-gen-go-grpc requires
 
-	inquiry Inquirer
-	raw     RawInquirer
-	logger  ErrorLogger
+	inquiry   Inquirer
+	raw       RawInquirer
+	logger    ErrorLogger
+	orders    OrderCreator
+	signer    TokenSigner
+	serviceID uint32
 }
 
 // NewGas returns the Gas implementation.
 func NewGas(deps GasDeps) *Gas {
-	return &Gas{inquiry: deps.Inquiry, raw: deps.Raw, logger: deps.Logger}
+	return &Gas{inquiry: deps.Inquiry, raw: deps.Raw, logger: deps.Logger, orders: deps.Orders, signer: deps.Signer, serviceID: deps.ServiceID}
 }
 
 // RegisterGas returns a Register that adds svc to a gRPC server. For a nil svc it returns nil, so

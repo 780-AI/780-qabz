@@ -57,6 +57,18 @@
       "description": "Gas/Inquiry body participateCode (the inquiry ID of a gas bill)"
     },
     {
+      "key": "gas_order_billId",
+      "value": "1234567890133",
+      "type": "string",
+      "description": "Gas/Order body billId (task 053: a valid gas bill ID, type digit 3)"
+    },
+    {
+      "key": "gas_order_payId",
+      "value": "1800000030",
+      "type": "string",
+      "description": "Gas/Order body payId (task 053: a valid pay ID of 18 000 000 rials, so the order takes the raw inquiry; empty: the price comes from the gas inquiry provider with the participate code)"
+    },
+    {
       "key": "irancell_mobile_billId",
       "value": "",
       "type": "string",
@@ -591,7 +603,7 @@
                 "inquiry"
               ]
             },
-            "description": "haf80.api.bill.Gas/Inquiry (task 023). Inquires a gas bill by participateCode (the gas subscription code). The request and the answer are those of bill (InquiryBillPayRequest, InquiryBillPayResponse), unchanged. Request rules, as in bill: participateCode or billId is required, and participateCode or payId is required; a billId that is sent must be a valid bill ID (6 to 13 digits with a valid check digit). So a request with only billId is invalid. A request with both billId and payId is the raw inquiry of bill: no provider, no saved inquiry; the price is read from the pay ID (the digits before the last 5, in thousands of rials) and the answer is HTTP 200 {\"price\":<rials>,\"payId\":\"...\",\"billId\":\"...\"} with paymentDeadline empty; a billId that is not valid, a payId that is not valid or a billId of an unknown bill type is HTTP 400 with the text of bill (شناسه قبض نامعتبر است, شناسه پرداخت نامعتبر است, نوع قبض نامعتبر است). The inquiry ID is the participateCode: it is the cache key and what the provider gets (two participate codes are two cache keys). The provider of (gas, inquiry) is picked with ProvidersService; the saved inquiries of the same participateCode and provider that are younger than caching.gas (default 1h; any user's rows count) answer with NO provider call, else the provider is called (Qabzino: Ayantech GasBillInquiry at providers.external.qabzino.gas_bill_endpoint) and the answer is saved. In the dev seed the enabled gas provider is parsian (no adapter yet: HTTP 503); to use Qabzino enable providers row 35 and disable row 43. With debug.mocks.qabzino.enable true (dev mode only, providers.external.qabzino.enabled true) the Qabzino adapter answers a fixed answer: price 32000000, payId 3200012345, paymentDeadline 2030-01-01, billId 1234567890125 (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"price\":<rials>,\"paymentDeadline\":\"yyyy-mm-dd\",\"payId\":\"...\",\"billId\":\"<the bill ID of the provider>\"} (no bill to pay: price 0 and an empty payId). An invalid request HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the code HTTP 400 with the provider message; any other failure HTTP 500. POST /v1/gas/order and /v1/gas/complete-order are not implemented yet (HTTP 501)."
+            "description": "haf80.api.bill.Gas/Inquiry (task 023). Inquires a gas bill by participateCode (the gas subscription code). The request and the answer are those of bill (InquiryBillPayRequest, InquiryBillPayResponse), unchanged. Request rules, as in bill: participateCode or billId is required, and participateCode or payId is required; a billId that is sent must be a valid bill ID (6 to 13 digits with a valid check digit). So a request with only billId is invalid. A request with both billId and payId is the raw inquiry of bill: no provider, no saved inquiry; the price is read from the pay ID (the digits before the last 5, in thousands of rials) and the answer is HTTP 200 {\"price\":<rials>,\"payId\":\"...\",\"billId\":\"...\"} with paymentDeadline empty; a billId that is not valid, a payId that is not valid or a billId of an unknown bill type is HTTP 400 with the text of bill (شناسه قبض نامعتبر است, شناسه پرداخت نامعتبر است, نوع قبض نامعتبر است). The inquiry ID is the participateCode: it is the cache key and what the provider gets (two participate codes are two cache keys). The provider of (gas, inquiry) is picked with ProvidersService; the saved inquiries of the same participateCode and provider that are younger than caching.gas (default 1h; any user's rows count) answer with NO provider call, else the provider is called (Qabzino: Ayantech GasBillInquiry at providers.external.qabzino.gas_bill_endpoint) and the answer is saved. In the dev seed the enabled gas provider is parsian (no adapter yet: HTTP 503); to use Qabzino enable providers row 35 and disable row 43. With debug.mocks.qabzino.enable true (dev mode only, providers.external.qabzino.enabled true) the Qabzino adapter answers a fixed answer: price 32000000, payId 3200012345, paymentDeadline 2030-01-01, billId 1234567890125 (return_type success), or the provider-down error (return_type error). Needs Authorization: Bearer {{token}} (collection auth), unless debug.auth.disable is true (then the user is debug.auth.mock_user_id; with that key empty HTTP 403). Expected: HTTP 200 and {\"price\":<rials>,\"paymentDeadline\":\"yyyy-mm-dd\",\"payId\":\"...\",\"billId\":\"<the bill ID of the provider>\"} (no bill to pay: price 0 and an empty payId). An invalid request HTTP 400 (\"invalid parameter\"); no valid token HTTP 403; no enabled provider, a failed provider call or a provider with no adapter HTTP 503 (message: the provider inquiry is temporarily disabled); a provider that has no inquiry for the code HTTP 400 with the provider message; any other failure HTTP 500. POST /v1/gas/order is Gas / Order (task 053); POST /v1/gas/complete-order is not implemented yet (HTTP 501)."
           },
           "event": [
             {
@@ -606,6 +618,62 @@
             }
           ],
           "response": []
+        },
+        {
+          "name": "Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": \"{{gas_order_billId}}\",\n  \"payId\": \"{{gas_order_payId}}\",\n  \"paymentType\": \"direct\",\n  \"participateCode\": \"{{gas_participateCode}}\",\n  \"price\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/v1/gas/order",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "v1",
+                "gas",
+                "order"
+              ]
+            },
+            "description": "haf80.api.bill.Gas/NewOrder (task 053: the gas bill, paid through Parsian only). Saves an order of a gas bill and answers the signed order token. The request and the answer are those of bill (NewOrderBillPayRequest, NewOrderResponse; bill's Gas.NewOrderV2), unchanged; price and paymentType are not read. The steps are those of Water / Order and Electricity / Order: (1) the request needs billId or payId (bill's order check, not the check of Gas / Inquiry: a request with only billId is an order); else HTTP 400 (no log line). (2) the inquiry ID is participateCode when it is set, else billId (it is orders.data and the inquiry_id of the Parsian payment). (3) the order provider of (gas, order) is picked with ProvidersService: Parsian (dev seed row 46, enabled; the eways2 row 18 is disabled and has no adapter in Qabz). (4) bill already paid: a pending or success order of the billId and payId of the request in providers.internal.parsian.settlement_inquiry_gas (default 360h): HTTP 400 with bill's text. (5) the price: a numeric billId and payId give the raw inquiry (the amount of the pay ID, no provider call); else the regular inquiry of gas with the inquiry ID (the enabled gas inquiry provider; saved inquiries for caching.paid_gas, default 72h). In the dev seed that provider is parsian (row 43), which has no gas inquiry: HTTP 503; with Qabzino (row 35 enabled, row 43 disabled) and debug.mocks.qabzino.enabled: price 32009000 from the mock. (6) no provider fee; the fee (fees table; no row: 9000). (7) one orders row with the status initial. (8) the token (RS256): payload serviceId, orderId, provider, price, userId and data (payId, type gas, billId, payAmount, rawAmount, about (bill's text قبض گاز), aboutIcon (Gas.svg), invoicePayID, invoiceBillID, receiptPayID, receiptBillID; feeAmount and feeDescription when the fee is above 0). Expected with the default variables (gas_order_billId 1234567890133, gas_order_payId 1800000030: 18 000 000 rials): HTTP 200, price 18009000. A second order of a paid bill: HTTP 400. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. No enabled order provider: HTTP 503. The payment step (PaymentComplete/OrderComplete) is gRPC only, on the internal server server.internal_grpc.addr; it has no HTTP route. After a 200 answer, the test script saves orderId and price in order_token and order_price, for Payment (external) / Invoice."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('answer has serviceId, orderId and price', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.orderId).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.price).to.be.above(0);",
+                  "    pm.expect(body).to.have.property('serviceId');",
+                  "});",
+                  "// Saves the order token and the total of the answer for Payment (external) / Invoice.",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('order_token', body.orderId);",
+                  "    pm.collectionVariables.set('order_price', String(body.price));",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

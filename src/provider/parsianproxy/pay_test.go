@@ -89,6 +89,28 @@ func TestPayElectricity(t *testing.T) {
 	}
 }
 
+// TestPayGas (task 053): a gas bill has the fields of bill's ParsianGas: the same as ParsianWater
+// (the inquiry type regular; the inquiry ID is the participate code of the order).
+func TestPayGas(t *testing.T) {
+	f := &fakeClient{payResp: &pb.PayResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceId: 79}}
+	req := provider.PaymentRequest{
+		BillType: provider.BillTypeGas, InquiryType: provider.InquiryTypeRegular, OrderID: "o-4", UserID: "u-4",
+		InquiryID: "0012345678", BillID: "1234567890134", PayID: "1800012345", Amount: 18000000, RRN: "445578",
+	}
+	assert.True(t, SupportsPay(provider.BillTypeGas))
+	resp, err := newAdapter(t, f).Pay(context.Background(), req)
+	if !assert.NoError(t, err) || !assert.NotNil(t, resp) {
+		return
+	}
+	assert.Equal(t, &provider.PaymentResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceID: "79"}, resp)
+	if assert.Len(t, f.pays, 1) {
+		assert.Equal(t, &pb.PayRequest{
+			UserId: "u-4", OrderId: "o-4", ProviderOrderId: 445578, InquiryId: "0012345678", BillType: "gas",
+			InquiryType: "regular", BillId: "1234567890134", PayId: "1800012345", Amount: 18000000, PaymentRrn: "445578",
+		}, f.pays[0])
+	}
+}
+
 // TestPayRRN: an RRN that is not an integer is failed (400) with the error text and no call, as bill.
 func TestPayRRN(t *testing.T) {
 	for _, rrn := range []string{"", "abc", "12.5", "99999999999999999999"} {
@@ -136,7 +158,7 @@ func TestPayDown(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 
 	f = &fakeClient{payResp: &pb.PayResponse{Status: "success"}}
-	for _, bt := range []string{provider.BillTypeMobile, provider.BillTypeGas, ""} {
+	for _, bt := range []string{provider.BillTypeMobile, provider.BillTypeIrancell, ""} { // gas is paid since task 053
 		req := payRequest()
 		req.BillType = bt
 		_, err := newAdapter(t, f).Pay(context.Background(), req)

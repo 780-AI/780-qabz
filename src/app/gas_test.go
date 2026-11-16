@@ -84,7 +84,7 @@ func TestProviderRegistryServesGas(t *testing.T) {
 // the interface).
 func TestNewGasWithoutFlow(t *testing.T) {
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"})
-	svc := newGas(nil, nil)
+	svc := newGas(nil, nil, nil, 0, nil)
 	if assert.NotNil(t, svc) {
 		_, err := svc.Inquiry(ctx, &pb.InquiryBillPayRequest{ParticipateCode: "0012345678"})
 		assert.Equal(t, codes.Unimplemented, status.Code(err))
@@ -117,6 +117,8 @@ func TestDefaultBuilderServesGas(t *testing.T) {
 	c := pb.NewGasClient(conn)
 	_, err = c.Inquiry(ctx, &pb.InquiryBillPayRequest{ParticipateCode: "0012345678"})
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
-	_, err = c.NewOrder(ctx, &pb.NewOrderBillPayRequest{}) // positive control: a method that is not written yet
+	_, err = c.NewOrder(ctx, &pb.NewOrderBillPayRequest{BillId: "1234567890133", PayId: "1800000030"})
+	assert.Equal(t, codes.PermissionDenied, status.Code(err), "NewOrder is served (task 053)")
+	_, err = c.CompleteOrder(ctx, &pb.CompleteOrderRequest{}) // positive control: a method that is not written yet
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }

@@ -733,7 +733,6 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	for _, d := range []time.Duration{
 		c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
 		c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder,
-		c.ParsianSettlementInquiryGas,
 		c.ParsianSettlementInquiryMCIMobile, c.ParsianSettlementInquiryRightelMobile,
 	} {
 		assert.Zero(t, d)
@@ -741,6 +740,7 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryTelephone, "task 044: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryWater, "task 048: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryElectricity, "task 052: bill's default")
+	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryGas, "task 053: bill's default")
 	assert.Zero(t, c.JiringSwitchGetStatusChunk)
 	assert.False(t, c.JiringSwitchGetStatusIsLockable)
 	// Task 045: the defaults of the Parsian status worker.
@@ -931,6 +931,33 @@ func TestParseElectricityOrderKeys(t *testing.T) {
 	for yml, want := range map[string]string{
 		"caching: {paid_electricity: \"-1s\"}\n":                                        "caching.paid_electricity must not be negative",
 		"providers: {internal: {parsian: {settlement_inquiry_electricity: \"-1h\"}}}\n": "settlement_inquiry_electricity must not be negative",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+}
+
+// TestParseGasOrderKeys (task 053): caching.paid_gas and
+// providers.internal.parsian.settlement_inquiry_gas, their defaults and their rules.
+func TestParseGasOrderKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, 72*time.Hour, c.CachingPaidGas, "bill: caching.paidGas")
+	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryGas, "bill: parsian.settlementInquiryGas")
+
+	c, err = Parse([]byte(base + "caching: {paid_gas: \"2h\"}\nproviders: {internal: {parsian: {settlement_inquiry_gas: \"0s\"}}}\n"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, 2*time.Hour, c.CachingPaidGas)
+	assert.Zero(t, c.ParsianSettlementInquiryGas, "0: no window")
+
+	for yml, want := range map[string]string{
+		"caching: {paid_gas: \"-1s\"}\n":                                        "caching.paid_gas must not be negative",
+		"providers: {internal: {parsian: {settlement_inquiry_gas: \"-1h\"}}}\n": "settlement_inquiry_gas must not be negative",
 	} {
 		_, err := Parse([]byte(base + yml))
 		assert.ErrorContains(t, err, want, yml)

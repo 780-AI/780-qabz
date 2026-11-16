@@ -275,7 +275,10 @@ type Config struct {
 	// parsian.settlementInquiryElectricity). Default 360h (bill's example). 0: no window; a negative
 	// value is rejected.
 	ParsianSettlementInquiryElectricity time.Duration `path:"providers.internal.parsian.settlement_inquiry_electricity"`
-	ParsianSettlementInquiryGas         time.Duration `path:"providers.internal.parsian.settlement_inquiry_gas"`
+	// ParsianSettlementInquiryGas is read since task 053: the "bill already paid" check of a gas order
+	// paid through Parsian (bill: shouldSkipNewOrder, parsian.settlementInquiryGas). Default 360h
+	// (bill's example). 0: no window; a negative value is rejected.
+	ParsianSettlementInquiryGas time.Duration `path:"providers.internal.parsian.settlement_inquiry_gas"`
 	// ParsianSettlementInquiryTelephone is read since task 044: the "bill already paid" check of a
 	// landline order paid through Parsian (bill: shouldSkipNewOrder) looks at the orders created in
 	// this window. Default 360h (bill: parsian.settlementInquiryTelephone). 0: no window (every
@@ -355,6 +358,10 @@ type Config struct {
 	// the raw inquiry of the order fails. 0: every such order asks the provider; a negative value is
 	// rejected. Read at start.
 	CachingPaidElectricity time.Duration `path:"caching.paid_electricity"`
+	// CachingPaidGas is how long a saved gas inquiry gives the price of a gas order (task 053) with no
+	// provider call (bill: caching.paidGas, 72h). It applies only when the raw inquiry of the order
+	// fails. 0: every such order asks the provider; a negative value is rejected. Read at start.
+	CachingPaidGas time.Duration `path:"caching.paid_gas"`
 
 	// DebugMockQabzinoEnabled makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -489,9 +496,11 @@ func defaults() Config {
 		CachingPaidTel:                      72 * time.Hour,
 		CachingPaidWater:                    72 * time.Hour,
 		CachingPaidElectricity:              72 * time.Hour,
+		CachingPaidGas:                      72 * time.Hour,
 		ParsianSettlementInquiryTelephone:   360 * time.Hour,
 		ParsianSettlementInquiryWater:       360 * time.Hour,
 		ParsianSettlementInquiryElectricity: 360 * time.Hour,
+		ParsianSettlementInquiryGas:         360 * time.Hour,
 		ParsianGetStatusName:                "parsian-getstatus",
 		ParsianGetStatusChunk:               100,
 		ParsianGetStatusStart:               30 * time.Minute,
@@ -705,6 +714,12 @@ func (c Config) validate() error {
 	}
 	if c.ParsianSettlementInquiryElectricity < 0 {
 		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_electricity must not be negative (0: no window)"))
+	}
+	if c.CachingPaidGas < 0 {
+		errs = append(errs, errors.New("caching.paid_gas must not be negative (0: every order asks the provider)"))
+	}
+	if c.ParsianSettlementInquiryGas < 0 {
+		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_gas must not be negative (0: no window)"))
 	}
 	if !ValidMockPayReturnType(c.DebugMockParsianPayReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.parsian.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))

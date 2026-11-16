@@ -185,7 +185,7 @@ func TestInquiryTypeOf(t *testing.T) {
 	assert.Equal(t, provider.InquiryTypeMidterm, InquiryTypeOf(provider.BillTypeTelMidterm))
 	assert.Equal(t, provider.InquiryTypeFinalTerm, InquiryTypeOf(provider.BillTypeIrancell))
 	assert.Equal(t, provider.InquiryTypeRegular, InquiryTypeOf(provider.BillTypeWater), "task 048: bill RegularInquiryType")
-	assert.Empty(t, InquiryTypeOf("gas"))
+	assert.Empty(t, InquiryTypeOf("unknown"))
 }
 
 // seqInquirer answers each Inquire call with the next result.

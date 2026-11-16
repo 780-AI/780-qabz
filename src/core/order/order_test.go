@@ -361,7 +361,7 @@ func TestCreateDefaultFee(t *testing.T) {
 
 func TestCreateUnsupportedAndNotBuilt(t *testing.T) {
 	f := newFixture(t)
-	_, err := f.svc.Create(context.Background(), Request{BillType: "gas"})
+	_, err := f.svc.Create(context.Background(), Request{BillType: "unknown"})
 	assert.ErrorIs(t, err, ErrUnsupported)
 	assert.Empty(t, f.results, "an unknown bill type is not counted")
 	assert.Empty(t, f.sel.calls)

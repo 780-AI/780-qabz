@@ -129,7 +129,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	}
 	water := newWater(flow, orders, signer, uint32(serviceID), logger)
 	electricity := newElectricity(flow, orders, signer, uint32(serviceID), logger)
-	gas := newGas(flow, logger)
+	gas := newGas(flow, orders, signer, uint32(serviceID), logger)
 	tel := newTel(flow, orders, signer, uint32(serviceID), logger)
 	phone := newPhone(flow, orders, signer, uint32(serviceID), logger)
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
@@ -696,13 +696,21 @@ func newElectricity(flow *inquiry.Service, orders *order.Service, signer *crypto
 }
 
 // newGas builds the gRPC Gas service: POST /v1/gas/inquiry (task 023) on the same inquiry flow as
-// Water; the flow also answers the raw inquiry (a request with billId and payId). A server fault writes one error log line (grpcserver.Gas). A nil flow gives a service
-// whose Inquiry answers Unimplemented.
-func newGas(flow *inquiry.Service, logger Logger) *grpcserver.Gas {
-	deps := grpcserver.GasDeps{}
+// Water (the flow also answers the raw inquiry, a request with billId and payId) and POST
+// /v1/gas/order (task 053) on the order flow, with the token signed by signer. A server fault
+// writes one error log line (grpcserver.Gas). A nil flow gives a service whose Inquiry answers
+// Unimplemented; a nil orders or signer gives a service whose NewOrder answers Unimplemented.
+func newGas(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Gas {
+	deps := grpcserver.GasDeps{ServiceID: serviceID}
 	if flow != nil {
 		deps.Inquiry = flow
 		deps.Raw = flow
+	}
+	if orders != nil {
+		deps.Orders = orders
+	}
+	if signer != nil {
+		deps.Signer = signer
 	}
 	if logger != nil {
 		deps.Logger = logger
@@ -754,7 +762,7 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 	if reg := metrics.Registry(); reg != nil {
 		orders := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_order_create_total",
-			Help: "New orders (POST /v1/mobile/order, POST /v1/tel/order, POST /v1/water/order, POST /v1/electricity/order) by bill type (irancell, tel, telmidterm, water, electricity), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; already_paid: the bill ID and pay ID have a pending or successful order; error).",
+			Help: "New orders (POST /v1/mobile/order, POST /v1/tel/order, POST /v1/water/order, POST /v1/electricity/order, POST /v1/gas/order) by bill type (irancell, tel, telmidterm, water, electricity, gas), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; already_paid: the bill ID and pay ID have a pending or successful order; error).",
 		}, []string{"bill_type", "provider", "result"})
 		fees := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_fee_resolve_total",
@@ -783,6 +791,7 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 		provider.BillTypeTel: cfg.CachingPaidTel, provider.BillTypeTelMidterm: cfg.CachingPaidTel,
 		provider.BillTypeWater:       cfg.CachingPaidWater,       // task 048 (bill: caching.paidWater)
 		provider.BillTypeElectricity: cfg.CachingPaidElectricity, // task 052 (bill: caching.paidElectricity)
+		provider.BillTypeGas:         cfg.CachingPaidGas,         // task 053 (bill: caching.paidGas)
 	}
 	telWindow := cfg.ParsianSettlementInquiryTelephone
 	return order.NewService(order.Options{
@@ -799,6 +808,7 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 				provider.BillTypeTel: telWindow, provider.BillTypeTelMidterm: telWindow,
 				provider.BillTypeWater:       cfg.ParsianSettlementInquiryWater,       // task 048 (bill: parsian.settlementInquiryWater)
 				provider.BillTypeElectricity: cfg.ParsianSettlementInquiryElectricity, // task 052 (bill: parsian.settlementInquiryElectricity)
+				provider.BillTypeGas:         cfg.ParsianSettlementInquiryGas,         // task 053 (bill: parsian.settlementInquiryGas)
 			},
 		},
 	})
@@ -806,10 +816,10 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 
 // newPayments builds the payment step of the orders (order.Payments, task 044): the payment
 // service calls OrderComplete on the internal gRPC server. The order provider parsian pays the
-// bill types tel, telmidterm, water and electricity (parsianproxy.Pay; water since task 048,
-// electricity since task 052); after a success of tel or telmidterm the Karashop settlement runs in
-// the background (karashop.Settle) for the order providers parsian, eways and eways2, as bill (water
-// and electricity have no settlement). With
+// bill types tel, telmidterm, water, electricity and gas (parsianproxy.Pay; water since task 048,
+// electricity since task 052, gas since task 053); after a success of tel or telmidterm the Karashop
+// settlement runs in the background (karashop.Settle) for the order providers parsian, eways and
+// eways2, as bill (water, electricity and gas have no settlement). With
 // metrics on:
 //   - qabz_order_payment_total{bill_type,provider,status}: each OrderComplete call (success, failed,
 //     pending, processed, wrong_price, error; provider "none" when the order was not read);
@@ -857,7 +867,7 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 		Repository: postgres.NewOrderRepository(db),
 		Adapters:   adapters,
 		PayRoutes: map[string]map[string]bool{
-			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true, provider.BillTypeElectricity: true},
+			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true, provider.BillTypeElectricity: true, provider.BillTypeGas: true},
 		},
 		SettleRoutes: settleRoutes(),
 		Logger:       payLog,

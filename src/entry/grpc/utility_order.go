@@ -20,8 +20,8 @@ func orderInquiryID(req *pb.NewOrderBillPayRequest) string {
 	return req.GetBillId()
 }
 
-// utilityOrder is what NewOrder of a water and an electricity bill needs (bill: both are
-// controller.CreateNewOrder and the same token data keys; tasks 048 and 052).
+// utilityOrder is what NewOrder of a water, an electricity and a gas bill needs (bill: all three are
+// controller.CreateNewOrder and the same token data keys; tasks 048, 052 and 053).
 type utilityOrder struct {
 	orders    OrderCreator
 	signer    TokenSigner
@@ -30,8 +30,8 @@ type utilityOrder struct {
 }
 
 // newOrder makes an order of billType (POST /v1/water/order, task 048; POST /v1/electricity/order,
-// task 052; bill: controller/water and controller/electricity NewOrderV2 and
-// controller.CreateNewOrder). The steps of bill:
+// task 052; POST /v1/gas/order, task 053; bill: controller/water, controller/electricity and
+// controller/gas NewOrderV2 and controller.CreateNewOrder). The steps of bill:
 //   - The request check (bill: validateNewOrderRequest): billId or payId is set. Else
 //     InvalidArgument (HTTP 400) with no log line. @todo bill answers gRPC Unknown and writes one
 //     error line. See docs/this_vs_bill.md, item 38.
