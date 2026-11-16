@@ -1,7 +1,8 @@
-<!-- VERSION: 3.49 -->
+<!-- VERSION: 3.50 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.50 — 2026-11-16 — Added workers-follow-their-switch entry.
 v3.49 — 2026-11-16 — Added 050-irancell-status-worker entry.
 v3.48 — 2026-11-16 — Added 049-feature-spans entry.
 v3.47 — 2026-11-16 — Added tasks-folder-move entry.
@@ -165,6 +166,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — A test proves that a worker with its switch off does not start
+- **Type:** Minor (a test and a read-only accessor; no behavior change).
+- **Files:** `src/entry/cron/cron.go` (`Runner.Names()`: the names of the workers of the runner) and `cron_test.go` (`TestRunnerNames`); `src/app/crons_test.go` (`TestWorkersFollowTheirSwitch`: the 7 combinations of the Parsian status, Irancell status and settlement switches); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. Operator rule (2026-11-16): every worker follows its own config, and a disabled worker must not start. The code already did this (`newCrons` builds a worker only under its `enabled` key; with every switch off there is no runner; the Kafka producer exists only with a status worker on); the test now proves it, and a positive control (the Irancell worker built with its switch off) fails it.
+- **QA scenarios:** none needed (exempt: a test with no behavior change); `make test GO_TEST_PKGS="./app/ ./entry/cron/"` passes.
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-16] — Task 050: the Irancell status worker; the shared status worker fixes bill's defects
 - **Type:** Major (a new worker, shared worker behavior, config keys, a metric; Critical Files).

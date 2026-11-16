@@ -162,6 +162,16 @@ func NewRunner(o Options) (*Runner, error) {
 		onRun: o.OnRun, onDuration: o.OnDuration, now: time.Now}, nil
 }
 
+// Names gives the names of the workers of the runner, in the order of Options.Crons. The tests use it
+// to check which workers exist: a worker whose switch is off is not in the list.
+func (r *Runner) Names() []string {
+	names := make([]string, 0, len(r.crons))
+	for _, c := range r.crons {
+		names = append(names, c.Name())
+	}
+	return names
+}
+
 // Start starts the workers. Each one runs at once, then at each interval (bill: gocron v1 starts
 // at once). The runs do not use ctx: only Stop ends them.
 func (r *Runner) Start(ctx context.Context) error {

@@ -224,6 +224,37 @@ func TestNewStatusCronsRules(t *testing.T) {
 	assert.ErrorContains(t, err, "not unique")
 }
 
+// TestWorkersFollowTheirSwitch (operator, 2026-11-16): a worker whose switch is off does not exist
+// in the runner, so it never starts, whatever the other switches are; each switch makes exactly its
+// own worker (the Kafka producer exists only with a status worker on).
+func TestWorkersFollowTheirSwitch(t *testing.T) {
+	cache := redis.New("127.0.0.1:1", "", "p:")
+	defer cache.Close()
+	base := testConfig(t)
+	base.ParsianGetStatusEnabled, base.IrancellGetStatusEnabled, base.ConfirmPaymentTelephoneEnabled = false, false, false
+	names := map[string]string{"parsian": base.ParsianGetStatusName, "irancell": base.IrancellGetStatusName, "settle": base.ConfirmPaymentTelephoneName}
+	for mask := 1; mask < 8; mask++ {
+		cfg := base
+		on := map[string]bool{"parsian": mask&1 != 0, "irancell": mask&2 != 0, "settle": mask&4 != 0}
+		cfg.ParsianGetStatusEnabled, cfg.IrancellGetStatusEnabled, cfg.ConfirmPaymentTelephoneEnabled = on["parsian"], on["irancell"], on["settle"]
+		jobs, err := newCrons(cfg, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+		if !assert.NoError(t, err, "mask %d", mask) || !assert.NotNil(t, jobs) {
+			continue
+		}
+		var want []string
+		for _, k := range []string{"parsian", "irancell", "settle"} {
+			if on[k] {
+				want = append(want, names[k])
+			}
+		}
+		assert.Equal(t, want, jobs.runner.Names(), "mask %d: only the enabled workers exist", mask)
+		assert.Equal(t, on["parsian"] || on["irancell"], jobs.producer != nil, "mask %d: the producer only with a status worker", mask)
+		assert.NoError(t, jobs.Stop(context.Background()))
+	}
+	_, err := newCrons(base, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	assert.ErrorContains(t, err, "no worker is enabled", "every switch off: no runner")
+}
+
 // TestSettleCronLock (task 046): the lock policy has the chunk and no sync operations, so the TTL
 // is bill's default (4 h + 5 min, 2 min per order).
 func TestSettleCronLock(t *testing.T) {

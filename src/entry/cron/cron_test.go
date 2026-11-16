@@ -425,3 +425,11 @@ func TestRootSpan(t *testing.T) {
 	assert.Equal(t, ResultError, lockErr.Status().Description)
 	assert.Len(t, lockErr.Events(), 1)
 }
+
+// TestRunnerNames: the names of the workers, in order.
+func TestRunnerNames(t *testing.T) {
+	r, err := NewRunner(Options{Crons: []Cron{&fakeCron{name: "a", interval: time.Second}, &fakeCron{name: "b", interval: time.Second}}, Locker: &fakeLocker{}})
+	if assert.NoError(t, err) && assert.NotNil(t, r) {
+		assert.Equal(t, []string{"a", "b"}, r.Names())
+	}
+}
