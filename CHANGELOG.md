@@ -1,7 +1,8 @@
-<!-- VERSION: 3.50 -->
+<!-- VERSION: 3.51 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.51 — 2026-11-16 — Added payment-tasks-052-to-056 entry.
 v3.50 — 2026-11-16 — Added workers-follow-their-switch entry.
 v3.49 — 2026-11-16 — Added 050-irancell-status-worker entry.
 v3.48 — 2026-11-16 — Added 049-feature-spans entry.
@@ -166,6 +167,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Five payment tasks for the bill types that cannot be paid yet (tasks 052 to 056)
+- **Type:** Minor (task files only; no code).
+- **Files:** `docs/tasks/pending_tasks/052_electricity_payment.md`, `053_gas_payment.md`, `054_mci_mobile_payment.md`, `055_rightel_mobile_payment.md`, `056_irancell_payment.md` (new; task files are not manifest-tracked); `docs/tasks/pending_tasks/task_counter.json` (next ID 057); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. Each task was written after reading `bill` (`gateway/payment/*`, `app/paymentGateway.go`, `controller/{electricity,gas,phone}/newOrder.go`, `service/billPayment/newOrder.go`, commit `ff98e25`). Findings: electricity, gas and Rightel pay through Parsian or EWays (NATS); MCI through Jiring Switch or Parsian; Irancell only through a NATS request (the irancell proto has no bill-payment RPC), so task 056 starts with an operator decision; the seed enables EWays for Rightel (row 37) and Parsian only for electricity (47), gas (46) and MCI midterm (149).
+- **Author:** Mostafa Talebi / Claude Sonnet 5.5
 
 ## [2026-11-16] — A test proves that a worker with its switch off does not start
 - **Type:** Minor (a test and a read-only accessor; no behavior change).

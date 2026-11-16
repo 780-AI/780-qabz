@@ -1,4 +1,4 @@
-<!-- VERSION: 2.51 -->
+<!-- VERSION: 2.52 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.8 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.50 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.51 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.51 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.52 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.53 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -55,7 +55,8 @@
 ## Last Updated
 
 - **Date**: 2026-11-16
-- **Change**: 2026-11-16 — A test proves that a worker with its switch off does not start: `Runner.Names()` (`src/entry/cron/cron.go`), `TestWorkersFollowTheirSwitch` and `TestRunnerNames`; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v3.50, #5 manifest v2.51.
+- **Change**: 2026-11-16 — Five payment tasks (052 to 056: electricity, gas, MCI mobile, Rightel mobile, Irancell) created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 057; no code. Bumped #3 CHANGELOG v3.51, #5 manifest v2.52.
+- **Earlier change**: 2026-11-16 — A test proves that a worker with its switch off does not start: `Runner.Names()` (`src/entry/cron/cron.go`), `TestWorkersFollowTheirSwitch` and `TestRunnerNames`; Go files have no VERSION header, so no rows. Bumped #3 CHANGELOG v3.50, #5 manifest v2.51.
 - **Earlier change**: 2026-11-16 — Task 050 `irancell_status_worker`: the Irancell status worker on the shared `reconcile.StatusWorker` (`providers.internal.irancell.get_status.enabled`, default false; IrancellProxy `Status`), the shared worker fixes (keyset pages, save-report-commit, the 48 h lock window, `kafka.timeout` read, one error line for each failed step, `qabz_cron_orders_fixed`), conventions § 10; new test `src/app/irancell_status_live_test.go`; `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.49, #5 manifest v2.50, #6 folder_structure v0.53, #21 system.html v2.22, #28 OPEN_TASKS v1.85, #30 conventions v0.27, #34 app README v0.41, #35 this_vs_bill v0.26.
 - **Earlier change**: 2026-11-16 — Task 049 `feature_spans`: the inquiry spans (`inquiry.Service.Inquire`, `fromDatabase`, `fromProvider`), the status worker span `reconcile.StatusWorker.check`, the `Error` status of a rejected call (`entry/grpc/auth.go`); new tests `src/core/inquiry/tracing_test.go`, `src/core/reconcile/tracing_test.go`, `src/entry/grpc/tracing_test.go`; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.48, #5 manifest v2.49, #21 system.html v2.21, #28 OPEN_TASKS v1.84.
 - **Previous change**: 2026-11-16 — The task folders (`pending_tasks`, `in-progress_tasks`, `done_tasks`) moved from `docs/Plans/` to `docs/tasks/`; no code; task files are not manifest-tracked, so only the path of #33 changed. Bumped #1 CLAUDE.md v1.8, #3 CHANGELOG v3.47, #5 manifest v2.48, #6 folder_structure v0.52.
