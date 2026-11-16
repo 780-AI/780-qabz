@@ -1,7 +1,8 @@
-<!-- VERSION: 3.54 -->
+<!-- VERSION: 3.55 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.55 — 2026-11-16 — Added task-058-mci-jiring-fallback entry.
 v3.54 — 2026-11-16 — Added 053-gas-payment entry.
 v3.53 — 2026-11-16 — Added 057-no-v2-routes entry.
 v3.52 — 2026-11-16 — Added 052-electricity-payment entry.
@@ -170,6 +171,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 058 created: the MCI payment fallback from Parsian to the next provider
+- **Type:** Minor (a task file only; no code).
+- **Files:** `docs/tasks/pending_tasks/058_mci_jiring_fallback.md` (new; task files are not manifest-tracked); `docs/tasks/pending_tasks/task_counter.json` (next ID 059); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The operator answers to the task 054 design (Q1 to Q4): task 054 pays both MCI terms through Parsian only; task 058 adds the fallback to the next enabled provider row (today Jiring Switch) when Parsian is out of service for sure, with no fallback after a timeout and no hard-coded provider order (the order comes only from the `providers` rows and the future circuit breaker); also the Jiring Switch `Pay` / `Status`, its status worker and the pending-order query change.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 053: the gas bill payment through Parsian only
 - **Type:** Major (a new endpoint, config keys, a Critical File).
