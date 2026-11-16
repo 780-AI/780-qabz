@@ -100,15 +100,24 @@ type billType struct {
 //     BillTypeInquiryType[GAS] is regular). The inquiry ID is the participate code, else the bill ID
 //     (bill: SetInquiryID). The saved inquiries answer for Options.OrderCacheTTL (caching.paid_gas).
 //
+//   - mobile and mobilemidterm (task 054, the MCI operator): the raw inquiry first, as water (bill:
+//     no provider fee for MCI), else the final-term or the mid-term inquiry of the inquiry of mobile
+//     (one answer has both terms; bill: BillTypeInquiryType[MOBILE] final_term, [MOBILEMIDTERM]
+//     mid_term). @todo bill asks the inquiry provider of the order bill type (mobilemidterm has its own
+//     inquiry rows). See docs/this_vs_bill.md, item 42. The saved inquiries answer for
+//     Options.OrderCacheTTL: caching.paid_mobile for mobile, none for mobilemidterm (bill).
+//
 // A bill type with no order cache TTL (Options.OrderCacheTTL gives 0) never answers from saved
 // inquiries (inquiry.Request.NoCache).
 var billTypes = map[string]billType{
-	provider.BillTypeIrancell:    {directPrice: true, inquiryType: provider.InquiryTypeFinalTerm},
-	provider.BillTypeTel:         {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeFinalTerm},
-	provider.BillTypeTelMidterm:  {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeMidterm},
-	provider.BillTypeWater:       {inquiryType: provider.InquiryTypeRegular},
-	provider.BillTypeElectricity: {inquiryType: provider.InquiryTypeRegular},
-	provider.BillTypeGas:         {inquiryType: provider.InquiryTypeRegular},
+	provider.BillTypeIrancell:      {directPrice: true, inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeTel:           {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeTelMidterm:    {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeMidterm},
+	provider.BillTypeWater:         {inquiryType: provider.InquiryTypeRegular},
+	provider.BillTypeElectricity:   {inquiryType: provider.InquiryTypeRegular},
+	provider.BillTypeGas:           {inquiryType: provider.InquiryTypeRegular},
+	provider.BillTypeMobile:        {inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeMobileMidterm: {inquiryBillType: provider.BillTypeMobile, inquiryType: provider.InquiryTypeMidterm},
 }
 
 // InquiryTypeOf gives the inquiry type of an order bill type (bill: entity.BillTypeInquiryType), ""

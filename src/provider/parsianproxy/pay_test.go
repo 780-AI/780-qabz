@@ -111,6 +111,30 @@ func TestPayGas(t *testing.T) {
 	}
 }
 
+// TestPayMCI (task 054): an MCI bill has the fields of bill's ParsianMCIMobile (the order bill type,
+// the inquiry type of the term, the phone as the inquiry ID), for both terms.
+func TestPayMCI(t *testing.T) {
+	for bt, it := range map[string]string{provider.BillTypeMobile: provider.InquiryTypeFinalTerm, provider.BillTypeMobileMidterm: provider.InquiryTypeMidterm} {
+		f := &fakeClient{payResp: &pb.PayResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceId: 80}}
+		req := provider.PaymentRequest{
+			BillType: bt, InquiryType: it, OrderID: "o-5", UserID: "u-5",
+			InquiryID: "989121234567", BillID: "9123456780858", PayID: "4500012345", Amount: 450000, RRN: "445579",
+		}
+		assert.True(t, SupportsPay(bt), bt)
+		resp, err := newAdapter(t, f).Pay(context.Background(), req)
+		if !assert.NoError(t, err, bt) || !assert.NotNil(t, resp, bt) {
+			continue
+		}
+		assert.Equal(t, &provider.PaymentResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceID: "80"}, resp, bt)
+		if assert.Len(t, f.pays, 1, bt) {
+			assert.Equal(t, &pb.PayRequest{
+				UserId: "u-5", OrderId: "o-5", ProviderOrderId: 445579, InquiryId: "989121234567", BillType: bt,
+				InquiryType: it, BillId: "9123456780858", PayId: "4500012345", Amount: 450000, PaymentRrn: "445579",
+			}, f.pays[0], bt)
+		}
+	}
+}
+
 // TestPayRRN: an RRN that is not an integer is failed (400) with the error text and no call, as bill.
 func TestPayRRN(t *testing.T) {
 	for _, rrn := range []string{"", "abc", "12.5", "99999999999999999999"} {
@@ -158,7 +182,7 @@ func TestPayDown(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 
 	f = &fakeClient{payResp: &pb.PayResponse{Status: "success"}}
-	for _, bt := range []string{provider.BillTypeMobile, provider.BillTypeIrancell, ""} { // gas is paid since task 053
+	for _, bt := range []string{provider.BillTypeMobileMidTermRightel, provider.BillTypeIrancell, ""} { // gas since task 053, mobile and mobilemidterm since task 054
 		req := payRequest()
 		req.BillType = bt
 		_, err := newAdapter(t, f).Pay(context.Background(), req)

@@ -42,8 +42,8 @@ var errAlreadyPaid = status.Error(codes.FailedPrecondition, alreadyPaidText)
 
 // orderOperators gives the bill type of each operator and payment term of a mobile order (bill:
 // controller/phone phoneBillTypeMapper). It is the one table of the endpoint: task 039 filled the
-// entry of Irancell. An operator with a nil map is known but not available yet (Unimplemented: mci
-// and rightel until their own tasks); an operator that is not in the table (unknown) and a payment
+// entry of Irancell, task 054 the entry of MCI. An operator with a nil map is known but not available
+// yet (Unimplemented: rightel until its own task); an operator that is not in the table (unknown) and a payment
 // term that is not in the map of the operator are invalid (InvalidArgument).
 //
 //	bill: mci midTerm -> "mobilemidterm", fullTerm -> "mobile"; rightel midTerm -> "mobilemidtermRightel";
@@ -53,7 +53,10 @@ var orderOperators = map[pb.NewOrderPhoneRequest_OperatorEnum]map[pb.NewOrderPho
 		pb.NewOrderPhoneRequest_midTerm:  provider.BillTypeIrancell,
 		pb.NewOrderPhoneRequest_fullTerm: provider.BillTypeIrancell,
 	},
-	pb.NewOrderPhoneRequest_mci:     nil,
+	pb.NewOrderPhoneRequest_mci: {
+		pb.NewOrderPhoneRequest_midTerm:  provider.BillTypeMobileMidterm,
+		pb.NewOrderPhoneRequest_fullTerm: provider.BillTypeMobile,
+	},
 	pb.NewOrderPhoneRequest_rightel: nil,
 }
 
@@ -73,7 +76,7 @@ func validPhoneOrder(req *pb.NewOrderPhoneRequest, phone string) bool {
 }
 
 // NewOrder saves the order of a mobile bill and answers the signed order token (POST
-// /v1/mobile/order; task 039: the Irancell operator). The steps are those of bill
+// /v1/mobile/order; task 039: the Irancell operator; task 054: the MCI operator). The steps are those of bill
 // (controller/phone NewOrderV2 and createNewOrderPhone):
 //  1. The phone is converted to the 98 form (helpers.NormalizeMobile, task 038) and the request is
 //     checked (validPhoneOrder): InvalidArgument, no log line.
@@ -89,7 +92,7 @@ func validPhoneOrder(req *pb.NewOrderPhoneRequest, phone string) bool {
 //   - No user: PermissionDenied (as the inquiry; item 14).
 //   - An invalid request, the operator unknown, a payment term that the operator does not have, a
 //     total that does not fit the price field: InvalidArgument, no log line.
-//   - mci, rightel: Unimplemented, no log line.
+//   - rightel: Unimplemented, no log line.
 //   - A price of 0: FailedPrecondition with the text of bill, no log line.
 //   - No enabled order provider: Unavailable (the text of the inquiry), one log line.
 //   - A failed inquiry for the price: the answer of the inquiry endpoint (answerInquiryError).

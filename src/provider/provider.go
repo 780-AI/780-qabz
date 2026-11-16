@@ -23,6 +23,10 @@ const (
 	// BillTypeTelMidterm is the bill type of the mid term of a landline bill (bill: entity.TELMIDTERM;
 	// task 044). It is an order bill type: its inquiry is the inquiry of BillTypeTel.
 	BillTypeTelMidterm = "telmidterm"
+	// BillTypeMobileMidterm is the bill type of the mid term of an MCI mobile bill (bill:
+	// entity.MOBILEMIDTERM; task 054). It is an order bill type: its inquiry is the inquiry of
+	// BillTypeMobile.
+	BillTypeMobileMidterm = "mobilemidterm"
 
 	ActionInquiry = "inquiry"
 

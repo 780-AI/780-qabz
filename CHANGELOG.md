@@ -1,7 +1,8 @@
-<!-- VERSION: 3.55 -->
+<!-- VERSION: 3.56 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.56 — 2026-11-16 — Added 054-mci-mobile-payment entry.
 v3.55 — 2026-11-16 — Added task-058-mci-jiring-fallback entry.
 v3.54 — 2026-11-16 — Added 053-gas-payment entry.
 v3.53 — 2026-11-16 — Added 057-no-v2-routes entry.
@@ -171,6 +172,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 054: the MCI mobile bill payment through Parsian only
+- **Type:** Major (a public endpoint behavior, config keys, seed data, a Critical File).
+- **Files:** `src/entry/grpc/phone_order.go` (`orderOperators` has `mci`: `fullTerm` → `mobile`, `midTerm` → `mobilemidterm`) and its test; `src/provider/provider.go` (`BillTypeMobileMidterm`); `src/core/order/order.go` (the `billTypes` entries `mobile` and `mobilemidterm`), `src/core/order/token.go` (bill's MCI texts), `src/core/order/mobile_test.go` (new), `complete_test.go`, `water_test.go`; `src/config/config.go` (`caching.paid_mobile` new, 1h; `providers.internal.parsian.settlement_inquiry_mci_mobile` read, default 0s; negative values rejected) and its test; `src/provider/parsianproxy/parsianproxy.go` (`payBillTypes` has `mobile`, `mobilemidterm`) and `pay_test.go`; `src/provider/selector_test.go`; `src/app/defaults.go` (the order TTL, the already-paid windows and the `PayRoutes` entries of the MCI bill types; metric help texts), `src/app/mci_order_live_test.go` (new); `src/system/postgres/devdb/seed_providers.sql` (row 48 `enable`); `config.yml.example`; `qabz.postman_collection.json` (Phone / Order MCI and the variables `mci_order_billId`, `mci_order_payId`; the Phone / Order text); `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (items 38 and 42), `docs/folder_structure.md`, `src/app/README.md`, `docs/Plans/OPEN_TASKS.md`, `docs/tasks/done_tasks/054_mci_mobile_payment.md`.
+- **Impact:** **Yes, behavior changes.** (1) `POST /v1/mobile/order` with `operator` `mci` saves an order and answers the signed token (was HTTP 501); the order provider is Parsian (operator decision: Parsian only; the fallback to the next provider is task 058); the price is the raw inquiry of a numeric `billId` and `payId`, else the inquiry of `mobile` with the phone (the term of the request), with saved inquiries for `caching.paid_mobile` for `fullTerm` only. (2) The "already paid" check of an MCI order looks at the orders of any time (`settlement_inquiry_mci_mobile` 0, as bill). (3) `OrderComplete` pays both MCI bill types through Parsian; no settlement; the status worker finalizes them. (4) The dev seed row 48 (`parsian`, `mobile`, `order`) is `enable` (a database seeded before keeps its row).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 054 MCI payment through Parsian" (Go tests; feature ON with the Parsian mock and the status worker; the operator QA on stage after the deploy). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 058 created: the MCI payment fallback from Parsian to the next provider
 - **Type:** Minor (a task file only; no code).

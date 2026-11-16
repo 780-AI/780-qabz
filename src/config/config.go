@@ -283,7 +283,11 @@ type Config struct {
 	// landline order paid through Parsian (bill: shouldSkipNewOrder) looks at the orders created in
 	// this window. Default 360h (bill: parsian.settlementInquiryTelephone). 0: no window (every
 	// order of the bill ID and pay ID); a negative value is rejected.
-	ParsianSettlementInquiryTelephone     time.Duration `path:"providers.internal.parsian.settlement_inquiry_telephone"`
+	ParsianSettlementInquiryTelephone time.Duration `path:"providers.internal.parsian.settlement_inquiry_telephone"`
+	// ParsianSettlementInquiryMCIMobile is read since task 054: the "bill already paid" check of an
+	// MCI order (mobile, mobilemidterm) paid through Parsian (bill: shouldSkipNewOrder,
+	// parsian.settlementInquiryMCIMobile). Default 0 (bill's example). As bill, 0 is not "no check":
+	// the check looks at the orders of any time. A negative value is rejected.
 	ParsianSettlementInquiryMCIMobile     time.Duration `path:"providers.internal.parsian.settlement_inquiry_mci_mobile"`
 	ParsianSettlementInquiryRightelMobile time.Duration `path:"providers.internal.parsian.settlement_inquiry_rightel_mobile"`
 
@@ -362,6 +366,12 @@ type Config struct {
 	// provider call (bill: caching.paidGas, 72h). It applies only when the raw inquiry of the order
 	// fails. 0: every such order asks the provider; a negative value is rejected. Read at start.
 	CachingPaidGas time.Duration `path:"caching.paid_gas"`
+	// CachingPaidMobile is how long a saved MCI mobile inquiry gives the price of a full-term MCI
+	// order (the bill type mobile, task 054) with no provider call (bill: caching.paidMobile, 1h). It
+	// applies only when the raw inquiry of the order fails. A mid-term order (mobilemidterm) never
+	// uses saved inquiries (bill has no TTL for it). 0: every such order asks the provider; a negative
+	// value is rejected. Read at start.
+	CachingPaidMobile time.Duration `path:"caching.paid_mobile"`
 
 	// DebugMockQabzinoEnabled makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -497,6 +507,7 @@ func defaults() Config {
 		CachingPaidWater:                    72 * time.Hour,
 		CachingPaidElectricity:              72 * time.Hour,
 		CachingPaidGas:                      72 * time.Hour,
+		CachingPaidMobile:                   time.Hour,
 		ParsianSettlementInquiryTelephone:   360 * time.Hour,
 		ParsianSettlementInquiryWater:       360 * time.Hour,
 		ParsianSettlementInquiryElectricity: 360 * time.Hour,
@@ -720,6 +731,12 @@ func (c Config) validate() error {
 	}
 	if c.ParsianSettlementInquiryGas < 0 {
 		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_gas must not be negative (0: no window)"))
+	}
+	if c.CachingPaidMobile < 0 {
+		errs = append(errs, errors.New("caching.paid_mobile must not be negative (0: every order asks the provider)"))
+	}
+	if c.ParsianSettlementInquiryMCIMobile < 0 {
+		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_mci_mobile must not be negative (0: the orders of any time)"))
 	}
 	if !ValidMockPayReturnType(c.DebugMockParsianPayReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.parsian.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))

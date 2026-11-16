@@ -52,6 +52,19 @@ var metadata = map[string]Metadata{
 		Icon:           "https://public.780.ir/dl/Operator/Gas.svg",
 		FeeDescription: "کارمزد",
 	},
+	// bill: case entity.MOBILE: MciIcon, AboutIconMobileFinalTerm, FeeDescriptionMobile (task 054).
+	provider.BillTypeMobile: {
+		About:          "قبض موبایل",
+		Icon:           "https://public.780.ir/dl/Operator/logOhamrahaval2.svg",
+		FeeDescription: "کارمزد",
+	},
+	// bill: case entity.MOBILEMIDTERM: MciIcon, AboutIconMobileMidterm, FeeDescriptionMobile (task
+	// 054). bill's AboutIconMobileMidterm and AboutIconMobileFinalTerm have the same text.
+	provider.BillTypeMobileMidterm: {
+		About:          "قبض موبایل",
+		Icon:           "https://public.780.ir/dl/Operator/logOhamrahaval2.svg",
+		FeeDescription: "کارمزد",
+	},
 	// bill: case entity.TELMIDTERM: TelIcon, AboutIconTelMidterm, FeeDescriptionTel (task 044).
 	provider.BillTypeTelMidterm: {
 		About:          "قبض تلفن ثابت-میان دوره",

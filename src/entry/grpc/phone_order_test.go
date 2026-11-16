@@ -107,7 +107,7 @@ func TestNewOrderRequest(t *testing.T) {
 		{"payment type out of the enum", func(r *pb.NewOrderPhoneRequest) { r.PaymentType = 2 }, codes.InvalidArgument, 0},
 		{"operator unknown", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_unknown }, codes.InvalidArgument, 0},
 		{"type out of the enum", func(r *pb.NewOrderPhoneRequest) { r.Type = 5 }, codes.InvalidArgument, 0},
-		{"mci", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_mci }, codes.Unimplemented, 0},
+		{"mci (task 054)", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_mci }, codes.OK, 1},
 		{"rightel", func(r *pb.NewOrderPhoneRequest) { r.Operator = pb.NewOrderPhoneRequest_rightel }, codes.Unimplemented, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -231,4 +231,31 @@ func TestValidPhoneOrder(t *testing.T) {
 	assert.False(t, validPhoneOrder(orderReq(), ""))
 	assert.True(t, validPhoneOrder(&pb.NewOrderPhoneRequest{Operator: pb.NewOrderPhoneRequest_unknown}, "989350000391"),
 		"as bill, the value unknown passes the check")
+}
+
+// TestNewOrderMCI (task 054): the MCI operator gives the bill type of bill's phoneBillTypeMapper
+// (fullTerm: mobile, midTerm: mobilemidterm), the phone in the 98 form as the inquiry ID and the
+// option mci; the token has the operator mci.
+func TestNewOrderMCI(t *testing.T) {
+	for term, want := range map[pb.NewOrderPhoneRequest_PaymentTerms]string{
+		pb.NewOrderPhoneRequest_fullTerm: provider.BillTypeMobile,
+		pb.NewOrderPhoneRequest_midTerm:  provider.BillTypeMobileMidterm,
+	} {
+		saved := savedOrder()
+		saved.BillType = want
+		orders := &fakeOrders{o: saved}
+		signer := &fakeSigner{}
+		req := orderReq()
+		req.Operator, req.Type, req.Phone = pb.NewOrderPhoneRequest_mci, term, "09121234567"
+		_, err := newOrderPhone(orders, signer, nil).NewOrder(waterCtx(), req)
+		if !assert.NoError(t, err, want) || !assert.Len(t, orders.reqs, 1, want) {
+			continue
+		}
+		r := orders.reqs[0]
+		assert.Equal(t, []string{want, "989121234567", "mci"}, []string{r.BillType, r.InquiryID, r.Option}, want)
+		if assert.Len(t, signer.payloads, 1, want) {
+			assert.Contains(t, string(signer.payloads[0]), `"service":"mci"`, want)
+			assert.Contains(t, string(signer.payloads[0]), `"type":"`+want+`"`, want)
+		}
+	}
 }

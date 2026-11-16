@@ -2,6 +2,8 @@
 -- sorted by id. A NULL is a database NULL. ON CONFLICT (id) DO NOTHING keeps a row that already exists.
 -- inquiry_step and provider_fee are not given: they get the column defaults.
 -- unseed_providers.sql deletes the same ids (a unit test checks it).
+-- Task 054 (operator, 2026-11-16): row 48 (parsian, mobile, order) is 'enable' (was 'disable'), so a
+-- full-term MCI order goes to Parsian. A dev database seeded before keeps its row (ON CONFLICT).
 INSERT INTO providers ("id", "name", "subject", "bill_type", "action", "type", "priority", "timeout", "status", "updated_at", "use_nats") VALUES
 (2, 'tavanir', 'tavanir-inquiry', 'electricity', 'inquiry', 'retryable', 9, 100, 'enable', '2022-05-23T08:03:28.988789+04:30', true),
 (17, 'eways2', 'eways2-bill', 'electricity', 'order', 'retryable', 10, 500, 'disable', '2026-10-13T17:15:37.270428+03:30', true),
@@ -34,7 +36,7 @@ INSERT INTO providers ("id", "name", "subject", "bill_type", "action", "type", "
 (45, 'parsian', 'parsian-bill-payment', 'water', 'order', 'retryable', 9, 100, 'enable', '2022-05-28T14:36:32.109064+04:30', false),
 (46, 'parsian', 'parsian-bill-payment', 'gas', 'order', 'retryable', 9, 100, 'enable', '2022-05-28T14:36:32.109064+04:30', false),
 (47, 'parsian', 'parsian-bill-payment', 'electricity', 'order', 'retryable', 9, 100, 'enable', '2026-10-13T17:15:37.270428+03:30', false),
-(48, 'parsian', 'parsian-bill-payment', 'mobile', 'order', 'retryable', 9, 100, 'disable', '2022-05-28T14:36:32.109064+04:30', false),
+(48, 'parsian', 'parsian-bill-payment', 'mobile', 'order', 'retryable', 9, 100, 'enable', '2022-05-28T14:36:32.109064+04:30', false),
 (49, 'eways2', 'eways2-bill', 'raw', 'order', 'retryable', 10, 500, 'enable', '2022-03-10T12:42:16.895653+03:30', true),
 (50, 'parsian', 'parsian-bill-payment', 'tel', 'order', 'retryable', 9, 100, 'disable', '2022-05-28T14:36:32.109064+04:30', false),
 (51, 'parsian', 'parsian-bill-payment', 'telmidterm', 'order', 'retryable', 9, 100, 'enable', '2026-10-24T12:08:31.649964+03:30', false),

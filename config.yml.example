@@ -113,7 +113,7 @@ providers:
       settlement_inquiry_electricity: "360h" # "bill already paid" window of an electricity order paid through Parsian (bill: 360h); 0: no window
       settlement_inquiry_gas: "360h"       # "bill already paid" window of a gas order paid through Parsian (bill: 360h); 0: no window
       settlement_inquiry_telephone: "360h" # "bill already paid" window of a landline order paid through Parsian (bill: 360h); 0: no window
-      settlement_inquiry_mci_mobile: "0s"
+      settlement_inquiry_mci_mobile: "0s"  # "bill already paid" check of an MCI order (mobile, mobilemidterm) paid through Parsian (bill: 0); as bill, 0 checks the orders of any time (not "no check")
       settlement_inquiry_rightel_mobile: "0s"
     payment_server:          # the payment service (our own service; bill: paymentServer)
       address: ""            # address of the payment service; not read yet; the real value only in config.yml
@@ -157,6 +157,7 @@ caching:
   paid_water: "72h"          # how long a saved water inquiry gives the price of a water order whose raw inquiry failed, with no provider call (bill: paidWater); 0: every such order asks the provider
   paid_electricity: "72h"    # how long a saved electricity inquiry gives the price of an electricity order whose raw inquiry failed, with no provider call (bill: paidElectricity); 0: every such order asks the provider
   paid_gas: "72h"            # how long a saved gas inquiry gives the price of a gas order whose raw inquiry failed, with no provider call (bill: paidGas); 0: every such order asks the provider
+  paid_mobile: "1h"          # how long a saved MCI inquiry gives the price of a full-term MCI order (mobile) whose raw inquiry failed, with no provider call (bill: paidMobile); a mid-term order never uses it (bill); 0: every such order asks the provider
 
 kafka:                       # the Kafka client (bill: kafka); the producer exists only while a status worker is on (providers.internal.parsian.get_status.enabled or providers.internal.irancell.get_status.enabled)
   brokers:                   # the broker addresses; not empty while the worker is on

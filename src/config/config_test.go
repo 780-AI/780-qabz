@@ -733,7 +733,8 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	for _, d := range []time.Duration{
 		c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
 		c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder,
-		c.ParsianSettlementInquiryMCIMobile, c.ParsianSettlementInquiryRightelMobile,
+		c.ParsianSettlementInquiryMCIMobile, // task 054: read, bill's default 0
+		c.ParsianSettlementInquiryRightelMobile,
 	} {
 		assert.Zero(t, d)
 	}
@@ -958,6 +959,33 @@ func TestParseGasOrderKeys(t *testing.T) {
 	for yml, want := range map[string]string{
 		"caching: {paid_gas: \"-1s\"}\n":                                        "caching.paid_gas must not be negative",
 		"providers: {internal: {parsian: {settlement_inquiry_gas: \"-1h\"}}}\n": "settlement_inquiry_gas must not be negative",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+}
+
+// TestParseMCIOrderKeys (task 054): caching.paid_mobile and
+// providers.internal.parsian.settlement_inquiry_mci_mobile, their defaults and their rules.
+func TestParseMCIOrderKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, time.Hour, c.CachingPaidMobile, "bill: caching.paidMobile")
+	assert.Zero(t, c.ParsianSettlementInquiryMCIMobile, "bill: parsian.settlementInquiryMCIMobile 0")
+
+	c, err = Parse([]byte(base + "caching: {paid_mobile: \"2h\"}\nproviders: {internal: {parsian: {settlement_inquiry_mci_mobile: \"24h\"}}}\n"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, 2*time.Hour, c.CachingPaidMobile)
+	assert.Equal(t, 24*time.Hour, c.ParsianSettlementInquiryMCIMobile)
+
+	for yml, want := range map[string]string{
+		"caching: {paid_mobile: \"-1s\"}\n":                                            "caching.paid_mobile must not be negative",
+		"providers: {internal: {parsian: {settlement_inquiry_mci_mobile: \"-1h\"}}}\n": "settlement_inquiry_mci_mobile must not be negative",
 	} {
 		_, err := Parse([]byte(base + yml))
 		assert.ErrorContains(t, err, want, yml)
