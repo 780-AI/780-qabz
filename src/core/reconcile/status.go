@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
+	"qabz/common/monitoring/jaeger"
 	"qabz/core/order"
 	"qabz/provider"
 )
@@ -45,6 +48,13 @@ const (
 
 // actionStatus is the action label of a status call.
 const actionStatus = "status"
+
+// checkSpan is the span name of the check of one order (conventions § 17; task 049).
+const checkSpan = "reconcile.StatusWorker.check"
+
+// failedResults are the order results that are a failure: their span gets the status Error.
+// pending, skipped, late, success and failed are normal outcomes of a check.
+var failedResults = map[string]bool{ResultReadError: true, ResultSaveError: true, ResultReportError: true}
 
 // Repository reads and writes the orders of the worker (postgres.OrderRepository).
 type Repository interface {
@@ -169,9 +179,24 @@ func (w *StatusWorker) Run(ctx context.Context, ext Charger) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			w.count(w.check(ctx, adapter, id))
+			w.count(w.checkTraced(ctx, adapter, id))
 		}
 	}
+}
+
+// checkTraced is check in one span checkSpan, a child of the span in ctx (the root span of the
+// tick, entry/cron; conventions § 17; task 049), with the provider, the order ID and the result of
+// the order. A read, report or save failure gives the status Error.
+func (w *StatusWorker) checkTraced(ctx context.Context, adapter provider.ProviderInterface, orderID string) string {
+	ctx, span := otel.Tracer("qabz/core/reconcile").Start(ctx, checkSpan)
+	defer span.End()
+	result := w.check(ctx, adapter, orderID)
+	span.SetAttributes(attribute.String("provider", w.o.Provider), attribute.String("order.id", orderID),
+		attribute.String("result", result))
+	if failedResults[result] {
+		jaeger.Fail(span, result, nil)
+	}
+	return result
 }
 
 // check asks the status of one order and acts on it. It returns the result of the order.

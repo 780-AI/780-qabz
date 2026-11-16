@@ -1,7 +1,8 @@
-<!-- VERSION: 3.47 -->
+<!-- VERSION: 3.48 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.48 — 2026-11-16 — Added 049-feature-spans entry.
 v3.47 — 2026-11-16 — Added tasks-folder-move entry.
 v3.46 — 2026-11-15 — Added 048-water-payment entry.
 v3.45 — 2026-11-15 — Added session-wrap-up (tasks 047, 050, 051, 043 session) entry.
@@ -163,6 +164,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 049: the core-step spans of each feature
+- **Type:** Major (tracing behavior of every inquiry, the status worker and the auth check; a Critical File).
+- **Files:** `src/core/inquiry/inquiry.go` (the spans `inquiry.Service.Inquire`, `inquiry.Service.fromDatabase`, `inquiry.Service.fromProvider`; `Inquire` counts once from the new `inquire`; `fromDatabase` also returns the read error, for its span) and the new `src/core/inquiry/tracing_test.go`; `src/core/reconcile/status.go` (the span `reconcile.StatusWorker.check` for each order) and the new `src/core/reconcile/tracing_test.go`; `src/entry/grpc/auth.go` (a rejected call gives its server span the status `Error`, `rejected`) and the new `src/entry/grpc/tracing_test.go` (the 14 paths of the task on servers with the tracing handler); `docs/initial-discovery/system.html` (v2.21, Logs section "As built"); `docs/tasks/done_tasks/049_feature_spans.md` (moved from `pending_tasks/`, v1.0: design D1 to D6 approved, implementation notes I1 to I6, the verification record; not manifest-tracked); `docs/Plans/OPEN_TASKS.md` (v1.84); `docs/documents_manifest.md`.
+- **Impact:** **Yes, tracing changes** (no answer, metric, row or log line changes). With tracing on: (1) every inquiry (water, electricity, gas, landline, mobile Irancell, MCI, Rightel, and the inquiry inside an order) has `inquiry.Service.Inquire` (`bill_type`, `provider`, `result`) with the children `fromDatabase` (`hit`, `miss`, `error`) and `fromProvider`; `Error` on `Inquire` and `fromProvider` for every error, on `fromDatabase` for a failed read; (2) each order of a status worker tick is one span `reconcile.StatusWorker.check` (`provider`, `order.id`, `result`), `Error` for `read_error`, `report_error`, `save_error`; (3) a call that the auth check rejects has its server span with `Error` and `rejected`. A request that breaks a rule makes no `Inquire` span. Greeting, Services, my bills and the raw inquiry get no core span (one dependency call or none, D3). With tracing off (the default) nothing changes.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 049 core-step spans" (Go tests; feature ON with the compose Jaeger) and "Task 049 open decision" (a provider message can reach a span status; operator decision). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — The task folders move from `docs/Plans/` to `docs/tasks/`
 

@@ -4,13 +4,19 @@ import (
 	"context"
 	"errors"
 
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"qabz/common/auth"
+	"qabz/common/monitoring/jaeger"
 )
+
+// AuthRejected is the status description of the server span of a call that the auth check rejects
+// (conventions § 17; task 049).
+const AuthRejected = "rejected"
 
 // TokenVerifier checks an Authorization value ("Bearer <token>"). *auth.Verifier implements it.
 type TokenVerifier interface {
@@ -80,8 +86,20 @@ func (a *Auth) ServerOptions() []grpc.ServerOption {
 	return []grpc.ServerOption{grpc.ChainUnaryInterceptor(a.Unary()), grpc.ChainStreamInterceptor(a.Stream())}
 }
 
-// check returns ctx with the claims, or errRejected.
+// check returns ctx with the claims, or errRejected. A rejected call gives the status Error with
+// AuthRejected to the span in ctx (the server span of the tracing handler, conventions § 17; task
+// 049): the gRPC code PermissionDenied is not an error for the tracing handler, so the check sets
+// it. No reason and no token goes in the span.
 func (a *Auth) check(ctx context.Context) (context.Context, error) {
+	out, err := a.verify(ctx)
+	if err != nil {
+		jaeger.Fail(trace.SpanFromContext(ctx), AuthRejected, nil)
+	}
+	return out, err
+}
+
+// verify is check with no span.
+func (a *Auth) verify(ctx context.Context) (context.Context, error) {
 	if a == nil {
 		return ctx, errRejected
 	}

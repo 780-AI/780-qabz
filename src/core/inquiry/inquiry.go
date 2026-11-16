@@ -26,10 +26,30 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"qabz/common/helpers"
+	"qabz/common/monitoring/jaeger"
 	"qabz/provider"
 )
+
+// The span names of the inquiry flow (conventions § 17; task 049).
+const (
+	inquireSpan      = "inquiry.Service.Inquire"
+	fromDatabaseSpan = "inquiry.Service.fromDatabase"
+	fromProviderSpan = "inquiry.Service.fromProvider"
+)
+
+// Results of the span fromDatabaseSpan (a fixed set; not a metric).
+const (
+	dbHit   = "hit"
+	dbMiss  = "miss"
+	dbError = "error"
+)
+
+func tracer() trace.Tracer { return otel.Tracer("qabz/core/inquiry") }
 
 // RequestInitial is bill_inquiry_requests.status of a row before the provider answers (bill:
 // entity.INITIAL).
@@ -336,6 +356,12 @@ func generateTID(billType string) (string, error) {
 // request row, status or inquiry is written. The provider call and the errors are the same.
 //
 // Every other error is a failure of the database or of the code, with the stage in its text.
+//
+// A request that passes step 1 has one span inquireSpan, a child of the span in ctx (conventions
+// § 17; task 049), with the bill type, the provider and the result (the Result values that
+// Options.OnInquiry gets), and the status Error for every error. Steps 3 and 4 are its child spans
+// fromDatabaseSpan and fromProviderSpan. A request that breaks a rule makes no span: no dependency
+// is called.
 func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 	if s == nil || s.repo == nil || s.providers == nil || s.adapters == nil {
 		return Result{}, errors.New("inquiry: service not created with NewService")
@@ -354,45 +380,85 @@ func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("%w: user", ErrInvalid)
 	}
 
+	ctx, span := tracer().Start(ctx, inquireSpan)
+	res, providerName, result, err := s.inquire(ctx, req, bt)
+	s.countInquiry(req.BillType, providerName, result)
+	span.SetAttributes(attribute.String("bill_type", req.BillType), attribute.String("provider", providerName),
+		attribute.String("result", result))
+	if err != nil {
+		jaeger.Fail(span, result, err)
+	}
+	span.End()
+	return res, err
+}
+
+// inquire is steps 2 to 4 of Inquire with the span in ctx. It returns the provider name
+// (NoProviderLabel when none was picked) and the Result value of the call.
+func (s *Service) inquire(ctx context.Context, req Request, bt billType) (Result, string, string, error) {
 	pro, err := s.providers.PickProvider(req.BillType, provider.ActionInquiry)
 	if err != nil {
-		label, result := NoProviderLabel, ResultError
+		result := ResultError
 		if errors.Is(err, provider.ErrNoProvider) {
 			result = ResultNoProvider
 		}
-		s.countInquiry(req.BillType, label, result)
-		return Result{}, fmt.Errorf("pick provider for %s %s: %w", req.BillType, provider.ActionInquiry, err)
+		return Result{}, NoProviderLabel, result, fmt.Errorf("pick provider for %s %s: %w", req.BillType, provider.ActionInquiry, err)
 	}
 	if bt.onlyProvider != "" && pro.Name != bt.onlyProvider {
 		// The bill type has one provider that may answer. Another provider is never called: the
 		// answer is the one of "no enabled provider".
-		s.countInquiry(req.BillType, NoProviderLabel, ResultNoProvider)
-		return Result{}, fmt.Errorf("pick provider for %s %s: %w: only %q may answer, the pick is %q",
+		return Result{}, NoProviderLabel, ResultNoProvider, fmt.Errorf("pick provider for %s %s: %w: only %q may answer, the pick is %q",
 			req.BillType, provider.ActionInquiry, provider.ErrNoProvider, bt.onlyProvider, pro.Name)
 	}
 	adapter, ok := s.adapters.Get(pro.Name)
 	if !ok || adapter == nil {
-		s.countInquiry(req.BillType, pro.Name, ResultError)
-		return Result{}, fmt.Errorf("%w %q", ErrNoAdapter, pro.Name)
+		return Result{}, pro.Name, ResultError, fmt.Errorf("%w %q", ErrNoAdapter, pro.Name)
 	}
 	if !adapter.SupportsInquiry(req.BillType) {
 		// The adapter does not inquire this bill type: the same answer as no adapter (no saved
 		// inquiry read, no request row, no call), as before the adapter existed (task 036).
-		s.countInquiry(req.BillType, pro.Name, ResultError)
-		return Result{}, fmt.Errorf("%w %q for the bill type %q", ErrNoAdapter, pro.Name, req.BillType)
+		return Result{}, pro.Name, ResultError, fmt.Errorf("%w %q for the bill type %q", ErrNoAdapter, pro.Name, req.BillType)
 	}
 
 	// @todo this_vs_bill item 34: bill has no switch that turns off the inquiry tables (task 031,
 	// Options.NoStore).
 	if !s.noStore && !req.NoCache {
-		if res, ok := s.fromDatabase(ctx, req, pro, bt.skipSameTypePair); ok {
-			s.countInquiry(req.BillType, pro.Name, ResultDBHit)
-			return res, nil
+		if res, ok := s.tracedFromDatabase(ctx, req, pro, bt.skipSameTypePair); ok {
+			return res, pro.Name, ResultDBHit, nil
 		}
 	}
+	res, result, err := s.tracedFromProvider(ctx, req, pro, adapter)
+	return res, pro.Name, result, err
+}
+
+// tracedFromDatabase is fromDatabase in the span fromDatabaseSpan, with the result hit, miss or
+// error (a failed read: the status Error, and the flow goes on to the provider).
+func (s *Service) tracedFromDatabase(ctx context.Context, req Request, pro provider.Provider, skipSameTypePair bool) (Result, bool) {
+	ctx, span := tracer().Start(ctx, fromDatabaseSpan)
+	defer span.End()
+	res, ok, err := s.fromDatabase(ctx, req, pro, skipSameTypePair)
+	result := dbMiss
+	switch {
+	case err != nil:
+		result = dbError
+		jaeger.Fail(span, dbError, err)
+	case ok:
+		result = dbHit
+	}
+	span.SetAttributes(attribute.String("result", result))
+	return res, ok
+}
+
+// tracedFromProvider is fromProvider in the span fromProviderSpan, with the provider and the result
+// (the Result value), and the status Error for every error.
+func (s *Service) tracedFromProvider(ctx context.Context, req Request, pro provider.Provider, adapter provider.ProviderInterface) (Result, string, error) {
+	ctx, span := tracer().Start(ctx, fromProviderSpan)
+	defer span.End()
 	res, result, err := s.fromProvider(ctx, req, pro, adapter)
-	s.countInquiry(req.BillType, pro.Name, result)
-	return res, err
+	span.SetAttributes(attribute.String("provider", pro.Name), attribute.String("result", result))
+	if err != nil {
+		jaeger.Fail(span, result, err)
+	}
+	return res, result, err
 }
 
 func (s *Service) countInquiry(billType, providerName, result string) {
@@ -402,9 +468,9 @@ func (s *Service) countInquiry(billType, providerName, result string) {
 }
 
 // fromDatabase answers from valid saved inquiries (bill: getFromCache). ok is false when there is
-// no valid row, the cache is off, the read failed (logged), or skipSameTypePair is set and the two
-// rows have the same mobile inquiry type (bill: shouldSkipCache).
-func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Provider, skipSameTypePair bool) (Result, bool) {
+// no valid row, the cache is off, the read failed (logged; err is the read error, for the span), or
+// skipSameTypePair is set and the two rows have the same mobile inquiry type (bill: shouldSkipCache).
+func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Provider, skipSameTypePair bool) (Result, bool, error) {
 	var ttl time.Duration
 	if s.cacheTTL != nil {
 		ttl = s.cacheTTL(req.BillType)
@@ -413,7 +479,7 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 		ttl = req.CacheTTL
 	}
 	if ttl <= 0 {
-		return Result{}, false
+		return Result{}, false, nil
 	}
 	rows, err := s.repo.FindValid(ctx, req.InquiryID, ttl, pro.ID)
 	if err != nil {
@@ -421,14 +487,14 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 		if ctx.Err() == nil && s.log != nil {
 			s.log.Error("inquiry: read saved inquiries failed", "bill_type", req.BillType, "provider", pro.Name, "error", err)
 		}
-		return Result{}, false
+		return Result{}, false, err
 	}
 	if len(rows) == 0 {
-		return Result{}, false
+		return Result{}, false, nil
 	}
 	if skipSameTypePair && len(rows) == 2 && rows[0].InquiryType == rows[1].InquiryType &&
 		(rows[0].InquiryType == provider.InquiryTypeMidterm || rows[0].InquiryType == provider.InquiryTypeFinalTerm) {
-		return Result{}, false
+		return Result{}, false, nil
 	}
 	res := Result{FromDatabase: true, Inquiries: make([]Inquiry, 0, len(rows))}
 	copies := make([]Row, 0, len(rows))
@@ -449,7 +515,7 @@ func (s *Service) fromDatabase(ctx context.Context, req Request, pro provider.Pr
 	if err := s.repo.SaveInquiries(ctx, copies); err != nil && ctx.Err() == nil && s.log != nil {
 		s.log.Error("inquiry: save copies of saved inquiries failed", "bill_type", req.BillType, "provider", pro.Name, "error", err)
 	}
-	return res, true
+	return res, true, nil
 }
 
 // fromProvider calls the provider and saves the answer (bill: the step loop with one step). The
