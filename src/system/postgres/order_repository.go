@@ -82,11 +82,16 @@ WHERE inquiry_id = $1 AND pay_id = $2 AND is_cached = false`
 const setLastOrderDateSQL = `UPDATE bills SET last_order_date = NULLIF($3, ''), payment_deadline = NULL
 WHERE bill_id = $1 AND type = $2`
 
-// pendingIDsSQL reads one page of the order IDs whose newest row in the window has the status
-// pending or in-progress, for one provider (task 045; bill: order.Repository.GetAllPending, the same
-// query). The window filters the rows before the newest row is taken, as bill: a final row newer
-// than the window keeps the order in the list (task 045 C6). The window is in seconds before NOW()
-// (the clock of the database, as latestOrderSQL).
+// pendingIDsSQL reads one page of the orders whose newest row in the window has the status pending
+// or in-progress, for one provider (task 045; bill: order.Repository.GetAllPending). The window
+// filters the rows before the newest row is taken, as bill: a final row newer than the window keeps
+// the order in the list (task 045 C6). The window is in seconds before NOW() (the clock of the
+// database, as latestOrderSQL).
+//
+// @todo docs/this_vs_bill.md item 43: a keyset page on (created_at of the newest row in the window,
+// order_id) after the cursor $4, $5, in place of bill's OFFSET (task 050 D4). The key of an order only
+// grows, so an order that leaves the list or the window during the run does not move the other
+// orders back past the page, and no pending order of the window is skipped in a run.
 const pendingIDsSQL = `WITH ranked AS (
   SELECT order_id, status, created_at,
     ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY created_at DESC) AS rn
@@ -95,10 +100,11 @@ const pendingIDsSQL = `WITH ranked AS (
     AND created_at >= NOW() - make_interval(secs => $2::double precision)
     AND created_at <= NOW() - make_interval(secs => $3::double precision)
 )
-SELECT order_id::text FROM ranked
+SELECT order_id::text, created_at FROM ranked
 WHERE rn = 1 AND status IN ('pending', 'in-progress')
-ORDER BY created_at ASC
-LIMIT $4 OFFSET $5`
+  AND (created_at, order_id) > ($4::timestamptz, $5::uuid)
+ORDER BY created_at ASC, order_id ASC
+LIMIT $6`
 
 // nilUUID is the order_id before every order (the first page of ConfirmCandidates).
 const nilUUID = "00000000-0000-0000-0000-000000000000"
@@ -116,15 +122,20 @@ WHERE created_at > $2 AND created_at < $3
 ORDER BY order_id, created_at DESC
 LIMIT $5`
 
-// lockLatestSQL reads the status of the newest row of an order of the last 24 h and locks it, in
-// the transaction of InsertFinal (bill: NewOrderWithFinalStatus, SELECT ... FOR UPDATE).
+// lockLatestSQL reads the status of the newest row of an order of the last window $2 (seconds) and
+// locks it, in the transaction of InsertFinal (bill: NewOrderWithFinalStatus, SELECT ... FOR UPDATE).
+//
+// @todo docs/this_vs_bill.md item 43: the window is order.LatestWindow (48 h), the window of the
+// read (task 050 D5); bill locks the newest row of the last 24 h, so its save of an order of 24 h to
+// 48 h fails each time.
 const lockLatestSQL = `SELECT COALESCE(status, '') FROM orders
-WHERE order_id = $1::uuid AND created_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW()
+WHERE order_id = $1::uuid AND created_at BETWEEN NOW() - make_interval(secs => $2::double precision) AND NOW()
 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
 
 // ErrAlreadyFinal is the error of InsertFinal when the newest row of the order is success or
-// failed (bill: "order is already in final status"). Test it with errors.Is.
-var ErrAlreadyFinal = errors.New("order repository: order is already in final status")
+// failed (bill: "order is already in final status"). It is order.ErrAlreadyFinal. Test it with
+// errors.Is.
+var ErrAlreadyFinal = order.ErrAlreadyFinal
 
 // beginner starts a transaction (*pgxpool.Pool).
 type beginner interface {
@@ -174,27 +185,43 @@ func insertOrder(ctx context.Context, q querier, o order.Order) error {
 	return err
 }
 
-// PendingIDs gives one page (limit, offset) of the order IDs of the provider whose newest row
-// created from now-end to now-start has the status pending or in-progress, the oldest first (task
-// 045; bill: GetAllPending).
-func (r *OrderRepository) PendingIDs(ctx context.Context, providerName string, limit, offset int, start, end time.Duration) ([]string, error) {
+// PendingIDs gives one page of at most limit orders of the provider whose newest row created from
+// now-end to now-start has the status pending or in-progress, after the cursor, ordered by the
+// created_at of that row and the order ID (task 045, task 050 D4; bill: GetAllPending). The zero
+// cursor gives the first page.
+func (r *OrderRepository) PendingIDs(ctx context.Context, providerName string, limit int, after order.Cursor, start, end time.Duration) ([]order.Cursor, error) {
 	if r == nil || r.db == nil {
 		return nil, errNoOrderPool
 	}
-	rows, err := r.db.Query(ctx, pendingIDsSQL, providerName, end.Seconds(), start.Seconds(), limit, offset)
+	afterID := after.OrderID
+	if afterID == "" {
+		afterID = nilUUID
+	}
+	rows, err := r.db.Query(ctx, pendingIDsSQL, providerName, end.Seconds(), start.Seconds(), after.CreatedAt, afterID, limit)
 	if err != nil {
 		return nil, err
 	}
 	if rows == nil {
 		return nil, errors.New("order repository: no rows from Query")
 	}
-	return pgx.CollectRows(rows, pgx.RowTo[string])
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (order.Cursor, error) {
+		var c order.Cursor
+		err := row.Scan(&c.OrderID, &c.CreatedAt)
+		return c, err
+	})
 }
 
 // InsertFinal adds o, a row with a final status, in one transaction (task 045; bill:
-// NewOrderWithFinalStatus): it locks the newest row of the order of the last 24 h; no row is an
-// error (pgx.ErrNoRows), a final status there is ErrAlreadyFinal, and nothing is saved.
-func (r *OrderRepository) InsertFinal(ctx context.Context, o order.Order) (err error) {
+// NewOrderWithFinalStatus): it locks the newest row of the order of the last order.LatestWindow; no
+// row is an error (pgx.ErrNoRows), a final status there is ErrAlreadyFinal, and nothing is saved.
+// After the insert and before the commit it calls report (when not nil; task 050 D6): an error of
+// report rolls back the insert and is returned as it is.
+//
+// @todo docs/this_vs_bill.md item 43: bill reports on Kafka first and saves after, so a failed save
+// after a good report leaves the order pending; here a failed lock or insert reports nothing and a
+// failed report saves nothing. Only a commit that fails after a delivered report sends a second
+// report at the next run (the payment service accepts it, operator 2026-11-16).
+func (r *OrderRepository) InsertFinal(ctx context.Context, o order.Order, report func(context.Context) error) (err error) {
 	if r == nil || r.pool == nil {
 		return errNoOrderPool
 	}
@@ -210,7 +237,7 @@ func (r *OrderRepository) InsertFinal(ctx context.Context, o order.Order) (err e
 			_ = tx.Rollback(context.WithoutCancel(ctx))
 		}
 	}()
-	row := tx.QueryRow(ctx, lockLatestSQL, o.OrderID)
+	row := tx.QueryRow(ctx, lockLatestSQL, o.OrderID, order.LatestWindow.Seconds())
 	if row == nil {
 		err = errors.New("order repository: no row from QueryRow")
 		return err
@@ -224,6 +251,11 @@ func (r *OrderRepository) InsertFinal(ctx context.Context, o order.Order) (err e
 	}
 	if err = insertOrder(ctx, tx, o); err != nil {
 		return err
+	}
+	if report != nil {
+		if err = report(ctx); err != nil {
+			return err
+		}
 	}
 	return tx.Commit(ctx)
 }

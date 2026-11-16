@@ -16,12 +16,14 @@ import (
 
 // fakeClient is a Client that records the request and gives a fixed answer.
 type fakeClient struct {
-	mu    sync.Mutex
-	reqs  []*pb.BillInquiryRequest
-	resp  *pb.BillInquiryResponse
-	err   error
-	block bool // wait for the context
-	dl    bool // the context had a deadline
+	mu         sync.Mutex
+	reqs       []*pb.BillInquiryRequest
+	resp       *pb.BillInquiryResponse
+	err        error
+	block      bool                   // wait for the context
+	dl         bool                   // the context had a deadline
+	statusReqs []*pb.GetStatusRequest // task 050
+	statusResp *pb.GetStatusResponse
 }
 
 func (f *fakeClient) BillInquiry(ctx context.Context, in *pb.BillInquiryRequest, _ ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
@@ -34,6 +36,18 @@ func (f *fakeClient) BillInquiry(ctx context.Context, in *pb.BillInquiryRequest,
 		return nil, ctx.Err()
 	}
 	return f.resp, f.err
+}
+
+func (f *fakeClient) GetStatus(ctx context.Context, in *pb.GetStatusRequest, _ ...grpc.CallOption) (*pb.GetStatusResponse, error) {
+	f.mu.Lock()
+	f.statusReqs = append(f.statusReqs, in)
+	_, f.dl = ctx.Deadline()
+	f.mu.Unlock()
+	if f.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return f.statusResp, f.err
 }
 
 func (f *fakeClient) calls() int {
@@ -73,8 +87,6 @@ func TestNameAndNotSupported(t *testing.T) {
 	var nilAdapter *Adapter
 	assert.False(t, nilAdapter.Enabled())
 	_, err := a.Pay(context.Background(), provider.PaymentRequest{})
-	assert.ErrorIs(t, err, provider.ErrNotSupported)
-	_, err = a.Status(context.Background(), provider.StatusRequest{})
 	assert.ErrorIs(t, err, provider.ErrNotSupported)
 	_, err = a.GetDocument(context.Background(), provider.DocumentRequest{})
 	assert.ErrorIs(t, err, provider.ErrNotSupported)
@@ -279,6 +291,93 @@ func TestMockFixtures(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Same(t, provider.ProviderInterface(real), off, "off is the adapter itself")
 	}
+}
+
+// TestStatus (task 050 D3; bill: IrancellPaymentInquiry): GetStatus with the order ID and the
+// purchase type "charge", within the adapter timeout; the status, the message and the tid of the
+// answer as they are (also a status text that is not an order status).
+func TestStatus(t *testing.T) {
+	c := &fakeClient{statusResp: &pb.GetStatusResponse{Status: "success", Message: "done", Tid: "8800112233"}}
+	a := newAdapter(t, c)
+	res, err := a.Status(context.Background(), provider.StatusRequest{OrderID: "11111111-2222-4333-8444-555555555555", BillType: "irancell"})
+	if assert.NoError(t, err) && assert.NotNil(t, res) {
+		assert.Equal(t, provider.StatusResponse{Status: "success", Message: "done", ProviderTraceID: "8800112233"}, *res)
+	}
+	if assert.Len(t, c.statusReqs, 1) {
+		assert.Equal(t, "11111111-2222-4333-8444-555555555555", c.statusReqs[0].GetOrderId())
+		assert.Equal(t, "charge", c.statusReqs[0].GetPurchaseType())
+	}
+	assert.True(t, c.dl, "the call has the adapter timeout")
+	assert.Zero(t, c.calls(), "no inquiry call")
+
+	c.statusResp = &pb.GetStatusResponse{Status: "unknown-word"}
+	res, err = a.Status(context.Background(), provider.StatusRequest{OrderID: "o"})
+	if assert.NoError(t, err) && assert.NotNil(t, res) {
+		assert.Equal(t, "unknown-word", res.Status, "the text as it is; the worker decides")
+	}
+}
+
+// TestStatusFailuresAreProviderDown (task 050 D3): the switch off (nothing sent), no address, a gRPC
+// error, a nil answer and a timeout each give an error that wraps provider.ErrProviderDown; an
+// adapter not made with New is an error.
+func TestStatusFailuresAreProviderDown(t *testing.T) {
+	off, err := New(Options{Client: &fakeClient{}, Timeout: time.Second})
+	if assert.NoError(t, err) {
+		_, err = off.Status(context.Background(), provider.StatusRequest{OrderID: "o"})
+		assert.ErrorIs(t, err, provider.ErrProviderDown)
+		assert.Empty(t, off.client.(*fakeClient).statusReqs, "the switch off sends nothing")
+	}
+	for name, c := range map[string]*fakeClient{
+		"grpc error": {err: errors.New("unavailable")},
+		"nil answer": {},
+	} {
+		_, err := newAdapter(t, c).Status(context.Background(), provider.StatusRequest{OrderID: "o"})
+		assert.ErrorIs(t, err, provider.ErrProviderDown, name)
+	}
+	noAddr, _ := Dial("")
+	_, err = newAdapter(t, noAddr).Status(context.Background(), provider.StatusRequest{OrderID: "o"})
+	assert.ErrorIs(t, err, provider.ErrProviderDown)
+
+	slow := &fakeClient{block: true}
+	a, err := New(Options{Enabled: true, Client: slow, Timeout: 20 * time.Millisecond})
+	if assert.NoError(t, err) {
+		start := time.Now()
+		_, err = a.Status(context.Background(), provider.StatusRequest{OrderID: "o"})
+		assert.ErrorIs(t, err, provider.ErrProviderDown)
+		assert.Less(t, time.Since(start), time.Second, "the timeout ends the call")
+	}
+	var bad Adapter
+	_, err = bad.Status(context.Background(), provider.StatusRequest{})
+	assert.Error(t, err)
+}
+
+// TestMockStatus (task 050 D9): the mock answers success (the fixture), failed and pending
+// (ErrProviderDown) from status_return_type, with no call to the irancell service.
+func TestMockStatus(t *testing.T) {
+	f := MockFixtures()
+	if !assert.NotNil(t, f.Status) {
+		return
+	}
+	a, b := f.Status(provider.StatusRequest{}), f.Status(provider.StatusRequest{})
+	assert.NotSame(t, a, b, "a new value on each call")
+	c := &fakeClient{err: errors.New("must not be called")}
+	real := newAdapter(t, c)
+	for rt, want := range map[string]string{provider.MockReturnSuccess: provider.StatusSuccess, provider.MockReturnFailed: provider.StatusFailed, "": provider.StatusSuccess} {
+		m, err := provider.NewMock(real, provider.MockSettings{Enable: true, ReturnType: provider.MockReturnSuccess, StatusReturnType: rt}, f, nil)
+		if assert.NoError(t, err) {
+			res, err := m.Status(context.Background(), provider.StatusRequest{OrderID: "o"})
+			if assert.NoError(t, err, rt) && assert.NotNil(t, res, rt) {
+				assert.Equal(t, want, res.Status, rt)
+			}
+		}
+	}
+	m, err := provider.NewMock(real, provider.MockSettings{Enable: true, ReturnType: provider.MockReturnSuccess, StatusReturnType: provider.MockReturnPending}, f, nil)
+	if assert.NoError(t, err) {
+		_, err = m.Status(context.Background(), provider.StatusRequest{OrderID: "o"})
+		assert.ErrorIs(t, err, provider.ErrProviderDown)
+	}
+	assert.Empty(t, c.statusReqs, "the mock calls nothing")
+	assert.Equal(t, MockTrace, a.ProviderTraceID)
 }
 
 // SupportsInquiry gives true only for the bill types that Inquiry answers (task 036); Inquiry of

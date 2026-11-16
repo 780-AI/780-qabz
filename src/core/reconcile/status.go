@@ -32,11 +32,15 @@ const (
 	ResultFailed      = "failed"       // reported and saved as failed
 	ResultPending     = "pending"      // the provider gave no final status: nothing changes
 	ResultLate        = "late"         // a final status after the reverse deadline: saved, not reported
-	ResultSkipped     = "skipped"      // the newest row is final already
-	ResultReportError = "report_error" // the report failed: nothing saved, the next run asks again
-	ResultSaveError   = "save_error"   // the save failed (after the report, or of a late status)
+	ResultSkipped     = "skipped"      // the newest row is final already (at the read or at the save)
+	ResultReportError = "report_error" // the report failed: the save rolled back, the next run asks again
+	ResultSaveError   = "save_error"   // the save failed (nothing reported; or the commit after a good report; or a late status)
 	ResultReadError   = "read_error"   // the newest row was not read
 )
+
+// fixedResults are the order results that gave the order a final status in the run: they are counted
+// in StatusOptions.OnRunDone (task 050 D8).
+var fixedResults = map[string]bool{ResultSuccess: true, ResultFailed: true, ResultLate: true}
 
 // Provider call results, for StatusOptions.OnCall (the labels of qabz_provider_calls_total).
 const (
@@ -58,15 +62,18 @@ var failedResults = map[string]bool{ResultReadError: true, ResultSaveError: true
 
 // Repository reads and writes the orders of the worker (postgres.OrderRepository).
 type Repository interface {
-	// PendingIDs gives one page of the order IDs of the provider whose newest row created from
-	// now-end to now-start is pending or in-progress (bill: GetAllPending).
-	PendingIDs(ctx context.Context, providerName string, limit, offset int, start, end time.Duration) ([]string, error)
+	// PendingIDs gives one page of at most limit orders of the provider whose newest row created
+	// from now-end to now-start is pending or in-progress, after the cursor, ordered by the cursor
+	// (bill: GetAllPending; task 050 D4: a keyset page).
+	PendingIDs(ctx context.Context, providerName string, limit int, after order.Cursor, start, end time.Duration) ([]order.Cursor, error)
 	// Latest gives the newest row of the order created in the last window.
 	Latest(ctx context.Context, orderID string, window time.Duration) (order.Order, error)
 	// Insert adds a row (the late status; bill: NewOrder).
 	Insert(ctx context.Context, o order.Order) error
-	// InsertFinal adds a final row unless the newest row is final (bill: NewOrderWithFinalStatus).
-	InsertFinal(ctx context.Context, o order.Order) error
+	// InsertFinal adds a final row unless the newest row is final (order.ErrAlreadyFinal; bill:
+	// NewOrderWithFinalStatus), and calls report after the insert and before the commit: an error of
+	// report rolls back the insert and is returned (task 050 D6).
+	InsertFinal(ctx context.Context, o order.Order, report func(context.Context) error) error
 }
 
 // Adapters gives the adapter of a provider by name (provider.Registry).
@@ -117,9 +124,13 @@ type StatusOptions struct {
 	// OnCall gets each status call: provider, action "status", result (ok, down, canceled, error)
 	// and duration. Nil: nothing.
 	OnCall func(providerName, action, result string, d time.Duration)
+	// OnRunDone gets, once at the end of each run (also an empty run and a run that ends with an
+	// error), the number of orders that the run gave a final status: the results success, failed
+	// and late (task 050 D8). Nil: nothing.
+	OnRunDone func(name string, fixed int)
 }
 
-// StatusWorker is the status worker of one provider (task 045: parsian).
+// StatusWorker is the status worker of one provider (task 045: parsian; task 050: irancell).
 type StatusWorker struct {
 	o     StatusOptions
 	now   func() time.Time
@@ -148,39 +159,58 @@ func (w *StatusWorker) Chunk() int                      { return w.o.Chunk }
 func (w *StatusWorker) SyncOperations() []time.Duration { return w.o.SyncOperations }
 
 // @todo docs/this_vs_bill.md item 43: each call has the timeout of the adapter and the context of
-// the run (bill: no timeout, context.Background()); the failures write one line and are counted.
+// the run (bill: no timeout, context.Background()); every failure writes one line and is counted
+// (task 050 D7); keyset pages in place of bill's OFFSET (task 050 D4).
 //
 // Run checks the orders of the window, one page after the other (bill: InquiryCron):
-//  1. Read a page of order IDs (PendingIDs). A failed read ends the run with the error.
-//  2. No ID: the run ends.
+//  1. Read a page of orders after the cursor (PendingIDs). A failed read ends the run with the
+//     error (the runner writes the line cron: run failed).
+//  2. No order: the run ends.
 //  3. Charge the lock for the page (a lost lock ends the run), then check each order.
+//  4. The cursor becomes the last order of the page. A page shorter than the chunk is the last one.
 //
-// The offset grows by the chunk each time; an order that the run made final stays in the list
-// (C6) and is skipped at its check. A done ctx (the App stop) ends the run.
+// An order that the run made final stays in the list (task 045 C6) only while it is older than the
+// cursor, so it is not read again in the run. A done ctx (the App stop) ends the run. At each end,
+// OnRunDone gets the number of orders that the run made final.
 func (w *StatusWorker) Run(ctx context.Context, ext Charger) error {
+	fixed := 0
+	defer func() {
+		if w.o.OnRunDone != nil {
+			w.o.OnRunDone(w.o.Name, fixed)
+		}
+	}()
 	adapter, ok := w.o.Adapters.Get(w.o.Provider)
 	if !ok || adapter == nil {
 		return fmt.Errorf("reconcile: no adapter for the provider %s", w.o.Provider)
 	}
-	for offset := 0; ; offset += w.o.Chunk {
-		ids, err := w.o.Repository.PendingIDs(ctx, w.o.Provider, w.o.Chunk, offset, w.o.Start, w.o.End)
+	var after order.Cursor
+	for {
+		page, err := w.o.Repository.PendingIDs(ctx, w.o.Provider, w.o.Chunk, after, w.o.Start, w.o.End)
 		if err != nil {
 			return fmt.Errorf("reconcile: read the pending orders: %w", err)
 		}
-		if len(ids) == 0 {
+		if len(page) == 0 {
 			return nil
 		}
 		if ext != nil {
-			if err := ext.Charge(ctx, len(ids)); err != nil {
+			if err := ext.Charge(ctx, len(page)); err != nil {
 				return fmt.Errorf("reconcile: keep the lock: %w", err)
 			}
 		}
-		for _, id := range ids {
+		for _, p := range page {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			w.count(w.checkTraced(ctx, adapter, id))
+			result := w.checkTraced(ctx, adapter, p.OrderID)
+			w.count(result)
+			if fixedResults[result] {
+				fixed++
+			}
 		}
+		if len(page) < w.o.Chunk {
+			return nil
+		}
+		after = page[len(page)-1]
 	}
 }
 
@@ -201,9 +231,12 @@ func (w *StatusWorker) checkTraced(ctx context.Context, adapter provider.Provide
 
 // check asks the status of one order and acts on it. It returns the result of the order.
 func (w *StatusWorker) check(ctx context.Context, adapter provider.ProviderInterface, orderID string) string {
+	prefix := w.o.Provider + " status: "
 	o, err := w.o.Repository.Latest(ctx, orderID, latestWindow)
 	if err != nil {
-		return ResultReadError // retried at the next run; counted, no line (conventions § 10)
+		// Retried at the next run, but a line all the same (task 050 D7, conventions § 10).
+		w.logError(prefix+"read failed", "name", w.o.Name, "order_id", orderID, "error", err)
+		return ResultReadError
 	}
 	if o.Status == order.StatusSuccess || o.Status == order.StatusFailed {
 		return ResultSkipped
@@ -215,32 +248,51 @@ func (w *StatusWorker) check(ctx context.Context, adapter provider.ProviderInter
 	o.Status = status
 	o.ID = w.newID()
 
-	prefix := w.o.Provider + " status: "
 	if o.CreatedAt.Before(w.now().Add(-w.o.ReverseDeadline)) {
 		o.Message = ReverseDeadlineExceeded
 		if err := w.o.Repository.Insert(ctx, o); err != nil {
-			w.logError(prefix+"save failed", "order_id", orderID, "status", status, "error", err)
+			w.logError(prefix+"save failed", "name", w.o.Name, "order_id", orderID, "status", status, "error", err)
 			return ResultSaveError
 		}
-		w.logInfo(prefix+"reverse deadline exceeded", "order_id", orderID, "status", status, "created_at", o.CreatedAt.String())
+		w.logInfo(prefix+"reverse deadline exceeded", "name", w.o.Name, "order_id", orderID, "status", status, "created_at", o.CreatedAt.String())
 		return ResultLate
 	}
-	if err := w.o.Reporter.Report(ctx, orderID, status); err != nil {
-		w.logError(prefix+"report failed", "order_id", orderID, "status", status, "error", err)
+	// Save, report, commit (task 050 D6): the report runs inside the save transaction.
+	var reportErr error
+	reported := false
+	err = w.o.Repository.InsertFinal(ctx, o, func(ctx context.Context) error {
+		reportErr = w.o.Reporter.Report(ctx, orderID, status)
+		reported = reportErr == nil
+		return reportErr
+	})
+	stopped := ctx.Err() != nil // the App stop canceled the run: counted, no line (conventions § 10)
+	switch {
+	case reportErr != nil && stopped:
 		return ResultReportError
-	}
-	if err := w.o.Repository.InsertFinal(ctx, o); err != nil {
-		w.logError(prefix+"save failed", "order_id", orderID, "status", status, "error", err)
+	case reportErr != nil:
+		w.logError(prefix+"report failed", "name", w.o.Name, "order_id", orderID, "status", status, "error", reportErr)
+		return ResultReportError
+	case errors.Is(err, order.ErrAlreadyFinal):
+		// Another path saved a final row after the read: not an error, nothing reported.
+		w.logInfo(prefix+"already final", "name", w.o.Name, "order_id", orderID, "status", status)
+		return ResultSkipped
+	case err != nil && stopped:
+		return ResultSaveError
+	case err != nil:
+		// reported true: the commit failed after a delivered report; the next run reports again.
+		w.logError(prefix+"save failed", "name", w.o.Name, "order_id", orderID, "status", status, "reported", reported, "error", err)
 		return ResultSaveError
 	}
-	w.logInfo(prefix+"reported", "order_id", orderID, "status", status)
+	w.logInfo(prefix+"reported", "name", w.o.Name, "order_id", orderID, "status", status)
 	if status == order.StatusSuccess {
 		return ResultSuccess
 	}
 	return ResultFailed
 }
 
-// status asks the adapter. An error or no answer is pending (bill: a gRPC error is PENDING).
+// status asks the adapter. An error or no answer is pending (bill: a gRPC error is PENDING). A failed
+// call (not one that the App stop canceled), no answer and a status text that is not an order status
+// (success, failed, pending, in-progress) each write one error line (task 050 D7).
 func (w *StatusWorker) status(ctx context.Context, adapter provider.ProviderInterface, o order.Order) string {
 	start := w.now()
 	resp, err := adapter.Status(ctx, provider.StatusRequest{OrderID: o.OrderID, BillType: o.BillType})
@@ -256,11 +308,32 @@ func (w *StatusWorker) status(ctx context.Context, adapter provider.ProviderInte
 	if w.o.OnCall != nil {
 		w.o.OnCall(w.o.Provider, actionStatus, result, w.now().Sub(start))
 	}
-	if err != nil || resp == nil {
+	prefix := w.o.Provider + " status: "
+	switch {
+	case result == callCanceled:
+		return order.StatusPending // the App stop: the run ends, no line
+	case err != nil:
+		w.logError(prefix+"call failed", "name", w.o.Name, "order_id", o.OrderID, "error", err)
 		return order.StatusPending
+	case resp == nil:
+		w.logError(prefix+"call failed", "name", w.o.Name, "order_id", o.OrderID, "error", errEmptyAnswer)
+		return order.StatusPending
+	}
+	switch resp.Status {
+	case order.StatusSuccess, order.StatusFailed, order.StatusPending, order.StatusInProgress:
+	default:
+		w.logError(prefix+"unknown status", "name", w.o.Name, "order_id", o.OrderID, "status", resp.Status,
+			"error", errUnknownStatus)
 	}
 	return resp.Status
 }
+
+var (
+	// errEmptyAnswer is the cause of a status call that gave no answer and no error.
+	errEmptyAnswer = errors.New("reconcile: the provider gave no answer")
+	// errUnknownStatus is the cause of a status text that is not an order status.
+	errUnknownStatus = errors.New("reconcile: unknown status text")
+)
 
 func (w *StatusWorker) count(result string) {
 	if w.o.OnOrder != nil {

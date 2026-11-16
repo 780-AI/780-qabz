@@ -6,6 +6,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // Payment is the message of a final status to the payment service. It is a copy of bill's
@@ -70,21 +71,32 @@ type PaymentReporter struct {
 	publisher Publisher
 	topic     string
 	key       []byte
+	timeout   time.Duration
 }
 
 // NewPaymentReporter returns the reporter. key is service.ecosystem_name (task 045 D17: bill).
-func NewPaymentReporter(p Publisher, topic, key string) (*PaymentReporter, error) {
+// timeout is kafka.timeout, the limit of each publish (task 050 D6); positive.
+func NewPaymentReporter(p Publisher, topic, key string, timeout time.Duration) (*PaymentReporter, error) {
 	if p == nil || topic == "" || key == "" {
 		return nil, errors.New("reconcile: the publisher, the topic and the key are required")
 	}
-	return &PaymentReporter{publisher: p, topic: topic, key: []byte(key)}, nil
+	if timeout <= 0 {
+		return nil, errors.New("reconcile: the publish timeout must be positive")
+	}
+	return &PaymentReporter{publisher: p, topic: topic, key: []byte(key), timeout: timeout}, nil
 }
 
-// Report publishes the status message of the order.
+// @todo docs/this_vs_bill.md item 44: each publish waits at most kafka.timeout (task 050 D6; bill
+// has the key and does not read it). The status worker publishes inside the save transaction, so
+// the limit keeps the row lock short.
+//
+// Report publishes the status message of the order, within the timeout of the reporter.
 func (r *PaymentReporter) Report(ctx context.Context, orderID, status string) error {
 	value, err := StatusMessage(orderID, status)
 	if err != nil {
 		return fmt.Errorf("reconcile: status message: %w", err)
 	}
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
 	return r.publisher.Publish(ctx, r.topic, r.key, value)
 }

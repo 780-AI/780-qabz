@@ -13,6 +13,7 @@ import (
 	"qabz/core/order"
 	"qabz/core/reconcile"
 	"qabz/entry/cron"
+	"qabz/provider/irancellproxy"
 	"qabz/provider/parsianproxy"
 	"qabz/system/kafka"
 	"qabz/system/postgres"
@@ -25,8 +26,11 @@ type cronMetrics struct {
 	onRun      func(name, result string)
 	onDuration func(name string, d time.Duration)
 	onOrder    func(name, result string)
-	onCall     func(providerName, action, result string, d time.Duration)
-	onPublish  func(result string, d time.Duration)
+	// onRunDone observes qabz_cron_orders_fixed: the orders that a status worker run made final
+	// (task 050 D8).
+	onRunDone func(name string, fixed int)
+	onCall    func(providerName, action, result string, d time.Duration)
+	onPublish func(result string, d time.Duration)
 	// onSettle counts a settlement of the settlement worker on qabz_order_settle_total (source
 	// worker; task 046).
 	onSettle func(billType, providerName, result string)
@@ -36,6 +40,7 @@ type cronMetrics struct {
 //   - qabz_cron_runs_total{cron,result}: each tick (done, no_lock, error);
 //   - qabz_cron_duration_ms{cron}: each run that took the lock;
 //   - qabz_cron_orders_processed_total{cron,result}: each order of a run (reconcile.Result*);
+//   - qabz_cron_orders_fixed{cron}: the orders that one status worker run made final (task 050);
 //   - qabz_kafka_publish_total{result} (ok, error) and qabz_kafka_publish_duration_ms;
 //   - the settlements of the settlement worker on qabz_order_settle_total (source worker; task 046);
 //   - the status calls on qabz_provider_calls_total and qabz_provider_call_duration_ms (action
@@ -59,6 +64,11 @@ func newCronMetrics(metrics *prometheus.Server) (cronMetrics, error) {
 		Name: "qabz_cron_orders_processed_total",
 		Help: "Orders of a worker run by worker (cron) and result. The status worker: success, failed (reported and saved); pending (no final status); late (after the reverse deadline, saved and not reported); skipped (final already); report_error; save_error; read_error. The settlement worker: the result of the settlement (success, failed, pending, error, confirm_error, no_data, no_route; see qabz_order_settle_total).",
 	}, []string{"cron", "result"})
+	fixed := promclient.NewHistogramVec(promclient.HistogramOpts{
+		Name:    "qabz_cron_orders_fixed",
+		Help:    "Orders that one status worker run moved to a final status (success, failed and the late saves after the reverse deadline), by worker (cron); one observation at the end of each run that took the lock, also 0 and also a run that ended with an error.",
+		Buckets: []float64{0, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500},
+	}, []string{"cron"})
 	publishes := promclient.NewCounterVec(promclient.CounterOpts{
 		Name: "qabz_kafka_publish_total",
 		Help: "Kafka messages of the status worker to the payment service by result (ok: delivered; error: not delivered, or the wait ended).",
@@ -68,7 +78,7 @@ func newCronMetrics(metrics *prometheus.Server) (cronMetrics, error) {
 		Help:    "Duration of each Kafka publish (metadata, produce and delivery report) in milliseconds, for every result.",
 		Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000},
 	})
-	for _, c := range []promclient.Collector{runs, duration, orders, publishes, publishDuration} {
+	for _, c := range []promclient.Collector{runs, duration, orders, fixed, publishes, publishDuration} {
 		if err := reg.Register(c); err != nil {
 			return m, fmt.Errorf("cron: register metric: %w", err)
 		}
@@ -93,6 +103,7 @@ func newCronMetrics(metrics *prometheus.Server) (cronMetrics, error) {
 		duration.WithLabelValues(name).Observe(float64(d) / float64(time.Millisecond))
 	}
 	m.onOrder = func(name, result string) { orders.WithLabelValues(name, result).Inc() }
+	m.onRunDone = func(name string, n int) { fixed.WithLabelValues(name).Observe(float64(n)) }
 	m.onCall = func(providerName, action, result string, d time.Duration) {
 		calls.WithLabelValues(providerName, action, result).Inc()
 		callDuration.WithLabelValues(providerName, action).Observe(float64(d) / float64(time.Millisecond))
@@ -120,8 +131,7 @@ func registerOrExisting[T promclient.Collector](reg promclient.Registerer, c T) 
 	return zero, fmt.Errorf("cron: register metric: %w", err)
 }
 
-// cronJobs are the runner and the Kafka producer of the status worker (nil while that worker is
-// off). Stop ends the runs first, then sends what the producer has left and closes it.
+// cronJobs are the runner and the Kafka producer of the status workers (nil while both are off). Stop ends the runs first, then sends what the producer has left and closes it.
 type cronJobs struct {
 	runner   *cron.Runner
 	producer *kafka.Producer
@@ -170,7 +180,10 @@ func (c settleCron) Run(ctx context.Context, ext cron.Extender) error {
 //     providers.internal.parsian.get_status.enabled: the orders of the provider parsian from the
 //     get_status keys, the adapter of the registry (the mock in dev mode), the reports on Kafka
 //     (kafka.brokers, kafka.topic.payment.write.subject, the key and the client ID
-//     service.ecosystem_name);
+//     service.ecosystem_name, each publish limited by kafka.timeout);
+//   - the Irancell status worker (task 050; bill: IrancellGetStatusTask) with
+//     providers.internal.irancell.get_status.enabled: the same worker for the provider irancell,
+//     with its own get_status keys, and the same Kafka producer and reporter;
 //   - the settlement worker (task 046; bill: ConfirmPaymentTelephone) with
 //     confirm_payment.telephone.enabled: the paid landline orders that Karashop did not confirm,
 //     settled with the Karashop adapter of the registry (the mock in dev mode) by order.Settler.
@@ -193,17 +206,31 @@ func newCrons(cfg config.Config, db *postgres.Client, cache *redis.Client, adapt
 		_ = producer.Close(context.Background())
 		return nil, err
 	}
-	if cfg.ParsianGetStatusEnabled {
+	var reporter *reconcile.PaymentReporter
+	if cfg.ParsianGetStatusEnabled || cfg.IrancellGetStatusEnabled {
 		var err error
 		producer, err = kafka.New(kafka.Options{Brokers: cfg.KafkaBrokers, ClientID: cfg.ServiceEcosystemName, OnPublish: m.onPublish})
 		if err != nil {
 			return nil, err
 		}
-		reporter, err := reconcile.NewPaymentReporter(producer, cfg.KafkaPaymentWriteSubject, cfg.ServiceEcosystemName)
+		reporter, err = reconcile.NewPaymentReporter(producer, cfg.KafkaPaymentWriteSubject, cfg.ServiceEcosystemName, cfg.KafkaTimeout)
 		if err != nil {
 			return fail(err)
 		}
-		worker, err := reconcile.NewStatusWorker(reconcile.StatusOptions{
+	}
+	statusWorker := func(o reconcile.StatusOptions, lockTime time.Duration) error {
+		o.Repository, o.Adapters, o.Reporter = postgres.NewOrderRepository(db), adapters, reporter
+		o.Logger, o.OnOrder, o.OnCall, o.OnRunDone = workerLog, m.onOrder, m.onCall, m.onRunDone
+		worker, err := reconcile.NewStatusWorker(o)
+		if err != nil {
+			return err
+		}
+		crons = append(crons, statusCron{worker})
+		lockTimes[worker.Name()] = lockTime
+		return nil
+	}
+	if cfg.ParsianGetStatusEnabled {
+		if err := statusWorker(reconcile.StatusOptions{
 			Name:            cfg.ParsianGetStatusName,
 			Provider:        parsianproxy.Name,
 			Interval:        cfg.ParsianGetStatusCronTime,
@@ -212,18 +239,23 @@ func newCrons(cfg config.Config, db *postgres.Client, cache *redis.Client, adapt
 			Chunk:           cfg.ParsianGetStatusChunk,
 			ReverseDeadline: cfg.ParsianGetStatusReverseDeadline,
 			SyncOperations:  []time.Duration{cfg.ParsianGetStatusSyncAPICall, cfg.ParsianGetStatusSyncGetOrder, cfg.ParsianGetStatusSyncInsertOrder},
-			Repository:      postgres.NewOrderRepository(db),
-			Adapters:        adapters,
-			Reporter:        reporter,
-			Logger:          workerLog,
-			OnOrder:         m.onOrder,
-			OnCall:          m.onCall,
-		})
-		if err != nil {
+		}, cfg.ParsianGetStatusLockTime); err != nil {
 			return fail(err)
 		}
-		crons = append(crons, statusCron{worker})
-		lockTimes[worker.Name()] = cfg.ParsianGetStatusLockTime
+	}
+	if cfg.IrancellGetStatusEnabled {
+		if err := statusWorker(reconcile.StatusOptions{
+			Name:            cfg.IrancellGetStatusName,
+			Provider:        irancellproxy.Name,
+			Interval:        cfg.IrancellGetStatusCronTime,
+			Start:           cfg.IrancellGetStatusStart,
+			End:             cfg.IrancellGetStatusEnd,
+			Chunk:           cfg.IrancellGetStatusChunk,
+			ReverseDeadline: cfg.IrancellGetStatusReverseDeadline,
+			SyncOperations:  []time.Duration{cfg.IrancellGetStatusSyncAPICall, cfg.IrancellGetStatusSyncGetOrder, cfg.IrancellGetStatusSyncInsertOrder},
+		}, cfg.IrancellGetStatusLockTime); err != nil {
+			return fail(err)
+		}
 	}
 	if cfg.ConfirmPaymentTelephoneEnabled {
 		repo := postgres.NewOrderRepository(db)

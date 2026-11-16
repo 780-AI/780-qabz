@@ -44,6 +44,13 @@ const (
 // LatestWindow is how old the newest row of an order may be (bill: order.Repository.Get, 48 h).
 const LatestWindow = 48 * time.Hour
 
+// Cursor is an order in the pages of the status worker (task 050 D4): its ID and the created_at of
+// its newest row in the window. A page starts after the cursor; the zero Cursor is the first page.
+type Cursor struct {
+	OrderID   string
+	CreatedAt time.Time
+}
+
 // The results of a Complete call, for Options.OnPayment (a fixed set: metric labels), with
 // StatusSuccess, StatusFailed and StatusPending.
 const (
@@ -69,6 +76,9 @@ var (
 	ErrPaymentRoute = errors.New("order payment: the provider does not pay the bill type")
 	// ErrNotFound is the error of Repository.Latest when the order has no row in the window.
 	ErrNotFound = errors.New("order: not found")
+	// ErrAlreadyFinal is the error of a final save when the newest row of the order is success or
+	// failed already (bill: "order is already in final status"; task 050). Test it with errors.Is.
+	ErrAlreadyFinal = errors.New("order repository: order is already in final status")
 )
 
 // tehran is the zone of bills.last_order_date (bill: time.Now() of a process in Tehran).

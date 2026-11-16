@@ -1,7 +1,8 @@
-<!-- VERSION: 3.48 -->
+<!-- VERSION: 3.49 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.49 — 2026-11-16 — Added 050-irancell-status-worker entry.
 v3.48 — 2026-11-16 — Added 049-feature-spans entry.
 v3.47 — 2026-11-16 — Added tasks-folder-move entry.
 v3.46 — 2026-11-15 — Added 048-water-payment entry.
@@ -164,6 +165,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 050: the Irancell status worker; the shared status worker fixes bill's defects
+- **Type:** Major (a new worker, shared worker behavior, config keys, a metric; Critical Files).
+- **Files:** `src/core/reconcile/status.go` (keyset pages; the report inside the save transaction; one error line for a failed order read, a failed status call and an unknown status text; `ErrAlreadyFinal` skipped; `OnRunDone`) and `status_test.go`; `src/core/reconcile/report.go` (each publish limited by `kafka.timeout`) and `report_test.go`; `src/core/order/complete.go` (`order.Cursor`, `order.ErrAlreadyFinal`); `src/system/postgres/order_repository.go` (`PendingIDs` with a cursor, `InsertFinal` with the 48 h window and the report before the commit) and `order_status_live_test.go`; `src/provider/irancellproxy/irancellproxy.go` (`Status` = `GetStatus`, `purchase_type` `charge`; the mock `Status`) and its test; `src/config/config.go` (`providers.internal.irancell.get_status.enabled` and the read get_status keys with defaults, `debug.mocks.irancell.status_return_type`, `kafka.timeout` read, the shared checks) and its test; `src/app/crons.go` (the Irancell worker, one producer and reporter for both status workers, `qabz_cron_orders_fixed`), `src/app/defaults.go` (the builder gate and the mock key), `src/app/crons_test.go` and the new `src/app/irancell_status_live_test.go`; `config.yml.example` (no VERSION header, no row); `docs/initial-discovery/system.html` (v2.22); `docs/this_vs_bill.md` (v0.26: items 43, 44, new 47); `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (v0.27, § 10); `docs/folder_structure.md` (v0.53); `src/app/README.md` (v0.41); `docs/tasks/done_tasks/050_irancell_status_worker.md` (moved from `pending_tasks/`, v1.0: design C1 to C3, D1 to D14 approved, notes I1 to I4, the verification record; not manifest-tracked); `docs/Plans/OPEN_TASKS.md` (v1.85); `docs/documents_manifest.md`.
+- **Impact:** **Yes, behavior changes.** (1) New Irancell status worker, off by default (`providers.internal.irancell.get_status.enabled: false`: OFF is the behavior of before); with it on, the pending and in-progress Irancell orders are asked with `GetStatus` and `success` / `failed` are saved and reported on Kafka as the Parsian worker. (2) **The Parsian worker changes too** (shared code): pages after the last order (no order of the window skipped in a run, bill's `OFFSET` skipped some); save, report and commit in one transaction (a failed report saves nothing; a failed lock or insert reports nothing; a final row of another path is skipped with no report); the save locks the newest row of the last 48 h (was 24 h, an order of 24 h to 48 h failed each time); each publish waits at most `kafka.timeout` (`5s`); new error lines (a failed order read, a failed status call, an unknown status text); the new histogram `qabz_cron_orders_fixed{cron}`. (3) Conventions § 10: a failed worker step writes one error line also when the next run retries it. (4) With every worker off nothing changes. Operator decisions 2026-11-16: D6 (a), a second report is accepted by the payment service, D2 the operator's values, D11 (a).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 050 Irancell status worker" (Go tests; feature ON with the Irancell mock, compose Kafka and Jaeger) and "Task 050 follow-ups". Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 049: the core-step spans of each feature
 - **Type:** Major (tracing behavior of every inquiry, the status worker and the auth check; a Critical File).

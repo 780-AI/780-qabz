@@ -57,20 +57,21 @@ providers:
       name: ""                 # name of the provider (bill: irancell.name); not read yet
       grpc_address: ""         # host:port of the internal gRPC server of the irancell service (no TLS); empty: every Irancell call fails as "provider down"
       nats_subject: ""         # NATS subject of the Irancell bill payment; not read yet (order flow)
-      get_status:              # cron that asks the status of pending Irancell orders; not read yet (order flow)
-        cron_time: "0s"
-        name: ""
-        start: "0s"
-        end: "0s"
-        chunk: 0
-        every: "0s"
-        lock_time: "0s"
-        is_lockable: false
-        reverse_deadline: "0s"
-        sync_operations:
-          api_call_get_status: "0s"
-          get_order_query: "0s"
-          insert_order_query: "0s"
+      get_status:              # the worker that asks the irancell service the status of the pending and in-progress Irancell orders (task 050; bill: irancell.getStatus)
+        enabled: false         # false: no worker; true: the keys below are checked at start
+        cron_time: "15m"       # the interval; positive
+        name: "irancell-get-status" # the lock key, the metric label cron and the log lines; not the Parsian worker name
+        start: "30m"           # the window of the orders: created from now-end to now-start; end greater than start
+        end: "48h"             # not greater than 48h (the worker reads the newest row of an order of the last 48h)
+        chunk: 100             # orders in one page; positive
+        every: "15m"           # not read (bill has it): the interval is cron_time
+        lock_time: "30m"       # only logged, as bill (the lock TTL comes from sync_operations)
+        is_lockable: true      # not read (bill has it): Qabz always takes the lock
+        reverse_deadline: "10h" # a final status of an order older than this is saved as reverse_deadline_exceeded and not reported; 0: every final status
+        sync_operations:       # the lock TTL: sum x 1.1 x chunk + 5m (bill)
+          api_call_get_status: "30s"
+          get_order_query: "3ms"
+          insert_order_query: "3ms"
     jiring_switch:             # the jiring-switch service (our own service); answers the MCI mobile bill (bill type mobile)
       enabled: false           # false: every Jiring Switch call fails as "provider down", nothing is sent to the jiring-switch service, the mock does not apply
       timeout: "10s"           # limit of each call to the jiring-switch service; positive
@@ -155,7 +156,7 @@ caching:
   paid_tel: "72h"            # how long a saved landline inquiry gives the price of a landline order (tel, telmidterm) with no provider call (bill: paidTel); 0: every order asks the provider
   paid_water: "72h"          # how long a saved water inquiry gives the price of a water order whose raw inquiry failed, with no provider call (bill: paidWater); 0: every such order asks the provider
 
-kafka:                       # the Kafka client (bill: kafka); the producer exists only while providers.internal.parsian.get_status.enabled is true
+kafka:                       # the Kafka client (bill: kafka); the producer exists only while a status worker is on (providers.internal.parsian.get_status.enabled or providers.internal.irancell.get_status.enabled)
   brokers:                   # the broker addresses; not empty while the worker is on
     - "localhost:9092"
   topic:
@@ -169,7 +170,7 @@ kafka:                       # the Kafka client (bill: kafka); the producer exis
   username: ""               # not read yet (bill has it and does not use it)
   password: ""               # not read yet (bill has it and does not use it)
   auth: false                # not read yet (bill has it and does not use it)
-  timeout: "5s"              # not read yet (bill has it and does not use it)
+  timeout: "5s"              # the limit of each publish of the status workers (task 050; bill has it and does not use it); positive while a status worker is on
 
 confirm_payment:              # the settlement workers (task 046; bill: confirmPayment)
   telephone:                 # the worker that settles again each paid landline order (tel, telmidterm) that Karashop did not confirm (bill: confirmPayment.telephone)
@@ -199,7 +200,8 @@ debug:
       return_type: "success" # "success" or "error"
     irancell:                # the Irancell mock: a fixed answer, no call to the irancell service
       enabled: false
-      return_type: "success" # "success" or "error"
+      return_type: "success" # inquiry: "success" or "error"
+      status_return_type: "success" # status of an order (the status worker): "success", "failed" or "pending" (the answer of a timeout)
     jiring_switch:           # the Jiring Switch mock: a fixed answer, no call to the jiring-switch service
       enabled: false
       return_type: "success" # "success" or "error"

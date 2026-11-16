@@ -167,17 +167,22 @@ type Config struct {
 	// The config of the Irancell provider (task 035): the keys that bill has for its irancell
 	// service client (bill: irancell.name, irancell.grpcAddress, irancell.natsSubject and the
 	// irancell.getStatus block), in the layout of this project, and the switch and the timeout of the
-	// adapter. The bill keys have no default: the real values are only in config.yml. Not
-	// hot-reloadable.
+	// adapter. The bill keys name, grpc_address and nats_subject have no default: the real values are
+	// only in config.yml. Not hot-reloadable.
 	//   - IrancellGRPCAddress is the host:port of the internal gRPC server of the irancell service
 	//     (pb.InternalService, no TLS, as in bill). The Irancell adapter (provider/irancellproxy)
 	//     reads it. Empty: every Irancell call fails as "provider down".
 	//   - IrancellName and IrancellNATSSubject (the subject of the bill payment) are not read yet:
 	//     they belong to the order flow.
-	//   - The get_status keys are the settings of bill's cron that asks the status of pending Irancell
-	//     orders. Not read yet: Qabz has no order flow and no such cron. The three sync_operations
-	//     keys are bill's list getStatus.syncOperations (one single-key map for each item) as three
-	//     keys, because a Config field maps one path.
+	//   - The get_status keys are the settings of the Irancell status worker (task 050; bill:
+	//     IrancellGetStatusTask), read since task 050 as the Parsian worker (see
+	//     ParsianGetStatusEnabled). IrancellGetStatusEnabled (not a bill key) turns the worker on;
+	//     false (the default): no worker, as before task 050. With the worker on, End must also not
+	//     be greater than StatusMaxEnd. The defaults are the values of the operator's config (task 050
+	//     D2; bill's example config has no Irancell worker values). Every and IsLockable are not read
+	//     (Qabz uses CronTime and always takes the lock). The three sync_operations keys are bill's
+	//     list getStatus.syncOperations (one single-key map for each item) as three keys, because a
+	//     Config field maps one path.
 	//   - IrancellEnabled turns the Irancell provider on. False (the default): every call fails as
 	//     "provider down", nothing is sent to the irancell service and the mock
 	//     (debug.mocks.irancell) does not apply, as for Qabzino and Tavanir.
@@ -187,6 +192,7 @@ type Config struct {
 	IrancellName                     string        `path:"providers.internal.irancell.name"`
 	IrancellGRPCAddress              string        `path:"providers.internal.irancell.grpc_address"`
 	IrancellNATSSubject              string        `path:"providers.internal.irancell.nats_subject"`
+	IrancellGetStatusEnabled         bool          `path:"providers.internal.irancell.get_status.enabled"`
 	IrancellGetStatusCronTime        time.Duration `path:"providers.internal.irancell.get_status.cron_time"`
 	IrancellGetStatusName            string        `path:"providers.internal.irancell.get_status.name"`
 	IrancellGetStatusStart           time.Duration `path:"providers.internal.irancell.get_status.start"`
@@ -362,6 +368,10 @@ type Config struct {
 	// DebugMockIrancellReturnType is the answer of the Irancell mock: MockReturnSuccess or
 	// MockReturnError. It has no effect while the mock is off. Development only.
 	DebugMockIrancellReturnType string `path:"debug.mocks.irancell.return_type"`
+	// DebugMockIrancellStatusReturnType is the answer of the Irancell mock to a status call (task
+	// 050): MockReturnSuccess, MockReturnFailed or MockReturnPending (the answer of a timeout). No
+	// effect while the mock is off. Development only.
+	DebugMockIrancellStatusReturnType string `path:"debug.mocks.irancell.status_return_type"`
 
 	// DebugMockJiringSwitchEnabled and DebugMockParsianEnabled make the Jiring Switch and the Parsian
 	// adapter answer with a fixed answer, with no call to the jiring-switch or the parsian-v2
@@ -393,10 +403,11 @@ type Config struct {
 	// The Kafka client (task 045, supertask 043 decision C; bill: kafka.*). Every key of bill's
 	// kafka block, with the defaults of bill's example config. Read: KafkaBrokers (the addresses
 	// of the producer) and KafkaPaymentWriteSubject (the topic of the status messages to the payment
-	// service). Not read (bill has them and does not use them): the write group, the read subject
-	// and group, the user name, the password (a Secret), auth and the timeout. The producer exists
-	// only while the Parsian status worker is on; then the brokers and the write subject must not be
-	// empty. Not hot-reloadable.
+	// service) and, since task 050, KafkaTimeout (the limit of each publish; bill has it and does not
+	// read it). Not read (bill has them and does not use them): the write group, the read subject and
+	// group, the user name, the password (a Secret) and auth. The producer exists only while a status
+	// worker (Parsian or Irancell) is on; then the brokers and the write subject must not be empty and
+	// the timeout must be positive. Not hot-reloadable.
 	KafkaBrokers             []string      `path:"kafka.brokers"`
 	KafkaPaymentWriteSubject string        `path:"kafka.topic.payment.write.subject"`
 	KafkaPaymentWriteGroup   string        `path:"kafka.topic.payment.write.group"`
@@ -481,6 +492,20 @@ func defaults() Config {
 		ParsianGetStatusSyncAPICall:       30 * time.Second,
 		ParsianGetStatusSyncGetOrder:      3 * time.Millisecond,
 		ParsianGetStatusSyncInsertOrder:   3 * time.Millisecond,
+
+		// The Irancell status worker (task 050 D2): the values of the operator's config.
+		IrancellGetStatusName:             "irancell-get-status",
+		IrancellGetStatusCronTime:         15 * time.Minute,
+		IrancellGetStatusStart:            30 * time.Minute,
+		IrancellGetStatusEnd:              48 * time.Hour,
+		IrancellGetStatusChunk:            100,
+		IrancellGetStatusEvery:            15 * time.Minute,
+		IrancellGetStatusLockTime:         30 * time.Minute,
+		IrancellGetStatusIsLockable:       true,
+		IrancellGetStatusReverseDeadline:  10 * time.Hour,
+		IrancellGetStatusSyncAPICall:      30 * time.Second,
+		IrancellGetStatusSyncGetOrder:     3 * time.Millisecond,
+		IrancellGetStatusSyncInsertOrder:  3 * time.Millisecond,
 		KafkaBrokers:                      []string{"localhost:9092"},
 		KafkaPaymentWriteSubject:          "paymentwriter",
 		KafkaPaymentWriteGroup:            "paymentwriter",
@@ -497,6 +522,7 @@ func defaults() Config {
 		DebugMockQabzinoReturnType:        MockReturnSuccess,
 		DebugMockTavanirReturnType:        MockReturnSuccess,
 		DebugMockIrancellReturnType:       MockReturnSuccess,
+		DebugMockIrancellStatusReturnType: MockReturnSuccess,
 		DebugMockJiringSwitchReturnType:   MockReturnSuccess,
 		DebugMockParsianReturnType:        MockReturnSuccess,
 		DebugMockParsianPayReturnType:     MockReturnSuccess,
@@ -672,8 +698,17 @@ func (c Config) validate() error {
 	if c.ServiceEcosystemName == "" {
 		errs = append(errs, errors.New("service.ecosystem_name must not be empty (the name that the other services see; for example bill)"))
 	}
+	if !ValidMockPayReturnType(c.DebugMockIrancellStatusReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.irancell.status_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
+	}
 	if c.ParsianGetStatusEnabled {
 		errs = append(errs, c.validateParsianGetStatus()...)
+	}
+	if c.IrancellGetStatusEnabled {
+		errs = append(errs, c.validateIrancellGetStatus()...)
+	}
+	if c.ParsianGetStatusEnabled || c.IrancellGetStatusEnabled {
+		errs = append(errs, c.validateKafkaProducer()...)
 	}
 	if c.ConfirmPaymentTelephoneEnabled {
 		errs = append(errs, c.validateConfirmPaymentTelephone()...)
@@ -710,34 +745,89 @@ func (c Config) validate() error {
 	return errors.Join(errs...)
 }
 
-// validateParsianGetStatus checks the keys of the Parsian status worker and of its Kafka producer
-// (task 045). validate calls it only while the worker is on.
-func (c Config) validateParsianGetStatus() []error {
-	const p = "providers.internal.parsian.get_status."
+// statusWorkerKeys are the keys of one status worker, for validateStatusWorker.
+type statusWorkerKeys struct {
+	prefix                          string // the config path of the get_status block, with the dot
+	name                            string
+	cronTime, start, end, deadline  time.Duration
+	chunk                           int
+	syncAPI, syncGetOrder, syncSave time.Duration
+	maxEnd                          time.Duration // 0: no limit
+}
+
+// validateStatusWorker checks the keys of one status worker (task 045; shared since task 050).
+func validateStatusWorker(k statusWorkerKeys) []error {
+	p := k.prefix
 	var errs []error
-	if c.ParsianGetStatusName == "" {
+	if k.name == "" {
 		errs = append(errs, errors.New(p+"name must not be empty (the lock key and the metric label)"))
 	}
-	if c.ParsianGetStatusCronTime <= 0 {
+	if k.cronTime <= 0 {
 		errs = append(errs, errors.New(p+"cron_time must be a positive duration (for example 15m)"))
 	}
-	if c.ParsianGetStatusChunk <= 0 {
+	if k.chunk <= 0 {
 		errs = append(errs, errors.New(p+"chunk must be positive (for example 100)"))
 	}
-	if c.ParsianGetStatusStart < 0 || c.ParsianGetStatusEnd <= c.ParsianGetStatusStart {
+	if k.start < 0 || k.end <= k.start {
 		errs = append(errs, errors.New(p+"start must not be negative and end must be greater than start (for example 30m and 10h)"))
 	}
-	if c.ParsianGetStatusReverseDeadline < 0 {
+	if k.maxEnd > 0 && k.end > k.maxEnd {
+		errs = append(errs, fmt.Errorf("%send must not be greater than %s (the worker reads the newest row of an order of the last %s)", p, k.maxEnd, k.maxEnd))
+	}
+	if k.deadline < 0 {
 		errs = append(errs, errors.New(p+"reverse_deadline must not be negative"))
 	}
-	if c.ParsianGetStatusSyncAPICall < 0 || c.ParsianGetStatusSyncGetOrder < 0 || c.ParsianGetStatusSyncInsertOrder < 0 {
+	if k.syncAPI < 0 || k.syncGetOrder < 0 || k.syncSave < 0 {
 		errs = append(errs, errors.New(p+"sync_operations must not be negative"))
 	}
+	return errs
+}
+
+// validateParsianGetStatus checks the keys of the Parsian status worker (task 045). validate calls
+// it only while the worker is on.
+func (c Config) validateParsianGetStatus() []error {
+	return validateStatusWorker(statusWorkerKeys{
+		prefix: "providers.internal.parsian.get_status.", name: c.ParsianGetStatusName,
+		cronTime: c.ParsianGetStatusCronTime, start: c.ParsianGetStatusStart, end: c.ParsianGetStatusEnd,
+		deadline: c.ParsianGetStatusReverseDeadline, chunk: c.ParsianGetStatusChunk,
+		syncAPI: c.ParsianGetStatusSyncAPICall, syncGetOrder: c.ParsianGetStatusSyncGetOrder, syncSave: c.ParsianGetStatusSyncInsertOrder,
+	})
+}
+
+// StatusMaxEnd is the greatest providers.internal.irancell.get_status.end: the worker reads the
+// newest row of an order of the last 48 h (order.LatestWindow), so an older order is never checked
+// (task 050 D2).
+const StatusMaxEnd = 48 * time.Hour
+
+// validateIrancellGetStatus checks the keys of the Irancell status worker (task 050). validate calls
+// it only while the worker is on. Its name must differ from the Parsian worker name while both are
+// on (the lock key and the metric label).
+func (c Config) validateIrancellGetStatus() []error {
+	errs := validateStatusWorker(statusWorkerKeys{
+		prefix: "providers.internal.irancell.get_status.", name: c.IrancellGetStatusName,
+		cronTime: c.IrancellGetStatusCronTime, start: c.IrancellGetStatusStart, end: c.IrancellGetStatusEnd,
+		deadline: c.IrancellGetStatusReverseDeadline, chunk: c.IrancellGetStatusChunk,
+		syncAPI: c.IrancellGetStatusSyncAPICall, syncGetOrder: c.IrancellGetStatusSyncGetOrder, syncSave: c.IrancellGetStatusSyncInsertOrder,
+		maxEnd: StatusMaxEnd,
+	})
+	if c.ParsianGetStatusEnabled && c.IrancellGetStatusName != "" && c.IrancellGetStatusName == c.ParsianGetStatusName {
+		errs = append(errs, errors.New("providers.internal.irancell.get_status.name must differ from providers.internal.parsian.get_status.name (the lock key and the metric label)"))
+	}
+	return errs
+}
+
+// validateKafkaProducer checks the keys of the Kafka producer of the status workers (task 045; the
+// timeout since task 050). validate calls it only while a status worker is on.
+func (c Config) validateKafkaProducer() []error {
+	var errs []error
 	if len(c.KafkaBrokers) == 0 || slices.Contains(c.KafkaBrokers, "") {
 		errs = append(errs, errors.New("kafka.brokers must have at least one address and no empty one (the status worker reports on Kafka)"))
 	}
 	if c.KafkaPaymentWriteSubject == "" {
 		errs = append(errs, errors.New("kafka.topic.payment.write.subject must not be empty (the status worker reports on Kafka)"))
+	}
+	if c.KafkaTimeout <= 0 {
+		errs = append(errs, errors.New("kafka.timeout must be a positive duration (the limit of each publish of the status worker; for example 5s)"))
 	}
 	return errs
 }

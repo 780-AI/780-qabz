@@ -19,7 +19,7 @@ import (
 )
 
 var cronMetricNames = []string{"qabz_cron_runs_total", "qabz_cron_duration_ms", "qabz_cron_orders_processed_total",
-	"qabz_kafka_publish_total", "qabz_kafka_publish_duration_ms"}
+	"qabz_cron_orders_fixed", "qabz_kafka_publish_total", "qabz_kafka_publish_duration_ms"}
 
 // TestCronMetrics (task 045): with metrics on, each callback records its label values, the status
 // calls go to the provider call metrics that newInquiryFlow registered; with metrics off every
@@ -30,6 +30,7 @@ func TestCronMetrics(t *testing.T) {
 	assert.Nil(t, off.onRun)
 	assert.Nil(t, off.onDuration)
 	assert.Nil(t, off.onOrder)
+	assert.Nil(t, off.onRunDone)
 	assert.Nil(t, off.onCall)
 	assert.Nil(t, off.onPublish)
 	assert.Nil(t, off.onSettle)
@@ -56,6 +57,9 @@ func TestCronMetrics(t *testing.T) {
 		reconcile.ResultSkipped, reconcile.ResultReportError, reconcile.ResultSaveError, reconcile.ResultReadError} {
 		m.onOrder("parsian-getstatus", result)
 	}
+	m.onRunDone("irancell-get-status", 0)
+	m.onRunDone("irancell-get-status", 7)
+	m.onRunDone("parsian-getstatus", 3)
 	m.onCall("parsian", "status", "ok", time.Millisecond)
 	m.onPublish(kafka.ResultOK, time.Millisecond)
 	m.onPublish(kafka.ResultError, time.Millisecond)
@@ -73,6 +77,25 @@ func TestCronMetrics(t *testing.T) {
 	assert.Equal(t, 3, got["qabz_cron_runs_total"], "done, no_lock, error")
 	assert.Equal(t, 1, got["qabz_cron_duration_ms"])
 	assert.Equal(t, 8, got["qabz_cron_orders_processed_total"], "every result")
+	assert.Equal(t, 2, got["qabz_cron_orders_fixed"], "task 050: one series for each worker")
+	for _, f := range families {
+		if f.GetName() != "qabz_cron_orders_fixed" {
+			continue
+		}
+		for _, mt := range f.GetMetric() {
+			h := mt.GetHistogram()
+			if !assert.Len(t, mt.GetLabel(), 1) || !assert.NotNil(t, h) {
+				continue
+			}
+			if mt.GetLabel()[0].GetValue() == "irancell-get-status" {
+				assert.Equal(t, uint64(2), h.GetSampleCount(), "one observation for each run, also 0")
+				assert.Equal(t, 7.0, h.GetSampleSum())
+				if assert.NotEmpty(t, h.GetBucket()) {
+					assert.Equal(t, uint64(1), h.GetBucket()[0].GetCumulativeCount(), "the 0 run is in the bucket 0")
+				}
+			}
+		}
+	}
 	assert.Equal(t, 2, got["qabz_kafka_publish_total"], "ok, error")
 	assert.Equal(t, 1, got["qabz_kafka_publish_duration_ms"])
 	assert.Equal(t, 2, got["qabz_order_settle_total"], "task 046: the settlements of the worker")
@@ -172,6 +195,33 @@ func TestNewStatusCronsRules(t *testing.T) {
 	both.ConfirmPaymentTelephoneName = cfg.ParsianGetStatusName
 	_, err = newCrons(both, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
 	assert.ErrorContains(t, err, "not unique")
+
+	// Task 050: the Irancell worker alone has the Kafka producer; with the Parsian worker the two
+	// share it; a bad option of the Irancell worker or kafka.timeout 0 stops the build.
+	irancell := none
+	irancell.IrancellGetStatusEnabled = true
+	jobs, err = newCrons(irancell, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	if assert.NoError(t, err) && assert.NotNil(t, jobs) {
+		assert.NotNil(t, jobs.producer)
+		assert.NoError(t, jobs.Stop(context.Background()))
+	}
+	two := cfg
+	two.IrancellGetStatusEnabled = true
+	jobs, err = newCrons(two, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	if assert.NoError(t, err) && assert.NotNil(t, jobs) {
+		assert.NoError(t, jobs.Stop(context.Background()))
+	}
+	bad = irancell
+	bad.IrancellGetStatusChunk = 0
+	_, err = newCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	assert.ErrorContains(t, err, "chunk")
+	bad = irancell
+	bad.KafkaTimeout = 0
+	_, err = newCrons(bad, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	assert.ErrorContains(t, err, "publish timeout")
+	two.IrancellGetStatusName = cfg.ParsianGetStatusName
+	_, err = newCrons(two, nil, cache, cacheTestAdapters{}, cronMetrics{}, nil)
+	assert.ErrorContains(t, err, "not unique")
 }
 
 // TestSettleCronLock (task 046): the lock policy has the chunk and no sync operations, so the TTL
@@ -189,14 +239,14 @@ func TestSettleCronLock(t *testing.T) {
 	assert.Equal(t, 2*time.Minute, base)
 }
 
-// TestDefaultBuilderCrons (tasks 045 and 046): with both worker switches off (the default) the
-// App has no workers; with either one on, the App has the workers; the cron metrics are registered
+// TestDefaultBuilderCrons (tasks 045, 046 and 050): with every worker switch off (the default) the
+// App has no workers; with any one on, the App has the workers; the cron metrics are registered
 // in every case (with metrics on).
 func TestDefaultBuilderCrons(t *testing.T) {
-	for _, sw := range [][2]bool{{false, false}, {true, false}, {false, true}, {true, true}} {
+	for _, sw := range [][3]bool{{false, false, false}, {true, false, false}, {false, true, false}, {true, true, false}, {false, false, true}, {true, true, true}} {
 		cfg := testConfig(t)
-		cfg.ParsianGetStatusEnabled, cfg.ConfirmPaymentTelephoneEnabled = sw[0], sw[1]
-		enabled := sw[0] || sw[1]
+		cfg.ParsianGetStatusEnabled, cfg.ConfirmPaymentTelephoneEnabled, cfg.IrancellGetStatusEnabled = sw[0], sw[1], sw[2]
+		enabled := sw[0] || sw[1] || sw[2]
 		b, err := NewDefaultBuilder(context.Background(), cfg)
 		if !assert.NoError(t, err) || !assert.NotNil(t, b) {
 			continue

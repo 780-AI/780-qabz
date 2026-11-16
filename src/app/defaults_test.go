@@ -189,7 +189,7 @@ func metricsServer(t *testing.T, b *Builder) *prometheus.Server {
 
 var qabzMetrics = []string{
 	prometheus.RequestDurationName, "qabz_auth_rejected_total", "qabz_services_cache_total",
-	"qabz_mybill_insert_total", "qabz_mybill_delete_total",
+	"qabz_mybill_insert_total", "qabz_mybill_delete_total", "qabz_cron_orders_fixed",
 	"qabz_providers_loads_total", "qabz_providers_load_duration_ms",
 	"qabz_providers_last_load_success_timestamp_ms", "qabz_providers_changes_total",
 	"qabz_providers_active_count",

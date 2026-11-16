@@ -1,9 +1,10 @@
 // Package irancellproxy is the Irancell adapter (task 035): it calls the irancell service, one of
-// our own services, over gRPC (pb.InternalService/BillInquiry, pb/proto/irancell). The irancell
-// service calls Irancell; Qabz does not. Only Inquiry of an Irancell mobile bill is implemented;
-// every other method returns provider.ErrNotSupported. The rules copy the old bill service
-// (gateway/inquiry/mobile_irancell.go, IrancellMobile, and base.go
-// handlePhoneResponseWithoutInquiry).
+// our own services, over gRPC (pb.InternalService/BillInquiry and GetStatus, pb/proto/irancell). The
+// irancell service calls Irancell; Qabz does not. Inquiry of an Irancell mobile bill and Status of an
+// order (task 050, the status worker) are implemented; every other method returns
+// provider.ErrNotSupported. The rules copy the old bill service (gateway/inquiry/mobile_irancell.go,
+// IrancellMobile, and base.go handlePhoneResponseWithoutInquiry; gateway/paymentInquiry/irancell.go,
+// IrancellPaymentInquiry).
 package irancellproxy
 
 import (
@@ -26,6 +27,9 @@ const Name = "irancell"
 // successMessage is the message of an answer with inquiries (bill: "the operation was done successfully").
 const successMessage = "عملیات با موفقیت انجام شد"
 
+// purchaseType is the purchase_type of every GetStatus call (bill: "charge").
+const purchaseType = "charge"
+
 var (
 	// errNoAddress is the cause of every call of a client made with no address.
 	errNoAddress = errors.New("providers.internal.irancell.grpc_address is not set")
@@ -37,6 +41,7 @@ var (
 // uses. Tests give a fake.
 type Client interface {
 	BillInquiry(ctx context.Context, in *pb.BillInquiryRequest, opts ...grpc.CallOption) (*pb.BillInquiryResponse, error)
+	GetStatus(ctx context.Context, in *pb.GetStatusRequest, opts ...grpc.CallOption) (*pb.GetStatusResponse, error)
 }
 
 // Options configure New.
@@ -90,6 +95,10 @@ func Dial(addr string) (Client, error) {
 type noClient struct{}
 
 func (noClient) BillInquiry(context.Context, *pb.BillInquiryRequest, ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
+	return nil, errNoAddress
+}
+
+func (noClient) GetStatus(context.Context, *pb.GetStatusRequest, ...grpc.CallOption) (*pb.GetStatusResponse, error) {
 	return nil, errNoAddress
 }
 
@@ -186,9 +195,37 @@ func (*Adapter) Pay(context.Context, provider.PaymentRequest) (*provider.Payment
 	return nil, provider.ErrNotSupported
 }
 
-// Status is not supported yet.
-func (*Adapter) Status(context.Context, provider.StatusRequest) (*provider.StatusResponse, error) {
-	return nil, provider.ErrNotSupported
+// Status asks the irancell service for the status of an order (task 050; bill:
+// IrancellPaymentInquiry.Execute): GetStatus with the order ID and the purchase type "charge", with
+// the timeout of the adapter.
+//   - A call that fails (the switch is off, no address, a connection error, a timeout, a nil answer)
+//     returns an error that wraps provider.ErrProviderDown (bill: the status pending with the error
+//     text; the status worker counts it pending).
+//   - Else the status, the message and the trace ID (tid) of the answer, as they are.
+func (a *Adapter) Status(ctx context.Context, req provider.StatusRequest) (*provider.StatusResponse, error) {
+	if a == nil || a.client == nil {
+		return nil, errors.New("irancellproxy: adapter not created with New")
+	}
+	if !a.enabled {
+		return nil, fmt.Errorf("irancellproxy: get status: %w: %w", provider.ErrProviderDown, errDisabled)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
+	defer cancel()
+	resp, err := a.client.GetStatus(ctx, &pb.GetStatusRequest{OrderId: req.OrderID, PurchaseType: purchaseType})
+	if err != nil {
+		return nil, fmt.Errorf("irancellproxy: get status: %w: %w", provider.ErrProviderDown, err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("irancellproxy: get status: %w: empty answer", provider.ErrProviderDown)
+	}
+	return &provider.StatusResponse{
+		Status:          resp.GetStatus(),
+		Message:         resp.GetMessage(),
+		ProviderTraceID: resp.GetTid(),
+	}, nil
 }
 
 // GetDocument is not supported yet.
@@ -211,9 +248,10 @@ const (
 )
 
 // MockFixtures returns the fixed answers of the Irancell mock (debug.mocks.irancell): Inquiry
-// answers with the two inquiries above.
+// answers with the two inquiries above; Status answers success (task 050; the failed and pending
+// answers come from debug.mocks.irancell.status_return_type).
 func MockFixtures() provider.MockFixtures {
-	return provider.MockFixtures{Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
+	return provider.MockFixtures{Status: mockStatus, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
 		return &provider.InquiryResponse{
 			Status:          provider.ResponseSuccess,
 			Code:            200,
@@ -225,4 +263,9 @@ func MockFixtures() provider.MockFixtures {
 			},
 		}
 	}}
+}
+
+// mockStatus is the success answer of the Irancell mock to a status call (task 050).
+func mockStatus(provider.StatusRequest) *provider.StatusResponse {
+	return &provider.StatusResponse{Status: provider.StatusSuccess, Message: successMessage, ProviderTraceID: MockTrace}
 }

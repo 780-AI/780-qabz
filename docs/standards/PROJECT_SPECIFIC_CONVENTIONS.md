@@ -1,7 +1,8 @@
-<!-- VERSION: 0.26 -->
-<!-- Last Updated: 2026-11-15 -->
+<!-- VERSION: 0.27 -->
+<!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v0.27 — 2026-11-16 — Task 050 (operator rule of 2026-11-15): § 10 — every failed step of a background worker writes one error line, also when the next run retries it (a failed read was "counted, no line"); the line has the worker name and the order ID when there is one; a call that the App stop canceled writes none.
 v0.26 — 2026-11-15 — Task 051 (operator, decisions D1 to D4): § 8 — an on/off switch is a bool key named `enabled` (the one exception: `debug.auth.disable`), a renamed key goes in `renamedKeys`, checked by tests; § 15 — the mock switch is `debug.mocks.<provider>.enabled`; § 17 — the off switch is `logs.tracing.enabled` (with `logs.tracing.otlp_endpoint`).
 v0.25 — 2026-11-15 — Task 047 (operator decisions D4, D10): § 17 — a failed span uses `jaeger.Fail` (the result and the error type), never `span.RecordError`; the gateway makes no HTTP span; the shared hooks that task 047 added; the test helper `jaegertest`.
 v0.24 — 2026-11-15 — New § 17 (operator): every added or changed feature is traced with OpenTelemetry spans sent to Jaeger, one trace for each path of execution, from the entry to the last dependency call; the features that exist get their spans in task 047.
@@ -257,6 +258,7 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 - An unexpected fault in the code: a broken invariant, a nil result where a value is required, a panic that a recovery middleware catches.
 - A failure that stops the start or ends the process: a missing or bad config value, a failed connection or migration, a listener that cannot bind. Before the logger exists, print the error to stderr in place of a log line.
 - A failed background job (a cron run, a consumer message) that is not retried.
+- **A failed step of a background worker, also when the next run retries it** (operator, 2026-11-15, task 050): a failed page read, a failed read of one order, a failed or timed-out provider call, an answer that the worker cannot use (an unknown status text), a failed report, a failed save, a lost lock, a failed release, a panic. One error line for each, with the worker name, the order ID (when there is one) and the error. A provider answer that is a normal outcome (for example `pending`) is not an error. A call that the App stop canceled writes no line (the run ends).
 
 **Common errors (do not log them):**
 - A client error: an invalid request (`InvalidArgument`), a rejected token (`PermissionDenied`), a missing row (`NotFound`), a duplicate.

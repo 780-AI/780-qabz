@@ -555,39 +555,48 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 	assert.NoError(t, err, "an old circuit_breaker block is ignored")
 }
 
-// TestParseIrancellProviderKeys (task 035): the keys of the Irancell provider have no default, take
-// their values, and a bad value names its key.
+// TestParseIrancellProviderKeys (task 035; task 050 D2): the bill keys name, grpc_address and
+// nats_subject have no default; the get_status keys have the values of the operator's config as
+// defaults, with the worker off; every key takes its value, and a bad value names its key.
 func TestParseIrancellProviderKeys(t *testing.T) {
 	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
 	c, err := Parse([]byte(base))
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Equal(t, []string{"", "", "", ""},
+	assert.Equal(t, []string{"", "", "", "irancell-get-status"},
 		[]string{c.IrancellName, c.IrancellGRPCAddress, c.IrancellNATSSubject, c.IrancellGetStatusName})
-	assert.Equal(t, make([]time.Duration, 9), []time.Duration{
+	assert.Equal(t, []time.Duration{
+		15 * time.Minute, 30 * time.Minute, 48 * time.Hour, 15 * time.Minute, 30 * time.Minute, 10 * time.Hour,
+		30 * time.Second, 3 * time.Millisecond, 3 * time.Millisecond,
+	}, []time.Duration{
 		c.IrancellGetStatusCronTime, c.IrancellGetStatusStart, c.IrancellGetStatusEnd, c.IrancellGetStatusEvery,
 		c.IrancellGetStatusLockTime, c.IrancellGetStatusReverseDeadline,
 		c.IrancellGetStatusSyncAPICall, c.IrancellGetStatusSyncGetOrder, c.IrancellGetStatusSyncInsertOrder,
 	})
-	assert.Equal(t, 0, c.IrancellGetStatusChunk)
-	assert.False(t, c.IrancellGetStatusIsLockable)
+	assert.Equal(t, 100, c.IrancellGetStatusChunk)
+	assert.True(t, c.IrancellGetStatusIsLockable)
+	assert.False(t, c.IrancellGetStatusEnabled, "the worker is off by default (the behavior before task 050)")
+	assert.Equal(t, MockReturnSuccess, c.DebugMockIrancellStatusReturnType)
 
-	c, err = Parse([]byte(base + `providers: {internal: {irancell: {name: "irancell", grpc_address: "irancell:8084", nats_subject: "irancell-bill", get_status: {cron_time: "15m", name: "irancell-get-status", start: "30m", end: "48h", chunk: 100, every: "16m", lock_time: "31m", is_lockable: true, reverse_deadline: "10h", sync_operations: {api_call_get_status: "30s", get_order_query: "3ms", insert_order_query: "4ms"}}}}}
+	c, err = Parse([]byte(base + `providers: {internal: {irancell: {name: "irancell", grpc_address: "irancell:8084", nats_subject: "irancell-bill", get_status: {enabled: true, cron_time: "14m", name: "irancell-x", start: "31m", end: "47h", chunk: 50, every: "16m", lock_time: "31m", is_lockable: false, reverse_deadline: "9h", sync_operations: {api_call_get_status: "29s", get_order_query: "2ms", insert_order_query: "4ms"}}}}}
+debug: {mocks: {irancell: {status_return_type: "pending"}}}
 `))
 	if assert.NoError(t, err) {
-		assert.Equal(t, []string{"irancell", "irancell:8084", "irancell-bill", "irancell-get-status"},
+		assert.True(t, c.IrancellGetStatusEnabled)
+		assert.Equal(t, MockReturnPending, c.DebugMockIrancellStatusReturnType)
+		assert.Equal(t, []string{"irancell", "irancell:8084", "irancell-bill", "irancell-x"},
 			[]string{c.IrancellName, c.IrancellGRPCAddress, c.IrancellNATSSubject, c.IrancellGetStatusName})
 		assert.Equal(t, []time.Duration{
-			15 * time.Minute, 30 * time.Minute, 48 * time.Hour, 16 * time.Minute, 31 * time.Minute, 10 * time.Hour,
-			30 * time.Second, 3 * time.Millisecond, 4 * time.Millisecond,
+			14 * time.Minute, 31 * time.Minute, 47 * time.Hour, 16 * time.Minute, 31 * time.Minute, 9 * time.Hour,
+			29 * time.Second, 2 * time.Millisecond, 4 * time.Millisecond,
 		}, []time.Duration{
 			c.IrancellGetStatusCronTime, c.IrancellGetStatusStart, c.IrancellGetStatusEnd, c.IrancellGetStatusEvery,
 			c.IrancellGetStatusLockTime, c.IrancellGetStatusReverseDeadline,
 			c.IrancellGetStatusSyncAPICall, c.IrancellGetStatusSyncGetOrder, c.IrancellGetStatusSyncInsertOrder,
 		})
-		assert.Equal(t, 100, c.IrancellGetStatusChunk)
-		assert.True(t, c.IrancellGetStatusIsLockable)
+		assert.Equal(t, 50, c.IrancellGetStatusChunk)
+		assert.False(t, c.IrancellGetStatusIsLockable)
 		assert.Equal(t, 10*time.Second, c.QabzinoTimeout, "the keys of the other providers keep their defaults")
 	}
 
@@ -1062,4 +1071,52 @@ func errText(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+// TestIrancellGetStatusRules (task 050 D1, D2): with the Irancell worker on, every bad key stops the
+// start and names its key; end may not pass 48h; the name may not be the Parsian worker name while
+// both are on; the Kafka keys (with kafka.timeout) are checked when only the Irancell worker is on.
+// With the worker off, the same values are accepted.
+func TestIrancellGetStatusRules(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	_, err := Parse([]byte(base + "providers: {internal: {irancell: {get_status: {enabled: true}}}}\n"))
+	assert.NoError(t, err, "the defaults are valid")
+	for gs, want := range map[string]string{
+		`name: ""`:                "get_status.name must not be empty",
+		`cron_time: "0s"`:         "get_status.cron_time must be a positive",
+		`chunk: 0`:                "get_status.chunk must be positive",
+		`start: "-1s"`:            "get_status.start must not be negative",
+		`start: "2h", end: "1h"`:  "end must be greater than start",
+		`end: "49h"`:              "providers.internal.irancell.get_status.end must not be greater than 48h0m0s",
+		`reverse_deadline: "-1s"`: "get_status.reverse_deadline must not be negative",
+		`sync_operations: {api_call_get_status: "-1s"}`: "get_status.sync_operations must not be negative",
+	} {
+		_, err := Parse([]byte(base + "providers: {internal: {irancell: {get_status: {enabled: true, " + gs + "}}}}\n"))
+		assert.ErrorContains(t, err, want, gs)
+		_, err = Parse([]byte(base + "providers: {internal: {irancell: {get_status: {enabled: false, " + gs + "}}}}\n"))
+		assert.NoError(t, err, "off: %s", gs)
+	}
+	_, err = Parse([]byte(base + "providers: {internal: {irancell: {get_status: {enabled: true, end: \"48h\"}}}}\n"))
+	assert.NoError(t, err, "end 48h is the limit")
+
+	const same = "providers: {internal: {irancell: {get_status: {enabled: true, name: w}}, parsian: {get_status: {enabled: %t, name: w}}}}\n"
+	_, err = Parse([]byte(base + fmt.Sprintf(same, true)))
+	assert.ErrorContains(t, err, "irancell.get_status.name must differ from providers.internal.parsian.get_status.name")
+	_, err = Parse([]byte(base + fmt.Sprintf(same, false)))
+	assert.NoError(t, err, "the Parsian worker off: the same name is not a conflict")
+
+	for kafka, want := range map[string]string{
+		"kafka: {brokers: []}":                                "kafka.brokers must have at least one address",
+		"kafka: {topic: {payment: {write: {subject: \"\"}}}}": "kafka.topic.payment.write.subject must not be empty",
+		"kafka: {timeout: \"0s\"}":                            "kafka.timeout must be a positive duration",
+	} {
+		_, err := Parse([]byte(base + "providers: {internal: {irancell: {get_status: {enabled: true}}}}\n" + kafka + "\n"))
+		assert.ErrorContains(t, err, want, kafka)
+		_, err = Parse([]byte(base + kafka + "\n"))
+		assert.NoError(t, err, "no status worker: %s", kafka)
+	}
+	_, err = Parse([]byte(base + "providers: {internal: {parsian: {get_status: {enabled: true}}}}\nkafka: {timeout: \"0s\"}\n"))
+	assert.ErrorContains(t, err, "kafka.timeout must be a positive duration", "the Parsian worker checks the timeout too")
+	_, err = Parse([]byte(base + "debug: {mocks: {irancell: {status_return_type: \"error\"}}}\n"))
+	assert.ErrorContains(t, err, "debug.mocks.irancell.status_return_type must be")
 }

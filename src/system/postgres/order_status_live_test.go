@@ -43,9 +43,19 @@ func insertRows(t *testing.T, ctx context.Context, c *postgres.Client, rows []st
 	}
 }
 
-// TestLivePendingIDs (task 045): bill's GetAllPending. Only the provider; only the newest row in the
-// window; pending and in-progress only; the oldest first; LIMIT and OFFSET; a final row newer than
-// the window keeps the order in the list (C6).
+// cursorIDs gives the order IDs of the cursors.
+func cursorIDs(cs []order.Cursor) []string {
+	out := make([]string, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, c.OrderID)
+	}
+	return out
+}
+
+// TestLivePendingIDs (task 045; task 050 D4): bill's GetAllPending with a keyset page. Only the
+// provider; only the newest row in the window; pending and in-progress only; the oldest first; LIMIT
+// and the cursor (created_at of the newest row in the window, order_id); a final row newer than the
+// window keeps the order in the list (C6).
 func TestLivePendingIDs(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -64,41 +74,84 @@ func TestLivePendingIDs(t *testing.T) {
 		{8, order.StatusInitial, "parsian", time.Hour}, // initial: out
 	})
 
-	all, err := r.PendingIDs(ctx, "parsian", 100, 0, start, end)
+	all, err := r.PendingIDs(ctx, "parsian", 100, order.Cursor{}, start, end)
 	if !assert.NoError(t, err) {
 		return
 	}
-	if !assert.Equal(t, []string{statusOrderID(1), statusOrderID(2), statusOrderID(7)}, all, "the oldest newest row first") {
+	if !assert.Equal(t, []string{statusOrderID(1), statusOrderID(2), statusOrderID(7)}, cursorIDs(all), "the oldest newest row first") {
 		return // the pages below slice all
 	}
+	for _, cur := range all {
+		assert.False(t, cur.CreatedAt.IsZero(), "the cursor has the created_at of the newest row in the window")
+	}
 
-	page1, err := r.PendingIDs(ctx, "parsian", 2, 0, start, end)
+	page1, err := r.PendingIDs(ctx, "parsian", 2, order.Cursor{}, start, end)
 	assert.NoError(t, err)
 	assert.Equal(t, all[:2], page1)
-	page2, err := r.PendingIDs(ctx, "parsian", 2, 2, start, end)
+	page2, err := r.PendingIDs(ctx, "parsian", 2, page1[1], start, end)
 	assert.NoError(t, err)
 	assert.Equal(t, all[2:], page2)
-	none, err := r.PendingIDs(ctx, "parsian", 2, 4, start, end)
+	none, err := r.PendingIDs(ctx, "parsian", 2, page2[0], start, end)
 	assert.NoError(t, err)
 	assert.Empty(t, none)
 
-	other, err := r.PendingIDs(ctx, "irancell", 100, 0, start, end)
+	other, err := r.PendingIDs(ctx, "irancell", 100, order.Cursor{}, start, end)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{statusOrderID(4)}, other)
+	assert.Equal(t, []string{statusOrderID(4)}, cursorIDs(other))
 
-	_, err = postgres.NewOrderRepository(nil).PendingIDs(ctx, "parsian", 1, 0, start, end)
+	_, err = postgres.NewOrderRepository(nil).PendingIDs(ctx, "parsian", 1, order.Cursor{}, start, end)
 	assert.Error(t, err)
 }
 
-// TestLiveInsertFinal (task 045): bill's NewOrderWithFinalStatus. A pending order gets the final
-// row; a second final row is ErrAlreadyFinal and is not saved; an order with no row of the last 24 h
-// is pgx.ErrNoRows.
+// TestLivePendingIDsSameTime (task 050 D4): orders whose newest rows have the same created_at are
+// ordered and paged by order_id, so a page boundary in such a group skips and repeats nothing.
+func TestLivePendingIDsSameTime(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	c := seededClient(t, ctx)
+	r := postgres.NewOrderRepository(c)
+	rows := make([]statusRow, 0, 5)
+	for n := 21; n <= 25; n++ {
+		rows = append(rows, statusRow{n, order.StatusPending, "parsian", time.Hour})
+	}
+	insertRows(t, ctx, c, rows)
+	_, err := c.Pool().Exec(ctx, `UPDATE orders SET created_at = date_trunc('second', NOW()) - INTERVAL '1 hour' WHERE order_id::text LIKE 'cccccccc-%'`)
+	if !assert.NoError(t, err) {
+		return
+	}
+	var got []string
+	after := order.Cursor{}
+	for i := 0; i < 5; i++ {
+		page, err := r.PendingIDs(ctx, "parsian", 2, after, 30*time.Minute, 10*time.Hour)
+		if !assert.NoError(t, err) || len(page) == 0 {
+			break
+		}
+		got = append(got, cursorIDs(page)...)
+		after = page[len(page)-1]
+	}
+	assert.Equal(t, []string{statusOrderID(21), statusOrderID(22), statusOrderID(23), statusOrderID(24), statusOrderID(25)}, got)
+}
+
+// TestLiveInsertFinal (task 045; task 050 D5, D6): bill's NewOrderWithFinalStatus. A pending order
+// gets the final row; the report runs after the insert, inside the transaction (the row is not seen
+// from another connection before the commit); a second final row is ErrAlreadyFinal, is not saved
+// and is not reported; an order of 25 h gets its final row (one window with the read: bill locks
+// only the last 24 h and fails); an order with no row of the last 48 h is pgx.ErrNoRows; a failed
+// report rolls the insert back.
 func TestLiveInsertFinal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	c := seededClient(t, ctx)
 	r := postgres.NewOrderRepository(c)
-	insertRows(t, ctx, c, []statusRow{{11, order.StatusPending, "parsian", time.Hour}, {12, order.StatusPending, "parsian", 25 * time.Hour}})
+	insertRows(t, ctx, c, []statusRow{
+		{11, order.StatusPending, "parsian", time.Hour}, {12, order.StatusPending, "parsian", 25 * time.Hour},
+		{13, order.StatusPending, "parsian", 49 * time.Hour}, {14, order.StatusInProgress, "irancell", time.Hour},
+	})
+	count := func(n int) int {
+		var k int
+		assert.NoError(t, c.Pool().QueryRow(ctx, `SELECT count(*) FROM orders WHERE order_id = $1`, statusOrderID(n)).Scan(&k))
+		return k
+	}
 
 	pending, err := r.Latest(ctx, statusOrderID(11), order.LatestWindow)
 	if !assert.NoError(t, err) {
@@ -106,9 +159,17 @@ func TestLiveInsertFinal(t *testing.T) {
 	}
 	final := pending
 	final.ID, final.Status = "eeeeeeee-0000-4000-8000-000000000001", order.StatusSuccess
-	if !assert.NoError(t, r.InsertFinal(ctx, final)) {
+	reports := 0
+	seenOutside := -1
+	if !assert.NoError(t, r.InsertFinal(ctx, final, func(context.Context) error {
+		reports++
+		seenOutside = count(11) // another connection: the insert is not committed yet
+		return nil
+	})) {
 		return
 	}
+	assert.Equal(t, 1, reports)
+	assert.Equal(t, 1, seenOutside, "the report runs before the commit")
 	got, err := r.Latest(ctx, statusOrderID(11), order.LatestWindow)
 	if assert.NoError(t, err) {
 		got.CreatedAt, final.CreatedAt = time.Time{}, time.Time{}
@@ -117,20 +178,37 @@ func TestLiveInsertFinal(t *testing.T) {
 
 	again := final
 	again.ID, again.Status = "eeeeeeee-0000-4000-8000-000000000002", order.StatusFailed
-	err = r.InsertFinal(ctx, again)
+	err = r.InsertFinal(ctx, again, func(context.Context) error { reports++; return nil })
 	assert.True(t, errors.Is(err, postgres.ErrAlreadyFinal), "%v", err)
-	var n int
-	assert.NoError(t, c.Pool().QueryRow(ctx, `SELECT count(*) FROM orders WHERE order_id = $1`, statusOrderID(11)).Scan(&n))
-	assert.Equal(t, 2, n, "nothing saved after a final status")
+	assert.True(t, errors.Is(err, order.ErrAlreadyFinal), "the order sentinel")
+	assert.Equal(t, 1, reports, "a final row: nothing reported")
+	assert.Equal(t, 2, count(11), "nothing saved after a final status")
 
 	old, err := r.Latest(ctx, statusOrderID(12), order.LatestWindow)
 	if assert.NoError(t, err) {
 		old.ID, old.Status = "eeeeeeee-0000-4000-8000-000000000003", order.StatusSuccess
-		err = r.InsertFinal(ctx, old)
-		assert.True(t, errors.Is(err, pgx.ErrNoRows), "no row of the last 24 h: %v", err)
+		assert.NoError(t, r.InsertFinal(ctx, old, nil), "an order of 25 h is saved (task 050 D5)")
+		assert.Equal(t, 2, count(12))
 	}
 
-	assert.Error(t, postgres.NewOrderRepository(nil).InsertFinal(ctx, final))
+	gone := pending
+	gone.OrderID, gone.ID = statusOrderID(13), "eeeeeeee-0000-4000-8000-000000000004"
+	err = r.InsertFinal(ctx, gone, nil)
+	assert.True(t, errors.Is(err, pgx.ErrNoRows), "no row of the last 48 h: %v", err)
+
+	ir, err := r.Latest(ctx, statusOrderID(14), order.LatestWindow)
+	if assert.NoError(t, err) {
+		ir.ID, ir.Status = "eeeeeeee-0000-4000-8000-000000000005", order.StatusSuccess
+		err = r.InsertFinal(ctx, ir, func(context.Context) error { return errors.New("kafka down") })
+		assert.ErrorContains(t, err, "kafka down")
+		assert.Equal(t, 1, count(14), "a failed report saves nothing (task 050 D6)")
+		latest, err := r.Latest(ctx, statusOrderID(14), order.LatestWindow)
+		if assert.NoError(t, err) {
+			assert.Equal(t, order.StatusInProgress, latest.Status)
+		}
+	}
+
+	assert.Error(t, postgres.NewOrderRepository(nil).InsertFinal(ctx, final, nil))
 }
 
 // confirmRow is one orders row of the settlement tests (task 046): order n, the bill type, the

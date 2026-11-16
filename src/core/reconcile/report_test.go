@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -34,10 +35,13 @@ type fakePublisher struct {
 	topic      string
 	key, value []byte
 	err        error
+	deadline   time.Time // the deadline of the ctx of the last publish
+	hasLimit   bool
 }
 
-func (f *fakePublisher) Publish(_ context.Context, topic string, key, value []byte) error {
+func (f *fakePublisher) Publish(ctx context.Context, topic string, key, value []byte) error {
 	f.topic, f.key, f.value = topic, key, value
+	f.deadline, f.hasLimit = ctx.Deadline()
 	return f.err
 }
 
@@ -45,7 +49,7 @@ func (f *fakePublisher) Publish(_ context.Context, topic string, key, value []by
 // of StatusMessage; a failed publish is the error of Report.
 func TestPaymentReporter(t *testing.T) {
 	p := &fakePublisher{}
-	r, err := NewPaymentReporter(p, "paymentwriter", "bill")
+	r, err := NewPaymentReporter(p, "paymentwriter", "bill", time.Second)
 	if !assert.NoError(t, err) || !assert.NotNil(t, r) {
 		return
 	}
@@ -59,9 +63,25 @@ func TestPaymentReporter(t *testing.T) {
 	assert.ErrorContains(t, r.Report(context.Background(), "o-1", "success"), "kafka down")
 
 	for _, args := range [][2]string{{"", "bill"}, {"t", ""}} {
-		_, err := NewPaymentReporter(p, args[0], args[1])
+		_, err := NewPaymentReporter(p, args[0], args[1], time.Second)
 		assert.Error(t, err)
 	}
-	_, err = NewPaymentReporter(nil, "t", "bill")
+	_, err = NewPaymentReporter(nil, "t", "bill", time.Second)
 	assert.Error(t, err)
+	_, err = NewPaymentReporter(p, "t", "bill", 0)
+	assert.Error(t, err, "the publish timeout must be positive")
+}
+
+// TestPaymentReporterTimeout (task 050 D6): each publish waits at most the timeout of the reporter
+// (kafka.timeout), also when the ctx of the run has no deadline.
+func TestPaymentReporterTimeout(t *testing.T) {
+	p := &fakePublisher{}
+	r, err := NewPaymentReporter(p, "paymentwriter", "bill", 5*time.Second)
+	if !assert.NoError(t, err) {
+		return
+	}
+	before := time.Now()
+	assert.NoError(t, r.Report(context.Background(), "o-1", "success"))
+	assert.True(t, p.hasLimit, "the publish has a deadline")
+	assert.WithinDuration(t, before.Add(5*time.Second), p.deadline, time.Second)
 }

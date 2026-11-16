@@ -186,10 +186,11 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		b.WithTracer(tr)
 	}
 
-	// The workers (tasks 045 and 046): the metrics exist with metrics on; the Parsian status worker
-	// and its Kafka producer only with providers.internal.parsian.get_status.enabled; the settlement
-	// worker only with confirm_payment.telephone.enabled. Built last, so no later failed step leaves
-	// the producer open.
+	// The workers (tasks 045, 046 and 050): the metrics exist with metrics on; the Parsian status
+	// worker only with providers.internal.parsian.get_status.enabled, the Irancell status worker only
+	// with providers.internal.irancell.get_status.enabled, and their Kafka producer only with one of
+	// them; the settlement worker only with confirm_payment.telephone.enabled. Built last, so no later
+	// failed step leaves the producer open.
 	cronMetrics, err := newCronMetrics(metrics)
 	if err != nil {
 		db.Close()
@@ -198,10 +199,13 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	if !cfg.ParsianGetStatusEnabled {
 		logger.Info("parsian status worker off (providers.internal.parsian.get_status.enabled: false)")
 	}
+	if !cfg.IrancellGetStatusEnabled {
+		logger.Info("irancell status worker off (providers.internal.irancell.get_status.enabled: false)")
+	}
 	if !cfg.ConfirmPaymentTelephoneEnabled {
 		logger.Info("settlement worker off (confirm_payment.telephone.enabled: false)")
 	}
-	if cfg.ParsianGetStatusEnabled || cfg.ConfirmPaymentTelephoneEnabled {
+	if cfg.ParsianGetStatusEnabled || cfg.IrancellGetStatusEnabled || cfg.ConfirmPaymentTelephoneEnabled {
 		jobs, err := newCrons(cfg, db, cache, registry, cronMetrics, logger)
 		if err != nil {
 			db.Close()
@@ -456,7 +460,8 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	// providers.internal.irancell.enabled: false wins over the mock, as for Qabzino and Tavanir.
-	irancellMock := provider.MockSettings{Enable: dev && cfg.DebugMockIrancellEnabled && cfg.IrancellEnabled, ReturnType: cfg.DebugMockIrancellReturnType}
+	irancellMock := provider.MockSettings{Enable: dev && cfg.DebugMockIrancellEnabled && cfg.IrancellEnabled, ReturnType: cfg.DebugMockIrancellReturnType,
+		StatusReturnType: cfg.DebugMockIrancellStatusReturnType} // task 050: the status of an order
 	if err := registerAdapter(registry, irancellAdapter, "Irancell", disabledNotice("internal.irancell", "Irancell", cfg.IrancellEnabled),
 		irancellMock, irancellproxy.MockFixtures(), logger); err != nil {
 		return nil, err
