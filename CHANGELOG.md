@@ -1,7 +1,8 @@
-<!-- VERSION: 3.58 -->
+<!-- VERSION: 3.59 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.59 — 2026-11-16 — Added session-wrap-up (tasks 055 and 056 session) entry.
 v3.58 — 2026-11-16 — Added 056-irancell-payment entry.
 v3.57 — 2026-11-16 — Added 055-rightel-mobile-payment entry.
 v3.56 — 2026-11-16 — Added 054-mci-mobile-payment entry.
@@ -174,6 +175,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Session wrap-up (tasks 055 and 056 session)
+- **Type:** Minor (governance: the register; no code).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (v1.92: 5 lesson candidates (the tool input turns `\u` text into the real character; the `committer` agent stops on the attribution line; a Go module zip that the proxy refuses; Docker Hub did not answer; a status worker in a feature-ON run reads every pending order of the dev database) and more evidence for 2 (the `code-reviewer` agent before the task commit; shared local runtime); push of 495f052..2aa2ca9 done).
+- **Impact:** No runtime impact.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 056: the Irancell mobile bill payment over NATS
 - **Type:** Major (a new dependency and package, new config keys, a payment behavior, a Critical File).

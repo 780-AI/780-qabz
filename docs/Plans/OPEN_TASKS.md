@@ -1,7 +1,8 @@
-<!-- VERSION: 1.91 -->
+<!-- VERSION: 1.92 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v1.92 — 2026-11-16 — Session wrap-up (tasks 055 and 056 session): 5 lesson candidates and more evidence for 2; push of 495f052..2aa2ca9 done.
 v1.91 — 2026-11-16 — Task 056 Irancell payment over NATS: QA scenario (feature-ON run done by the implementer; the operator QA is on stage with the real irancell service) and follow-ups (the NATS endpoints of stage and prod, the Irancell status worker switch, the old task 050 follow-up (a)).
 v1.90 — 2026-11-16 — Task 055 Rightel payment through Parsian: QA scenario (feature-ON run done by the implementer; the operator QA is on stage after the deploy) and follow-ups (the provider rows of stage and prod; the Qabzino mock of the local config).
 v1.89 — 2026-11-16 — Task 054 MCI payment through Parsian: QA scenario (feature-ON run done by the implementer; the operator QA is on stage after the deploy) and follow-ups (the provider rows of stage and prod; task 058 the fallback).
@@ -560,3 +561,13 @@ Found in the 2026-11-15 session wrap-up (task 047 commit, tasks 050 and 051, sup
 - More evidence for **Rule 10 review table before every commit** (`CLAUDE.md` Rule 10, L044): the commits `ff5b2ad` (task 050) and `28bf511` (task 051 start) are docs-only and were made with no review table in chat; the agent reported it to the operator in the same session.
 - More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): tasks 047 (`428240d`) and 051 (`6de36c2`) were committed on the in-chat Rule 10 review only; the agent did not run.
 - More evidence for **Shared local runtime** (2026-11-08): the operator's debug App was on 8080 / 8082 / 9090; the task 051 checks used App copies on 18080 / 18082 / 19090 and the running compose Jaeger, and left the compose services running.
+
+Found in the 2026-11-16 session wrap-up (tasks 055 and 056 session):
+
+- **The tool input turns `\u` text into the real character.** A Go test literal with JSON escapes (`\u003c`, `\u2028`), written with the Write tool and then with a heredoc, reached the file as the real characters `<` and U+2028; the expected string was wrong and the test failed. An `od -c` of the line showed it; the fix built the backslash with Python `chr(92)`. Candidate: a SESSION_OPENER § 3.2 row and a feedback memory: after writing a literal with a backslash escape, check the file bytes (`od -c` or `grep -c`) before the test run. Recommendation: codify (memory and row).
+- **The `committer` agent stops on the attribution line.** Its own reminder names its model (Sonnet), so it stopped at the message line `Co-Authored-By: Claude Opus 5.5` of the parent session (task 055); a brief that says the line is correct worked (task 056). Candidate: the `commit-push` skill says that the brief names the attribution line of the parent session as correct. Recommendation: codify (skill text).
+- **A Go module zip that the proxy refuses.** `proxy.golang.org` answered 403 for every `klauspost/compress` zip (inside and outside the sandbox); `GOPROXY=direct go mod download <module>@<version>` fetched it from the source, and the checksum database verified it. Candidate: a note in conventions § 2. Recommendation: queue (one instance).
+- **Docker Hub did not answer.** The compose image `nats:2.15.0` had to come from the local `nats:latest` (v2.15.0) with a local tag. Candidate: before a new compose image, check `docker images` and the registry; record the version of a local image. Recommendation: queue (one instance; task 056 follow-up (c)).
+- **A status worker in a feature-ON run reads every pending order of the dev database.** The task 056 run turned the Irancell worker on with `start` 1s; the dev database had 8 older Irancell orders inside the 48 h window (all `initial`, so not touched). Candidate: before a worker runs in a feature-ON check, count the pending and in-progress orders of its provider in the window, as task 054 did for Parsian. Recommendation: queue (more evidence for **Shared local runtime**).
+- More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): the operator asked for the agent before both task commits of this session; for task 056 it found stale docs ("Qabz has no NATS" in four places), a wrong comment and a `null` decode that differed from bill, all fixed before the commit; for task 055 it found nothing. Recommendation: codify.
+- More evidence for **Shared local runtime** (2026-11-08): the operator's debug App stayed on 8080 / 8082 / 9090; the feature-ON runs used App copies on 18080 / 18082 / 18083 / 19090; only the compose `nats` container that this session started was stopped.

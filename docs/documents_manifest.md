@@ -1,4 +1,4 @@
-<!-- VERSION: 2.59 -->
+<!-- VERSION: 2.60 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.8 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.58 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.59 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.59 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.60 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.59 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -43,7 +43,7 @@
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.91 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.92 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.28 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-16
-- **Change**: 2026-11-16 — Task 056 `irancell_payment`: `OrderComplete` pays an Irancell order over NATS (new `src/system/nats/nats.go`, `src/app/nats.go`; `irancellproxy.Pay` with bill's message), config section `nats`, `providers.internal.irancell.pay_timeout`, `debug.mocks.irancell.pay_return_type`, nats.go v1.55.0, compose service `nats`; `config.yml.example`, `docker-compose.yml`, `src/go.mod`, `src/go.sum` (no VERSION header, no rows); new test files `src/system/nats/nats_test.go`, `src/provider/irancellproxy/pay_test.go`, `src/app/nats_test.go`, `src/app/irancell_payment_live_test.go` (Go files are not manifest-tracked). Bumped #3 CHANGELOG v3.58, #5 manifest v2.59, #6 folder structure v0.59, #21 system.html v2.28, #28 OPEN_TASKS v1.91, #34 app README v0.47, #35 this_vs_bill v0.32.
-- **Previous change**: 2026-11-16 — Task 055 `rightel_mobile_payment`: `POST /v1/mobile/order` serves the operator `rightel` (`midTerm` → `mobilemidtermRightel`; `fullTerm` HTTP 400), ParsianProxy pays it (Parsian only), the Rightel entry of the order flow, `providers.internal.parsian.settlement_inquiry_rightel_mobile` read (default 360h), `caching.paid_mobile` also for Rightel, dev seed row 500 `enable`, Postman Phone / Order Rightel; new test files `src/core/order/rightel_test.go`, `src/app/rightel_order_live_test.go` (Go files are not manifest-tracked). Bumped #3 CHANGELOG v3.57, #5 manifest v2.58, #6 folder structure v0.58, #21 system.html v2.27, #28 OPEN_TASKS v1.90, #34 app README v0.46, #35 this_vs_bill v0.31.
+- **Change**: 2026-11-16 — Session wrap-up (tasks 055 and 056 session): 5 lesson candidates and more evidence for 2 in `OPEN_TASKS.md`; push of 495f052..2aa2ca9 done. Bumped #3 CHANGELOG v3.59, #5 manifest v2.60, #28 OPEN_TASKS v1.92.
+- **Previous change**: 2026-11-16 — Task 056 `irancell_payment`: `OrderComplete` pays an Irancell order over NATS (new `src/system/nats/nats.go`, `src/app/nats.go`; `irancellproxy.Pay` with bill's message), config section `nats`, `providers.internal.irancell.pay_timeout`, `debug.mocks.irancell.pay_return_type`, nats.go v1.55.0, compose service `nats`; `config.yml.example`, `docker-compose.yml`, `src/go.mod`, `src/go.sum` (no VERSION header, no rows); new test files `src/system/nats/nats_test.go`, `src/provider/irancellproxy/pay_test.go`, `src/app/nats_test.go`, `src/app/irancell_payment_live_test.go` (Go files are not manifest-tracked). Bumped #3 CHANGELOG v3.58, #5 manifest v2.59, #6 folder structure v0.59, #21 system.html v2.28, #28 OPEN_TASKS v1.91, #34 app README v0.47, #35 this_vs_bill v0.32.
+- **Earlier change**: 2026-11-16 — Task 055 `rightel_mobile_payment`: `POST /v1/mobile/order` serves the operator `rightel` (`midTerm` → `mobilemidtermRightel`; `fullTerm` HTTP 400), ParsianProxy pays it (Parsian only), the Rightel entry of the order flow, `providers.internal.parsian.settlement_inquiry_rightel_mobile` read (default 360h), `caching.paid_mobile` also for Rightel, dev seed row 500 `enable`, Postman Phone / Order Rightel; new test files `src/core/order/rightel_test.go`, `src/app/rightel_order_live_test.go` (Go files are not manifest-tracked). Bumped #3 CHANGELOG v3.57, #5 manifest v2.58, #6 folder structure v0.58, #21 system.html v2.27, #28 OPEN_TASKS v1.90, #34 app README v0.46, #35 this_vs_bill v0.31.
 - **Earlier change**: 2026-11-16 — Task 054 `mci_mobile_payment`: `POST /v1/mobile/order` serves the operator `mci` (`mobile`, `mobilemidterm`), ParsianProxy pays both (Parsian only), the MCI entries of the order flow, `caching.paid_mobile` (new) and `providers.internal.parsian.settlement_inquiry_mci_mobile` (read, default 0s); the dev seed row 48 `enable`; new tests `src/core/order/mobile_test.go`, `src/app/mci_order_live_test.go`; `config.yml.example`, the seed SQL and the Postman collection (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.56, #5 manifest v2.57, #6 folder_structure v0.57, #21 system.html v2.26, #28 OPEN_TASKS v1.89, #34 app README v0.45, #35 this_vs_bill v0.30.
 - **Earlier change**: 2026-11-16 — Task 058 `mci_jiring_fallback` created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 059; no code. Bumped #3 CHANGELOG v3.55, #5 manifest v2.56.
 - **Earlier change**: 2026-11-16 — Task 053 `gas_payment`: `POST /v1/gas/order` (`Gas.NewOrder`, new `src/entry/grpc/gas_order.go` on the shared handler), ParsianProxy pays `gas` (Parsian only), the `gas` entry of the order flow, `caching.paid_gas` (new) and `providers.internal.parsian.settlement_inquiry_gas` (read, default 360h); new tests `src/core/order/gas_test.go`, `src/entry/grpc/gas_order_test.go`, `src/app/gas_order_live_test.go`; `config.yml.example` and the Postman collection (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.54, #5 manifest v2.55, #6 folder_structure v0.56, #21 system.html v2.25, #28 OPEN_TASKS v1.88, #34 app README v0.44, #35 this_vs_bill v0.29.
