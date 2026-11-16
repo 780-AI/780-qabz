@@ -96,7 +96,25 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	registry, err := newProviderRegistry(cfg, logger)
+	// The NATS client of the Irancell payment (task 056); nil when it is not needed. A later failed
+	// step closes it (built is set only at the end).
+	natsClient, err := newNATS(cfg, metrics, logger)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	built := false
+	var payer irancellproxy.Requester // nil: no NATS client (an untyped nil, not a nil *nats.Client)
+	if natsClient != nil {
+		payer = natsClient
+		b.WithBroker(natsClient)
+		defer func() {
+			if !built {
+				_ = natsClient.Close(ctx)
+			}
+		}()
+	}
+	registry, err := newProviderRegistryWith(cfg, logger, payer)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -217,6 +235,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		}
 		b.WithCrons(jobs)
 	}
+	built = true
 	return b, nil
 }
 
@@ -396,7 +415,8 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 // 023), rightel_bill_endpoint (task 037) and timeout, not the gRPC QabzinoProxy) and Tavanir (task 022; since task 034 the direct HTTP client of the Tavanir
 // endpoints with providers.external.tavanir.enabled, auth_endpoint, basic_branch_endpoint, username, password
 // and timeout; it calls no other service) and Irancell (task 035: a gRPC client of the irancell
-// service with providers.internal.irancell.enabled, grpc_address and timeout), and Jiring Switch and Parsian
+// service with providers.internal.irancell.enabled, grpc_address and timeout; task 056: the payment
+// over the NATS client of newNATS with nats_subject and pay_timeout), and Jiring Switch and Parsian
 // (task 036, the MCI mobile bill: gRPC clients of the jiring-switch and the parsian-v2 service with
 // providers.internal.jiring_switch.* and providers.internal.parsian.*), and Karashop (task 025, the landline bill: the
 // direct HTTPS client of the Karashop API with providers.external.karashop.enabled, code, password,
@@ -406,6 +426,12 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 // is added later follows the same pattern (registerAdapter) with its own debug.mocks.<provider>. A
 // nil logger writes no line.
 func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, error) {
+	return newProviderRegistryWith(cfg, logger, nil)
+}
+
+// newProviderRegistryWith is newProviderRegistry with the NATS client of the Irancell payment (task
+// 056; nil: every Irancell payment is pending, with no message sent).
+func newProviderRegistryWith(cfg config.Config, logger Logger, payer irancellproxy.Requester) (*provider.Registry, error) {
 	registry := provider.NewRegistry()
 	dev := cfg.Mode == config.ModeDev
 
@@ -453,16 +479,20 @@ func newProviderRegistry(cfg config.Config, logger Logger) (*provider.Registry, 
 		return nil, err
 	}
 	irancellAdapter, err := irancellproxy.New(irancellproxy.Options{
-		Enabled: cfg.IrancellEnabled,
-		Client:  irancellClient,
-		Timeout: cfg.IrancellTimeout,
+		Enabled:    cfg.IrancellEnabled,
+		Client:     irancellClient,
+		Timeout:    cfg.IrancellTimeout,
+		NATS:       payer,                   // task 056: the payment over NATS
+		Subject:    cfg.IrancellNATSSubject, // task 056
+		PayTimeout: cfg.IrancellPayTimeout,  // task 056
 	})
 	if err != nil {
 		return nil, err
 	}
 	// providers.internal.irancell.enabled: false wins over the mock, as for Qabzino and Tavanir.
 	irancellMock := provider.MockSettings{Enable: dev && cfg.DebugMockIrancellEnabled && cfg.IrancellEnabled, ReturnType: cfg.DebugMockIrancellReturnType,
-		StatusReturnType: cfg.DebugMockIrancellStatusReturnType} // task 050: the status of an order
+		StatusReturnType: cfg.DebugMockIrancellStatusReturnType, // task 050: the status of an order
+		PayReturnType:    cfg.DebugMockIrancellPayReturnType}    // task 056: the payment
 	if err := registerAdapter(registry, irancellAdapter, "Irancell", disabledNotice("internal.irancell", "Irancell", cfg.IrancellEnabled),
 		irancellMock, irancellproxy.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -833,9 +863,10 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 // service calls OrderComplete on the internal gRPC server. The order provider parsian pays the
 // bill types tel, telmidterm, water, electricity, gas, mobile, mobilemidterm and mobilemidtermRightel
 // (parsianproxy.Pay; water since task 048, electricity since task 052, gas since task 053, the MCI
-// bill types since task 054, Rightel since task 055); after a success of tel or telmidterm the Karashop
+// bill types since task 054, Rightel since task 055), and the order provider irancell pays the bill
+// type irancell (irancellproxy.Pay over NATS, task 056); after a success of tel or telmidterm the Karashop
 // settlement runs in the background (karashop.Settle) for the order providers parsian, eways and
-// eways2, as bill (water, electricity, gas, MCI and Rightel have no settlement). With
+// eways2, as bill (water, electricity, gas, MCI, Rightel and Irancell have no settlement). With
 // metrics on:
 //   - qabz_order_payment_total{bill_type,provider,status}: each OrderComplete call (success, failed,
 //     pending, processed, wrong_price, error; provider "none" when the order was not read);
@@ -886,6 +917,7 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true, provider.BillTypeElectricity: true, provider.BillTypeGas: true,
 				provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true, // task 054: Parsian only (task 058: the fallback)
 				provider.BillTypeMobileMidTermRightel: true}, // task 055: Parsian only (operator); bill also has EWaysRightelMobile (NATS)
+			irancellproxy.Name: {provider.BillTypeIrancell: true}, // task 056: the irancell service over NATS (bill: IrancellMobile)
 		},
 		SettleRoutes: settleRoutes(),
 		Logger:       payLog,

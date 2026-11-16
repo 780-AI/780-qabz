@@ -1,7 +1,8 @@
-<!-- VERSION: 3.57 -->
+<!-- VERSION: 3.58 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.58 — 2026-11-16 — Added 056-irancell-payment entry.
 v3.57 — 2026-11-16 — Added 055-rightel-mobile-payment entry.
 v3.56 — 2026-11-16 — Added 054-mci-mobile-payment entry.
 v3.55 — 2026-11-16 — Added task-058-mci-jiring-fallback entry.
@@ -173,6 +174,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 056: the Irancell mobile bill payment over NATS
+- **Type:** Major (a new dependency and package, new config keys, a payment behavior, a Critical File).
+- **Files:** `src/system/nats/nats.go` (new: the NATS client, request/reply, nats.go v1.55.0) and `nats_test.go`; `src/go.mod`, `src/go.sum` (nats.go, nkeys, nuid; klauspost/compress); `src/provider/irancellproxy/irancellproxy.go` (`Pay` over NATS with bill's message, `SupportsPay`, the options `NATS`, `Subject`, `PayTimeout`, the mock fixture `Pay`) and `pay_test.go` (new); `src/provider/provider.go` (`PaymentRequest.Option`); `src/core/order/complete.go` (fills `Option`), `mobile_test.go`, `rightel_test.go`; `src/config/config.go` (section `nats`, `providers.internal.irancell.pay_timeout`, `debug.mocks.irancell.pay_return_type`; `nats_subject` read) and its test; `src/app/nats.go` (new: `newNATS`, the NATS metrics), `src/app/defaults.go` (the client, `newProviderRegistryWith`, the `PayRoutes` entry `irancell`, the mock key), `src/app/app.go`, `src/app/builder.go` (`Broker`, closed in `App.Stop`), `src/app/nats_test.go`, `src/app/irancell_payment_live_test.go` (new), `src/app/water_live_test.go` (`newLiveStack`); `docker-compose.yml` (service `nats`, profile `nats`); `config.yml.example`; `qabz.postman_collection.json` (the Phone / Order text); `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (item 49), `docs/folder_structure.md`, `src/app/README.md`, `docs/Plans/OPEN_TASKS.md`, `docs/tasks/done_tasks/056_irancell_payment.md`.
+- **Impact:** **Yes, behavior changes.** (1) `OrderComplete` pays an Irancell order (was: `failed`, no payment route): one NATS request on `providers.internal.irancell.nats_subject` with bill's message bytes; the answer of the irancell service gives `success`, `failed` or `pending` (any other or an empty status is `pending`, as bill); `ref_id` stays empty, as bill; a timeout, no connection or no responder is `pending`, and the Irancell status worker finalizes it. (2) New config: section `nats` (no default endpoints; the client exists only while the Irancell adapter is enabled and its mock is off), `providers.internal.irancell.pay_timeout` (30s), `debug.mocks.irancell.pay_return_type`. (3) The App starts when NATS does not answer (bill stops); one error line, the client connects again in the background. (4) New metrics `qabz_nats_requests_total`, `qabz_nats_request_duration_ms`, `qabz_nats_connected`; span `nats.Request`. (5) A new dependency: nats.go v1.55.0.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 056 Irancell payment over NATS" (Go tests with the compose NATS; feature ON with the mock, the status worker and the compose NATS with a fake irancell responder; the operator QA on stage with the real irancell service). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 055: the Rightel mobile bill payment through Parsian only
 - **Type:** Major (a public endpoint behavior, a config key read, seed data, a Critical File).

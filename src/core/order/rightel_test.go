@@ -147,7 +147,7 @@ func TestCompleteRightelSuccess(t *testing.T) {
 	if assert.Len(t, f.parsian.payReqs, 1) {
 		assert.Equal(t, provider.PaymentRequest{
 			BillType: rtBillType, InquiryType: provider.InquiryTypeMidterm, OrderID: "order-1", UserID: testUser,
-			InquiryID: testRightelPhone, BillID: testRightelBill, PayID: testRightelPay, Amount: 230000, RRN: "445580",
+			InquiryID: testRightelPhone, BillID: testRightelBill, PayID: testRightelPay, Amount: 230000, RRN: "445580", Option: "rightel",
 		}, f.parsian.payReqs[0])
 	}
 	assert.Equal(t, []string{testRightelPhone + "/" + testRightelPay}, f.repo.paid, "bill: UpdateIsPaid(inquiry ID, pay ID)")

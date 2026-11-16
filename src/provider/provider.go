@@ -176,6 +176,7 @@ type PaymentRequest struct {
 	PayID       string
 	Amount      uint64 // rials: the base price (no fee)
 	RRN         string // the reference of the payment service
+	Option      string // orders.option: the operator of a mobile order (task 056: the Irancell message has it, as bill)
 }
 
 // PaymentResponse is the answer of ProviderInterface.Pay: the answer of the provider as it came.

@@ -8,7 +8,8 @@ import (
 
 // Builder makes an App. Every dependency is an interface, so tests inject fakes.
 // The config, logger, database, cache and metrics are required. The tracer, migrator, config reloader,
-// provider list, gRPC server, HTTP gateway, internal gRPC server, background jobs and workers are optional.
+// provider list, gRPC server, HTTP gateway, internal gRPC server, background jobs, workers and the
+// message broker are optional.
 type Builder struct {
 	cfg       *config.Holder[config.Config]
 	logger    Logger
@@ -24,6 +25,7 @@ type Builder struct {
 	internal  Server
 	bg        Background
 	crons     Crons
+	broker    Broker
 }
 
 // NewBuilder returns an empty Builder.
@@ -58,6 +60,9 @@ func (b *Builder) WithBackground(bg Background) *Builder { b.bg = bg; return b }
 
 // WithCrons sets the workers (task 045). Skip it for none.
 func (b *Builder) WithCrons(c Crons) *Builder { b.crons = c; return b }
+
+// WithBroker sets the message broker client (task 056: the NATS client). Skip it when there is none.
+func (b *Builder) WithBroker(br Broker) *Builder { b.broker = br; return b }
 
 // WithLogger sets the logger.
 func (b *Builder) WithLogger(l Logger) *Builder { b.logger = l; return b }
@@ -96,5 +101,5 @@ func (b *Builder) Build() (*App, error) {
 		return nil, err
 	}
 	return &App{cfg: b.cfg, logger: b.logger, db: b.db, cache: b.cache, metrics: b.metrics, tracer: b.tracer,
-		migrator: b.migrator, reloader: b.reloader, providers: b.providers, grpc: b.grpc, http: b.http, internal: b.internal, bg: b.bg, crons: b.crons}, nil
+		migrator: b.migrator, reloader: b.reloader, providers: b.providers, grpc: b.grpc, http: b.http, internal: b.internal, bg: b.bg, crons: b.crons, broker: b.broker}, nil
 }

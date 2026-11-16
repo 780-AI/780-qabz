@@ -80,6 +80,12 @@ type Crons interface {
 	Stop(ctx context.Context) error
 }
 
+// Broker is a message broker client (task 056: the NATS client of the Irancell payment). Close
+// closes it; the App calls it when no request can be in flight.
+type Broker interface {
+	Close(ctx context.Context) error
+}
+
 // Tracer exports traces.
 type Tracer interface {
 	Shutdown(ctx context.Context) error
@@ -102,6 +108,7 @@ type App struct {
 	internal  Server         // nil: no internal gRPC server (task 044)
 	bg        Background     // nil: no background jobs (task 044)
 	crons     Crons          // nil: no workers (task 045)
+	broker    Broker         // nil: no message broker (task 056)
 
 	mu      sync.Mutex
 	started bool
@@ -275,6 +282,11 @@ func (a *App) release(ctx context.Context, run running) error {
 	// The background jobs stop after the servers (no new payment) and before the database closes.
 	if a.bg != nil {
 		errs = append(errs, a.bg.Stop(ctx))
+	}
+	// The message broker closes after the servers, the workers and the background jobs: no payment
+	// request can start after it (task 056).
+	if a.broker != nil {
+		errs = append(errs, a.broker.Close(ctx))
 	}
 	if a.providers != nil && run.providers {
 		errs = append(errs, a.providers.Stop(ctx))

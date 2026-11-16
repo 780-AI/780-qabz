@@ -56,7 +56,8 @@ providers:
       timeout: "10s"           # limit of each call to the irancell service; positive
       name: ""                 # name of the provider (bill: irancell.name); not read yet
       grpc_address: ""         # host:port of the internal gRPC server of the irancell service (no TLS); empty: every Irancell call fails as "provider down"
-      nats_subject: ""         # NATS subject of the Irancell bill payment; not read yet (order flow)
+      nats_subject: ""         # NATS subject of the Irancell bill payment (task 056; bill: irancell.natsSubject, "irancell-bill"); empty with the adapter enabled and the mock off: every Irancell payment is pending
+      pay_timeout: "30s"       # limit of each Irancell payment request over NATS (task 056; bill: a fixed 30 s); positive
       get_status:              # the worker that asks the irancell service the status of the pending and in-progress Irancell orders (task 050; bill: irancell.getStatus)
         enabled: false         # false: no worker; true: the keys below are checked at start
         cron_time: "15m"       # the interval; positive
@@ -175,6 +176,16 @@ kafka:                       # the Kafka client (bill: kafka); the producer exis
   auth: false                # not read yet (bill has it and does not use it)
   timeout: "5s"              # the limit of each publish of the status workers (task 050; bill has it and does not use it); positive while a status worker is on
 
+nats:                        # the NATS client (task 056; bill: nats); it exists only while the Irancell adapter is enabled and its mock is off; the real values only in config.yml
+  endpoints: []              # the server URLs (for example "nats://host:4222"); no default; not empty while the client exists
+  username: ""               # no default
+  password: ""               # no default
+  auth: false                # true: TLS (bill passes this key to the TLS switch of the client, not to the user name and password)
+  allow_reconnect: true      # connect again after a lost connection
+  max_reconnect: 50          # the number of reconnect attempts; -1: no limit
+  reconnect_wait: "5s"       # the wait between reconnect attempts (bill: 5, in seconds); not negative
+  timeout: "3s"              # the limit of each connect attempt (bill: 3, in seconds); positive
+
 confirm_payment:              # the settlement workers (task 046; bill: confirmPayment)
   telephone:                 # the worker that settles again each paid landline order (tel, telmidterm) that Karashop did not confirm (bill: confirmPayment.telephone)
     enabled: false           # false: no worker; true: the keys below are checked at start
@@ -205,6 +216,7 @@ debug:
       enabled: false
       return_type: "success" # inquiry: "success" or "error"
       status_return_type: "success" # status of an order (the status worker): "success", "failed" or "pending" (the answer of a timeout)
+      pay_return_type: "success" # payment (task 056): "success", "failed" or "pending" (the answer of a timeout)
     jiring_switch:           # the Jiring Switch mock: a fixed answer, no call to the jiring-switch service
       enabled: false
       return_type: "success" # "success" or "error"

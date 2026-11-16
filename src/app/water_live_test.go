@@ -16,6 +16,7 @@ import (
 	"qabz/config"
 	"qabz/core/order"
 	grpcserver "qabz/entry/grpc"
+	"qabz/provider/irancellproxy"
 	"qabz/system/postgres"
 	"qabz/system/postgres/postgrestest"
 )
@@ -51,6 +52,12 @@ func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string
 
 // newLiveWaterCfg is newLiveWater with a change of the config (nil: none) before the App parts are built.
 func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL string, change func(*config.Config)) *liveWaterStack {
+	t.Helper()
+	return newLiveStack(t, ctx, returnType, setupSQL, change, nil)
+}
+
+// newLiveStack is newLiveWaterCfg with the NATS client of the Irancell payment (task 056; nil: none).
+func newLiveStack(t *testing.T, ctx context.Context, returnType, setupSQL string, change func(*config.Config), payer irancellproxy.Requester) *liveWaterStack {
 	t.Helper()
 	schemaDSN := postgrestest.SeededSchema(t, ctx, postgrestest.RunDSN(t))
 	db, err := postgres.New(ctx, schemaDSN)
@@ -90,7 +97,7 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 		t.FailNow()
 	}
 	t.Cleanup(func() { assert.NoError(t, providers.Stop(context.Background())) })
-	registry, err := newProviderRegistry(cfg, log)
+	registry, err := newProviderRegistryWith(cfg, log, payer)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}

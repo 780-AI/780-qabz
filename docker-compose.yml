@@ -16,6 +16,12 @@
 #   COMPOSE_PROFILES=tracing make compose up ARGS="-d --wait"  (both: COMPOSE_PROFILES=tracing,kafka)
 # Set logs.tracing.enabled: true and logs.tracing.otlp_endpoint: "localhost:4317" in config.yml and open the UI at http://localhost:16686.
 # The store is in memory: a restart of the container drops the traces.
+# The `nats` service has the profile `nats` (task 056: the Irancell payment over NATS and its live tests);
+# `make compose up` does not start it:
+#   COMPOSE_PROFILES=nats make compose up ARGS="-d --wait"
+# It listens on localhost:4222 (set nats.endpoints: ["nats://127.0.0.1:4222"] in config.yml) and serves
+# the monitoring page on localhost:8222. The image has no shell, so the service has no healthcheck.
+# The live tests of system/nats and of the Irancell payment use it and skip when it does not answer.
 
 services:
   postgres:
@@ -73,6 +79,15 @@ services:
       timeout: 10s
       retries: 12
       start_period: 20s
+
+  nats:
+    profiles: ["nats"]
+    image: nats:2.15.0             # one server, no JetStream; development only
+    restart: unless-stopped
+    command: ["-p", "4222", "-m", "8222"]
+    ports:
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
 
   jaeger:
     profiles: ["tracing"]

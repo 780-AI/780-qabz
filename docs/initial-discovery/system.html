@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.27 -->
+<!-- VERSION: 2.28 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.28 — 2026-11-16 — Task 056 Irancell payment over NATS: `OrderComplete` pays an Irancell order through the irancell service with one NATS request on `providers.internal.irancell.nats_subject` (bill's message bytes; the answer kept as bill, `ref_id` empty); new `system/nats` client and config section `nats`; `providers.internal.irancell.pay_timeout` (30s); `debug.mocks.irancell.pay_return_type`; the App starts when NATS does not answer; metrics `qabz_nats_requests_total`, `qabz_nats_request_duration_ms`, `qabz_nats_connected`; span `nats.Request`; compose service `nats` (profile `nats`).
 v2.27 — 2026-11-16 — Task 055 Rightel payment: `POST /v1/mobile/order` serves the operator `rightel` (`midTerm` → `mobilemidtermRightel`; `fullTerm` HTTP 400, bill has no entry); Parsian only (no EWays route); the raw inquiry first, else the inquiry of `mobilemidtermRightel` (Qabzino) with the phone; `caching.paid_mobile` also for Rightel (as bill); `providers.internal.parsian.settlement_inquiry_rightel_mobile` read, default 360h (bill's example); ParsianProxy pays it, no settlement; the dev seed row 500 is `enable`; the status worker finalizes Rightel orders with no change.
 v2.26 — 2026-11-16 — Task 054 MCI payment: `POST /v1/mobile/order` serves the operator `mci` (`fullTerm` → `mobile`, `midTerm` → `mobilemidterm`; Parsian only until task 058; the raw inquiry first, else the inquiry of `mobile` with the phone), `caching.paid_mobile` (new, 1h, `mobile` only), `providers.internal.parsian.settlement_inquiry_mci_mobile` (read, 0s: any time, as bill), ParsianProxy pays both MCI bill types, no settlement; the dev seed row 48 is `enable`; the status worker finalizes MCI orders with no change.
 v2.25 — 2026-11-16 — Task 053 gas payment: `POST /v1/gas/order` (`Gas.NewOrder`, the steps of the water and electricity order, order provider Parsian only (seed row 46; no EWays), the raw inquiry first, else the regular gas inquiry with the participate code (else the bill ID) as the inquiry ID), `caching.paid_gas` (new, 72h), `providers.internal.parsian.settlement_inquiry_gas` (read, 360h), ParsianProxy pays `gas`, no settlement; the status worker finalizes gas orders with no change.
@@ -202,7 +203,7 @@ The following are all endpoints involved in the inquiry and ordering of the bill
 | `qabzino` | HTTPS (Ayantech, direct since task 030; the gRPC adapter `haf80.api.qabzino.Inquiry/BillInquiry` is QabzinoProxy, not used) | `providers.external.qabzino.*_bill_endpoint` | Ayantech token | Inquiry (water: task 030; gas: task 023, with the participate code; Rightel mobile: task 037, with the phone in the 0 form) | Water, Gas, Landline, Rightel mobile (the types `bill` registers it for) |
 | `irancell` | gRPC | `pb.InternalService/BillInquiry` | internal (IrancellProxy since task 035; `providers.internal.irancell.grpc_address`) | Inquiry (task 035; only the Irancell provider answers the bill type `irancell`) | `Irancell` mobile |
 | `irancell` | gRPC | `pb.InternalService/GetStatus` | unchanged (`recharge` still calls it); `bill` calls internal | Order | `Irancell` mobile (also called by `recharge`, so it has to stay) |
-| `irancell` | NATS | `irancell-bill` | internal | Order | `Irancell` mobile payment |
+| `irancell` | NATS | `irancell-bill` | internal | Order | `Irancell` mobile payment (task 056: request/reply, queue group `irancell-bill`; the irancell service has no payment RPC) |
 | `tavanir` | HTTPS (Tavanir SAAPA, direct since task 034; Qabz does not call the `tavanir` microservice) | `providers.external.tavanir.auth_endpoint` (login), `providers.external.tavanir.basic_branch_endpoint` (inquiry) | user name and password, then a Bearer token kept in memory | Inquiry | Electricity |
 | `tavanir` | HTTPS (not implemented yet) | `providers.external.tavanir.bill_document_endpoint`, `providers.external.tavanir.branch_debit_endpoint` | the same token | Inquiry (bill document, debit) | Electricity |
 | `Karashab` (outside our projects) | HTTPS (direct from Qabz since task 025: `provider/karashop`) | `providers.external.karashop.bill_inquiry_url`, called by `bill` (`BillInquiry`) and by Qabz (two calls per inquiry: `tci-end-getBillAccInfo`, `tci-mid-getBillAccInfo`) | code and password in the body (`providers.external.karashop.code`, `password`) | Inquiry (task 025; only Karashop answers the bill type `tel`) | Landline |
@@ -225,8 +226,9 @@ providers:
       enabled: false               # false (default): every Irancell call fails as "provider down", nothing is sent, the mock does not apply
       timeout: 10s                 # limit of each call to the irancell service; positive
       grpc_address: irancell:8084  # host:port of the internal gRPC server of the irancell service (no TLS); empty: every call fails as "provider down"
-      name: irancell               # the bill keys (bill: irancell.name, natsSubject); not read yet (order flow)
-      nats_subject: irancell-bill
+      name: irancell               # bill's key (bill: irancell.name); not read
+      nats_subject: irancell-bill  # read since task 056: the NATS subject of the Irancell payment (bill: irancell.natsSubject); no default
+      pay_timeout: 30s             # task 056 (not a bill key): the limit of each payment request over NATS (bill: a fixed 30 s); positive
       get_status: {enabled: false, cron_time: 15m, name: irancell-get-status, start: 30m, end: 48h, chunk: 100, every: 15m, lock_time: 30m, is_lockable: true, reverse_deadline: 10h,
                    sync_operations: {api_call_get_status: 30s, get_order_query: 3ms, insert_order_query: 3ms}} # read since task 050: the Irancell status worker (below); enabled false: no worker; end not greater than 48h; every and is_lockable not read
     jiring_switch:                 # the jiring-switch service, our own service (task 036); the providers.name is jiring-switch
@@ -317,6 +319,18 @@ kafka:                           # bill's kafka block; the producer exists only 
 The settlement worker (task 046; bill: `confirmPayment.telephone`; bill's example config has no values, the defaults are the operator's):
 
 ```yaml
+nats:                            # task 056 (bill: nats): the client of the Irancell payment; it exists only while the Irancell adapter is enabled and its mock is off
+  endpoints: []                  # the server URLs; no default (the real values only in config.yml); empty: no client, every Irancell payment is pending
+  username: ""                   # no default
+  password: ""                   # a Secret; no default
+  auth: false                    # true: TLS (bill passes this key to the TLS switch of the client)
+  allow_reconnect: true
+  max_reconnect: 50              # -1: no limit
+  reconnect_wait: 5s             # bill: 5 (seconds)
+  timeout: 3s                    # the limit of each connect attempt; bill: 3 (seconds)
+```
+
+```yaml
 confirm_payment:
   telephone:
     enabled: false                 # false: no worker (as before task 046); true: the keys below are checked at start
@@ -351,6 +365,7 @@ debug:
       enabled: true
       return_type: success   # success or error
       status_return_type: success # task 050: the status of an order (success, failed or pending = the answer of a timeout)
+      pay_return_type: success    # task 056: the payment (success, failed or pending = the answer of a timeout)
     jiring_switch:           # task 036
       enabled: true
       return_type: success   # success or error
@@ -443,7 +458,9 @@ type ProviderRegistry interface {
 
 **MCI order and payment (task 054).** `POST /v1/mobile/order` with `operator` `mci` (`Phone.NewOrder`, the Irancell handler of task 039) maps the payment term to bill's bill type (`fullTerm`: `mobile`, final term; `midTerm`: `mobilemidterm`, mid term). The order provider of (bill type, `order`) is Parsian only (seed row 48 for `mobile`, `enable` since task 054 (operator); row 149 for `mobilemidterm`); the Jiring Switch rows 30 and 29 are the fallback of task 058 and have no payment route before it. The "bill already paid" check uses `providers.internal.parsian.settlement_inquiry_mci_mobile` (default 0: the orders of any time, as bill). The price is the raw inquiry of a numeric `billId` and `payId`, else the inquiry of `mobile` with the phone (the enabled MCI inquiry provider; one answer has both terms, `this_vs_bill.md` item 42), with saved inquiries for `caching.paid_mobile` for `mobile` only; no provider fee; the default fee; the token keys of the Irancell order with bill's MCI texts (`about` `قبض موبایل`, `aboutIcon` `logOhamrahaval2.svg`, `service` `mci`). `OrderComplete` pays it through ParsianProxy (`inquiry_type` `final_term` or `midterm`, `inquiry_id` the phone); after a `success` only `is_paid` and `last_order_date` are set (no settlement for MCI). The status worker finalizes `pending` and `in-progress` MCI orders of Parsian with no change.
 
-**Rightel order and payment (task 055).** `POST /v1/mobile/order` with `operator` `rightel` maps `midTerm` to bill's one bill type `mobilemidtermRightel` (mid term); `fullTerm` is HTTP 400 (bill has no entry either; bill answers HTTP 500). The order provider of (`mobilemidtermRightel`, `order`) is Parsian only (seed row 500, `enable` since task 055 (operator), priority 9; the `eways2` row 37 has no payment route: Qabz has no NATS and no EWays adapter). The "bill already paid" check uses `providers.internal.parsian.settlement_inquiry_rightel_mobile` (default 360h, bill's example). The price is the raw inquiry of a numeric `billId` and `payId`, else the inquiry of `mobilemidtermRightel` with the phone (only Qabzino answers, task 037), with saved inquiries for `caching.paid_mobile`; no provider fee; the default fee; the token keys of the Irancell order with bill's Rightel texts (`about` `قبض موبایل`, `aboutIcon` `logOrhightel2.svg`, `service` `rightel`). `OrderComplete` pays it through ParsianProxy (`inquiry_type` `midterm`, `inquiry_id` the phone); no settlement. The status worker finalizes `pending` and `in-progress` Rightel orders of Parsian with no change.
+**Rightel order and payment (task 055).** `POST /v1/mobile/order` with `operator` `rightel` maps `midTerm` to bill's one bill type `mobilemidtermRightel` (mid term); `fullTerm` is HTTP 400 (bill has no entry either; bill answers HTTP 500). The order provider of (`mobilemidtermRightel`, `order`) is Parsian only (seed row 500, `enable` since task 055 (operator), priority 9; the `eways2` row 37 has no payment route: Qabz has no EWays adapter (its NATS client, task 056, is only for the Irancell payment)). The "bill already paid" check uses `providers.internal.parsian.settlement_inquiry_rightel_mobile` (default 360h, bill's example). The price is the raw inquiry of a numeric `billId` and `payId`, else the inquiry of `mobilemidtermRightel` with the phone (only Qabzino answers, task 037), with saved inquiries for `caching.paid_mobile`; no provider fee; the default fee; the token keys of the Irancell order with bill's Rightel texts (`about` `قبض موبایل`, `aboutIcon` `logOrhightel2.svg`, `service` `rightel`). `OrderComplete` pays it through ParsianProxy (`inquiry_type` `midterm`, `inquiry_id` the phone); no settlement. The status worker finalizes `pending` and `in-progress` Rightel orders of Parsian with no change.
+
+**Irancell payment (task 056).** `OrderComplete` of an Irancell order (order provider row 26 `irancell`) pays it through the irancell service, as bill's `IrancellMobile`: one NATS request/reply on `providers.internal.irancell.nats_subject` (`irancell-bill`; the irancell service reads it in the queue group `irancell-bill`) with bill's message bytes (`inquiry_id` the phone, `bill_id`, `pay_id` (`irancell` for a direct price), `order_id`, `user_id`, `dialer` empty, `rrn`, `amount` the base price, `option` `irancell`, `type` `irancell`, `InquiryType` `final_term`) and the limit `providers.internal.irancell.pay_timeout` (30s). The answer of the irancell service (`code`, `message`, `tid`, `status`) gives the status: `success`, `failed`, `pending`; any other or an empty status (the code 400 answer of a bad phone) is `pending`, as bill; `ref_id` stays empty (bill does not read `tid`). A timeout, no connection, no responder or an answer that does not decode is `pending`; the Irancell status worker (task 050) finalizes it with `GetStatus` and the order ID. No settlement; no "bill already paid" window. The client (`system/nats`, nats.go) exists only while the Irancell adapter is enabled and its mock is off; the App starts when NATS does not answer (it connects again in the background). The mock: `debug.mocks.irancell.pay_return_type`. Metrics: `qabz_nats_requests_total`, `qabz_nats_request_duration_ms`, `qabz_nats_connected`; the span `nats.Request`. The differences from bill are item 49 of `docs/this_vs_bill.md`.
 
 **Details of an inquiry (task 022).** The interface has no separate method for details. `InquiryResponse` has the field `Details *Details`, with one field for each bill type that has details (`Details.Electricity`: phase, company name, tariff type, customer type, serial number, service address, service post code, customer name, and the `city` and `region` that the order flow of `bill` reads; `Details.Gas` (task 023): `city` and `kind`, the two keys that `bill` saves for a Qabzino gas answer; the client does not get them; `Details.Tel` (task 044): the service status of the line, saved as bill's `{"service_status": ...}`, read by the Karashop provider fee). An adapter with no details (Qabzino water) leaves it nil. The inquiry flow (`core/inquiry`) saves the details with each inquiry in `bill_inquiries.extra_data` (one JSON object; `bill` writes only `city` and `region` there) and reads them back when saved inquiries answer the call, so the answer from the database has the same details as the answer of the provider.
 
@@ -664,6 +681,9 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 | `qabz_cron_orders_fixed` | histogram | Orders that one status worker run moved to a final status (`success`, `failed` and the late saves after the reverse deadline), by `cron`; one observation at the end of each run that took the lock, also 0 and also a run that ended with an error; buckets 0 to 2500. Implemented (task 050) |
 | `qabz_kafka_publish_total` | counter | Kafka messages of the status worker to the payment service by `result`: `ok` (delivered), `error` (not delivered, or the wait ended). Implemented (task 045) |
 | `qabz_kafka_publish_duration_ms` | histogram | Duration of each Kafka publish (metadata, produce and delivery report) in milliseconds; buckets 1 ms to 10 000 ms. Implemented (task 045) |
+| `qabz_nats_requests_total` | counter | NATS requests (task 056: the Irancell payment) by `subject` and `result`: `ok`, `timeout` (also while the client connects again), `no_responders`, `no_connection`, `error` |
+| `qabz_nats_request_duration_ms` | histogram | Duration of each NATS request in milliseconds, by `subject` |
+| `qabz_nats_connected` | gauge | 1 while the NATS client is connected, else 0 (the client exists only while the Irancell adapter is enabled and its mock is off) |
 | `qabz_pending_orders` | gauge | Orders waiting right now. Not implemented yet (task 045 decision D14 (a): it needs a count query; a later task) |
 | `qabz_oldest_pending_order_age_ms` | gauge | Age of the oldest pending order, against the 10-hour deadline. Not implemented yet (task 045 D14 (a)) |
 | `qabz_karashab_unconfirmed_orders` | gauge | Landline orders not yet confirmed |

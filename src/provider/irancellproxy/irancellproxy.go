@@ -1,18 +1,23 @@
 // Package irancellproxy is the Irancell adapter (task 035): it calls the irancell service, one of
 // our own services, over gRPC (pb.InternalService/BillInquiry and GetStatus, pb/proto/irancell). The
-// irancell service calls Irancell; Qabz does not. Inquiry of an Irancell mobile bill and Status of an
-// order (task 050, the status worker) are implemented; every other method returns
+// irancell service calls Irancell; Qabz does not. Inquiry of an Irancell mobile bill, Status of an
+// order (task 050, the status worker) and Pay of an Irancell order (task 056: a NATS request, the
+// irancell service has no payment RPC) are implemented; every other method returns
 // provider.ErrNotSupported. The rules copy the old bill service (gateway/inquiry/mobile_irancell.go,
 // IrancellMobile, and base.go handlePhoneResponseWithoutInquiry; gateway/paymentInquiry/irancell.go,
-// IrancellPaymentInquiry).
+// IrancellPaymentInquiry; gateway/payment/mobile_irancell.go, IrancellMobile).
 package irancellproxy
 
 import (
 	"context"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/valyala/fastjson"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -35,7 +40,21 @@ var (
 	errNoAddress = errors.New("providers.internal.irancell.grpc_address is not set")
 	// errDisabled is the cause of every call while providers.internal.irancell.enabled is false.
 	errDisabled = errors.New("providers.internal.irancell.enabled is false")
+	// errNoNATS is the cause of every payment while the adapter has no NATS client (task 056).
+	errNoNATS = errors.New("no NATS client (nats.endpoints is empty or the client was not made)")
+	// errNoSubject is the cause of every payment while providers.internal.irancell.nats_subject is empty.
+	errNoSubject = errors.New("providers.internal.irancell.nats_subject is not set")
 )
+
+// defaultPayTimeout is the limit of a payment request when Options.PayTimeout is 0 (bill: the fixed
+// 30 s of pkg/orderbus).
+const defaultPayTimeout = 30 * time.Second
+
+// Requester sends a NATS request and returns the bytes of the answer (system/nats.Client, task 056).
+// Tests give a fake.
+type Requester interface {
+	Request(ctx context.Context, subject string, data []byte) ([]byte, error)
+}
 
 // Client is the part of the generated gRPC client (pb.InternalServiceClient) that the adapter
 // uses. Tests give a fake.
@@ -53,13 +72,23 @@ type Options struct {
 	Client Client
 	// Timeout limits each call. Required, positive.
 	Timeout time.Duration
+	// NATS sends the payment requests (task 056). Nil: every Pay fails as "provider down".
+	NATS Requester
+	// Subject is providers.internal.irancell.nats_subject. Empty: every Pay fails as "provider down".
+	Subject string
+	// PayTimeout limits each payment request (providers.internal.irancell.pay_timeout). 0: 30 s.
+	// Not negative.
+	PayTimeout time.Duration
 }
 
 // Adapter implements provider.ProviderInterface for Irancell. It is safe for concurrent use.
 type Adapter struct {
-	enabled bool
-	client  Client
-	timeout time.Duration
+	enabled    bool
+	client     Client
+	timeout    time.Duration
+	nats       Requester
+	subject    string
+	payTimeout time.Duration
 }
 
 var _ provider.ProviderInterface = (*Adapter)(nil)
@@ -72,7 +101,14 @@ func New(opts Options) (*Adapter, error) {
 	if opts.Timeout <= 0 {
 		return nil, errors.New("irancellproxy: timeout must be positive")
 	}
-	return &Adapter{enabled: opts.Enabled, client: opts.Client, timeout: opts.Timeout}, nil
+	if opts.PayTimeout < 0 {
+		return nil, errors.New("irancellproxy: pay timeout must not be negative")
+	}
+	payTimeout := opts.PayTimeout
+	if payTimeout == 0 {
+		payTimeout = defaultPayTimeout
+	}
+	return &Adapter{enabled: opts.Enabled, client: opts.Client, timeout: opts.Timeout, nats: opts.NATS, subject: opts.Subject, payTimeout: payTimeout}, nil
 }
 
 // Dial returns a client for the irancell service at addr (host:port of its internal gRPC server,
@@ -190,9 +226,128 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	return out, nil
 }
 
-// Pay is not supported yet.
-func (*Adapter) Pay(context.Context, provider.PaymentRequest) (*provider.PaymentResponse, error) {
-	return nil, provider.ErrNotSupported
+// SupportsPay reports whether Pay pays the bill type: only irancell (task 056).
+func SupportsPay(billType string) bool { return billType == provider.BillTypeIrancell }
+
+// payMessage is the NATS payment message of bill (gateway/payment dto.go PaymentRequest, marshalled
+// by the JSON EncodedConn of nats.go v1.11.0, that is encoding/json v1): the same names in the same
+// order. InquiryType has no tag in bill, so its key is the Go name. The irancell service reads it as
+// entity.BillRequest.
+type payMessage struct {
+	InquiryID   string `json:"inquiry_id"`
+	BillID      string `json:"bill_id"`
+	PayID       string `json:"pay_id"`
+	OrderID     string `json:"order_id"`
+	UserID      string `json:"user_id"`
+	Dialer      string `json:"dialer"`
+	RRN         string `json:"rrn"`
+	Amount      uint64 `json:"amount"`
+	Option      string `json:"option"`
+	BillType    string `json:"type"`
+	InquiryType string
+}
+
+// marshalPayMessage gives the bytes of m as bill's encoding/json v1 Marshal gives them (the struct
+// order, the HTML and JS escapes of v1, invalid UTF-8 written as U+FFFD with no error, as v1), with
+// encoding/json/v2 (conventions § 1: v1 is forbidden).
+func marshalPayMessage(m payMessage) ([]byte, error) {
+	return json.Marshal(m, json.Deterministic(true), jsontext.EscapeForHTML(true), jsontext.EscapeForJS(true), jsontext.AllowInvalidUTF8(true))
+}
+
+// parsers holds the fastjson parsers of the payment answers (a provider answer is a hot path,
+// conventions § 1).
+var parsers fastjson.ParserPool
+
+// parsePayAnswer reads the answer of the irancell service (entity.ChargeResponse: code, message,
+// tid, status). It must be a JSON object (null is an answer with no field, as bill's v1); code, when it is there and not null, a whole number that
+// fits int32, and message and status strings (bill decodes them into an int32 and strings: anything
+// else is a decode error, so pending). status is kept as it came (the order step makes an unknown or empty status pending, as bill's validStatuses).
+//
+// @todo docs/this_vs_bill.md item 49: bill decodes with encoding/json v1, which matches the keys with
+// no case ("Code", "STATUS"); the irancell service writes them in lower case, so only those are read.
+// The tid is not kept (operator decision Q1 (a) of task 056): bill's PaymentResponse has no field for
+// it, so ref_id stays empty, as bill.
+func parsePayAnswer(data []byte) (*provider.PaymentResponse, error) {
+	p := parsers.Get()
+	defer parsers.Put(p)
+	v, err := p.ParseBytes(data)
+	if err != nil {
+		return nil, fmt.Errorf("the answer is not JSON: %w", err)
+	}
+	out := &provider.PaymentResponse{}
+	if v.Type() == fastjson.TypeNull { // bill's v1 decode of null: no error, every field zero (pending, code 0)
+		return out, nil
+	}
+	if v.Type() != fastjson.TypeObject {
+		return nil, errors.New("the answer is not a JSON object")
+	}
+	for key, dst := range map[string]*string{"message": &out.Message, "status": &out.Status} {
+		f := v.Get(key)
+		switch {
+		case f == nil || f.Type() == fastjson.TypeNull:
+		case f.Type() == fastjson.TypeString:
+			*dst = string(f.GetStringBytes())
+		default: // bill: a decode error, so pending
+			return nil, fmt.Errorf("the %s of the answer is not a string: %s", key, f.String())
+		}
+	}
+	if c := v.Get("code"); c != nil && c.Type() != fastjson.TypeNull {
+		n, err := c.Int64()
+		if err != nil || n < math.MinInt32 || n > math.MaxInt32 {
+			return nil, fmt.Errorf("the code of the answer is not an int32: %s", c.String())
+		}
+		out.Code = int32(n)
+	}
+	return out, nil
+}
+
+// Pay pays an Irancell order through the irancell service (task 056; bill: IrancellMobile.Execute of
+// gateway/payment/mobile_irancell.go): one NATS request on providers.internal.irancell.nats_subject
+// with bill's message (payMessage) and the limit providers.internal.irancell.pay_timeout.
+//   - Not the bill type irancell: provider.ErrNotSupported.
+//   - The switch off, no NATS client, no subject: an error that wraps provider.ErrProviderDown, with
+//     no message sent.
+//   - A failed request (a timeout, no connection, no responder) or an answer that is not a JSON object
+//     (or whose code is not an int32): an error that wraps provider.ErrProviderDown (bill: pending,
+//     code 500, the error text; the order step does the same).
+//   - Else the code, status and message of the answer, as they came; ProviderTraceID is empty
+//     (parsePayAnswer).
+func (a *Adapter) Pay(ctx context.Context, req provider.PaymentRequest) (*provider.PaymentResponse, error) {
+	if a == nil || a.client == nil {
+		return nil, errors.New("irancellproxy: adapter not created with New")
+	}
+	if !SupportsPay(req.BillType) {
+		return nil, fmt.Errorf("irancellproxy: pay %q: %w", req.BillType, provider.ErrNotSupported)
+	}
+	switch {
+	case !a.enabled:
+		return nil, fmt.Errorf("irancellproxy: pay: %w: %w", provider.ErrProviderDown, errDisabled)
+	case a.nats == nil:
+		return nil, fmt.Errorf("irancellproxy: pay: %w: %w", provider.ErrProviderDown, errNoNATS)
+	case a.subject == "":
+		return nil, fmt.Errorf("irancellproxy: pay: %w: %w", provider.ErrProviderDown, errNoSubject)
+	}
+	data, err := marshalPayMessage(payMessage{
+		InquiryID: req.InquiryID, BillID: req.BillID, PayID: req.PayID, OrderID: req.OrderID, UserID: req.UserID,
+		Dialer: req.Dialer, RRN: req.RRN, Amount: req.Amount, Option: req.Option, BillType: req.BillType, InquiryType: req.InquiryType,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("irancellproxy: pay: message: %w", err)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, a.payTimeout)
+	defer cancel()
+	answer, err := a.nats.Request(ctx, a.subject, data)
+	if err != nil {
+		return nil, fmt.Errorf("irancellproxy: pay: %w: %w", provider.ErrProviderDown, err)
+	}
+	resp, err := parsePayAnswer(answer)
+	if err != nil {
+		return nil, fmt.Errorf("irancellproxy: pay: %w: %w", provider.ErrProviderDown, err)
+	}
+	return resp, nil
 }
 
 // Status asks the irancell service for the status of an order (task 050; bill:
@@ -249,9 +404,10 @@ const (
 
 // MockFixtures returns the fixed answers of the Irancell mock (debug.mocks.irancell): Inquiry
 // answers with the two inquiries above; Status answers success (task 050; the failed and pending
-// answers come from debug.mocks.irancell.status_return_type).
+// answers come from debug.mocks.irancell.status_return_type); Pay answers success (task 056; the
+// failed and pending answers come from debug.mocks.irancell.pay_return_type).
 func MockFixtures() provider.MockFixtures {
-	return provider.MockFixtures{Status: mockStatus, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
+	return provider.MockFixtures{Status: mockStatus, Pay: mockPay, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
 		return &provider.InquiryResponse{
 			Status:          provider.ResponseSuccess,
 			Code:            200,
@@ -263,6 +419,13 @@ func MockFixtures() provider.MockFixtures {
 			},
 		}
 	}}
+}
+
+// mockPay is the success answer of the Irancell mock to a payment (task 056): the answer of the
+// irancell service to a success (code 200, its success text), with no trace ID, as Pay gives it
+// (the tid is not kept). The failed and pending answers come from debug.mocks.irancell.pay_return_type.
+func mockPay(provider.PaymentRequest) *provider.PaymentResponse {
+	return &provider.PaymentResponse{Status: provider.StatusSuccess, Code: 200, Message: successMessage}
 }
 
 // mockStatus is the success answer of the Irancell mock to a status call (task 050).

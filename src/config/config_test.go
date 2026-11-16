@@ -992,6 +992,42 @@ func TestParseMCIOrderKeys(t *testing.T) {
 	}
 }
 
+// TestParseNATSKeys (task 056): the nats section and the Irancell payment keys: bill's example
+// defaults (no endpoints, user or password), the values of a file, and the checks.
+func TestParseNATSKeys(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Empty(t, c.NATSEndpoints)
+	assert.Equal(t, []any{"", "***", false, true, 50, 5 * time.Second, 3 * time.Second, 30 * time.Second, MockReturnSuccess},
+		[]any{c.NATSUsername, c.NATSPassword.String(), c.NATSAuth, c.NATSAllowReconnect, c.NATSMaxReconnect, c.NATSReconnectWait, c.NATSTimeout,
+			c.IrancellPayTimeout, c.DebugMockIrancellPayReturnType})
+
+	c, err = Parse([]byte(base + "nats: {endpoints: [\"nats://a:4222\", \"nats://b:4222\"], username: u, password: p, auth: true, allow_reconnect: false, " +
+		"max_reconnect: -1, reconnect_wait: \"2s\", timeout: \"1s\"}\n" +
+		"providers: {internal: {irancell: {nats_subject: irancell-bill, pay_timeout: \"45s\"}}}\ndebug: {mocks: {irancell: {pay_return_type: pending}}}\n"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, []string{"nats://a:4222", "nats://b:4222"}, c.NATSEndpoints)
+	assert.Equal(t, []any{"u", "p", true, false, -1, 2 * time.Second, time.Second, "irancell-bill", 45 * time.Second, MockReturnPending},
+		[]any{c.NATSUsername, c.NATSPassword.Reveal(), c.NATSAuth, c.NATSAllowReconnect, c.NATSMaxReconnect, c.NATSReconnectWait, c.NATSTimeout,
+			c.IrancellNATSSubject, c.IrancellPayTimeout, c.DebugMockIrancellPayReturnType})
+
+	for yml, want := range map[string]string{
+		"providers: {internal: {irancell: {pay_timeout: \"0s\"}}}\n": "pay_timeout must be a positive duration",
+		"nats: {max_reconnect: -2}\n":                                "nats.max_reconnect must be -1",
+		"nats: {reconnect_wait: \"-1s\"}\n":                          "nats.reconnect_wait must not be negative",
+		"nats: {timeout: \"0s\"}\n":                                  "nats.timeout must be a positive duration",
+		"debug: {mocks: {irancell: {pay_return_type: error}}}\n":     "debug.mocks.irancell.pay_return_type must be",
+	} {
+		_, err := Parse([]byte(base + yml))
+		assert.ErrorContains(t, err, want, yml)
+	}
+}
+
 // TestParseRightelOrderKeys (task 055): the "bill already paid" window of a Rightel order paid
 // through Parsian is read, default 360h (bill's example); a negative value is rejected. The saved
 // inquiries of a Rightel order use caching.paid_mobile (TestParseMCIOrderKeys).

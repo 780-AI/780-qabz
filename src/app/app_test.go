@@ -386,6 +386,29 @@ func TestInternalServerAndBackgroundOrder(t *testing.T) {
 	assert.Equal(t, []string{"db.ping", "cache.ping", "grpc.start", "internal.start", "grpc.stop", "background.stop", "cache.close", "db.close", "logger.sync"}, r.c.order)
 }
 
+// fakeBroker records its Close (task 056).
+type fakeBroker struct{ c *calls }
+
+func (f *fakeBroker) Close(context.Context) error { f.c.add("broker.close"); return nil }
+
+// TestBrokerClosesAfterBackground (task 056): the message broker closes after the servers and the
+// background jobs (no payment request can start after it), also after a failed start.
+func TestBrokerClosesAfterBackground(t *testing.T) {
+	r := newRig()
+	grpcSrv := &fakeServer{name: "grpc", c: r.c}
+	a := build(t, r.builder().WithGRPCServer(grpcSrv).WithBackground(&fakeBackground{c: r.c}).WithBroker(&fakeBroker{c: r.c}))
+	assert.NoError(t, a.Start(context.Background()))
+	r.c.order = nil
+	assert.NoError(t, a.Stop(context.Background()))
+	assert.Equal(t, []string{"metrics.stop", "grpc.stop", "background.stop", "broker.close", "cache.close", "db.close", "logger.sync"}, r.c.order)
+
+	r = newRig()
+	grpcSrv = &fakeServer{name: "grpc", c: r.c, startErr: errors.New("port in use")}
+	a = build(t, r.builder().WithGRPCServer(grpcSrv).WithBroker(&fakeBroker{c: r.c}))
+	assert.Error(t, a.Start(context.Background()))
+	assert.Contains(t, r.c.order, "broker.close")
+}
+
 // TestCronsOrder (task 045): the workers start after the servers and before the metrics endpoint,
 // and stop after the servers and before the background jobs, the cache and the database. A failed
 // metrics start stops the workers; a failed workers start stops the servers and starts no metrics.

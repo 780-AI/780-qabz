@@ -165,7 +165,7 @@ func TestCompleteMCISuccess(t *testing.T) {
 		if assert.Len(t, f.parsian.payReqs, 1, bt) {
 			assert.Equal(t, provider.PaymentRequest{
 				BillType: bt, InquiryType: it, OrderID: "order-1", UserID: testUser,
-				InquiryID: testPhone, BillID: testMCIBill, PayID: testMCIPay, Amount: 450000, RRN: "445577",
+				InquiryID: testPhone, BillID: testMCIBill, PayID: testMCIPay, Amount: 450000, RRN: "445577", Option: "mci",
 			}, f.parsian.payReqs[0], bt)
 		}
 		assert.Equal(t, []string{testPhone + "/" + testMCIPay}, f.repo.paid, bt, "bill: UpdateIsPaid(inquiry ID, pay ID)")

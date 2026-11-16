@@ -172,8 +172,12 @@ type Config struct {
 	//   - IrancellGRPCAddress is the host:port of the internal gRPC server of the irancell service
 	//     (pb.InternalService, no TLS, as in bill). The Irancell adapter (provider/irancellproxy)
 	//     reads it. Empty: every Irancell call fails as "provider down".
-	//   - IrancellName and IrancellNATSSubject (the subject of the bill payment) are not read yet:
-	//     they belong to the order flow.
+	//   - IrancellName is not read.
+	//   - IrancellNATSSubject is read since task 056: the NATS subject of the Irancell bill payment
+	//     (bill: irancell.natsSubject, "irancell-bill"). Empty with the adapter enabled and the mock
+	//     off: one warn line at start, and every Irancell payment is pending.
+	//   - IrancellPayTimeout (task 056, not a bill key; operator decision Q4 (a)) limits each payment
+	//     request over NATS. Default 30s (bill: the fixed 30 s of pkg/orderbus). Positive.
 	//   - The get_status keys are the settings of the Irancell status worker (task 050; bill:
 	//     IrancellGetStatusTask), read since task 050 as the Parsian worker (see
 	//     ParsianGetStatusEnabled). IrancellGetStatusEnabled (not a bill key) turns the worker on;
@@ -192,6 +196,7 @@ type Config struct {
 	IrancellName                     string        `path:"providers.internal.irancell.name"`
 	IrancellGRPCAddress              string        `path:"providers.internal.irancell.grpc_address"`
 	IrancellNATSSubject              string        `path:"providers.internal.irancell.nats_subject"`
+	IrancellPayTimeout               time.Duration `path:"providers.internal.irancell.pay_timeout"`
 	IrancellGetStatusEnabled         bool          `path:"providers.internal.irancell.get_status.enabled"`
 	IrancellGetStatusCronTime        time.Duration `path:"providers.internal.irancell.get_status.cron_time"`
 	IrancellGetStatusName            string        `path:"providers.internal.irancell.get_status.name"`
@@ -403,6 +408,10 @@ type Config struct {
 	// 050): MockReturnSuccess, MockReturnFailed or MockReturnPending (the answer of a timeout). No
 	// effect while the mock is off. Development only.
 	DebugMockIrancellStatusReturnType string `path:"debug.mocks.irancell.status_return_type"`
+	// DebugMockIrancellPayReturnType is the answer of the Irancell mock to a payment (task 056):
+	// MockReturnSuccess, MockReturnFailed or MockReturnPending (the answer of a timeout). No effect
+	// while the mock is off. Development only.
+	DebugMockIrancellPayReturnType string `path:"debug.mocks.irancell.pay_return_type"`
 
 	// DebugMockJiringSwitchEnabled and DebugMockParsianEnabled make the Jiring Switch and the Parsian
 	// adapter answer with a fixed answer, with no call to the jiring-switch or the parsian-v2
@@ -448,6 +457,22 @@ type Config struct {
 	KafkaPassword            Secret        `path:"kafka.password"`
 	KafkaAuth                bool          `path:"kafka.auth"`
 	KafkaTimeout             time.Duration `path:"kafka.timeout"`
+
+	// The NATS client (task 056; bill: Nats.*, client/broker nats_dto.go). bill's keys in snake_case,
+	// with the defaults of bill's example config; the endpoints, the user name and the password have
+	// no default (the real values only in config.yml). The client exists only while the Irancell
+	// adapter is enabled and its mock is off; then the endpoints must not be empty. NATSAuth turns TLS
+	// on, as bill (it passes the key to nats.Options.Secure), not the user name and password.
+	// NATSReconnectWait and NATSTimeout are durations (bill: whole seconds, 5 and 3). bill's
+	// nats.encoder is not a key: Qabz sends JSON only. Not hot-reloadable.
+	NATSEndpoints      []string      `path:"nats.endpoints"`
+	NATSUsername       string        `path:"nats.username"`
+	NATSPassword       Secret        `path:"nats.password"`
+	NATSAuth           bool          `path:"nats.auth"`
+	NATSAllowReconnect bool          `path:"nats.allow_reconnect"`
+	NATSMaxReconnect   int           `path:"nats.max_reconnect"`
+	NATSReconnectWait  time.Duration `path:"nats.reconnect_wait"`
+	NATSTimeout        time.Duration `path:"nats.timeout"`
 
 	// The settlement worker (task 046; bill: confirmPayment.telephone, ConfirmPaymentTelephone).
 	// bill's example config has no values; the defaults are the operator's (2026-11-15).
@@ -568,6 +593,15 @@ func defaults() Config {
 
 		// Task 055: bill's example value.
 		ParsianSettlementInquiryRightelMobile: 360 * time.Hour,
+
+		// Task 056: the Irancell payment over NATS (bill's example values).
+		IrancellPayTimeout:             30 * time.Second,
+		DebugMockIrancellPayReturnType: MockReturnSuccess,
+		NATSEndpoints:                  []string{}, // no default; the example has an empty list
+		NATSAllowReconnect:             true,
+		NATSMaxReconnect:               50,
+		NATSReconnectWait:              5 * time.Second,
+		NATSTimeout:                    3 * time.Second,
 	}
 }
 
@@ -688,6 +722,21 @@ func (c Config) validate() error {
 	}
 	if c.IrancellTimeout <= 0 {
 		errs = append(errs, errors.New("providers.internal.irancell.timeout must be a positive duration (for example 10s)"))
+	}
+	if c.IrancellPayTimeout <= 0 {
+		errs = append(errs, errors.New("providers.internal.irancell.pay_timeout must be a positive duration (for example 30s)"))
+	}
+	if c.NATSMaxReconnect < -1 {
+		errs = append(errs, errors.New("nats.max_reconnect must be -1 (no limit) or more"))
+	}
+	if c.NATSReconnectWait < 0 {
+		errs = append(errs, errors.New("nats.reconnect_wait must not be negative"))
+	}
+	if c.NATSTimeout <= 0 {
+		errs = append(errs, errors.New("nats.timeout must be a positive duration (for example 3s)"))
+	}
+	if !ValidMockPayReturnType(c.DebugMockIrancellPayReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.irancell.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
 	}
 	if c.CachingIrancell < 0 {
 		errs = append(errs, errors.New("caching.irancell must not be negative (0 turns the cache off)"))

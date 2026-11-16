@@ -334,6 +334,7 @@ func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest
 	resp, payErr := adapter.Pay(ctx, provider.PaymentRequest{
 		BillType: o.BillType, InquiryType: InquiryTypeOf(o.BillType), OrderID: o.OrderID, UserID: o.UserID,
 		Dialer: req.Dialer, InquiryID: o.Data, BillID: o.BillID, PayID: o.PayID, Amount: uint64(max(o.BasePrice, 0)), RRN: o.RRN,
+		Option: o.Option, // task 056: bill sends ord.Option in the payment request
 	})
 	o.Status, o.RefID, o.Message, o.StatusCode = StatusPending, "", "", http.StatusInternalServerError
 	switch {
