@@ -18,7 +18,7 @@ Implement `Electricity.Inquiry` (`POST /v1/electricity/inquiry`, `pb/proto/qabz/
 Help:
 - `bill` (`~/projects/bill`): `controller/electricity/inquiry.go` (handler, `validateInquiryRequest`, `setElectricityDetails`), `gateway/inquiry/electricity.go` (`TavanirElectricity.Execute`: the provider has no trace ID, details mapping), `gateway/inquiry/dto.go` (`ElectricityDetails`), `client/grpc/tavanir/`, config `tavanir.grpcAddress`.
 - The seed has Tavanir enabled for (`electricity`, `inquiry`) (`src/system/postgres/devdb/seed_providers.sql`, id 2).
-- Task 021 (`docs/Plans/done_tasks/021_water_inquiry_endpoint.md`) is the pattern: its design decisions, `docs/this_vs_bill.md` items 14 to 22 (the same differences apply: error mapping, one request row), the Postman collection and the metrics.
+- Task 021 (`docs/tasks/done_tasks/021_water_inquiry_endpoint.md`) is the pattern: its design decisions, `docs/this_vs_bill.md` items 14 to 22 (the same differences apply: error mapping, one request row), the Postman collection and the metrics.
 - Each difference from `bill` that a client or the database can see is a numbered item in `docs/this_vs_bill.md` with a `@todo` at the code (task 013 practice).
 
 Points for the design step:

@@ -1,7 +1,8 @@
-<!-- VERSION: 0.51 -->
-<!-- Last Updated: 2026-11-15 -->
+<!-- VERSION: 0.52 -->
+<!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v0.52 — 2026-11-16 — The task folders moved from docs/Plans/ to docs/tasks/ (task files are not listed here).
 v0.51 — 2026-11-15 — Task 048: entry/grpc water_order.go (Water.NewOrderV2 = POST /v2/water/order); core/order water in billTypes; provider/parsianproxy pays water.
 v0.50 — 2026-11-15 — Task 047: common/monitoring/jaeger/jaegertest/ (the span-tree test helper); system/postgres tracer.go; provider/http.go (the traced HTTP client).
 v0.49 — 2026-11-15 — Task 046: core/order settle.go (Settler = the settlement of a paid order, shared by the payment step and the worker), core/reconcile settle.go (SettleWorker = the Karashop settlement worker).
@@ -126,7 +127,8 @@ Authoritative layout reference (CLAUDE.md § 13).
 │   ├── Plans/                         # committed plans (Rule 1)
 │   │   ├── .gitkeep
 │   │   ├── Implementation_Plan.md     # step list for the Qabz implementation (PLAN-001 draft)
-│   │   ├── OPEN_TASKS.md              # open-tasks register (committed; deviates from L046)
+│   │   └── OPEN_TASKS.md              # open-tasks register (committed; deviates from L046)
+│   ├── tasks/                         # task files (CLAUDE.md § 1)
 │   │   ├── pending_tasks/             # task files not started
 │   │   │   ├── task_counter.json      # next_task_id; incremented for each new task
 │   │   │   └── task_template.md       # task file rules and format (template lives only here)

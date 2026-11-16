@@ -26,7 +26,7 @@ Help:
 - `bill`: `controller/phone/inquiry.go`, `controller/phone/phone.go`, `gateway/inquiry/mobile_irancell.go`, `gateway/inquiry/base.go` (`handlePhoneResponseWithoutInquiry`), `app/inquiryGateway.go`, `service/billInquiry/inquiry.go`.
 - The `irancell` service: `service/bill/`.
 - The seed: `src/system/postgres/devdb/seed_providers.sql` (ids 26, 31, 33, 38).
-- Task 023 (`docs/Plans/done_tasks/023_gas_inquiry_endpoint.md`) is the newest pattern: its design decisions, the `billTypes` table, the mock, the Postman collection, the metrics. Tasks 030 and 034 are the pattern of a direct provider adapter.
+- Task 023 (`docs/tasks/done_tasks/023_gas_inquiry_endpoint.md`) is the newest pattern: its design decisions, the `billTypes` table, the mock, the Postman collection, the metrics. Tasks 030 and 034 are the pattern of a direct provider adapter.
 - Each difference from `bill` that a client or the database can see is a numbered item in `docs/this_vs_bill.md` with a `@todo` at the code (task 013 practice).
 
 Points for the design step:

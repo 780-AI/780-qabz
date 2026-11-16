@@ -42,7 +42,7 @@ Implement `Tel.Inquiry` (`POST /v1/tel/inquiry`, `pb/proto/qabz/services.proto`)
 Help:
 - `bill`: `controller/telephone/inquiry.go`, `gateway/inquiry/telephone.go` (`KarashopTelephone`), `gateway/inquiry/karashopTranslator.go`, `thirdparty/karashop/` (`karashop.go`, `billInquiry.go`, `dto.go`), `app/inquiryGateway.go` (`initKarashopProvider`), `config/thirdParty.go`, `service/billInquiry/inquiry.go` (step loop, cache skip).
 - The seed: `src/system/postgres/devdb/seed_providers.sql` (ids 123456 `telmidterm` and 124325 `tel`, both `karashop`, `enable`).
-- Tasks 021 (`docs/Plans/done_tasks/021_water_inquiry_endpoint.md`), 023 (raw inquiry), 035 and 037 (two inquiries per answer, `onlyProvider`) are the pattern: their design decisions, `docs/this_vs_bill.md` items 14 to 22 (the same differences apply: error mapping, one request row), the Postman collection and the metrics.
+- Tasks 021 (`docs/tasks/done_tasks/021_water_inquiry_endpoint.md`), 023 (raw inquiry), 035 and 037 (two inquiries per answer, `onlyProvider`) are the pattern: their design decisions, `docs/this_vs_bill.md` items 14 to 22 (the same differences apply: error mapping, one request row), the Postman collection and the metrics.
 - Each difference from `bill` that a client or the database can see is a numbered item in `docs/this_vs_bill.md` with a `@todo` at the code (task 013 practice).
 
 Points for the design step:

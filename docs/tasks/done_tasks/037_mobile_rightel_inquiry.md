@@ -25,7 +25,7 @@ Help:
 - `bill`: `controller/phone/inquiry.go`, `controller/phone/phone.go`, `gateway/inquiry/mobile_rightel.go`, `gateway/inquiry/base.go` (`handlePhoneResponseWithoutInquiry`), `app/inquiryGateway.go`, `service/billInquiry/inquiry.go`.
 - The `qabzino` service: `gateway/rightel_mobile.go`, `gateway/base.go`, `gateway/translator.go`, `client/qabzino/dto_new.go` (`RightelBillInquiry2`), `config.example.yaml` (`rightelBillEndpoint`).
 - The seed: `src/system/postgres/devdb/seed_providers.sql` (ids 32, 34).
-- Task 023 (`docs/Plans/done_tasks/023_gas_inquiry_endpoint.md`) is the newest pattern: its design decisions (6 and 9 for the Qabzino kind and the mock), the `billTypes` table, the Postman collection, the metrics.
+- Task 023 (`docs/tasks/done_tasks/023_gas_inquiry_endpoint.md`) is the newest pattern: its design decisions (6 and 9 for the Qabzino kind and the mock), the `billTypes` table, the Postman collection, the metrics.
 - Each difference from `bill` that a client or the database can see is a numbered item in `docs/this_vs_bill.md` with a `@todo` at the code (task 013 practice).
 
 Points for the design step:

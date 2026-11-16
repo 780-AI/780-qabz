@@ -1,7 +1,8 @@
-<!-- VERSION: 3.46 -->
-<!-- Last Updated: 2026-11-15 -->
+<!-- VERSION: 3.47 -->
+<!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.47 — 2026-11-16 — Added tasks-folder-move entry.
 v3.46 — 2026-11-15 — Added 048-water-payment entry.
 v3.45 — 2026-11-15 — Added session-wrap-up (tasks 047, 050, 051, 043 session) entry.
 v3.44 — 2026-11-15 — Added 043-supertask-done entry.
@@ -162,6 +163,11 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — The task folders move from `docs/Plans/` to `docs/tasks/`
+
+- **Files:** `docs/tasks/pending_tasks/`, `docs/tasks/in-progress_tasks/`, `docs/tasks/done_tasks/` (moved with `git mv` from `docs/Plans/`; the task files are not changed, but the paths to `docs/Plans/done_tasks/` in the done tasks 022, 023, 025, 035, 036, 037 and 039 now say `docs/tasks/done_tasks/`); `CLAUDE.md` (v1.8, § 1: the new path); `docs/folder_structure.md` (v0.52: the new `docs/tasks/` folder); `docs/documents_manifest.md` (row 33: the new path of the task template); `CHANGELOG.md`.
+- **Impact:** None on runtime behavior. From now on every task file is in `docs/tasks/{pending|in-progress|done}_tasks/`. The `docs/Plans/` folder keeps `OPEN_TASKS.md` and `Implementation_Plan.md`. The old paths in the earlier entries of this file and of the manifest stay as they were (history).
 
 ## [2026-11-15] — Task 048: the water bill payment through Parsian; a failed order answers `failed`
 - **Type:** Major (a new endpoint, a behavior change of `OrderComplete`, config keys, a Critical File).

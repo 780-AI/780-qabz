@@ -49,7 +49,7 @@ This is the first payment task of Qabz. It makes `Phone.NewOrderV2` (`POST /v2/m
 Help:
 - `bill`: `controller/phone/newOrder.go`, `controller/base.go` (`GenerateJWT`), `service/billPayment/newOrder.go`, `service/feeResolver/fee_resolver.go`, `pkg/helper/fee.go` and `fee_test.go`, `pkg/helper/helper.go`, `pkg/helper/phoneNumberNormalizer.go` (`Replace98`), `pkg/crypt/jwtSign.go`, `domain/entity/payment.go` (`InitialOrderEnc`), `domain/entity/order.go`, `domain/repository/order/order_dto.go`, `app/application_dto.go` (the key is read at start), `config.example.yaml` (`paymentServer.privateKeyPath`).
 - Qabz: `src/entry/grpc/phone.go` (the handler, the operator table), `src/core/inquiry` (the pattern of a shared flow), `helpers.NormalizeMobile` (task 038), `src/system/postgres/devdb/` (the seed files and their tests), the empty folders `src/core/order`, `src/core/fee` and `src/common/crypto`.
-- Task 035 (`docs/Plans/done_tasks/035_mobile_irancell_inquiry.md`) is the pattern of an Irancell task; its follow-up (a) names the Irancell config keys that the order flow needs.
+- Task 035 (`docs/tasks/done_tasks/035_mobile_irancell_inquiry.md`) is the pattern of an Irancell task; its follow-up (a) names the Irancell config keys that the order flow needs.
 - Each difference from `bill` that a client or the database can see is a numbered item in `docs/this_vs_bill.md` with a `@todo` at the code (task 013 practice). When Qabz copies a rule from `bill`, a differential test against the `bill` code decides it (task 023 practice).
 
 Points for the design step (the operator approves the design before the code):

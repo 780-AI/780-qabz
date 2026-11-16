@@ -17,7 +17,7 @@ Implement `Gas.Inquiry` (`POST /v1/gas/inquiry`, `pb/proto/qabz/services.proto`)
 Help:
 - `bill`: `controller/gas/inquiry.go` (handler, `validateInquiryRequest`, `rawInquiry`), `gateway/inquiry/gas.go` (`QabzinoGas`, `ParsianGas`, `GasCompanyGas`), `client/grpc/qabzino/`.
 - The seed: `src/system/postgres/devdb/seed_providers.sql` (ids 35, 43, 99).
-- Tasks 021 (`docs/Plans/done_tasks/021_water_inquiry_endpoint.md`) and 022 (`docs/Plans/pending_tasks/022_electricity_inquiry_endpoint.md`) are the pattern: their design decisions, `docs/this_vs_bill.md` items 14 to 22 (the same differences apply: error mapping, one request row), the Postman collection and the metrics.
+- Tasks 021 (`docs/tasks/done_tasks/021_water_inquiry_endpoint.md`) and 022 (`docs/tasks/pending_tasks/022_electricity_inquiry_endpoint.md`) are the pattern: their design decisions, `docs/this_vs_bill.md` items 14 to 22 (the same differences apply: error mapping, one request row), the Postman collection and the metrics.
 - Each difference from `bill` that a client or the database can see is a numbered item in `docs/this_vs_bill.md` with a `@todo` at the code (task 013 practice).
 
 Points for the design step:
