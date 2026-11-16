@@ -165,10 +165,19 @@ func (s *statusByOrder) Status(_ context.Context, req provider.StatusRequest) (*
 }
 
 // TestLiveWaterStatusWorker (task 048 D13): the Parsian status worker finalizes two pending water
-// orders (Parsian answers success and failed): one final row each and one Kafka message each with
-// bill's value on paymentwriter; the request to Parsian has the bill type water. A later
-// OrderComplete of the failed order answers failed.
+// orders (liveStatusWorker).
 func TestLiveWaterStatusWorker(t *testing.T) {
+	liveStatusWorker(t, provider.BillTypeWater, 45, liveWaterBill, liveWaterPay, "48")
+}
+
+// liveStatusWorker: the Parsian status worker finalizes two pending orders of billType (Parsian
+// answers success and failed): one final row each and one Kafka message each with bill's value on
+// paymentwriter; the request to Parsian has the bill type. A later OrderComplete of the failed order
+// answers failed. providerID is the Parsian order row of the bill type in the seed; tag (two digits)
+// makes the order IDs of each caller different. Water (task 048 D13) and electricity (task 052 D11)
+// use it.
+func liveStatusWorker(t *testing.T, billType string, providerID int64, billID, payID, tag string) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	addr, password, prefix := liveRedisOf(t)
@@ -178,12 +187,12 @@ func TestLiveWaterStatusWorker(t *testing.T) {
 	}
 	t.Cleanup(db.Close)
 
-	const okID, failID = "cccccccc-0000-4000-8000-000000000481", "cccccccc-0000-4000-8000-000000000482"
+	okID, failID := "cccccccc-0000-4000-8000-000000000"+tag+"1", "cccccccc-0000-4000-8000-000000000"+tag+"2"
 	repo := postgres.NewOrderRepository(db)
 	for i, id := range []string{okID, failID} {
-		o := order.Order{ID: []string{"dddddddd-0000-4000-8000-000000000481", "dddddddd-0000-4000-8000-000000000482"}[i], OrderID: id,
-			BillType: provider.BillTypeWater, BillID: liveWaterBill, PayID: liveWaterPay, Data: liveWaterBill, Price: 25_009_000,
-			ProviderID: 45, ProviderName: "parsian", Status: order.StatusPending, RRN: "778899", BasePrice: 25_000_000}
+		o := order.Order{ID: "dddddddd-0000-4000-8000-000000000" + tag + []string{"1", "2"}[i], OrderID: id,
+			BillType: billType, BillID: billID, PayID: payID, Data: billID, Price: 25_009_000,
+			ProviderID: providerID, ProviderName: "parsian", Status: order.StatusPending, RRN: "778899", BasePrice: 25_000_000}
 		if !assert.NoError(t, repo.Insert(ctx, o)) {
 			return
 		}
@@ -228,14 +237,14 @@ func TestLiveWaterStatusWorker(t *testing.T) {
 		got, err := repo.Latest(ctx, id, order.LatestWindow)
 		if assert.NoError(t, err, id) {
 			assert.Equal(t, want, got.Status, id)
-			assert.Equal(t, provider.BillTypeWater, got.BillType, id)
+			assert.Equal(t, billType, got.BillType, id)
 		}
 	}
 	adapter.mu.Lock()
-	assert.ElementsMatch(t, []provider.StatusRequest{{OrderID: okID, BillType: "water"}, {OrderID: failID, BillType: "water"}}, adapter.reqs)
+	assert.ElementsMatch(t, []provider.StatusRequest{{OrderID: okID, BillType: billType}, {OrderID: failID, BillType: billType}}, adapter.reqs)
 	adapter.mu.Unlock()
 
-	c, err := ckafka.NewConsumer(&ckafka.ConfigMap{"bootstrap.servers": mc.BootstrapServers(), "group.id": "qabz-live-water", "enable.auto.commit": false})
+	c, err := ckafka.NewConsumer(&ckafka.ConfigMap{"bootstrap.servers": mc.BootstrapServers(), "group.id": "qabz-live-" + billType, "enable.auto.commit": false})
 	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
 		return
 	}

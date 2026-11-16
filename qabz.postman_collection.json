@@ -34,9 +34,9 @@
     },
     {
       "key": "electricity_payId",
-      "value": "",
+      "value": "1800000030",
       "type": "string",
-      "description": "Electricity/Inquiry body payId (bill ignores it for electricity)"
+      "description": "Electricity/Inquiry body payId (bill ignores it for electricity); Electricity/Order V2 body payId (task 052: a valid pay ID of 18 000 000 rials, so the order takes the raw inquiry; empty: the price comes from the Tavanir inquiry)"
     },
     {
       "key": "gas_billId",
@@ -499,6 +499,62 @@
             }
           ],
           "response": []
+        },
+        {
+          "name": "Order V2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": \"{{electricity_billId}}\",\n  \"payId\": \"{{electricity_payId}}\",\n  \"paymentType\": \"direct\",\n  \"participateCode\": \"\",\n  \"price\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/v2/electricity/order",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "v2",
+                "electricity",
+                "order"
+              ]
+            },
+            "description": "haf80.api.bill.Electricity/NewOrderV2 (task 052: the electricity bill, paid through Parsian). Saves an order of an electricity bill and answers the signed order token. The request and the answer are those of bill (NewOrderBillPayRequest, NewOrderResponse), unchanged; price and paymentType are not read. The steps are those of bill and of Water / Order V2: (1) the request needs billId or payId; else HTTP 400 (no log line). (2) the inquiry ID is participateCode when it is set, else billId. (3) the order provider of (electricity, order) is picked with ProvidersService: Parsian (dev seed row 47, enabled; the eways2 row 17 is disabled and has no adapter in Qabz). (4) bill already paid: a pending or success order of the billId and payId of the request in providers.internal.parsian.settlement_inquiry_electricity (default 360h): HTTP 400 with bill's text. (5) the price: a numeric billId and payId give the raw inquiry (the amount of the pay ID, no provider call); else the regular inquiry of electricity (Tavanir, dev seed row 2; saved inquiries for caching.paid_electricity, default 72h). (6) no provider fee; the fee (fees table; no row: 9000). (7) one orders row with the status initial. (8) the token (RS256): payload serviceId, orderId, provider, price, userId and data (payId, type, billId, payAmount, rawAmount, about (bill's text \" قبض برق\", with the first space), aboutIcon, invoicePayID, invoiceBillID, receiptPayID, receiptBillID; feeAmount and feeDescription when the fee is above 0). Expected with the dev seed and the default variables (electricity_payId 1800000030: 18 000 000 rials): HTTP 200, price 18009000. With an empty electricity_payId and the Tavanir mock (debug.mocks.tavanir.enabled): price 18009000 from the mock inquiry. A second order of a paid bill: HTTP 400. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. No enabled order provider: HTTP 503. A failed Tavanir inquiry has the answers of Electricity / Inquiry (HTTP 503 or 400). The payment step (PaymentComplete/OrderComplete) is gRPC only, on the internal server server.internal_grpc.addr; it has no HTTP route. POST /v1/electricity/order stays HTTP 501. After a 200 answer, the test script saves orderId and price in order_token and order_price, for Payment (external) / Invoice."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('answer has serviceId, orderId and price', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.orderId).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.price).to.be.above(0);",
+                  "    pm.expect(body).to.have.property('serviceId');",
+                  "});",
+                  "// Saves the order token and the total of the answer for Payment (external) / Invoice.",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('order_token', body.orderId);",
+                  "    pm.collectionVariables.set('order_price', String(body.price));",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

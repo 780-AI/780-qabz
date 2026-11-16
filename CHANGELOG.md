@@ -1,7 +1,8 @@
-<!-- VERSION: 3.51 -->
+<!-- VERSION: 3.52 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.52 — 2026-11-16 — Added 052-electricity-payment entry.
 v3.51 — 2026-11-16 — Added payment-tasks-052-to-056 entry.
 v3.50 — 2026-11-16 — Added workers-follow-their-switch entry.
 v3.49 — 2026-11-16 — Added 050-irancell-status-worker entry.
@@ -167,6 +168,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 052: the electricity bill payment through Parsian
+- **Type:** Major (a new endpoint, config keys, a Critical File).
+- **Files:** `src/entry/grpc/utility_order.go` (new: `utilityOrder.newOrderV2` = the shared order handler of water and electricity, bill's request check `billId` or `payId`, `orderInquiryID` = the participate code or the bill ID; was `waterInquiryID`), `src/entry/grpc/electricity_order.go` (new: `Electricity.NewOrderV2` = `POST /v2/electricity/order`) and its test, `src/entry/grpc/water_order.go` (only the water method; the answers do not change), `src/entry/grpc/electricity.go` (`ElectricityDeps` gets `Orders`, `Signer`, `ServiceID`), `src/entry/grpc/water_order_test.go`; `src/core/order/order.go` (the `billTypes` entry `electricity`: the raw inquiry first, else the regular inquiry), `token.go` (bill's electricity texts, also the space at the start of `about` (`" قبض برق"`, decision D7 (a)); `WaterData` renamed `UtilityData`), the tests (`electricity_test.go` new; `water_test.go`, `complete_test.go`); `src/provider/parsianproxy/parsianproxy.go` (`Pay` pays `electricity`) and `pay_test.go`; `src/config/config.go` (new key `caching.paid_electricity`, default `72h`; `providers.internal.parsian.settlement_inquiry_electricity` is read, default `360h`, was `0s`; negative values rejected) and its test; `src/app/defaults.go` (the electricity order wiring, the order TTL, the "already paid" window, the `PayRoutes` entry, metric help texts), `src/app/water_test.go`, `src/app/water_live_test.go`, `src/app/water_order_live_test.go` (the status worker test is the shared `liveStatusWorker`), `src/app/electricity_order_live_test.go` (new: the order and payment rows, the Tavanir price, failed and pending, the status worker on an electricity order); `src/app/README.md` (v0.42); `config.yml.example` (the two keys; no VERSION header, no row); `qabz.postman_collection.json` (new item Electricity / Order V2; no VERSION header, no row); `docs/initial-discovery/system.html` (v2.23); `docs/this_vs_bill.md` (v0.27: item 38 covers `POST /v2/electricity/order`, Parsian only); `docs/folder_structure.md` (v0.54); `docs/tasks/done_tasks/052_electricity_payment.md` (moved from `pending_tasks/`, v0.3: the design, the operator approval "Approve, D2 Parsian, D7 (a)" and the verification record; not manifest-tracked); `docs/Plans/OPEN_TASKS.md` (v1.86); `docs/documents_manifest.md`.
+- **Impact:** **Yes, behavior changes.** (1) New endpoint `POST /v2/electricity/order`: an `orders` row `initial` and the signed token (the order provider Parsian, seed row 47); the price is the raw inquiry of a numeric `billId` and `payId`, else the Tavanir inquiry (seed row 2) with saved inquiries for `caching.paid_electricity`; `OrderComplete` pays an electricity order through Parsian; after a success no settlement runs (bill has none for electricity); the status worker finalizes electricity orders with no code change. `POST /v1/electricity/order` stays HTTP 501. (2) `providers.internal.parsian.settlement_inquiry_electricity` now has the default `360h` and is read (the "bill already paid" window of an electricity order). (3) The water order answers do not change (the shared handler). The local `config.yml` (git-ignored) got the two keys.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 052 electricity payment through Parsian" (Go tests; feature ON with the Parsian and Tavanir mocks and the status worker; the operator QA on stage after the deploy). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Five payment tasks for the bill types that cannot be paid yet (tasks 052 to 056)
 - **Type:** Minor (task files only; no code).

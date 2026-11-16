@@ -35,7 +35,7 @@ func newOrderWater(o *fakeOrders, s *fakeSigner, log *errLog) *Water {
 
 // TestWaterNewOrderV2 (task 048): the order request of bill (the bill type water, the IDs of the
 // request, the bill ID as the inquiry ID, the user and the dialer), the token payload with
-// WaterData, and the answer.
+// UtilityData, and the answer.
 func TestWaterNewOrderV2(t *testing.T) {
 	orders := &fakeOrders{o: savedWaterOrder()}
 	signer := &fakeSigner{}
@@ -45,7 +45,7 @@ func TestWaterNewOrderV2(t *testing.T) {
 	}
 	assert.Equal(t, []order.Request{{BillType: provider.BillTypeWater, BillID: "1234567890125", PayID: "2500012340",
 		InquiryID: "1234567890125", UserID: billsUser, Dialer: "989121234567"}}, orders.reqs)
-	want, err := order.MarshalPayload(order.TokenPayload(savedWaterOrder(), 105, order.WaterData(savedWaterOrder())))
+	want, err := order.MarshalPayload(order.TokenPayload(savedWaterOrder(), 105, order.UtilityData(savedWaterOrder())))
 	assert.NoError(t, err)
 	if assert.Len(t, signer.payloads, 1) {
 		assert.Equal(t, string(want), string(signer.payloads[0]))

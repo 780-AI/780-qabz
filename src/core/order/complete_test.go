@@ -51,7 +51,7 @@ func (r *payRepo) ProviderName(ctx context.Context, id int64) (string, error) {
 	if r.nameErr != nil {
 		return "", r.nameErr
 	}
-	if id == 51 || id == 45 { // 45: the water order row of Parsian (task 048)
+	if id == 51 || id == 45 || id == 47 { // 45: the water order row of Parsian (task 048); 47: the electricity row (task 052)
 		return "parsian", nil
 	}
 	return "other", nil

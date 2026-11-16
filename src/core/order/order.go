@@ -92,13 +92,18 @@ type billType struct {
 //     BillTypeInquiryType[WATER]). The saved inquiries answer for Options.OrderCacheTTL
 //     (caching.paid_water).
 //
+//   - electricity (task 052): the same rules as water (bill: controller.CreateNewOrder, no provider
+//     fee, BillTypeInquiryType[ELECTRICITY] is regular). The saved inquiries answer for
+//     Options.OrderCacheTTL (caching.paid_electricity).
+//
 // A bill type with no order cache TTL (Options.OrderCacheTTL gives 0) never answers from saved
 // inquiries (inquiry.Request.NoCache).
 var billTypes = map[string]billType{
-	provider.BillTypeIrancell:   {directPrice: true, inquiryType: provider.InquiryTypeFinalTerm},
-	provider.BillTypeTel:        {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeFinalTerm},
-	provider.BillTypeTelMidterm: {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeMidterm},
-	provider.BillTypeWater:      {inquiryType: provider.InquiryTypeRegular},
+	provider.BillTypeIrancell:    {directPrice: true, inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeTel:         {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeFinalTerm},
+	provider.BillTypeTelMidterm:  {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeMidterm},
+	provider.BillTypeWater:       {inquiryType: provider.InquiryTypeRegular},
+	provider.BillTypeElectricity: {inquiryType: provider.InquiryTypeRegular},
 }
 
 // InquiryTypeOf gives the inquiry type of an order bill type (bill: entity.BillTypeInquiryType), ""

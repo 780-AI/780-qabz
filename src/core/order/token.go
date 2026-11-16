@@ -38,6 +38,14 @@ var metadata = map[string]Metadata{
 		Icon:           "https://public.780.ir/dl/Operator/AbvaFazelab.svg",
 		FeeDescription: "کارمزد",
 	},
+	// bill: case entity.ELECTRICITY: ElectricityIcon, AboutIconElectricity, FeeDescriptionElectricity
+	// (task 052). bill's AboutIconElectricity starts with a space; Qabz keeps it (operator decision D7
+	// (a)), so the token has the bytes of bill.
+	provider.BillTypeElectricity: {
+		About:          " قبض برق",
+		Icon:           "https://public.780.ir/dl/Operator/Bargh.svg",
+		FeeDescription: "کارمزد",
+	},
 	// bill: case entity.TELMIDTERM: TelIcon, AboutIconTelMidterm, FeeDescriptionTel (task 044).
 	provider.BillTypeTelMidterm: {
 		About:          "قبض تلفن ثابت-میان دوره",
@@ -115,9 +123,11 @@ func TelData(o Order, phone string) map[string]string {
 	return data
 }
 
-// WaterData is the data map of the order token of a water bill (task 048; bill: controller/water
-// NewOrderV2). feeAmount (the fee) and feeDescription are there only when the fee is above 0.
-func WaterData(o Order) map[string]string {
+// UtilityData is the data map of the order token of a water bill (task 048; bill: controller/water
+// NewOrderV2) and of an electricity bill (task 052; bill: controller/electricity NewOrderV2): the two
+// maps of bill have the same keys, and the texts come from MetadataOf(o.BillType). feeAmount (the fee)
+// and feeDescription are there only when the fee is above 0.
+func UtilityData(o Order) map[string]string {
 	meta := MetadataOf(o.BillType)
 	data := map[string]string{
 		"payId":         o.PayID,

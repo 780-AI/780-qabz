@@ -110,7 +110,7 @@ providers:
           get_order_query: "3ms"
           insert_order_query: "3ms"
       settlement_inquiry_water: "360h"     # "bill already paid" window of a water order paid through Parsian (bill: 360h); 0: no window
-      settlement_inquiry_electricity: "0s"
+      settlement_inquiry_electricity: "360h" # "bill already paid" window of an electricity order paid through Parsian (bill: 360h); 0: no window
       settlement_inquiry_gas: "0s"
       settlement_inquiry_telephone: "360h" # "bill already paid" window of a landline order paid through Parsian (bill: 360h); 0: no window
       settlement_inquiry_mci_mobile: "0s"
@@ -155,6 +155,7 @@ caching:
   tel: "1h"                  # how long a saved landline inquiry (bill type tel) answers the same number with no provider call; 0: cache off
   paid_tel: "72h"            # how long a saved landline inquiry gives the price of a landline order (tel, telmidterm) with no provider call (bill: paidTel); 0: every order asks the provider
   paid_water: "72h"          # how long a saved water inquiry gives the price of a water order whose raw inquiry failed, with no provider call (bill: paidWater); 0: every such order asks the provider
+  paid_electricity: "72h"    # how long a saved electricity inquiry gives the price of an electricity order whose raw inquiry failed, with no provider call (bill: paidElectricity); 0: every such order asks the provider
 
 kafka:                       # the Kafka client (bill: kafka); the producer exists only while a status worker is on (providers.internal.parsian.get_status.enabled or providers.internal.irancell.get_status.enabled)
   brokers:                   # the broker addresses; not empty while the worker is on

@@ -132,17 +132,17 @@ func TestCreateWaterAlreadyPaid(t *testing.T) {
 	assert.Equal(t, []string{"water: order already-paid check failed"}, f.log.lines)
 }
 
-// TestWaterData: the token keys of bill's Water.NewOrderV2, with and without a fee.
-func TestWaterData(t *testing.T) {
+// TestUtilityData: the token keys of bill's Water.NewOrderV2 for a water order, with and without a fee.
+func TestUtilityData(t *testing.T) {
 	o := Order{BillType: provider.BillTypeWater, BillID: testWaterBill, PayID: testWaterPay, Price: 259000, BasePrice: 250000, Fee: 9000}
 	assert.Equal(t, map[string]string{
 		"payId": testWaterPay, "type": "water", "billId": testWaterBill, "payAmount": "259000", "rawAmount": "250000",
 		"about": "قبض آب", "aboutIcon": "https://public.780.ir/dl/Operator/AbvaFazelab.svg",
 		"invoicePayID": testWaterPay, "invoiceBillID": testWaterBill, "receiptPayID": testWaterPay, "receiptBillID": testWaterBill,
 		"feeAmount": "9000", "feeDescription": "کارمزد",
-	}, WaterData(o))
+	}, UtilityData(o))
 	o.Fee = 0
-	noFee := WaterData(o)
+	noFee := UtilityData(o)
 	assert.Len(t, noFee, 11)
 	assert.NotContains(t, noFee, "feeAmount")
 	assert.NotContains(t, noFee, "feeDescription")
@@ -201,7 +201,7 @@ func TestCompleteWaterNoRoute(t *testing.T) {
 // row is failed answers failed with the message of that row (MessageProcessed when it has none),
 // with no row and no provider call, for every bill type.
 func TestCompleteFailedOrderAnswersFailed(t *testing.T) {
-	for _, billType := range []string{provider.BillTypeWater, provider.BillTypeTel, provider.BillTypeTelMidterm} {
+	for _, billType := range []string{provider.BillTypeWater, provider.BillTypeElectricity, provider.BillTypeTel, provider.BillTypeTelMidterm} {
 		for message, want := range map[string]string{"mock: the payment failed": "mock: the payment failed", "": MessageProcessed} {
 			f := newWaterPayFixture(t)
 			f.repo.latest.BillType = billType

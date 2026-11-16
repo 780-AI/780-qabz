@@ -269,7 +269,11 @@ type Config struct {
 	// ParsianSettlementInquiryWater is read since task 048: the "bill already paid" check of a water
 	// order paid through Parsian (bill: shouldSkipNewOrder, parsian.settlementInquiryWater). Default
 	// 360h (bill's example). 0: no window; a negative value is rejected.
-	ParsianSettlementInquiryWater       time.Duration `path:"providers.internal.parsian.settlement_inquiry_water"`
+	ParsianSettlementInquiryWater time.Duration `path:"providers.internal.parsian.settlement_inquiry_water"`
+	// ParsianSettlementInquiryElectricity is read since task 052: the "bill already paid" check of an
+	// electricity order paid through Parsian (bill: shouldSkipNewOrder,
+	// parsian.settlementInquiryElectricity). Default 360h (bill's example). 0: no window; a negative
+	// value is rejected.
 	ParsianSettlementInquiryElectricity time.Duration `path:"providers.internal.parsian.settlement_inquiry_electricity"`
 	ParsianSettlementInquiryGas         time.Duration `path:"providers.internal.parsian.settlement_inquiry_gas"`
 	// ParsianSettlementInquiryTelephone is read since task 044: the "bill already paid" check of a
@@ -346,6 +350,11 @@ type Config struct {
 	// with no provider call (bill: caching.paidWater, 72h). It applies only when the raw inquiry of the
 	// order fails. 0: every such order asks the provider; a negative value is rejected. Read at start.
 	CachingPaidWater time.Duration `path:"caching.paid_water"`
+	// CachingPaidElectricity is how long a saved electricity inquiry gives the price of an electricity
+	// order (task 052) with no provider call (bill: caching.paidElectricity, 72h). It applies only when
+	// the raw inquiry of the order fails. 0: every such order asks the provider; a negative value is
+	// rejected. Read at start.
+	CachingPaidElectricity time.Duration `path:"caching.paid_electricity"`
 
 	// DebugMockQabzinoEnabled makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -472,26 +481,28 @@ func defaults() Config {
 		ParsianTimeout:      10 * time.Second,
 		KarashopTimeout:     30 * time.Second,
 
-		CachingWater:                      time.Hour,
-		CachingElectricity:                time.Hour,
-		CachingGas:                        time.Hour,
-		CachingMobile:                     5 * time.Hour,
-		CachingTel:                        time.Hour,
-		CachingPaidTel:                    72 * time.Hour,
-		CachingPaidWater:                  72 * time.Hour,
-		ParsianSettlementInquiryTelephone: 360 * time.Hour,
-		ParsianSettlementInquiryWater:     360 * time.Hour,
-		ParsianGetStatusName:              "parsian-getstatus",
-		ParsianGetStatusChunk:             100,
-		ParsianGetStatusStart:             30 * time.Minute,
-		ParsianGetStatusEnd:               10 * time.Hour,
-		ParsianGetStatusCronTime:          15 * time.Minute,
-		ParsianGetStatusLockTime:          30 * time.Minute,
-		ParsianGetStatusIsLockable:        true,
-		ParsianGetStatusReverseDeadline:   10 * time.Hour,
-		ParsianGetStatusSyncAPICall:       30 * time.Second,
-		ParsianGetStatusSyncGetOrder:      3 * time.Millisecond,
-		ParsianGetStatusSyncInsertOrder:   3 * time.Millisecond,
+		CachingWater:                        time.Hour,
+		CachingElectricity:                  time.Hour,
+		CachingGas:                          time.Hour,
+		CachingMobile:                       5 * time.Hour,
+		CachingTel:                          time.Hour,
+		CachingPaidTel:                      72 * time.Hour,
+		CachingPaidWater:                    72 * time.Hour,
+		CachingPaidElectricity:              72 * time.Hour,
+		ParsianSettlementInquiryTelephone:   360 * time.Hour,
+		ParsianSettlementInquiryWater:       360 * time.Hour,
+		ParsianSettlementInquiryElectricity: 360 * time.Hour,
+		ParsianGetStatusName:                "parsian-getstatus",
+		ParsianGetStatusChunk:               100,
+		ParsianGetStatusStart:               30 * time.Minute,
+		ParsianGetStatusEnd:                 10 * time.Hour,
+		ParsianGetStatusCronTime:            15 * time.Minute,
+		ParsianGetStatusLockTime:            30 * time.Minute,
+		ParsianGetStatusIsLockable:          true,
+		ParsianGetStatusReverseDeadline:     10 * time.Hour,
+		ParsianGetStatusSyncAPICall:         30 * time.Second,
+		ParsianGetStatusSyncGetOrder:        3 * time.Millisecond,
+		ParsianGetStatusSyncInsertOrder:     3 * time.Millisecond,
 
 		// The Irancell status worker (task 050 D2): the values of the operator's config.
 		IrancellGetStatusName:             "irancell-get-status",
@@ -688,6 +699,12 @@ func (c Config) validate() error {
 	}
 	if c.ParsianSettlementInquiryWater < 0 {
 		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_water must not be negative (0: no window)"))
+	}
+	if c.CachingPaidElectricity < 0 {
+		errs = append(errs, errors.New("caching.paid_electricity must not be negative (0: every order asks the provider)"))
+	}
+	if c.ParsianSettlementInquiryElectricity < 0 {
+		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_electricity must not be negative (0: no window)"))
 	}
 	if !ValidMockPayReturnType(c.DebugMockParsianPayReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.parsian.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
