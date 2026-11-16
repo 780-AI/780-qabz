@@ -22,6 +22,9 @@ import (
 // settleJobSpan is the root span of the settlement in the background (task 047).
 const settleJobSpan = "order.Payments.settle"
 
+// completeSpan is the span name of one Complete call (conventions § 17; task 048).
+const completeSpan = "order.Payments.Complete"
+
 // The payment step of an order (task 044; bill: controller/payment/orderComplete.go and
 // service/billPayment/completeOrder.go CompleteOrder). The payment service calls it after the user
 // paid: the order is checked, saved in-progress with the RRN, paid through the order provider, and
@@ -44,7 +47,7 @@ const LatestWindow = 48 * time.Hour
 // The results of a Complete call, for Options.OnPayment (a fixed set: metric labels), with
 // StatusSuccess, StatusFailed and StatusPending.
 const (
-	PaymentProcessed  = "processed"   // the order is not initial: answered pending, nothing saved
+	PaymentProcessed  = "processed"   // the order is not initial: answered pending (failed for a failed order), nothing saved
 	PaymentWrongPrice = "wrong_price" // the price is not the order price: answered pending, nothing saved
 	PaymentError      = "error"       // a failed read or write, or no payment route
 )
@@ -195,8 +198,10 @@ type CompleteRequest struct {
 // Complete runs the payment step (bill: CompleteOrder, the same steps in the same order):
 //  1. It reads the newest row of the order (LatestWindow). None, or a failed read:
 //     ErrPaymentDatabase.
-//  2. A row that is not initial is answered pending with MessageProcessed; a price that is not the
-//     order price is answered pending with MessageWrongPrice. Nothing is saved, no provider call.
+//  2. A failed row is answered failed with its message (MessageProcessed when it has none; task
+//     048, operator rule: a failed order gives failed); another row that is not initial is answered
+//     pending with MessageProcessed; a price that is not the order price is answered pending with
+//     MessageWrongPrice. Nothing is saved, no provider call.
 //  3. It reads the name of the order provider. A failed read saves failed (MessageNoProviderRow,
 //  400. and returns ErrPaymentDatabase.
 //  4. It saves in-progress with the RRN. A failed write saves failed (MessageInsertFailed, 400) and
@@ -213,6 +218,11 @@ type CompleteRequest struct {
 // The reads and writes after step 2 do not stop when ctx is done: bill's take no context, so a
 // payment service that leaves does not lose the status of a payment that was sent, and no order is
 // saved as failed before its payment was sent. Only the provider call takes ctx.
+//
+// One span completeSpan, a child of the span in ctx (conventions § 17; task 048), has the order ID,
+// the bill type, the order provider and the result (a status or a Payment value), and the status
+// Error for an error and for a failed payment. The background job keeps its link to the span of the
+// request (task 047 D11).
 func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, error) {
 	if p == nil || p.repo == nil || p.adapters == nil {
 		return Order{}, errors.New("order payment: not created with NewPayments")
@@ -220,20 +230,66 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	sctx, span := otel.Tracer("qabz/core/order").Start(ctx, completeSpan)
+	billType, providerName, result := "", NoProviderLabel, PaymentError
+	o, err := p.complete(sctx, ctx, req, func(bt, pro, r string) {
+		billType, providerName, result = bt, pro, r
+		p.countPayment(bt, pro, r)
+	})
+	if o.OrderID != "" {
+		span.SetAttributes(attribute.String("order.id", o.OrderID))
+	}
+	if billType != "" {
+		span.SetAttributes(attribute.String("bill_type", billType))
+	}
+	span.SetAttributes(attribute.String("provider", providerName), attribute.String("result", result))
+	switch {
+	case err != nil:
+		jaeger.Fail(span, result, err)
+	case o.Status == StatusFailed:
+		jaeger.Fail(span, StatusFailed, nil)
+	}
+	span.End()
+	return o, err
+}
+
+// complete is Complete with the span in ctx; requestCtx is the context of the request (the link of
+// the background job); done gets the bill type, the provider and the result once per call.
+func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest, done func(billType, providerName, result string)) (Order, error) {
 	o, err := p.repo.Latest(ctx, req.OrderID, LatestWindow)
 	if err != nil {
-		p.countPayment("", NoProviderLabel, PaymentError)
+		done("", NoProviderLabel, PaymentError)
 		if !errors.Is(err, ErrNotFound) && ctx.Err() == nil && p.log != nil {
 			p.log.Error("order complete: read the order failed", "order_id", req.OrderID, "error", err)
 		}
 		return Order{}, fmt.Errorf("%w: read the order %s: %w", ErrPaymentDatabase, req.OrderID, err)
 	}
+	if o.Status == StatusFailed {
+		// The operator rule of task 048 (D11 (a)): when the order is failed, the payment service gets
+		// failed, the answer of the first call. @todo bill answers pending with MessageProcessed. See
+		// docs/this_vs_bill.md, item 46.
+		done(o.BillType, o.ProviderName, PaymentProcessed)
+		switch o.Message {
+		case MessageNoProviderRow, MessageInsertFailed:
+			// A step before the payment failed: the first call got the error of the step (the general
+			// text), never the internal message of the row (conventions § 10).
+			return Order{}, fmt.Errorf("%w: the order %s failed before: %s", ErrPaymentDatabase, o.OrderID, o.Message)
+		case MessageNoPaymentRoute:
+			return Order{}, fmt.Errorf("%w: the order %s failed before: %s", ErrPaymentRoute, o.OrderID, o.Message)
+		}
+		msg := o.Message
+		if msg == "" {
+			msg = MessageProcessed
+		}
+		return Order{OrderID: o.OrderID, UserID: o.UserID, BillID: o.BillID, BillType: o.BillType, Data: o.Data,
+			ProviderName: o.ProviderName, Status: StatusFailed, Message: msg, StatusCode: o.StatusCode}, nil
+	}
 	if o.Status != StatusInitial {
-		p.countPayment(o.BillType, o.ProviderName, PaymentProcessed)
+		done(o.BillType, o.ProviderName, PaymentProcessed)
 		return Order{Status: StatusPending, Message: MessageProcessed}, nil
 	}
 	if o.Price != req.Price {
-		p.countPayment(o.BillType, o.ProviderName, PaymentWrongPrice)
+		done(o.BillType, o.ProviderName, PaymentWrongPrice)
 		return Order{Status: StatusPending, Message: MessageWrongPrice}, nil
 	}
 
@@ -241,7 +297,7 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 	name, err := p.repo.ProviderName(wctx, o.ProviderID)
 	if err != nil {
 		p.saveFailed(wctx, o, MessageNoProviderRow)
-		p.countPayment(o.BillType, o.ProviderName, PaymentError)
+		done(o.BillType, o.ProviderName, PaymentError)
 		return Order{}, fmt.Errorf("%w: read the provider %d: %w", ErrPaymentDatabase, o.ProviderID, err)
 	}
 
@@ -249,7 +305,7 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 	o.Status = StatusInProgress
 	if err := p.insert(wctx, &o); err != nil {
 		p.saveFailed(wctx, o, MessageInsertFailed)
-		p.countPayment(o.BillType, name, PaymentError)
+		done(o.BillType, name, PaymentError)
 		return Order{}, fmt.Errorf("%w: save in-progress: %w", ErrPaymentDatabase, err)
 	}
 
@@ -260,7 +316,7 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 	adapter, ok := p.adapters.Get(name)
 	if !p.payRoutes[name][billType] || !ok || adapter == nil {
 		p.saveFailed(wctx, o, MessageNoPaymentRoute)
-		p.countPayment(o.BillType, name, PaymentError)
+		done(o.BillType, name, PaymentError)
 		return Order{}, fmt.Errorf("%w: %s %s", ErrPaymentRoute, name, billType)
 	}
 
@@ -288,13 +344,13 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 		if p.log != nil {
 			p.log.Error("order complete: save the payment status failed", "order_id", o.OrderID, "status", o.Status, "error", err)
 		}
-		p.countPayment(o.BillType, name, PaymentError)
+		done(o.BillType, name, PaymentError)
 		return Order{OrderID: o.OrderID, UserID: o.UserID, BillID: o.BillID, BillType: o.BillType, Data: o.Data,
 			ProviderName: name, Status: StatusPending, Message: MessageInsertFailed, StatusCode: http.StatusInternalServerError}, nil
 	}
-	p.countPayment(o.BillType, name, o.Status)
+	done(o.BillType, name, o.Status)
 	if o.Status == StatusSuccess {
-		p.background(ctx, o)
+		p.background(requestCtx, o)
 	}
 	return o, nil
 }

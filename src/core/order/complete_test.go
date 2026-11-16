@@ -51,7 +51,7 @@ func (r *payRepo) ProviderName(ctx context.Context, id int64) (string, error) {
 	if r.nameErr != nil {
 		return "", r.nameErr
 	}
-	if id == 51 {
+	if id == 51 || id == 45 { // 45: the water order row of Parsian (task 048)
 		return "parsian", nil
 	}
 	return "other", nil
@@ -296,10 +296,11 @@ func TestCompleteStatuses(t *testing.T) {
 	assert.Equal(t, []string{"parsian/pending"}, f.pays)
 }
 
-// TestCompleteChecks: a processed order and a wrong price answer pending with bill's text, with no
-// row and no provider call; a missing order is ErrPaymentDatabase.
+// TestCompleteChecks: a processed order (not failed) and a wrong price answer pending with bill's
+// text, with no row and no provider call; a missing order is ErrPaymentDatabase. A failed order is
+// TestCompleteFailedOrderAnswersFailed.
 func TestCompleteChecks(t *testing.T) {
-	for _, status := range []string{StatusInProgress, StatusSuccess, StatusFailed, StatusPending} {
+	for _, status := range []string{StatusInProgress, StatusSuccess, StatusPending} {
 		f := newPayFixture(t)
 		f.repo.latest.Status = status
 		o, err := f.p.Complete(context.Background(), completeReq())

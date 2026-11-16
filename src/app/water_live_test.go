@@ -112,7 +112,7 @@ func newLiveWaterCfg(t *testing.T, ctx context.Context, returnType, setupSQL str
 	if !assert.NoError(t, err) || !assert.NotNil(t, signer) {
 		t.FailNow()
 	}
-	return &liveWaterStack{db: db, water: newWater(flow, log), electricity: newElectricity(flow, log), gas: newGas(flow, log),
+	return &liveWaterStack{db: db, water: newWater(flow, orders, signer, 105, log), electricity: newElectricity(flow, log), gas: newGas(flow, log),
 		phone: newPhone(flow, orders, signer, 105, log), tel: newTel(flow, orders, signer, 105, log), signer: signer, metrics: metrics, log: log,
 		payments: payments}
 }

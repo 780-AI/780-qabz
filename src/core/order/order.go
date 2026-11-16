@@ -16,11 +16,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
+	"qabz/common/monitoring/jaeger"
 	"qabz/core/fee"
 	"qabz/core/inquiry"
 	"qabz/provider"
 )
+
+// createSpan is the span name of one Create call (conventions § 17; task 048).
+const createSpan = "order.Service.Create"
 
 // ActionOrder is providers.action of the provider that is paid for an order (bill:
 // entity.OrderAction).
@@ -81,12 +87,18 @@ type billType struct {
 //     @todo bill asks the inquiry provider of the order bill type for one term. See
 //     docs/this_vs_bill.md, item 42. The saved inquiries answer for Options.OrderCacheTTL (caching.paid_tel).
 //
+//   - water (task 048): the raw inquiry first (bill: no provider fee for water, so the second price
+//     rule runs before the provider inquiry), else the regular inquiry of water (bill:
+//     BillTypeInquiryType[WATER]). The saved inquiries answer for Options.OrderCacheTTL
+//     (caching.paid_water).
+//
 // A bill type with no order cache TTL (Options.OrderCacheTTL gives 0) never answers from saved
 // inquiries (inquiry.Request.NoCache).
 var billTypes = map[string]billType{
 	provider.BillTypeIrancell:   {directPrice: true, inquiryType: provider.InquiryTypeFinalTerm},
 	provider.BillTypeTel:        {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeFinalTerm},
 	provider.BillTypeTelMidterm: {inquiryFirst: true, inquiryBillType: provider.BillTypeTel, inquiryType: provider.InquiryTypeMidterm},
+	provider.BillTypeWater:      {inquiryType: provider.InquiryTypeRegular},
 }
 
 // InquiryTypeOf gives the inquiry type of an order bill type (bill: entity.BillTypeInquiryType), ""
@@ -324,6 +336,9 @@ type price struct {
 //  6. The fee (FeeResolver). A failed fee does not stop the order: it is logged (one error line).
 //  7. The total = price + fee + provider fee; below 0 or above math.MaxUint32 is ErrTotalTooLarge.
 //  8. The orders row with StatusInitial and a new order ID. A failed write is an error.
+//
+// One span createSpan, a child of the span in ctx (conventions § 17; task 048), has the bill type,
+// the order provider and the result (the Result values), and the status Error for every error.
 func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 	if s == nil || s.providers == nil || s.inquiry == nil || s.raw == nil || s.fees == nil || s.repo == nil {
 		return Order{}, errors.New("order: service not created with NewService")
@@ -331,6 +346,26 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, span := otel.Tracer("qabz/core/order").Start(ctx, createSpan)
+	providerName, result := NoProviderLabel, ResultError
+	o, err := s.create(ctx, req, func(p, r string) {
+		providerName, result = p, r
+		s.count(req.BillType, p, r)
+	})
+	if _, known := billTypes[req.BillType]; known { // an unknown text is not put in the span
+		span.SetAttributes(attribute.String("bill_type", req.BillType))
+	}
+	span.SetAttributes(attribute.String("provider", providerName), attribute.String("result", result))
+	if err != nil {
+		jaeger.Fail(span, result, err)
+	}
+	span.End()
+	return o, err
+}
+
+// create is Create with the span in ctx; done gets the provider name and the result once per call
+// of a known bill type.
+func (s *Service) create(ctx context.Context, req Request, done func(providerName, result string)) (Order, error) {
 	bt, ok := billTypes[req.BillType]
 	if !ok {
 		return Order{}, fmt.Errorf("%w %q", ErrUnsupported, req.BillType)
@@ -342,12 +377,12 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 		if errors.Is(err, provider.ErrNoProvider) {
 			result = ResultNoProvider
 		}
-		s.count(req.BillType, NoProviderLabel, result)
+		done(NoProviderLabel, result)
 		return Order{}, fmt.Errorf("pick provider for %s %s: %w", req.BillType, ActionOrder, err)
 	}
 
 	if s.alreadyPaid(ctx, req, pro.Name) {
-		s.count(req.BillType, pro.Name, ResultAlreadyPaid)
+		done(pro.Name, ResultAlreadyPaid)
 		return Order{}, ErrAlreadyPaid
 	}
 
@@ -358,11 +393,11 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 		if errors.As(err, &inqErr) || errors.Is(err, ErrNoInquiry) {
 			result = ResultInquiryFailed
 		}
-		s.count(req.BillType, pro.Name, result)
+		done(pro.Name, result)
 		return Order{}, err
 	}
 	if p.amount == 0 {
-		s.count(req.BillType, pro.Name, ResultZeroPrice)
+		done(pro.Name, ResultZeroPrice)
 		return Order{}, ErrZeroPrice
 	}
 
@@ -371,7 +406,7 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 		// bill reads the row for its provider fee (feeableBillType); a failed read fails the order.
 		providerFee, err = s.providerFee(ctx, p.billInquiryID)
 		if err != nil {
-			s.count(req.BillType, pro.Name, ResultError)
+			done(pro.Name, ResultError)
 			return Order{}, err
 		}
 	}
@@ -383,7 +418,7 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 
 	total := int64(p.amount) + f.Fee + int64(providerFee)
 	if providerFee > math.MaxInt64 || total < 0 || total > math.MaxUint32 {
-		s.count(req.BillType, pro.Name, ResultInvalid)
+		done(pro.Name, ResultInvalid)
 		return Order{}, fmt.Errorf("%w: %d", ErrTotalTooLarge, total)
 	}
 
@@ -394,10 +429,10 @@ func (s *Service) Create(ctx context.Context, req Request) (Order, error) {
 		BasePrice: int64(p.amount), ProviderFee: providerFee, BillInquiryID: p.billInquiryID, FeeSource: f.Source,
 	}
 	if err := s.repo.Insert(ctx, o); err != nil {
-		s.count(req.BillType, pro.Name, ResultError)
+		done(pro.Name, ResultError)
 		return Order{}, fmt.Errorf("order: insert: %w", err)
 	}
-	s.count(req.BillType, pro.Name, ResultCreated)
+	done(pro.Name, ResultCreated)
 	return o, nil
 }
 

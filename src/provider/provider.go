@@ -33,6 +33,9 @@ const (
 	// FinalTermInquiryType): one answer has a mid-term and a final-term (full-term) inquiry.
 	InquiryTypeMidterm   = "midterm"
 	InquiryTypeFinalTerm = "final_term"
+	// InquiryTypeRegular is the inquiry type of a water, an electricity and a gas bill (bill:
+	// entity.RegularInquiryType; task 048: the price of a water order and the Parsian payment).
+	InquiryTypeRegular = "regular"
 
 	// The statuses of a payment and of a settlement (bill: entity.SUCCESS, FAILED, PENDING; task 044).
 	StatusSuccess = "success"

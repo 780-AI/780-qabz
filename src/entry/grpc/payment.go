@@ -85,7 +85,9 @@ func RegisterPaymentComplete(svc pb.PaymentCompleteServer) Register {
 //     failed payment" and the error of bill.
 //   - A failed payment: one info line "order complete: failed payment" and an error with the
 //     message of the provider (gRPC Unknown, as bill's errors.New(order.Message)). The payment
-//     service refunds it.
+//     service refunds it. A second call for an order whose newest row is failed gets the answer of
+//     the first call: the message of that row for a failed payment, the error of bill for a step
+//     that failed before the payment (task 048; bill answers pending, docs/this_vs_bill.md item 46).
 //   - Else (success or pending): status and stepStatus.service are the status, data is {"refID":
 //     ref_id}, one info line "order complete: successful payment" (bill writes it for pending too).
 func (p *PaymentComplete) OrderComplete(ctx context.Context, req *pb.PaymentOrder) (*pb.PaymentOrder, error) {

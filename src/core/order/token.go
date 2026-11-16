@@ -32,6 +32,12 @@ var metadata = map[string]Metadata{
 		Icon:           "https://public.780.ir/dl/Operator/mokhaberat.svg",
 		FeeDescription: "تسویه آنی",
 	},
+	// bill: case entity.WATER: WaterIcon, AboutIconWater, FeeDescriptionWater (task 048).
+	provider.BillTypeWater: {
+		About:          "قبض آب",
+		Icon:           "https://public.780.ir/dl/Operator/AbvaFazelab.svg",
+		FeeDescription: "کارمزد",
+	},
 	// bill: case entity.TELMIDTERM: TelIcon, AboutIconTelMidterm, FeeDescriptionTel (task 044).
 	provider.BillTypeTelMidterm: {
 		About:          "قبض تلفن ثابت-میان دوره",
@@ -105,6 +111,30 @@ func TelData(o Order, phone string) map[string]string {
 	}
 	if o.ProviderFee > 0 {
 		data["providerFee"] = strconv.FormatUint(o.ProviderFee, 10)
+	}
+	return data
+}
+
+// WaterData is the data map of the order token of a water bill (task 048; bill: controller/water
+// NewOrderV2). feeAmount (the fee) and feeDescription are there only when the fee is above 0.
+func WaterData(o Order) map[string]string {
+	meta := MetadataOf(o.BillType)
+	data := map[string]string{
+		"payId":         o.PayID,
+		"type":          o.BillType,
+		"billId":        o.BillID,
+		"payAmount":     strconv.FormatUint(uint64(o.Price), 10),
+		"rawAmount":     strconv.FormatInt(o.BasePrice, 10),
+		"about":         meta.About,
+		"aboutIcon":     meta.Icon,
+		"invoicePayID":  o.PayID,
+		"invoiceBillID": o.BillID,
+		"receiptPayID":  o.PayID,
+		"receiptBillID": o.BillID,
+	}
+	if o.Fee > 0 {
+		data["feeAmount"] = strconv.FormatInt(o.Fee, 10)
+		data["feeDescription"] = meta.FeeDescription
 	}
 	return data
 }

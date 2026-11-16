@@ -127,7 +127,8 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	water, electricity, gas := newWater(flow, logger), newElectricity(flow, logger), newGas(flow, logger)
+	water := newWater(flow, orders, signer, uint32(serviceID), logger)
+	electricity, gas := newElectricity(flow, logger), newGas(flow, logger)
 	tel := newTel(flow, orders, signer, uint32(serviceID), logger)
 	phone := newPhone(flow, orders, signer, uint32(serviceID), logger)
 	// The request metrics come first in the chain, so a call that the auth check rejects is counted too.
@@ -645,13 +646,20 @@ var (
 	providerCallDurationLabels = []string{"provider", "action"}
 )
 
-// newWater builds the gRPC Water service: POST /v1/water/inquiry (task 021) on the inquiry flow. A
-// server fault writes one error log line (grpcserver.Water). A nil flow gives a service whose
-// Inquiry answers Unimplemented.
-func newWater(flow *inquiry.Service, logger Logger) *grpcserver.Water {
-	deps := grpcserver.WaterDeps{}
+// newWater builds the gRPC Water service: POST /v1/water/inquiry (task 021) on the inquiry flow and
+// POST /v2/water/order (task 048) on the order flow, with the token signed by signer. A server fault
+// writes one error log line (grpcserver.Water). A nil flow gives a service whose Inquiry answers
+// Unimplemented; a nil orders or signer gives a service whose NewOrderV2 answers Unimplemented.
+func newWater(flow *inquiry.Service, orders *order.Service, signer *crypto.Signer, serviceID uint32, logger Logger) *grpcserver.Water {
+	deps := grpcserver.WaterDeps{ServiceID: serviceID}
 	if flow != nil {
 		deps.Inquiry = flow
+	}
+	if orders != nil {
+		deps.Orders = orders
+	}
+	if signer != nil {
+		deps.Signer = signer
 	}
 	if logger != nil {
 		deps.Logger = logger
@@ -732,7 +740,7 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 	if reg := metrics.Registry(); reg != nil {
 		orders := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_order_create_total",
-			Help: "New orders (POST /v2/mobile/order, POST /v2/tel/order) by bill type (irancell, tel, telmidterm), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; already_paid: the bill ID and pay ID have a pending or successful order; error).",
+			Help: "New orders (POST /v2/mobile/order, POST /v2/tel/order, POST /v2/water/order) by bill type (irancell, tel, telmidterm, water), order provider (none when no provider was picked) and result (created: the orders row is saved; invalid: the total does not fit the price field; no_provider; zero_price; inquiry_failed: the inquiry for the price failed or has no inquiry of the bill type; already_paid: the bill ID and pay ID have a pending or successful order; error).",
 		}, []string{"bill_type", "provider", "result"})
 		fees := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_fee_resolve_total",
@@ -757,7 +765,10 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 	if err != nil {
 		return nil, err
 	}
-	orderTTL := map[string]time.Duration{provider.BillTypeTel: cfg.CachingPaidTel, provider.BillTypeTelMidterm: cfg.CachingPaidTel}
+	orderTTL := map[string]time.Duration{
+		provider.BillTypeTel: cfg.CachingPaidTel, provider.BillTypeTelMidterm: cfg.CachingPaidTel,
+		provider.BillTypeWater: cfg.CachingPaidWater, // task 048 (bill: caching.paidWater)
+	}
 	telWindow := cfg.ParsianSettlementInquiryTelephone
 	return order.NewService(order.Options{
 		Providers:     providers,
@@ -769,15 +780,19 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 		OnOrder:       onOrder,
 		OrderCacheTTL: func(billType string) time.Duration { return orderTTL[billType] }, // read-only map; no entry: no saved inquiry
 		AlreadyPaidWindows: map[string]map[string]time.Duration{
-			parsianproxy.Name: {provider.BillTypeTel: telWindow, provider.BillTypeTelMidterm: telWindow},
+			parsianproxy.Name: {
+				provider.BillTypeTel: telWindow, provider.BillTypeTelMidterm: telWindow,
+				provider.BillTypeWater: cfg.ParsianSettlementInquiryWater, // task 048 (bill: parsian.settlementInquiryWater)
+			},
 		},
 	})
 }
 
 // newPayments builds the payment step of the orders (order.Payments, task 044): the payment
 // service calls OrderComplete on the internal gRPC server. The order provider parsian pays the
-// bill types tel and telmidterm (parsianproxy.Pay); after a success the Karashop settlement runs in
-// the background (karashop.Settle) for the order providers parsian, eways and eways2, as bill. With
+// bill types tel, telmidterm and water (parsianproxy.Pay; water since task 048); after a success of
+// tel or telmidterm the Karashop settlement runs in the background (karashop.Settle) for the order
+// providers parsian, eways and eways2, as bill (water has no settlement). With
 // metrics on:
 //   - qabz_order_payment_total{bill_type,provider,status}: each OrderComplete call (success, failed,
 //     pending, processed, wrong_price, error; provider "none" when the order was not read);
@@ -791,7 +806,7 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 	if reg := metrics.Registry(); reg != nil {
 		payments := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_order_payment_total",
-			Help: "OrderComplete calls of the payment service by bill type, order provider (none when the order was not read) and result (success, failed, pending: the status of the payment; processed: the order is not initial; wrong_price; error: a failed read or write, or the provider does not pay the bill type).",
+			Help: "OrderComplete calls of the payment service by bill type, order provider (none when the order was not read) and result (success, failed, pending: the status of the payment; processed: the order is not initial, answered pending, or failed for a failed order; wrong_price; error: a failed read or write, or the provider does not pay the bill type).",
 		}, []string{"bill_type", "provider", "status"})
 		duration := promclient.NewHistogramVec(promclient.HistogramOpts{
 			Name:    "qabz_provider_pay_duration_ms",
@@ -825,7 +840,7 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 		Repository: postgres.NewOrderRepository(db),
 		Adapters:   adapters,
 		PayRoutes: map[string]map[string]bool{
-			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true},
+			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true},
 		},
 		SettleRoutes: settleRoutes(),
 		Logger:       payLog,

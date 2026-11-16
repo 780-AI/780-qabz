@@ -22,7 +22,7 @@
     },
     {
       "key": "water_payId",
-      "value": "",
+      "value": "2500012310",
       "type": "string",
       "description": "Water/Inquiry body payId (bill ignores it for water)"
     },
@@ -391,6 +391,62 @@
             }
           ],
           "response": []
+        },
+        {
+          "name": "Order V2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": \"{{water_billId}}\",\n  \"payId\": \"{{water_payId}}\",\n  \"paymentType\": \"direct\",\n  \"participateCode\": \"\",\n  \"price\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/v2/water/order",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "v2",
+                "water",
+                "order"
+              ]
+            },
+            "description": "haf80.api.bill.Water/NewOrderV2 (task 048: the water bill, paid through Parsian). Saves an order of a water bill and answers the signed order token. The request and the answer are those of bill (NewOrderBillPayRequest, NewOrderResponse), unchanged; price and paymentType are not read. The steps are those of bill: (1) the request needs billId or payId; else HTTP 400 (no log line). (2) the inquiry ID is participateCode when it is set, else billId. (3) the order provider of (water, order) is picked with ProvidersService: Parsian (dev seed row 45, enabled). (4) bill already paid: a pending or success order of the billId and payId of the request in providers.internal.parsian.settlement_inquiry_water (default 360h): HTTP 400 with bill's text. (5) the price: a numeric billId and payId give the raw inquiry (the amount of the pay ID, no provider call); else the regular inquiry of water (saved inquiries for caching.paid_water, default 72h). (6) no provider fee; the fee (fees table; no row: 9000). (7) one orders row with the status initial. (8) the token (RS256): payload serviceId, orderId, provider, price, userId and data (payId, type, billId, payAmount, rawAmount, about, aboutIcon, invoicePayID, invoiceBillID, receiptPayID, receiptBillID; feeAmount and feeDescription when the fee is above 0). Expected with the dev seed and the default variables (water_payId 2500012310: 25 000 000 rials): HTTP 200, price 25009000. A second order of a paid bill: HTTP 400. Needs a user (a token, or debug.auth.disable with debug.auth.mock_user_id): no user is HTTP 403. No enabled order provider: HTTP 503. The payment step (PaymentComplete/OrderComplete) is gRPC only, on the internal server server.internal_grpc.addr; it has no HTTP route. POST /v1/water/order stays HTTP 501. After a 200 answer, the test script saves orderId and price in order_token and order_price, for Payment (external) / Invoice."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('answer has serviceId, orderId and price', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.orderId).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.price).to.be.above(0);",
+                  "    pm.expect(body).to.have.property('serviceId');",
+                  "});",
+                  "// Saves the order token and the total of the answer for Payment (external) / Invoice.",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('order_token', body.orderId);",
+                  "    pm.collectionVariables.set('order_price', String(body.price));",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

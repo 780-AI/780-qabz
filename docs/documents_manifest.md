@@ -1,4 +1,4 @@
-<!-- VERSION: 2.46 -->
+<!-- VERSION: 2.47 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.7 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.45 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.46 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.46 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.50 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v2.47 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.51 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -36,27 +36,28 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v2.19 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v2.20 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.82 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.83 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
 | 30 | Project Specific Conventions | v0.26 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/Plans/pending_tasks/task_template.md` |
-| 34 | App module README | v0.39 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.24 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.40 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.25 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-15
-- **Change**: 2026-11-15 — Session wrap-up (task 047 commit, tasks 050 and 051, supertask 043 close): 4 lesson candidates and more evidence for 3 in the register; a housekeeping item (the tracing config is not in this_vs_bill.md); no code, no new files. Bumped #3 CHANGELOG v3.45, #5 manifest v2.46, #28 OPEN_TASKS v1.82.
-- **Previous change**: 2026-11-15 — Supertask 043 `tel_payment` done (operator decision, before the real end-to-end test, which stays open in OPEN_TASKS); the task file moved to `done_tasks/` (not manifest-tracked); no code. Bumped #3 CHANGELOG v3.44, #5 manifest v2.45, #28 OPEN_TASKS v1.81.
+- **Change**: 2026-11-15 — Task 048 `water_payment`: `POST /v2/water/order` (`Water.NewOrderV2`, new `src/entry/grpc/water_order.go`), ParsianProxy pays `water`, the `water` entry of the order flow, `caching.paid_water` (new) and `providers.internal.parsian.settlement_inquiry_water` (read, default 360h); a second `OrderComplete` for a `failed` order answers `failed` (every bill type); the spans `order.Service.Create` and `order.Payments.Complete`; new tests `src/core/order/water_test.go`, `src/entry/grpc/water_order_test.go`, `src/app/water_order_live_test.go`; `config.yml.example` and the Postman collection (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.46, #5 manifest v2.47, #6 folder_structure v0.51, #21 system.html v2.20, #28 OPEN_TASKS v1.83, #34 app README v0.40, #35 this_vs_bill v0.25.
+- **Previous change**: 2026-11-15 — Session wrap-up (task 047 commit, tasks 050 and 051, supertask 043 close): 4 lesson candidates and more evidence for 3 in the register; a housekeeping item (the tracing config is not in this_vs_bill.md); no code, no new files. Bumped #3 CHANGELOG v3.45, #5 manifest v2.46, #28 OPEN_TASKS v1.82.
+- **Earlier change**: 2026-11-15 — Supertask 043 `tel_payment` done (operator decision, before the real end-to-end test, which stays open in OPEN_TASKS); the task file moved to `done_tasks/` (not manifest-tracked); no code. Bumped #3 CHANGELOG v3.44, #5 manifest v2.45, #28 OPEN_TASKS v1.81.
 - **Earlier change**: 2026-11-15 — Task 051 tracing switch and `enabled` keys: `logs.tracing.enabled` and `logs.tracing.otlp_endpoint` (was `logs.otlp_endpoint`), `debug.mocks.<provider>.enabled` (was `.enable`), the renamed-key check, the § 8 rule and its test; `config.yml.example`, `docker-compose.yml` (no VERSION header, no rows); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.43, #5 manifest v2.44, #21 system.html v2.19, #28 OPEN_TASKS v1.80, #30 conventions v0.26, #34 app README v0.39.
 - **Earlier change**: 2026-11-15 — New task 051 `tracing_switch_and_enabled_keys` started with the approved design (D1 (a), D2 (a), D3 (a), D4 (a)); `task_counter.json` is 052; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.42, #5 manifest v2.43.
 - **Earlier change**: 2026-11-15 — New pending task 050 `irancell_status_worker` (the Irancell status worker on the shared status worker of task 045, with the defects of bill's worker fixed, every error logged and a metric of the statuses fixed in each run); `task_counter.json` is 051; no code; task files are not manifest-tracked. Bumped #3 CHANGELOG v3.41, #5 manifest v2.42.

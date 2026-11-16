@@ -137,7 +137,7 @@ func TestNewInquiryFlowRules(t *testing.T) {
 		flow, err := newInquiryFlow(cfg, db, sel, reg, off, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, flow)
-		assert.NotNil(t, newWater(flow, nil))
+		assert.NotNil(t, newWater(flow, nil, nil, 0, nil))
 		assert.NotNil(t, newElectricity(flow, nil))
 	}
 	// A flow that cannot be built: the selector is required.
@@ -146,7 +146,7 @@ func TestNewInquiryFlowRules(t *testing.T) {
 
 	// No flow: the services exist and their Inquiry is not available (no typed nil in the interface).
 	ctx := auth.WithClaims(context.Background(), auth.Claims{UserID: "6f1c1e0a-3b7e-4c2b-9a51-2f0f6d1d8c11"})
-	_, err = newWater(nil, nil).Inquiry(ctx, &pb.InquiryBillPayRequest{BillId: "1234567890125"})
+	_, err = newWater(nil, nil, nil, 0, nil).Inquiry(ctx, &pb.InquiryBillPayRequest{BillId: "1234567890125"})
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 	_, err = newElectricity(nil, nil).Inquiry(ctx, &pb.InquiryBillPayRequest{BillId: "1234567890125"})
 	assert.Equal(t, codes.Unimplemented, status.Code(err))

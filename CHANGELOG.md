@@ -1,7 +1,8 @@
-<!-- VERSION: 3.45 -->
+<!-- VERSION: 3.46 -->
 <!-- Last Updated: 2026-11-15 -->
 <!--
 CHANGE LOG
+v3.46 — 2026-11-15 — Added 048-water-payment entry.
 v3.45 — 2026-11-15 — Added session-wrap-up (tasks 047, 050, 051, 043 session) entry.
 v3.44 — 2026-11-15 — Added 043-supertask-done entry.
 v3.43 — 2026-11-15 — Added 051-tracing-switch-and-enabled-keys entry.
@@ -161,6 +162,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-15] — Task 048: the water bill payment through Parsian; a failed order answers `failed`
+- **Type:** Major (a new endpoint, a behavior change of `OrderComplete`, config keys, a Critical File).
+- **Files:** `src/entry/grpc/water_order.go` (new: `Water.NewOrderV2` = `POST /v2/water/order`, bill's request check `billId` or `payId`, the inquiry ID is the participate code or the bill ID) and its test; `src/entry/grpc/water.go` (`WaterDeps` gets `Orders`, `Signer`, `ServiceID`); `src/entry/grpc/payment.go` (comment); `src/core/order/order.go` (the `billTypes` entry `water`: the raw inquiry first, else the regular inquiry), `token.go` (the water texts, `WaterData`), `complete.go` (a newest row `failed` answers `failed`: the message of the row for a failed payment, the error of the first call (the general text) for a step that failed before the payment; no row, no provider call; `this_vs_bill.md` item 46; the span `order.Payments.Complete`), the span `order.Service.Create` in `order.go` (conventions § 17) and the tests (`water_test.go` new; four old tests used `water` as an unknown bill type and now use `gas`); `src/provider/provider.go` (`InquiryTypeRegular`); `src/provider/parsianproxy/parsianproxy.go` (`Pay` pays `water`) and `pay_test.go`; `src/config/config.go` (new key `caching.paid_water`, default `72h`; `providers.internal.parsian.settlement_inquiry_water` is read, default `360h`, was `0s`; negative values rejected) and its test; `src/app/defaults.go` (the water order wiring, the order TTL, the "already paid" window, the `PayRoutes` entry, metric help texts), `src/app/water_test.go`, `src/app/water_live_test.go`, `src/app/water_order_live_test.go` (new: the order and payment rows, the failed second call, the status worker on water orders with a Kafka mock cluster); `src/app/README.md` (v0.40); `config.yml.example` (the two keys; no VERSION header, no row); `qabz.postman_collection.json` (new item Water / Order V2; the variable `water_payId` has the default `2500012310`; no VERSION header, no row); `docs/initial-discovery/system.html` (v2.20); `docs/this_vs_bill.md` (v0.25: item 38 covers `POST /v2/water/order`; new item 46); `docs/folder_structure.md` (v0.51); `docs/Plans/done_tasks/048_water_payment.md` (moved from `in-progress_tasks/`, v0.3: the verification record; not manifest-tracked); `docs/Plans/OPEN_TASKS.md` (v1.83); `docs/documents_manifest.md`.
+- **Impact:** **Yes, behavior changes.** (1) New endpoint `POST /v2/water/order`: an `orders` row `initial` and the signed token (the order provider Parsian, seed row 45); `OrderComplete` pays a water order through Parsian; after a success no settlement runs (bill has none for water); the status worker finalizes water orders with no code change. (2) **Every bill type:** a second `OrderComplete` for an order whose newest row is `failed` now answers `failed`, the answer of the first call (gRPC `Unknown` with the message of the provider, or the general text when a step before the payment failed); before, it answered `pending` with `order has been processed before` (operator rule of task 048, decision D11 (a)). (4) With tracing on, every order and every `OrderComplete` has a core span (`order.Service.Create`, `order.Payments.Complete`) between the server span and the Postgres and provider spans. (3) `providers.internal.parsian.settlement_inquiry_water` now has the default `360h` and is read (the "bill already paid" window of a water order). The local `config.yml` (git-ignored) got `caching.paid_water`.
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 048 water payment through Parsian" (Go tests; feature ON with the Parsian mock and the status worker; the operator QA on stage after the deploy) and "Task 048 D12" (the operator confirms that the payment service reads a gRPC error as `failed`). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-15] — Session wrap-up (task 047 commit, tasks 050 and 051, supertask 043 close)
 - **Type:** Minor (governance: the register; no code).

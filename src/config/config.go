@@ -247,19 +247,22 @@ type Config struct {
 	// every final status, as bill), and the three sync_operations durations give the lock TTL
 	// (bill's formula). LockTime is only logged and IsLockable is not read (bill: lockTime is only
 	// logged; Qabz always takes the lock). ParsianName is not read. Not hot-reloadable.
-	ParsianGetStatusEnabled             bool          `path:"providers.internal.parsian.get_status.enabled"`
-	ParsianName                         string        `path:"providers.internal.parsian.name"`
-	ParsianGetStatusName                string        `path:"providers.internal.parsian.get_status.name"`
-	ParsianGetStatusChunk               int           `path:"providers.internal.parsian.get_status.chunk"`
-	ParsianGetStatusStart               time.Duration `path:"providers.internal.parsian.get_status.start"`
-	ParsianGetStatusEnd                 time.Duration `path:"providers.internal.parsian.get_status.end"`
-	ParsianGetStatusCronTime            time.Duration `path:"providers.internal.parsian.get_status.cron_time"`
-	ParsianGetStatusLockTime            time.Duration `path:"providers.internal.parsian.get_status.lock_time"`
-	ParsianGetStatusIsLockable          bool          `path:"providers.internal.parsian.get_status.is_lockable"`
-	ParsianGetStatusReverseDeadline     time.Duration `path:"providers.internal.parsian.get_status.reverse_deadline"`
-	ParsianGetStatusSyncAPICall         time.Duration `path:"providers.internal.parsian.get_status.sync_operations.api_call_get_status"`
-	ParsianGetStatusSyncGetOrder        time.Duration `path:"providers.internal.parsian.get_status.sync_operations.get_order_query"`
-	ParsianGetStatusSyncInsertOrder     time.Duration `path:"providers.internal.parsian.get_status.sync_operations.insert_order_query"`
+	ParsianGetStatusEnabled         bool          `path:"providers.internal.parsian.get_status.enabled"`
+	ParsianName                     string        `path:"providers.internal.parsian.name"`
+	ParsianGetStatusName            string        `path:"providers.internal.parsian.get_status.name"`
+	ParsianGetStatusChunk           int           `path:"providers.internal.parsian.get_status.chunk"`
+	ParsianGetStatusStart           time.Duration `path:"providers.internal.parsian.get_status.start"`
+	ParsianGetStatusEnd             time.Duration `path:"providers.internal.parsian.get_status.end"`
+	ParsianGetStatusCronTime        time.Duration `path:"providers.internal.parsian.get_status.cron_time"`
+	ParsianGetStatusLockTime        time.Duration `path:"providers.internal.parsian.get_status.lock_time"`
+	ParsianGetStatusIsLockable      bool          `path:"providers.internal.parsian.get_status.is_lockable"`
+	ParsianGetStatusReverseDeadline time.Duration `path:"providers.internal.parsian.get_status.reverse_deadline"`
+	ParsianGetStatusSyncAPICall     time.Duration `path:"providers.internal.parsian.get_status.sync_operations.api_call_get_status"`
+	ParsianGetStatusSyncGetOrder    time.Duration `path:"providers.internal.parsian.get_status.sync_operations.get_order_query"`
+	ParsianGetStatusSyncInsertOrder time.Duration `path:"providers.internal.parsian.get_status.sync_operations.insert_order_query"`
+	// ParsianSettlementInquiryWater is read since task 048: the "bill already paid" check of a water
+	// order paid through Parsian (bill: shouldSkipNewOrder, parsian.settlementInquiryWater). Default
+	// 360h (bill's example). 0: no window; a negative value is rejected.
 	ParsianSettlementInquiryWater       time.Duration `path:"providers.internal.parsian.settlement_inquiry_water"`
 	ParsianSettlementInquiryElectricity time.Duration `path:"providers.internal.parsian.settlement_inquiry_electricity"`
 	ParsianSettlementInquiryGas         time.Duration `path:"providers.internal.parsian.settlement_inquiry_gas"`
@@ -333,6 +336,10 @@ type Config struct {
 	// bill types tel and telmidterm, task 044) with no provider call (bill: caching.paidTel, 72h). 0:
 	// every order asks the provider; a negative value is rejected. Read at start.
 	CachingPaidTel time.Duration `path:"caching.paid_tel"`
+	// CachingPaidWater is how long a saved water inquiry gives the price of a water order (task 048)
+	// with no provider call (bill: caching.paidWater, 72h). It applies only when the raw inquiry of the
+	// order fails. 0: every such order asks the provider; a negative value is rejected. Read at start.
+	CachingPaidWater time.Duration `path:"caching.paid_water"`
 
 	// DebugMockQabzinoEnabled makes the Qabzino adapter answer with a fixed answer, with no call to
 	// the backend (task 021). Development only: a mode other than dev removes the debug section, so
@@ -460,7 +467,9 @@ func defaults() Config {
 		CachingMobile:                     5 * time.Hour,
 		CachingTel:                        time.Hour,
 		CachingPaidTel:                    72 * time.Hour,
+		CachingPaidWater:                  72 * time.Hour,
 		ParsianSettlementInquiryTelephone: 360 * time.Hour,
+		ParsianSettlementInquiryWater:     360 * time.Hour,
 		ParsianGetStatusName:              "parsian-getstatus",
 		ParsianGetStatusChunk:             100,
 		ParsianGetStatusStart:             30 * time.Minute,
@@ -647,6 +656,12 @@ func (c Config) validate() error {
 	}
 	if c.ParsianSettlementInquiryTelephone < 0 {
 		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_telephone must not be negative (0: no window)"))
+	}
+	if c.CachingPaidWater < 0 {
+		errs = append(errs, errors.New("caching.paid_water must not be negative (0: every order asks the provider)"))
+	}
+	if c.ParsianSettlementInquiryWater < 0 {
+		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_water must not be negative (0: no window)"))
 	}
 	if !ValidMockPayReturnType(c.DebugMockParsianPayReturnType) {
 		errs = append(errs, fmt.Errorf("debug.mocks.parsian.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))

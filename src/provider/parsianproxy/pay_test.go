@@ -46,6 +46,27 @@ func TestPayRequest(t *testing.T) {
 	}
 }
 
+// TestPayWater (task 048): a water bill has the fields of bill's ParsianWater: the same as
+// ParsianTelephone, with the inquiry type regular and the bill ID as the inquiry ID.
+func TestPayWater(t *testing.T) {
+	f := &fakeClient{payResp: &pb.PayResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceId: 77}}
+	req := provider.PaymentRequest{
+		BillType: provider.BillTypeWater, InquiryType: provider.InquiryTypeRegular, OrderID: "o-2", UserID: "u-2",
+		InquiryID: "1234567890125", BillID: "1234567890125", PayID: "2500012340", Amount: 25000000, RRN: "445566",
+	}
+	resp, err := newAdapter(t, f).Pay(context.Background(), req)
+	if !assert.NoError(t, err) || !assert.NotNil(t, resp) {
+		return
+	}
+	assert.Equal(t, &provider.PaymentResponse{Code: 200, Status: "success", Message: "ok", ProviderTraceID: "77"}, resp)
+	if assert.Len(t, f.pays, 1) {
+		assert.Equal(t, &pb.PayRequest{
+			UserId: "u-2", OrderId: "o-2", ProviderOrderId: 445566, InquiryId: "1234567890125", BillType: "water",
+			InquiryType: "regular", BillId: "1234567890125", PayId: "2500012340", Amount: 25000000, PaymentRrn: "445566",
+		}, f.pays[0])
+	}
+}
+
 // TestPayRRN: an RRN that is not an integer is failed (400) with the error text and no call, as bill.
 func TestPayRRN(t *testing.T) {
 	for _, rrn := range []string{"", "abc", "12.5", "99999999999999999999"} {
@@ -93,7 +114,7 @@ func TestPayDown(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 
 	f = &fakeClient{payResp: &pb.PayResponse{Status: "success"}}
-	for _, bt := range []string{provider.BillTypeMobile, provider.BillTypeWater, ""} {
+	for _, bt := range []string{provider.BillTypeMobile, provider.BillTypeGas, ""} {
 		req := payRequest()
 		req.BillType = bt
 		_, err := newAdapter(t, f).Pay(context.Background(), req)
@@ -101,6 +122,7 @@ func TestPayDown(t *testing.T) {
 	}
 	assert.Empty(t, f.pays)
 	assert.True(t, SupportsPay(provider.BillTypeTel))
+	assert.True(t, SupportsPay(provider.BillTypeWater), "task 048")
 	var nilAdapter *Adapter
 	_, err = nilAdapter.Pay(context.Background(), payRequest())
 	assert.Error(t, err)

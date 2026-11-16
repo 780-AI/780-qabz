@@ -37,27 +37,36 @@ type Inquirer interface {
 // WaterInquirer is the Inquirer of the Water service.
 type WaterInquirer = Inquirer
 
-// WaterDeps are the dependencies of Water. A zero value is valid: Inquiry then answers
-// codes.Unimplemented.
+// WaterDeps are the dependencies of Water. A zero value is valid: Inquiry and NewOrderV2 then
+// answer codes.Unimplemented.
 type WaterDeps struct {
 	// Inquiry runs the flow. Nil: Inquiry is not available.
 	Inquiry WaterInquirer
 	// Logger gets one error line for each server fault. Nil: no log line.
 	Logger ErrorLogger
+	// Orders saves an order (order.Service; task 048). Nil: NewOrderV2 is not available.
+	Orders OrderCreator
+	// Signer signs the order token (crypto.Signer). Nil: NewOrderV2 is not available.
+	Signer TokenSigner
+	// ServiceID is serviceId of the order answer and of the token (config service.id).
+	ServiceID uint32
 }
 
-// Water implements the gRPC service haf80.api.bill.Water. Methods that are not written yet return
-// codes.Unimplemented through the embedded type.
+// Water implements the gRPC service haf80.api.bill.Water. Methods that are not written yet
+// (NewOrder, CompleteOrder) return codes.Unimplemented through the embedded type.
 type Water struct {
 	pb.UnimplementedWaterServer // embedded by value, as protoc-gen-go-grpc requires
 
-	inquiry WaterInquirer
-	logger  ErrorLogger
+	inquiry   WaterInquirer
+	logger    ErrorLogger
+	orders    OrderCreator
+	signer    TokenSigner
+	serviceID uint32
 }
 
 // NewWater returns the Water implementation.
 func NewWater(deps WaterDeps) *Water {
-	return &Water{inquiry: deps.Inquiry, logger: deps.Logger}
+	return &Water{inquiry: deps.Inquiry, logger: deps.Logger, orders: deps.Orders, signer: deps.Signer, serviceID: deps.ServiceID}
 }
 
 // RegisterWater returns a Register that adds svc to a gRPC server. For a nil svc it returns nil, so
