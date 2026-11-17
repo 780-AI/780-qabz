@@ -271,11 +271,12 @@ type Options struct {
 	// OnProviderCall is called once per provider call with the provider name, the action, one of
 	// the Call values and the duration of the call. Nil: no call.
 	OnProviderCall func(providerName, action, result string, d time.Duration)
-	// OnProviderDown is called after each provider-down result (ResultProviderDown) of a call that is
-	// not a trial, with the row of the call (task 059: the App demotes the row with the dev-only key
-	// debug.provider_switcher.demote_on_down; task 060 counts it in the circuit breaker). It runs on
-	// the request path after the call. Nil: no call.
-	OnProviderDown func(p provider.Provider)
+	// OnProviderResult is called after each provider call that is not a trial and that the provider
+	// answered or that was down, with the row of the call and down true for ResultProviderDown, false
+	// for ResultProviderOK and ResultProviderRefused (task 060: the circuit breaker counts it). A
+	// canceled call, an error and a saved answer do not call it; the trial result goes to the Provider
+	// Switcher. It runs on the request path after the call and must not wait. Nil: no call.
+	OnProviderResult func(p provider.Provider, down bool)
 	// NoStore turns off every use of the Repository (task 031, debug.cache_inquiries: false):
 	// no read of saved inquiries (CacheTTL does not apply), no request row, no saved answer. Every
 	// call goes to the provider. False (the zero value): the flow as before. The Repository is
@@ -285,15 +286,15 @@ type Options struct {
 
 // Service is the inquiry flow. It is safe for concurrent use.
 type Service struct {
-	repo           Repository
-	providers      Selector
-	adapters       Adapters
-	cacheTTL       func(billType string) time.Duration
-	log            Logger
-	onInquiry      func(billType, providerName, result string)
-	onProviderCall func(providerName, action, result string, d time.Duration)
-	onProviderDown func(p provider.Provider)
-	noStore        bool
+	repo             Repository
+	providers        Selector
+	adapters         Adapters
+	cacheTTL         func(billType string) time.Duration
+	log              Logger
+	onInquiry        func(billType, providerName, result string)
+	onProviderCall   func(providerName, action, result string, d time.Duration)
+	onProviderResult func(p provider.Provider, down bool)
+	noStore          bool
 
 	// newID and newTID are replaced by tests.
 	newID  func() string
@@ -312,7 +313,7 @@ func NewService(o Options) (*Service, error) {
 	}
 	return &Service{
 		repo: o.Repository, providers: o.Providers, adapters: o.Adapters, cacheTTL: o.CacheTTL,
-		log: o.Logger, onInquiry: o.OnInquiry, onProviderCall: o.OnProviderCall, onProviderDown: o.OnProviderDown, noStore: o.NoStore,
+		log: o.Logger, onInquiry: o.OnInquiry, onProviderCall: o.OnProviderCall, onProviderResult: o.OnProviderResult, noStore: o.NoStore,
 		newID: uuid.NewString, newTID: generateTID,
 	}, nil
 }
@@ -404,8 +405,11 @@ func (s *Service) inquire(ctx context.Context, req Request, bt billType) (Result
 	switch {
 	case trial.Active():
 		trial.Done(trialResult(result))
-	case result == ResultProviderDown && s.onProviderDown != nil:
-		s.onProviderDown(pro)
+	case s.onProviderResult == nil:
+	case result == ResultProviderDown:
+		s.onProviderResult(pro, true)
+	case result == ResultProviderOK, result == ResultProviderRefused:
+		s.onProviderResult(pro, false)
 	}
 	return res, pro.Name, result, err
 }

@@ -115,33 +115,33 @@ func TestNewInquiryFlowRules(t *testing.T) {
 	sel := &provider.ProvidersService{}
 
 	on := prometheus.New("127.0.0.1:0", true)
-	flow, err := newInquiryFlow(cfg, db, sel, reg, on, nil)
+	flow, err := newInquiryFlow(cfg, db, sel, reg, on, nil, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, flow)
 	for _, name := range []string{"qabz_inquiries_total", "qabz_provider_calls_total", "qabz_provider_call_duration_ms"} {
 		assert.True(t, registered(t, on.Registry(), name), name)
 	}
-	_, err = newInquiryFlow(cfg, db, sel, reg, on, nil)
+	_, err = newInquiryFlow(cfg, db, sel, reg, on, nil, nil)
 	assert.ErrorContains(t, err, "inquiry: register metric")
 
 	taken := prometheus.New("127.0.0.1:0", true)
 	if assert.NotNil(t, taken.Registry()) {
 		assert.NoError(t, taken.Registry().Register(promclient.NewCounter(promclient.CounterOpts{Name: "qabz_provider_calls_total", Help: "taken"})))
-		flow, err = newInquiryFlow(cfg, db, sel, reg, taken, nil)
+		flow, err = newInquiryFlow(cfg, db, sel, reg, taken, nil, nil)
 		assert.ErrorContains(t, err, "inquiry: register metric")
 		assert.Nil(t, flow)
 	}
 
 	off := prometheus.New("127.0.0.1:0", false)
 	for range 2 {
-		flow, err := newInquiryFlow(cfg, db, sel, reg, off, nil)
+		flow, err := newInquiryFlow(cfg, db, sel, reg, off, nil, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, flow)
 		assert.NotNil(t, newWater(flow, nil, nil, 0, nil))
 		assert.NotNil(t, newElectricity(flow, nil, nil, 0, nil))
 	}
 	// A flow that cannot be built: the selector is required.
-	_, err = newInquiryFlow(cfg, db, nil, reg, off, nil)
+	_, err = newInquiryFlow(cfg, db, nil, reg, off, nil, nil)
 	assert.Error(t, err)
 
 	// No flow: the services exist and their Inquiry is not available (no typed nil in the interface).

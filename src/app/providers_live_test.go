@@ -141,7 +141,7 @@ func TestLiveProvidersLoadIntervalHotReload(t *testing.T) {
 		return
 	}
 	repo := &timedRepo{inner: postgres.NewProviderRepository(db)}
-	providers, err := newProviders(holder, repo, prometheus.New("127.0.0.1:0", false), log, nil)
+	providers, err := newProviders(holder, repo, prometheus.New("127.0.0.1:0", false), log, nil, nil)
 	if !assert.NoError(t, err) || !assert.NotNil(t, providers) {
 		return
 	}

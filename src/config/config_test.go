@@ -311,7 +311,28 @@ func TestProvidersLoadInterval(t *testing.T) {
 
 	fields, err := hotFields[Config]()
 	assert.NoError(t, err)
-	assert.Equal(t, []hotField{{index: fieldIndex(t, "ProvidersLoadInterval"), key: "providers_load_interval", typ: "duration"}}, fields)
+	want := []hotField{{index: fieldIndex(t, "ProvidersLoadInterval"), key: "providers_load_interval", typ: "duration"}}
+	// Task 060: the circuit breaker keys, the general block and the override of each provider.
+	for _, f := range []struct{ name, key, typ string }{
+		{"CircuitBreakerEnabled", "circuit_breaker_enabled", "bool"},
+		{"CircuitBreakerFailureRatio", "circuit_breaker_failure_ratio", "int"},
+		{"CircuitBreakerWindow", "circuit_breaker_window", "duration"},
+		{"CircuitBreakerMinCalls", "circuit_breaker_min_calls", "int"},
+		{"CircuitBreakerOpenTime", "circuit_breaker_open_time", "duration"},
+	} {
+		want = append(want, hotField{index: fieldIndex(t, f.name), key: f.key, typ: f.typ})
+	}
+	for _, p := range []struct{ field, key string }{
+		{"Irancell", "irancell"}, {"JiringSwitch", "jiring_switch"}, {"Parsian", "parsian"},
+		{"Karashop", "karashop"}, {"Qabzino", "qabzino"}, {"Tavanir", "tavanir"},
+	} {
+		want = append(want,
+			hotField{index: fieldIndex(t, p.field+"CircuitBreakerFailureRatio"), key: p.key + "_circuit_breaker_failure_ratio", typ: "int"},
+			hotField{index: fieldIndex(t, p.field+"CircuitBreakerWindow"), key: p.key + "_circuit_breaker_window", typ: "duration"},
+			hotField{index: fieldIndex(t, p.field+"CircuitBreakerMinCalls"), key: p.key + "_circuit_breaker_min_calls", typ: "int"},
+			hotField{index: fieldIndex(t, p.field+"CircuitBreakerOpenTime"), key: p.key + "_circuit_breaker_open_time", typ: "duration"})
+	}
+	assert.Equal(t, want, fields)
 }
 
 // fieldIndex returns the index of the Config field name. It stops the test if there is none.
@@ -550,9 +571,13 @@ func TestParseTavanirProviderKeys(t *testing.T) {
 		assert.NotContains(t, fmt.Sprintf("%v %+v %#v", c.TavanirPassword, c.TavanirPassword, c.TavanirPassword), "secret-pw")
 	}
 
-	// Task 040: the old circuit_breaker block (no field reads it) is still a valid config.
-	_, err = Parse([]byte(base + "providers: {external: {tavanir: {circuit_breaker: {name: \"tavanir\", max_requests: 100000, interval: \"1s\", timeout: \"10s\", failure_ratio: 101}}}}\n"))
-	assert.NoError(t, err, "an old circuit_breaker block is ignored")
+	// Task 040: the old circuit_breaker block of the tavanir service is still a valid config. Task
+	// 060: its failure_ratio is now the override of Tavanir; the other old keys are not read.
+	c, err = Parse([]byte(base + "providers: {external: {tavanir: {circuit_breaker: {name: \"tavanir\", max_requests: 100000, interval: \"1s\", timeout: \"10s\", failure_ratio: 99}}}}\n"))
+	if assert.NoError(t, err, "an old circuit_breaker block") {
+		assert.Equal(t, 99, c.TavanirCircuitBreakerFailureRatio)
+		assert.Zero(t, c.TavanirCircuitBreakerWindow)
+	}
 }
 
 // TestParseIrancellProviderKeys (task 035; task 050 D2): the bill keys name, grpc_address and
@@ -811,32 +836,87 @@ func TestParseCacheInquiries(t *testing.T) {
 	assert.Error(t, err, "not a bool")
 }
 
-// TestParseDemoteOnDown (task 059): debug.provider_switcher.demote_on_down is 0 by default, takes a
-// duration in dev, is ignored (0) in a mode other than dev (task 020c), and a negative value or a
-// value that is not a duration is an error.
-func TestParseDemoteOnDown(t *testing.T) {
-	const base = "database: {postgres: {password: pw}}\n"
-	const on = "debug: {provider_switcher: {demote_on_down: 30s}}\n"
-	for _, mode := range []string{ModeDev, ModeStage, ModeProd} {
-		c, err := Parse([]byte("mode: " + mode + "\n" + base))
-		if assert.NoError(t, err, mode) {
-			assert.Zero(t, c.DebugProviderSwitcherDemoteOnDown, "default, %s", mode)
-		}
+// TestParseCircuitBreaker (task 060): the defaults of the general block (off, 30 %, 2m, 20, 1m)
+// and of the overrides (0); the keys of every provider; the start checks of each key; an old
+// debug.provider_switcher.demote_on_down is still valid (not read).
+func TestParseCircuitBreaker(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base))
+	if !assert.NoError(t, err) {
+		return
 	}
-	c, err := Parse([]byte("mode: dev\n" + base + on))
-	if assert.NoError(t, err) {
-		assert.Equal(t, 30*time.Second, c.DebugProviderSwitcherDemoteOnDown)
+	assert.False(t, c.CircuitBreakerEnabled)
+	assert.Equal(t, CircuitBreaker{FailureRatio: 30, Window: 2 * time.Minute, MinCalls: 20, OpenTime: time.Minute}, c.CircuitBreakerGeneral())
+	assert.True(t, c.CircuitBreakerGeneral().GeneralValid())
+	for k, o := range c.CircuitBreakerOverrides() {
+		assert.Equal(t, CircuitBreaker{}, o, k)
+		assert.True(t, o.OverrideValid(), k)
 	}
-	for _, mode := range []string{ModeStage, ModeProd} {
-		c, err := Parse([]byte("mode: " + mode + "\n" + base + on))
-		if assert.NoError(t, err, mode) {
-			assert.Zero(t, c.DebugProviderSwitcherDemoteOnDown, "ignored outside dev, %s", mode)
-		}
+	assert.Len(t, c.CircuitBreakerOverrides(), 6)
+
+	c, err = Parse([]byte(base + `providers:
+  general: {circuit_breaker: {enabled: true, failure_ratio: 50, window: 5m, min_calls: 3, open_time: 30s}}
+  internal:
+    irancell: {circuit_breaker: {failure_ratio: 1, window: 1s, min_calls: 1, open_time: 2s}}
+    jiring_switch: {circuit_breaker: {failure_ratio: 2, window: 2s, min_calls: 2, open_time: 3s}}
+    parsian: {circuit_breaker: {failure_ratio: 3, window: 3s, min_calls: 3, open_time: 4s}}
+  external:
+    karashop: {circuit_breaker: {failure_ratio: 4, window: 4s, min_calls: 4, open_time: 5s}}
+    qabzino: {circuit_breaker: {failure_ratio: 5, window: 5s, min_calls: 5, open_time: 6s}}
+    tavanir: {circuit_breaker: {window: 6m}}
+debug: {provider_switcher: {demote_on_down: 30s}}
+`))
+	if !assert.NoError(t, err) {
+		return
 	}
-	_, err = Parse([]byte("mode: dev\n" + base + "debug: {provider_switcher: {demote_on_down: -1s}}\n"))
-	assert.ErrorContains(t, err, "debug.provider_switcher.demote_on_down must not be negative")
-	_, err = Parse([]byte("mode: dev\n" + base + "debug: {provider_switcher: {demote_on_down: soon}}\n"))
-	assert.ErrorContains(t, err, "debug.provider_switcher.demote_on_down")
+	assert.True(t, c.CircuitBreakerEnabled)
+	assert.Equal(t, CircuitBreaker{50, 5 * time.Minute, 3, 30 * time.Second}, c.CircuitBreakerGeneral())
+	assert.Equal(t, map[string]CircuitBreaker{
+		"internal.irancell":      {1, time.Second, 1, 2 * time.Second},
+		"internal.jiring_switch": {2, 2 * time.Second, 2, 3 * time.Second},
+		"internal.parsian":       {3, 3 * time.Second, 3, 4 * time.Second},
+		"external.karashop":      {4, 4 * time.Second, 4, 5 * time.Second},
+		"external.qabzino":       {5, 5 * time.Second, 5, 6 * time.Second},
+		"external.tavanir":       {0, 6 * time.Minute, 0, 0},
+	}, c.CircuitBreakerOverrides())
+
+	for _, tc := range []struct{ yml, want string }{
+		{"general: {circuit_breaker: {failure_ratio: 0}}", "providers.general.circuit_breaker.failure_ratio must be 1 to 100"},
+		{"general: {circuit_breaker: {failure_ratio: 101}}", "providers.general.circuit_breaker.failure_ratio must be 1 to 100"},
+		{"general: {circuit_breaker: {window: 0s}}", "providers.general.circuit_breaker.window must be a positive duration"},
+		{"general: {circuit_breaker: {min_calls: 0}}", "providers.general.circuit_breaker.min_calls must be 1 or more"},
+		{"general: {circuit_breaker: {open_time: -1s}}", "providers.general.circuit_breaker.open_time must be a positive duration"},
+		{"external: {qabzino: {circuit_breaker: {failure_ratio: 101}}}", "providers.external.qabzino.circuit_breaker.failure_ratio must be 0 (the general value) to 100"},
+		{"external: {tavanir: {circuit_breaker: {failure_ratio: -1}}}", "providers.external.tavanir.circuit_breaker.failure_ratio must be 0"},
+		{"internal: {parsian: {circuit_breaker: {window: -1s}}}", "providers.internal.parsian.circuit_breaker.window must not be negative"},
+		{"internal: {jiring_switch: {circuit_breaker: {min_calls: -1}}}", "providers.internal.jiring_switch.circuit_breaker.min_calls must not be negative"},
+		{"external: {karashop: {circuit_breaker: {open_time: -1s}}}", "providers.external.karashop.circuit_breaker.open_time must not be negative"},
+		{"internal: {irancell: {circuit_breaker: {window: soon}}}", "providers.internal.irancell.circuit_breaker.window"},
+	} {
+		_, err := Parse([]byte(base + "providers: {" + tc.yml + "}\n"))
+		assert.ErrorContains(t, err, tc.want, tc.yml)
+	}
+}
+
+// TestCircuitBreakerValid (task 060): the range of a general block and of an override.
+func TestCircuitBreakerValid(t *testing.T) {
+	good := CircuitBreaker{FailureRatio: 30, Window: time.Minute, MinCalls: 1, OpenTime: time.Second}
+	assert.True(t, good.GeneralValid())
+	assert.True(t, good.OverrideValid())
+	assert.True(t, CircuitBreaker{FailureRatio: 100, Window: 1, MinCalls: 1, OpenTime: 1}.GeneralValid())
+	for name, b := range map[string]CircuitBreaker{
+		"ratio 0": {0, time.Minute, 1, time.Second}, "ratio 101": {101, time.Minute, 1, time.Second},
+		"window 0": {30, 0, 1, time.Second}, "min_calls 0": {30, time.Minute, 0, time.Second}, "open_time 0": {30, time.Minute, 1, 0},
+	} {
+		assert.False(t, b.GeneralValid(), name)
+	}
+	assert.True(t, CircuitBreaker{}.OverrideValid(), "0: the general value")
+	for name, b := range map[string]CircuitBreaker{
+		"ratio -1": {FailureRatio: -1}, "ratio 101": {FailureRatio: 101}, "window -1": {Window: -1},
+		"min_calls -1": {MinCalls: -1}, "open_time -1": {OpenTime: -1},
+	} {
+		assert.False(t, b.OverrideValid(), name)
+	}
 }
 
 // TestParsePaymentServerKeys (task 041): the payment_server keys (address, private_key_path,

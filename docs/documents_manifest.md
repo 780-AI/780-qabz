@@ -1,4 +1,4 @@
-<!-- VERSION: 2.65 -->
+<!-- VERSION: 2.66 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.8 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.64 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.65 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.65 | Governance | `docs/documents_manifest.md` |
-| 6 | Folder Structure | v0.61 | Governance | `docs/folder_structure.md` |
+| 5 | Document & Code Manifest | v2.66 | Governance | `docs/documents_manifest.md` |
+| 6 | Folder Structure | v0.62 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
 | 9 | Standards Log | v1.2 | Governance | `docs/STANDARDS_LOG.md` |
@@ -36,27 +36,28 @@
 | 18 | Doc Coverage Check | v0.1 | Scripts | `scripts/check_doc_coverage.py` |
 | 19 | Test Coverage Drift Check | v0.1 | Scripts | `scripts/check_test_coverage_drift.py` |
 | 20 | Project Data Locality Tool | v0.3 | Scripts | `scripts/claude_project_data.sh` |
-| 21 | System Architecture (Critical) | v2.30 | Design | `docs/initial-discovery/system.html` |
+| 21 | System Architecture (Critical) | v2.31 | Design | `docs/initial-discovery/system.html` |
 | 22 | Database Design (Critical) | v1.0 | Design | `docs/initial-discovery/database.html` |
 | 23 | Discovery Index | v1.0 | Design | `docs/initial-discovery/index.html` |
 | 24 | Service Dependencies | v1.0 | Design | `docs/initial-discovery/service_dep.html` |
 | 25 | Payment Flow Diagram | v1.0 | Design | `docs/initial-discovery/qabz-diagram.html` |
 | 26 | Cron Jobs Diagram | v1.0 | Design | `docs/initial-discovery/qabz-cron-diagram.html` |
 | 27 | Implementation Phases | v1.0 | Design | `docs/initial-discovery/implementation_phases.html` |
-| 28 | Open Tasks Register | v1.95 | Governance | `docs/Plans/OPEN_TASKS.md` |
+| 28 | Open Tasks Register | v1.96 | Governance | `docs/Plans/OPEN_TASKS.md` |
 | 29 | Implementation Plan | v0.12 | Plan | `docs/Plans/Implementation_Plan.md` |
-| 30 | Project Specific Conventions | v0.30 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
+| 30 | Project Specific Conventions | v0.31 | Governance | `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` |
 | 31 | YAML to env generator | v0.2 | Scripts | `scripts/yml_to_env/yml_to_env.py` |
 | 32 | YAML to env generator tests | v0.1 | Scripts | `scripts/yml_to_env/yml_to_env_test.py` |
 | 33 | Task Template | v0.3 | Plan | `docs/tasks/pending_tasks/task_template.md` |
-| 34 | App module README | v0.49 | Docs | `src/app/README.md` |
-| 35 | Qabz vs bill differences | v0.34 | Docs | `docs/this_vs_bill.md` |
+| 34 | App module README | v0.50 | Docs | `src/app/README.md` |
+| 35 | Qabz vs bill differences | v0.35 | Docs | `docs/this_vs_bill.md` |
 
 ## Last Updated
 
 - **Date**: 2026-11-17
-- **Change**: 2026-11-17 — Task 059 `provider_switcher`: the Provider Switcher in `ProvidersService` (new `src/provider/switcher.go`: `Demote` only with a next available row, `PickInquiry` and the trial inquiry, the return; a demoted order row is tried by an inquiry of the same provider), the inquiry flow uses `PickInquiry`, `onlyProvider` removed from `core/inquiry`, the development key `debug.provider_switcher.demote_on_down`, metrics `qabz_provider_switches_total`, `qabz_provider_demoted`, `qabz_provider_trial_total`; conventions § 13; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.64, #5 manifest v2.65, #6 folder_structure v0.61, #21 system.html v2.30, #28 OPEN_TASKS v1.95, #30 PROJECT_SPECIFIC_CONVENTIONS v0.30, #34 app README v0.49, #35 this_vs_bill v0.34.
-- **Previous change**: 2026-11-17 — Task 060 `circuit_breaker` created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 061; no code. Bumped #3 CHANGELOG v3.63, #5 manifest v2.64.
+- **Change**: 2026-11-17 — Task 060 `circuit_breaker`: the circuit breaker of each provider row (new `src/provider/breaker.go`: a sliding window of 20 buckets, the rule `min_calls` and `failure_ratio`, `Demote` for `open_time` only with a next available row, no count after `no_next`; it never blocks a call), the wiring (new `src/app/breaker.go`: the hot settings, the metrics `qabz_circuit_breaker_state` and `qabz_circuit_breaker_transitions_total`; `newProvidersAndBreaker`), `inquiry.Options.OnProviderResult` (replaces `OnProviderDown`), `order.PaymentOptions.OnPayResult`, the keys `providers.general.circuit_breaker.*` and the overrides of the 6 providers (hot), `debug.provider_switcher.demote_on_down` removed; conventions § 13; `config.yml.example` (no VERSION header, no row); Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.65, #5 manifest v2.66, #6 folder_structure v0.62, #21 system.html v2.31, #28 OPEN_TASKS v1.96, #30 PROJECT_SPECIFIC_CONVENTIONS v0.31, #34 app README v0.50, #35 this_vs_bill v0.35.
+- **Previous change**: 2026-11-17 — Task 059 `provider_switcher`: the Provider Switcher in `ProvidersService` (new `src/provider/switcher.go`: `Demote` only with a next available row, `PickInquiry` and the trial inquiry, the return; a demoted order row is tried by an inquiry of the same provider), the inquiry flow uses `PickInquiry`, `onlyProvider` removed from `core/inquiry`, the development key `debug.provider_switcher.demote_on_down`, metrics `qabz_provider_switches_total`, `qabz_provider_demoted`, `qabz_provider_trial_total`; conventions § 13; Go files have no VERSION header, so no rows; the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.64, #5 manifest v2.65, #6 folder_structure v0.61, #21 system.html v2.30, #28 OPEN_TASKS v1.95, #30 PROJECT_SPECIFIC_CONVENTIONS v0.30, #34 app README v0.49, #35 this_vs_bill v0.34.
+- **Earlier change**: 2026-11-17 — Task 060 `circuit_breaker` created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 061; no code. Bumped #3 CHANGELOG v3.63, #5 manifest v2.64.
 - **Earlier change**: 2026-11-17 — Task 059 `provider_switcher` created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 060; no code. Bumped #3 CHANGELOG v3.62, #5 manifest v2.63.
 - **Earlier change**: 2026-11-17 — Session wrap-up (task 058 session): 4 lesson candidates and more evidence for 3 in `OPEN_TASKS.md`; push of 303d74e..d4f7246 done. Bumped #3 CHANGELOG v3.61, #5 manifest v2.62, #28 OPEN_TASKS v1.94.
 - **Earlier change**: 2026-11-16 — Task 058 `mci_jiring_fallback`: the payment fallback to the next enabled order row after a payment that did not reach its provider for sure (`provider.ErrNotSent`, every bill type; MCI today: Parsian to Jiring Switch), the Jiring Switch `Pay` and `Status`, the Jiring Switch status worker, the pending query of the workers, conventions § 13 exception, dev seed rows 29 and 30 `enable`; new `src/provider/sent.go` and new test files `src/provider/sent_test.go`, `src/provider/jiring/pay_test.go`, `src/provider/parsianproxy/notsent_test.go`, `src/core/order/fallback_test.go`, `src/app/mci_fallback_live_test.go` (Go files have no VERSION header, so no rows); `config.yml.example` and the seed SQL (no VERSION header, no rows); the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.60, #5 manifest v2.61, #6 folder_structure v0.60, #21 system.html v2.29, #28 OPEN_TASKS v1.93, #30 PROJECT_SPECIFIC_CONVENTIONS v0.29, #34 app README v0.48, #35 this_vs_bill v0.33.

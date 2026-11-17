@@ -3,6 +3,7 @@ package inquiry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -38,14 +39,14 @@ func (l *switchLog) Info(msg string, _ ...any) {
 
 // switchRig is a flow on a ProvidersService with two water rows: 1 qabzino first, 2 tavanir next.
 type switchRig struct {
-	svc      *Service
-	list     *provider.ProvidersService
-	repo     *memRepo
-	qabzino  *stubProvider
-	tavanir  *stubProvider
-	inquiry  []string
-	downRows []int64
-	trials   []string
+	svc     *Service
+	list    *provider.ProvidersService
+	repo    *memRepo
+	qabzino *stubProvider
+	tavanir *stubProvider
+	inquiry []string
+	results []string // id/down or id/answer of OnProviderResult
+	trials  []string
 }
 
 func newSwitchRig(t *testing.T) *switchRig {
@@ -66,9 +67,15 @@ func newSwitchRig(t *testing.T) *switchRig {
 	r.tavanir = &stubProvider{name: "tavanir", resp: successResp()}
 	svc, err := NewService(Options{
 		Repository: r.repo, Providers: list, Adapters: fakeAdapters{"qabzino": r.qabzino, "tavanir": r.tavanir},
-		CacheTTL:       func(string) time.Duration { return time.Hour },
-		OnInquiry:      func(b, p, res string) { r.inquiry = append(r.inquiry, b+"/"+p+"/"+res) },
-		OnProviderDown: func(p provider.Provider) { r.downRows = append(r.downRows, p.ID) },
+		CacheTTL:  func(string) time.Duration { return time.Hour },
+		OnInquiry: func(b, p, res string) { r.inquiry = append(r.inquiry, b+"/"+p+"/"+res) },
+		OnProviderResult: func(p provider.Provider, down bool) {
+			res := "answer"
+			if down {
+				res = "down"
+			}
+			r.results = append(r.results, fmt.Sprintf("%d/%s", p.ID, res))
+		},
 	})
 	if !assert.NoError(t, err) {
 		t.FailNow()
@@ -104,7 +111,7 @@ func TestSwitchDemotedRowNotPicked(t *testing.T) {
 // TestSwitchTrialResults: the trial calls the demoted provider (also when a valid saved answer of
 // it exists: the trial reads no saved answer); a good and a refused answer put the row back; a
 // provider-down answer demotes it again; a fault with no verdict releases the trial. The flow never
-// calls a second provider; OnProviderDown is not called for a trial.
+// calls a second provider; OnProviderResult is not called for a trial (task 060).
 func TestSwitchTrialResults(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -129,7 +136,7 @@ func TestSwitchTrialResults(t *testing.T) {
 			assert.Equal(t, 0, r.tavanir.calls, "one request, one provider")
 			assert.Equal(t, 0, r.repo.findCalls, "a trial reads no saved answer")
 			assert.Equal(t, []string{tc.wantTrial}, r.trials)
-			assert.Empty(t, r.downRows, "no OnProviderDown for a trial")
+			assert.Empty(t, r.results, "no OnProviderResult for a trial")
 			p, err := r.list.PickProvider("water", "inquiry")
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantPick, p.ID)
@@ -137,23 +144,32 @@ func TestSwitchTrialResults(t *testing.T) {
 	}
 }
 
-// TestSwitchOnProviderDown: a provider-down result that is not a trial calls OnProviderDown with
-// the row; another result does not.
-func TestSwitchOnProviderDown(t *testing.T) {
+// TestSwitchOnProviderResult (task 060): a provider-down result that is not a trial calls
+// OnProviderResult with the row and down true; a good and a refused answer with down false; an
+// error that is not provider down, a canceled call and a saved answer do not call it.
+func TestSwitchOnProviderResult(t *testing.T) {
 	r := newSwitchRig(t)
-	ask := func() error { // NoCache: each request calls the provider
-		_, err := r.svc.Inquire(context.Background(), Request{BillType: "water", InquiryID: validBill, UserID: userA, NoCache: true})
+	ask := func(ctx context.Context, noCache bool) error {
+		_, err := r.svc.Inquire(ctx, Request{BillType: "water", InquiryID: validBill, UserID: userA, NoCache: noCache})
 		return err
 	}
-	assert.NoError(t, ask())
-	assert.Empty(t, r.downRows, "ok")
+	assert.NoError(t, ask(context.Background(), true))
+	assert.Equal(t, []string{"1/answer"}, r.results, "ok")
+	assert.NoError(t, ask(context.Background(), false))
+	assert.Equal(t, []string{"1/answer"}, r.results, "a saved answer calls no provider")
+	r.qabzino.resp = &provider.InquiryResponse{Status: provider.ResponseFailed, Message: "no bill"}
+	assert.Error(t, ask(context.Background(), true))
+	assert.Equal(t, []string{"1/answer", "1/answer"}, r.results, "a business answer is a good call")
 	r.qabzino.err = provider.ErrProviderDown
-	assert.ErrorIs(t, ask(), provider.ErrProviderDown)
-	assert.Equal(t, []int64{1}, r.downRows)
+	assert.ErrorIs(t, ask(context.Background(), true), provider.ErrProviderDown)
+	assert.Equal(t, []string{"1/answer", "1/answer", "1/down"}, r.results)
 	r.qabzino.err = errors.New("bad answer")
-	assert.Error(t, ask())
-	assert.Equal(t, 3, r.qabzino.calls)
-	assert.Equal(t, []int64{1}, r.downRows, "an error that is not provider down")
+	assert.Error(t, ask(context.Background(), true))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r.qabzino.err = provider.ErrProviderDown
+	assert.Error(t, ask(ctx, true))
+	assert.Equal(t, []string{"1/answer", "1/answer", "1/down"}, r.results, "an error that is not provider down, a cancel")
 }
 
 // TestSwitchTrialSpan: the span of a trial inquiry has provider.trial true; a plain inquiry has no

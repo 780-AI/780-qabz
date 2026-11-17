@@ -151,6 +151,13 @@ type PaymentOptions struct {
 	// OnPay is called after each provider payment call with the provider, the status of the
 	// answer and the duration. Nil: no call.
 	OnPay func(providerName, status string, d time.Duration)
+	// OnPayResult is called after each provider payment call (also each call after a move to the
+	// next provider, task 058) with the order row of the call (id, name, bill type, action order)
+	// and down true for an error that wraps provider.ErrProviderDown (provider.ErrNotSent and a
+	// timeout too), false for any answer of the provider (failed and pending too) (task 060: the
+	// circuit breaker counts it). A canceled call and another error do not call it. It runs on the
+	// request path after the call and must not wait. Nil: no call.
+	OnPayResult func(p provider.Provider, down bool)
 	// OnFallback is called once for each move of a payment to the next provider (task 058) with the
 	// bill type, the provider that was not reached and the next provider. Nil: no call.
 	OnFallback func(billType, from, to string)
@@ -171,6 +178,7 @@ type Payments struct {
 	log           PaymentLogger
 	onPayment     func(billType, providerName, result string)
 	onPay         func(providerName, status string, d time.Duration)
+	onPayResult   func(p provider.Provider, down bool)
 
 	mu      sync.Mutex
 	jobs    sync.WaitGroup
@@ -204,7 +212,7 @@ func NewPayments(o PaymentOptions) (*Payments, error) {
 	}
 	p := &Payments{
 		repo: o.Repository, adapters: o.Adapters, payRoutes: o.PayRoutes, groups: o.Providers, onFallback: o.OnFallback, settler: settler,
-		settleTimeout: o.SettleTimeout, log: o.Logger, onPayment: o.OnPayment, onPay: o.OnPay,
+		settleTimeout: o.SettleTimeout, log: o.Logger, onPayment: o.OnPayment, onPay: o.OnPay, onPayResult: o.OnPayResult,
 		newID: uuid.NewString, now: time.Now,
 	}
 	p.spawn = func(job func()) { go job() }
@@ -368,6 +376,7 @@ func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest
 		if p.onPay != nil {
 			p.onPay(name, payStatus(resp, payErr), time.Since(start))
 		}
+		p.payResult(ctx, o, name, payErr)
 		if payErr == nil || !errors.Is(payErr, provider.ErrNotSent) {
 			break
 		}
@@ -421,6 +430,23 @@ func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest
 		p.background(requestCtx, o)
 	}
 	return o, nil
+}
+
+// payResult reports one payment call of the order row o (provider name) to OnPayResult (task 060):
+// down for an error that wraps provider.ErrProviderDown, an answer for no error; a canceled call
+// and another error are not reported.
+func (p *Payments) payResult(ctx context.Context, o Order, name string, payErr error) {
+	if p.onPayResult == nil {
+		return
+	}
+	row := provider.Provider{ID: o.ProviderID, Name: name, BillType: o.BillType, Action: ActionOrder}
+	switch {
+	case payErr == nil:
+		p.onPayResult(row, false)
+	case ctx.Err() != nil:
+	case errors.Is(payErr, provider.ErrProviderDown):
+		p.onPayResult(row, true)
+	}
 }
 
 // payStatus is the status that the step saves for the answer of one payment call (the label of

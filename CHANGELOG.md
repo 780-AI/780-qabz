@@ -1,7 +1,8 @@
-<!-- VERSION: 3.64 -->
+<!-- VERSION: 3.65 -->
 <!-- Last Updated: 2026-11-17 -->
 <!--
 CHANGE LOG
+v3.65 — 2026-11-17 — Added 060-circuit-breaker entry.
 v3.64 — 2026-11-17 — Added 059-provider-switcher entry.
 v3.63 — 2026-11-17 — Added task-060-circuit-breaker entry.
 v3.62 — 2026-11-17 — Added task-059-provider-switcher entry.
@@ -180,6 +181,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-17] — Task 060: the circuit breaker (the error rate of a provider row starts a demotion)
+- **Type:** Major (provider domain logic, public interfaces of `core/inquiry` and `core/order`, new hot config keys, metrics, a conventions rule, a Critical File).
+- **Files:** `src/provider/breaker.go` (new: `Breaker`, `BreakerSettings`, `BreakerOptions`, `Report`, `Demoted`) and `breaker_test.go` (new); `src/core/inquiry/inquiry.go` (`Options.OnProviderResult` replaces `OnProviderDown`) and `switcher_test.go`; `src/core/order/complete.go` (`PaymentOptions.OnPayResult`, `payResult`) and `fallback_test.go`; `src/config/config.go` (the general keys, the overrides of `irancell`, `jiring_switch`, `parsian`, `karashop`, `qabzino`, `tavanir`, `CircuitBreaker` and its checks; the `@todo` of task 040 and `debug.provider_switcher.demote_on_down` removed) and `config_test.go`; `src/app/breaker.go` and `breaker_test.go` (new), `src/app/defaults.go` (`newProvidersAndBreaker`; `newProviders`, `newInquiryFlow`, `newPayments` take the breaker; `demoteOnDown` removed), `switcher_test.go`, `switcher_live_test.go`, `defaults_test.go`, `providers_test.go`, `providers_live_test.go`, `cacheinquiries_test.go`, `water_test.go`, `water_live_test.go`, `water_order_live_test.go`; `config.yml.example`; `docs/initial-discovery/system.html`, `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (§ 13), `docs/this_vs_bill.md` (item 52; items 27 and 51), `docs/folder_structure.md`, `src/app/README.md`, `docs/Plans/OPEN_TASKS.md`, `docs/documents_manifest.md`; the task file moved to `done_tasks/`.
+- **Impact:** **Yes, behavior changes when the switch is on.** (1) With `providers.general.circuit_breaker.enabled: false` (the default) nothing counts and nothing is demoted: the behavior before task 060. (2) With `enabled: true`, a provider row with `min_calls` calls or more in the `window` and `failure_ratio` percent or more provider-down results is demoted by the Provider Switcher for `open_time`, only when its group has a next available row; the trial inquiry decides the return. No call is blocked; a business answer is a good call. The inquiry flow and the payment step report; the status workers do not. (3) The development key `debug.provider_switcher.demote_on_down` is removed (an old `config.yml` with the key still loads; the key is not read). (4) New metrics `qabz_circuit_breaker_state` and `qabz_circuit_breaker_transitions_total`. (5) 29 new hot-reloadable keys (`app_hot_configs`). No API change (no Postman change).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 060 circuit breaker" (Go tests with `-race`; feature ON on the dev database with the fake jiring-switch service: the open at the threshold, the switch to Parsian, the trial and the close after `open_time`, no demotion in a group with one row). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-17] — Task 059: the Provider Switcher (demote a provider row, trial inquiry, return)
 - **Type:** Major (provider domain logic, a public interface, a new config key, metrics, a conventions rule, a Critical File).

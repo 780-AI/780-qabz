@@ -43,8 +43,9 @@ type liveWaterStack struct {
 	signer      *crypto.Signer // the order token key of phone (task 039)
 	metrics     *prometheus.Server
 	log         *liveLogger
-	payments    *order.Payments            // the payment step (task 044)
-	providers   *provider.ProvidersService // the provider list and the Provider Switcher (task 059)
+	payments    *order.Payments               // the payment step (task 044)
+	providers   *provider.ProvidersService    // the provider list and the Provider Switcher (task 059)
+	holder      *config.Holder[config.Config] // the hot config (task 060: the circuit breaker keys)
 }
 
 func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string) *liveWaterStack {
@@ -101,12 +102,15 @@ func newLiveStack(t *testing.T, ctx context.Context, returnType, setupSQL string
 	metrics := prometheus.New("127.0.0.1:0", true)
 	// As the composition root (task 059): the provider metrics on and the Available callback of the
 	// Provider Switcher.
-	providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), metrics, log, providerAvailable(registry, payRoutes()))
+	// Task 060: the circuit breaker with the provider list, as the composition root; holder is the
+	// hot config of the stack.
+	holder := config.NewHolder(cfg)
+	providers, breaker, err := newProvidersAndBreaker(holder, postgres.NewProviderRepository(db), metrics, log, providerAvailable(registry, payRoutes()))
 	if !assert.NoError(t, err) || !assert.NotNil(t, providers) || !assert.NoError(t, providers.Start(ctx)) {
 		t.FailNow()
 	}
 	t.Cleanup(func() { assert.NoError(t, providers.Stop(context.Background())) })
-	flow, err := newInquiryFlow(cfg, db, providers, registry, metrics, log)
+	flow, err := newInquiryFlow(cfg, db, providers, registry, metrics, log, breaker)
 	if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 		t.FailNow()
 	}
@@ -114,7 +118,7 @@ func newLiveStack(t *testing.T, ctx context.Context, returnType, setupSQL string
 	if !assert.NoError(t, err) || !assert.NotNil(t, orders) {
 		t.FailNow()
 	}
-	payments, err := newPayments(db, registry, providers, metrics, log) // task 058: the next provider of a payment that was not sent
+	payments, err := newPayments(db, registry, providers, metrics, log, breaker) // task 058: the next provider of a payment that was not sent
 	if !assert.NoError(t, err) || !assert.NotNil(t, payments) {
 		t.FailNow()
 	}
@@ -125,7 +129,7 @@ func newLiveStack(t *testing.T, ctx context.Context, returnType, setupSQL string
 	}
 	return &liveWaterStack{db: db, water: newWater(flow, orders, signer, 105, log), electricity: newElectricity(flow, orders, signer, 105, log), gas: newGas(flow, orders, signer, 105, log),
 		phone: newPhone(flow, orders, signer, 105, log), tel: newTel(flow, orders, signer, 105, log), signer: signer, metrics: metrics, log: log,
-		payments: payments, providers: providers}
+		payments: payments, providers: providers, holder: holder}
 }
 
 func (s *liveWaterStack) ask(user, bill string) (*pb.InquiryBillPayResponse, error) {

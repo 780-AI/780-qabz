@@ -50,6 +50,12 @@ database:
 providers:
   general:
     load_interval: "1m"     # how often the providers table is loaded again; at least 1s; hot-reloadable (key providers_load_interval)
+    circuit_breaker:         # task 060: counts the provider calls of each provider row (provider, bill type, action) and demotes the row (Provider Switcher); never blocks a call; every key hot-reloadable (key circuit_breaker_<name>)
+      enabled: false         # false: no count, no demotion (the behavior before task 060)
+      failure_ratio: 30      # percent (1 to 100) of provider-down calls in the window that demotes the row
+      window: "2m"           # the sliding window; positive
+      min_calls: 20          # the smallest number of calls in the window for which the ratio is trusted (not a number of failed calls); 1 or more
+      open_time: "1m"        # the time a row stays demoted before its trial inquiry; positive
   internal:                  # our own services
     irancell:                  # the irancell service (our own service); the real values only in config.yml
       enabled: false           # false: every Irancell call fails as "provider down", nothing is sent to the irancell service, the mock does not apply
@@ -73,6 +79,11 @@ providers:
           api_call_get_status: "30s"
           get_order_query: "3ms"
           insert_order_query: "3ms"
+      circuit_breaker:         # task 060: the override of the general circuit breaker; 0 = the general value; hot-reloadable (key irancell_circuit_breaker_<name>)
+        failure_ratio: 0       # 0 to 100
+        window: "0s"
+        min_calls: 0
+        open_time: "0s"
     jiring_switch:             # the jiring-switch service (our own service); answers the MCI mobile bill (bill type mobile)
       enabled: false           # false: every Jiring Switch call fails as "provider down", nothing is sent to the jiring-switch service, the mock does not apply
       timeout: "10s"           # limit of each call to the jiring-switch service; positive
@@ -92,6 +103,11 @@ providers:
           api_call_get_status: "30s"
           get_order_query: "3ms"
           insert_order_query: "3ms"
+      circuit_breaker:         # task 060: the override of the general circuit breaker; 0 = the general value; hot-reloadable (key jiring_switch_circuit_breaker_<name>)
+        failure_ratio: 0       # 0 to 100
+        window: "0s"
+        min_calls: 0
+        open_time: "0s"
     parsian:                   # the parsian-v2 service (our own service); answers the MCI mobile bill (bill type mobile)
       enabled: false           # false: every Parsian call fails as "provider down", nothing is sent to the parsian-v2 service, the mock does not apply
       timeout: "10s"           # limit of each call to the parsian-v2 service; positive
@@ -117,6 +133,11 @@ providers:
       settlement_inquiry_telephone: "360h" # "bill already paid" window of a landline order paid through Parsian (bill: 360h); 0: no window
       settlement_inquiry_mci_mobile: "0s"  # "bill already paid" check of an MCI order (mobile, mobilemidterm) paid through Parsian (bill: 0); as bill, 0 checks the orders of any time (not "no check")
       settlement_inquiry_rightel_mobile: "360h" # "bill already paid" window of a Rightel order (mobilemidtermRightel) paid through Parsian (bill: 360h); 0: no window
+      circuit_breaker:         # task 060: the override of the general circuit breaker; 0 = the general value; hot-reloadable (key parsian_circuit_breaker_<name>)
+        failure_ratio: 0       # 0 to 100
+        window: "0s"
+        min_calls: 0
+        open_time: "0s"
     payment_server:          # the payment service (our own service; bill: paymentServer)
       address: ""            # address of the payment service; not read yet; the real value only in config.yml
       private_key_path: ""   # path of the general private key file (PKCS #1 PEM) that signs the order token; read at start, a missing or bad key stops the App; the real value only in config.yml
@@ -129,6 +150,11 @@ providers:
       password: ""             # Karashop credential password (secret); the real value only in config.yml
       bill_inquiry_url: ""     # the real URL only in config.yml; empty: every Karashop call fails as "provider down"
       bill_payment_info_url: "" # URL of the settlement (SendPaymentInfo) after a landline payment; empty: every settlement fails; the real URL only in config.yml
+      circuit_breaker:         # task 060: the override of the general circuit breaker; 0 = the general value; hot-reloadable (key karashop_circuit_breaker_<name>)
+        failure_ratio: 0       # 0 to 100
+        window: "0s"
+        min_calls: 0
+        open_time: "0s"
     qabzino:
       grpc_address: ""         # host:port of the Qabzino backend (gRPC, no TLS); empty: every Qabzino call fails as "provider down"
       timeout: "10s"           # limit of each call to the Qabzino backend; positive
@@ -138,6 +164,11 @@ providers:
       gas_bill_endpoint: ""    # the real URL only in config.yml
       rightel_bill_endpoint: "" # Rightel mobile inquiry (task 037); the real URL only in config.yml
       water_bill_endpoint: ""  # the real URL only in config.yml
+      circuit_breaker:         # task 060: the override of the general circuit breaker; 0 = the general value; hot-reloadable (key qabzino_circuit_breaker_<name>)
+        failure_ratio: 0       # 0 to 100
+        window: "0s"
+        min_calls: 0
+        open_time: "0s"
     tavanir:
       enabled: false           # false: every Tavanir call fails as "provider down", nothing is sent to Tavanir, the mock does not apply
       timeout: "10s"           # limit of each HTTP call to Tavanir (the login and the inquiry each); positive
@@ -147,6 +178,11 @@ providers:
       branch_debit_endpoint: "" # the real URL only in config.yml
       username: ""             # Tavanir (SAAPA) user name; the real value only in config.yml
       password: ""             # Tavanir (SAAPA) password (secret); the real value only in config.yml
+      circuit_breaker:         # task 060: the override of the general circuit breaker; 0 = the general value; hot-reloadable (key tavanir_circuit_breaker_<name>)
+        failure_ratio: 0       # 0 to 100
+        window: "0s"
+        min_calls: 0
+        open_time: "0s"
 
 caching:
   water: "1h"                # how long a saved water inquiry answers the same bill with no provider call; 0: cache off
@@ -233,5 +269,3 @@ debug:
       return_type: "success" # inquiry: "success" or "error"
       settle_return_type: "success" # settlement (SendPaymentInfo): "success" or "error"
   cache_inquiries: true      # development only: false = the inquiry flow does not read or write bill_inquiries / bill_inquiry_requests (every inquiry calls the provider)
-  provider_switcher:         # task 059, development only: the feature-ON hook of the Provider Switcher (task 060 replaces it)
-    demote_on_down: "0s"     # > 0: each provider-down inquiry (not a trial) demotes its provider row for this period; 0 = off

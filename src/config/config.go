@@ -156,13 +156,53 @@ type Config struct {
 	TavanirBranchDebitEndpoint  string `path:"providers.external.tavanir.branch_debit_endpoint"`
 	TavanirUsername             string `path:"providers.external.tavanir.username"`
 	TavanirPassword             Secret `path:"providers.external.tavanir.password"`
-	// @todo circuit breaker: no provider has one yet (operator decision of task 034: every provider
-	// gets one at the end of the project). Task 040 removed the unused keys
-	// providers.external.tavanir.circuit_breaker.* (name "tavanir", max_requests 100000, interval 1s, timeout
-	// 10s, failure_ratio 99 percent, as the tavanir service). When the circuit breaker feature lands,
-	// add its keys for every provider (in config.yml and config.yml.example, conventions § 8) and the
-	// metrics qabz_circuit_breaker_state and qabz_circuit_breaker_transitions_total (system.html,
-	// Metrics). A config.yml that still has the old block is valid: the decoder reads only tagged paths.
+	// The circuit breaker (task 060; system.html, Provider Switcher): it counts the provider calls of
+	// each provider row (provider, bill type, action) in a sliding window and asks the Provider
+	// Switcher to demote the row when the row has CircuitBreakerMinCalls calls or more and
+	// CircuitBreakerFailureRatio percent or more of them were provider down. It never blocks a call.
+	// All keys are hot-reloadable (the key in app_hot_configs is the field name in snake case, for
+	// example circuit_breaker_window). Validate checks the start values; a hot value out of range is
+	// ignored by the App (an override falls back to the general value, a general value to its
+	// default) with one warn line at the change.
+	//   - CircuitBreakerEnabled false (the default): no count and no demotion (the behavior before
+	//     task 060). A row that is demoted when it goes to false returns by its trial.
+	//   - CircuitBreakerFailureRatio is the percent of failed calls (1 to 100) that opens the row.
+	//   - CircuitBreakerWindow is the length of the sliding window. Positive.
+	//   - CircuitBreakerMinCalls is the smallest number of calls in the window for which the ratio is
+	//     trusted (not a number of failed calls). 1 or more.
+	//   - CircuitBreakerOpenTime is the time a row stays demoted before its trial inquiry. Positive.
+	CircuitBreakerEnabled      bool          `path:"providers.general.circuit_breaker.enabled" hot_reload:"true"`
+	CircuitBreakerFailureRatio int           `path:"providers.general.circuit_breaker.failure_ratio" hot_reload:"true"`
+	CircuitBreakerWindow       time.Duration `path:"providers.general.circuit_breaker.window" hot_reload:"true"`
+	CircuitBreakerMinCalls     int           `path:"providers.general.circuit_breaker.min_calls" hot_reload:"true"`
+	CircuitBreakerOpenTime     time.Duration `path:"providers.general.circuit_breaker.open_time" hot_reload:"true"`
+	// The override of the circuit breaker of each provider (task 060; operator decision 5: no switch
+	// for each provider, only the four number keys). 0 (the default) takes the general value. A
+	// failure_ratio is 0 to 100, the others are not negative. Hot-reloadable as the general keys.
+	IrancellCircuitBreakerFailureRatio     int           `path:"providers.internal.irancell.circuit_breaker.failure_ratio" hot_reload:"true"`
+	IrancellCircuitBreakerWindow           time.Duration `path:"providers.internal.irancell.circuit_breaker.window" hot_reload:"true"`
+	IrancellCircuitBreakerMinCalls         int           `path:"providers.internal.irancell.circuit_breaker.min_calls" hot_reload:"true"`
+	IrancellCircuitBreakerOpenTime         time.Duration `path:"providers.internal.irancell.circuit_breaker.open_time" hot_reload:"true"`
+	JiringSwitchCircuitBreakerFailureRatio int           `path:"providers.internal.jiring_switch.circuit_breaker.failure_ratio" hot_reload:"true"`
+	JiringSwitchCircuitBreakerWindow       time.Duration `path:"providers.internal.jiring_switch.circuit_breaker.window" hot_reload:"true"`
+	JiringSwitchCircuitBreakerMinCalls     int           `path:"providers.internal.jiring_switch.circuit_breaker.min_calls" hot_reload:"true"`
+	JiringSwitchCircuitBreakerOpenTime     time.Duration `path:"providers.internal.jiring_switch.circuit_breaker.open_time" hot_reload:"true"`
+	ParsianCircuitBreakerFailureRatio      int           `path:"providers.internal.parsian.circuit_breaker.failure_ratio" hot_reload:"true"`
+	ParsianCircuitBreakerWindow            time.Duration `path:"providers.internal.parsian.circuit_breaker.window" hot_reload:"true"`
+	ParsianCircuitBreakerMinCalls          int           `path:"providers.internal.parsian.circuit_breaker.min_calls" hot_reload:"true"`
+	ParsianCircuitBreakerOpenTime          time.Duration `path:"providers.internal.parsian.circuit_breaker.open_time" hot_reload:"true"`
+	KarashopCircuitBreakerFailureRatio     int           `path:"providers.external.karashop.circuit_breaker.failure_ratio" hot_reload:"true"`
+	KarashopCircuitBreakerWindow           time.Duration `path:"providers.external.karashop.circuit_breaker.window" hot_reload:"true"`
+	KarashopCircuitBreakerMinCalls         int           `path:"providers.external.karashop.circuit_breaker.min_calls" hot_reload:"true"`
+	KarashopCircuitBreakerOpenTime         time.Duration `path:"providers.external.karashop.circuit_breaker.open_time" hot_reload:"true"`
+	QabzinoCircuitBreakerFailureRatio      int           `path:"providers.external.qabzino.circuit_breaker.failure_ratio" hot_reload:"true"`
+	QabzinoCircuitBreakerWindow            time.Duration `path:"providers.external.qabzino.circuit_breaker.window" hot_reload:"true"`
+	QabzinoCircuitBreakerMinCalls          int           `path:"providers.external.qabzino.circuit_breaker.min_calls" hot_reload:"true"`
+	QabzinoCircuitBreakerOpenTime          time.Duration `path:"providers.external.qabzino.circuit_breaker.open_time" hot_reload:"true"`
+	TavanirCircuitBreakerFailureRatio      int           `path:"providers.external.tavanir.circuit_breaker.failure_ratio" hot_reload:"true"`
+	TavanirCircuitBreakerWindow            time.Duration `path:"providers.external.tavanir.circuit_breaker.window" hot_reload:"true"`
+	TavanirCircuitBreakerMinCalls          int           `path:"providers.external.tavanir.circuit_breaker.min_calls" hot_reload:"true"`
+	TavanirCircuitBreakerOpenTime          time.Duration `path:"providers.external.tavanir.circuit_breaker.open_time" hot_reload:"true"`
 
 	// The config of the Irancell provider (task 035): the keys that bill has for its irancell
 	// service client (bill: irancell.name, irancell.grpcAddress, irancell.natsSubject and the
@@ -510,12 +550,6 @@ type Config struct {
 	// mode other than dev removes the debug section, so the key is true there. Not hot-reloadable:
 	// read at start (as the caching.* keys).
 	DebugCacheInquiries bool `path:"debug.cache_inquiries"`
-	// DebugProviderSwitcherDemoteOnDown is the feature-ON hook of the Provider Switcher (task 059):
-	// a value greater than 0 makes each provider-down inquiry that is not a trial demote its provider
-	// row for this period (ProvidersService.Demote). 0 (the default): no demotion, the behavior
-	// before task 059. Development only: a mode other than dev removes the debug section, so the key
-	// is 0 there. Task 060 (the circuit breaker) replaces it. Not hot-reloadable: read at start.
-	DebugProviderSwitcherDemoteOnDown time.Duration `path:"debug.provider_switcher.demote_on_down"`
 }
 
 func defaults() Config {
@@ -539,6 +573,11 @@ func defaults() Config {
 		MigrateTimeout:       60 * time.Second,
 
 		ProvidersLoadInterval: time.Minute,
+
+		CircuitBreakerFailureRatio: DefaultCircuitBreakerFailureRatio,
+		CircuitBreakerWindow:       DefaultCircuitBreakerWindow,
+		CircuitBreakerMinCalls:     DefaultCircuitBreakerMinCalls,
+		CircuitBreakerOpenTime:     DefaultCircuitBreakerOpenTime,
 
 		QabzinoTimeout:      10 * time.Second,
 		TavanirTimeout:      10 * time.Second,
@@ -750,6 +789,7 @@ func (c Config) validate() error {
 	if c.ProvidersLoadInterval < ProvidersMinLoadInterval {
 		errs = append(errs, fmt.Errorf("providers.general.load_interval must be at least %s", ProvidersMinLoadInterval))
 	}
+	errs = append(errs, c.circuitBreakerErrors()...)
 	if c.QabzinoTimeout <= 0 {
 		errs = append(errs, errors.New("providers.external.qabzino.timeout must be a positive duration (for example 10s)"))
 	}
@@ -803,9 +843,6 @@ func (c Config) validate() error {
 	}
 	if c.CachingPaidTel < 0 {
 		errs = append(errs, errors.New("caching.paid_tel must not be negative (0: every order asks the provider)"))
-	}
-	if c.DebugProviderSwitcherDemoteOnDown < 0 {
-		errs = append(errs, errors.New("debug.provider_switcher.demote_on_down must not be negative (0 turns it off)"))
 	}
 	if c.ParsianSettlementInquiryTelephone < 0 {
 		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_telephone must not be negative (0: no window)"))
@@ -1087,4 +1124,95 @@ func (c Config) RedisAddr() string {
 // PostgresTarget returns host:port/db for logs. It has no user and no password.
 func (c Config) PostgresTarget() string {
 	return net.JoinHostPort(c.PostgresHost, strconv.Itoa(c.PostgresPort)) + "/" + c.PostgresDB
+}
+
+// The defaults of the general circuit breaker keys (task 060). The App also falls back to them for
+// a hot general value out of range.
+const (
+	DefaultCircuitBreakerFailureRatio = 30
+	DefaultCircuitBreakerWindow       = 2 * time.Minute
+	DefaultCircuitBreakerMinCalls     = 20
+	DefaultCircuitBreakerOpenTime     = time.Minute
+)
+
+// CircuitBreaker is one block of the circuit breaker keys (task 060): the general block, or the
+// override of one provider (0: the general value).
+type CircuitBreaker struct {
+	FailureRatio int
+	Window       time.Duration
+	MinCalls     int
+	OpenTime     time.Duration
+}
+
+// GeneralValid reports whether b is valid as the general block: a failure_ratio of 1 to 100, a
+// positive window and open_time, and a min_calls of 1 or more.
+func (b CircuitBreaker) GeneralValid() bool {
+	return b.FailureRatio >= 1 && b.FailureRatio <= 100 && b.Window > 0 && b.MinCalls >= 1 && b.OpenTime > 0
+}
+
+// OverrideValid reports whether b is valid as the override of a provider: a failure_ratio of 0 to
+// 100 and no negative value (0 takes the general value).
+func (b CircuitBreaker) OverrideValid() bool {
+	return b.FailureRatio >= 0 && b.FailureRatio <= 100 && b.Window >= 0 && b.MinCalls >= 0 && b.OpenTime >= 0
+}
+
+// CircuitBreakerGeneral is the general block (providers.general.circuit_breaker, with no enabled).
+func (c Config) CircuitBreakerGeneral() CircuitBreaker {
+	return CircuitBreaker{FailureRatio: c.CircuitBreakerFailureRatio, Window: c.CircuitBreakerWindow,
+		MinCalls: c.CircuitBreakerMinCalls, OpenTime: c.CircuitBreakerOpenTime}
+}
+
+// CircuitBreakerOverrides are the override blocks by the config path of the provider block (for
+// example "internal.jiring_switch"). The App maps each to the provider name of the rows.
+func (c Config) CircuitBreakerOverrides() map[string]CircuitBreaker {
+	return map[string]CircuitBreaker{
+		"internal.irancell": {c.IrancellCircuitBreakerFailureRatio, c.IrancellCircuitBreakerWindow,
+			c.IrancellCircuitBreakerMinCalls, c.IrancellCircuitBreakerOpenTime},
+		"internal.jiring_switch": {c.JiringSwitchCircuitBreakerFailureRatio, c.JiringSwitchCircuitBreakerWindow,
+			c.JiringSwitchCircuitBreakerMinCalls, c.JiringSwitchCircuitBreakerOpenTime},
+		"internal.parsian": {c.ParsianCircuitBreakerFailureRatio, c.ParsianCircuitBreakerWindow,
+			c.ParsianCircuitBreakerMinCalls, c.ParsianCircuitBreakerOpenTime},
+		"external.karashop": {c.KarashopCircuitBreakerFailureRatio, c.KarashopCircuitBreakerWindow,
+			c.KarashopCircuitBreakerMinCalls, c.KarashopCircuitBreakerOpenTime},
+		"external.qabzino": {c.QabzinoCircuitBreakerFailureRatio, c.QabzinoCircuitBreakerWindow,
+			c.QabzinoCircuitBreakerMinCalls, c.QabzinoCircuitBreakerOpenTime},
+		"external.tavanir": {c.TavanirCircuitBreakerFailureRatio, c.TavanirCircuitBreakerWindow,
+			c.TavanirCircuitBreakerMinCalls, c.TavanirCircuitBreakerOpenTime},
+	}
+}
+
+// circuitBreakerErrors checks the circuit breaker keys at start (task 060).
+func (c Config) circuitBreakerErrors() []error {
+	var errs []error
+	g := c.CircuitBreakerGeneral()
+	if g.FailureRatio < 1 || g.FailureRatio > 100 {
+		errs = append(errs, errors.New("providers.general.circuit_breaker.failure_ratio must be 1 to 100 (percent)"))
+	}
+	if g.Window <= 0 {
+		errs = append(errs, errors.New("providers.general.circuit_breaker.window must be a positive duration (for example 2m)"))
+	}
+	if g.MinCalls < 1 {
+		errs = append(errs, errors.New("providers.general.circuit_breaker.min_calls must be 1 or more"))
+	}
+	if g.OpenTime <= 0 {
+		errs = append(errs, errors.New("providers.general.circuit_breaker.open_time must be a positive duration (for example 1m)"))
+	}
+	overrides := c.CircuitBreakerOverrides()
+	for _, k := range slices.Sorted(maps.Keys(overrides)) {
+		o := overrides[k]
+		path := "providers." + k + ".circuit_breaker."
+		if o.FailureRatio < 0 || o.FailureRatio > 100 {
+			errs = append(errs, errors.New(path+"failure_ratio must be 0 (the general value) to 100"))
+		}
+		if o.Window < 0 {
+			errs = append(errs, errors.New(path+"window must not be negative (0: the general value)"))
+		}
+		if o.MinCalls < 0 {
+			errs = append(errs, errors.New(path+"min_calls must not be negative (0: the general value)"))
+		}
+		if o.OpenTime < 0 {
+			errs = append(errs, errors.New(path+"open_time must not be negative (0: the general value)"))
+		}
+	}
+	return errs
 }

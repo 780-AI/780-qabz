@@ -196,6 +196,8 @@ var qabzMetrics = []string{
 	"qabz_provider_switches_total", // task 059
 	"qabz_provider_demoted",
 	"qabz_provider_trial_total",
+	"qabz_circuit_breaker_state", // task 060
+	"qabz_circuit_breaker_transitions_total",
 	"qabz_inquiries_total", "qabz_provider_calls_total", "qabz_provider_call_duration_ms",
 	"qabz_order_create_total", "qabz_fee_resolve_total",
 	// Task 045: the workers (registered also with the worker switch off).
@@ -270,7 +272,7 @@ func TestMetricsOffRegistersNothing(t *testing.T) {
 		check, err := newAuth(cfg, off, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, check)
-		providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), off, &fakeLogger{c: &calls{}}, nil)
+		providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), off, &fakeLogger{c: &calls{}}, nil, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, providers)
 	}

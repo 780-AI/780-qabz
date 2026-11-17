@@ -259,3 +259,44 @@ func TestPayStatus(t *testing.T) {
 		assert.Equal(t, s, payStatus(&provider.PaymentResponse{Status: s}, nil))
 	}
 }
+
+// TestCompleteOnPayResult (task 060): each payment call reports its order row to OnPayResult: a
+// payment that was not sent and a timeout are down, every answer (success, failed, pending) is a
+// good call, the call after a move reports the next row; another error and a canceled call are not
+// reported.
+func TestCompleteOnPayResult(t *testing.T) {
+	timeout := fmt.Errorf("test: pay: %w: %w", provider.ErrProviderDown, context.DeadlineExceeded)
+	for name, c := range map[string]struct {
+		resp   *provider.PaymentResponse
+		err    error
+		cancel bool
+		want   []string
+	}{
+		"not sent, next pays": {err: errNotSent, want: []string{"149/parsian/mobilemidterm/order/down", "29/jiring-switch/mobilemidterm/order/answer"}},
+		"timeout":             {err: timeout, want: []string{"149/parsian/mobilemidterm/order/down"}},
+		"success":             {resp: &provider.PaymentResponse{Status: "success", Code: 200}, want: []string{"149/parsian/mobilemidterm/order/answer"}},
+		"failed":              {resp: &provider.PaymentResponse{Status: "failed", Code: 400}, want: []string{"149/parsian/mobilemidterm/order/answer"}},
+		"pending":             {resp: &provider.PaymentResponse{Status: "pending", Code: 500}, want: []string{"149/parsian/mobilemidterm/order/answer"}},
+		"other error":         {err: errors.New("not supported")},
+		"canceled":            {err: timeout, cancel: true},
+	} {
+		var got []string
+		f := newFallbackFixture(t, func(_ *fallbackFixture, o *PaymentOptions) {
+			o.OnPayResult = func(p provider.Provider, down bool) {
+				res := "answer"
+				if down {
+					res = "down"
+				}
+				got = append(got, fmt.Sprintf("%d/%s/%s/%s/%s", p.ID, p.Name, p.BillType, p.Action, res))
+			}
+		})
+		f.parsian.payResp, f.parsian.payErr = c.resp, c.err
+		ctx, cancel := context.WithCancel(context.Background())
+		if c.cancel {
+			cancel()
+		}
+		_, _ = f.p.Complete(ctx, completeMCI())
+		cancel()
+		assert.Equal(t, c.want, got, name)
+	}
+}

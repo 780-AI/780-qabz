@@ -284,7 +284,7 @@ func liveProviderStatusWorker(t *testing.T, providerName string, on func(*config
 	assert.Error(t, err, "two messages only")
 
 	// The worker saved the failed row: OrderComplete now answers failed (task 048 D11), no new row.
-	payments, err := newPayments(db, oneAdapter{adapter}, nil, nil, nil)
+	payments, err := newPayments(db, oneAdapter{adapter}, nil, nil, nil, nil)
 	if !assert.NoError(t, err) {
 		return
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	promclient "github.com/prometheus/client_golang/prometheus"
@@ -113,14 +114,14 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		return nil, err
 	}
 	// The provider list after the adapters (task 059): the Provider Switcher asks which rows have an
-	// adapter (providerAvailable).
-	providers, err := newProviders(holder, postgres.NewProviderRepository(db), metrics, logger, providerAvailable(registry, payRoutes()))
+	// adapter (providerAvailable). The circuit breaker (task 060) comes with it.
+	providers, breaker, err := newProvidersAndBreaker(holder, postgres.NewProviderRepository(db), metrics, logger, providerAvailable(registry, payRoutes()))
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
 	b.WithProviders(providers)
-	flow, err := newInquiryFlow(cfg, db, providers, registry, metrics, logger)
+	flow, err := newInquiryFlow(cfg, db, providers, registry, metrics, logger, breaker)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -130,7 +131,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	payments, err := newPayments(db, registry, providers, metrics, logger)
+	payments, err := newPayments(db, registry, providers, metrics, logger, breaker)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -365,8 +366,9 @@ func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 // row). With metrics on, each change adds 1 to qabz_provider_switches_total{bill_type,action,result}
 // (demoted, no_next, restored, redemoted, cleared); qabz_provider_demoted{provider,bill_type,action}
 // is 1 while the row is demoted and 0 after it returns; each end of a trial adds 1 to
-// qabz_provider_trial_total{bill_type,action,result} (ok, failed, released).
-func newProviders(holder *config.Holder[config.Config], repo provider.Repository, metrics *prometheus.Server, logger Logger, available func(provider.Provider) bool) (*provider.ProvidersService, error) {
+// qabz_provider_trial_total{bill_type,action,result} (ok, failed, released). The circuit breaker
+// (task 060) gets each demotion and each return of a row (Breaker.Demoted); nil: no breaker.
+func newProviders(holder *config.Holder[config.Config], repo provider.Repository, metrics *prometheus.Server, logger Logger, available func(provider.Provider) bool, breaker *provider.Breaker) (*provider.ProvidersService, error) {
 	if holder == nil {
 		return nil, errors.New("providers: config holder is required")
 	}
@@ -433,6 +435,15 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 			demoted.WithLabelValues(p.Name, p.BillType, p.Action).Set(v)
 		}
 	}
+	if breaker != nil {
+		metric := onDemoted
+		onDemoted = func(p provider.Provider, on bool) {
+			if metric != nil {
+				metric(p, on)
+			}
+			breaker.Demoted(p, on)
+		}
+	}
 	return provider.NewProvidersService(repo, provider.Options{
 		Interval:      func() time.Duration { return holder.Get().ProvidersLoadInterval },
 		Changed:       holder.Changed,
@@ -445,6 +456,34 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 		OnDemoted:     onDemoted,
 		OnTrial:       onTrial,
 	})
+}
+
+// newProvidersAndBreaker builds the provider list (newProviders) and the circuit breaker
+// (newBreaker, task 060) that demotes a row through it; the list tells the breaker each demotion and
+// each return. A report comes only after the start, when the list is set.
+func newProvidersAndBreaker(holder *config.Holder[config.Config], repo provider.Repository, metrics *prometheus.Server, logger Logger, available func(provider.Provider) bool) (*provider.ProvidersService, *provider.Breaker, error) {
+	var mu sync.Mutex
+	var list *provider.ProvidersService
+	breaker, err := newBreaker(holder, func(id int64, period time.Duration) error {
+		mu.Lock()
+		l := list
+		mu.Unlock()
+		if l == nil {
+			return provider.ErrUnknownProvider
+		}
+		return l.Demote(id, period)
+	}, metrics, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	providers, err := newProviders(holder, repo, metrics, logger, available, breaker)
+	if err != nil {
+		return nil, nil, err
+	}
+	mu.Lock()
+	list = providers
+	mu.Unlock()
+	return providers, breaker, nil
 }
 
 // providerAvailable is the Available callback of the Provider Switcher (task 059): an inquiry row
@@ -672,7 +711,7 @@ func disabledNotice(key, title string, enabled bool) string {
 // writes one error log line. With debug.cache_inquiries false (task 031, development only) the flow
 // does not read or write the inquiry tables (inquiry.Options.NoStore): every inquiry calls the
 // provider; one warn line at start names the key.
-func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Selector, adapters inquiry.Adapters, metrics *prometheus.Server, logger Logger) (*inquiry.Service, error) {
+func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Selector, adapters inquiry.Adapters, metrics *prometheus.Server, logger Logger, breaker *provider.Breaker) (*inquiry.Service, error) {
 	var onInquiry func(billType, providerName, result string)             // nil: metrics are off, nothing is recorded
 	var onCall func(providerName, action, result string, d time.Duration) // nil: metrics are off, nothing is recorded
 	if reg := metrics.Registry(); reg != nil {
@@ -712,40 +751,21 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 	if !cfg.DebugCacheInquiries && logger != nil {
 		logger.Warn("inquiry store disabled (debug.cache_inquiries: false): development only, every inquiry calls the provider and nothing is saved")
 	}
-	onDown := demoteOnDown(cfg.DebugProviderSwitcherDemoteOnDown, providers, logger)
+	var onResult func(p provider.Provider, down bool) // nil: no breaker (task 060)
+	if breaker != nil {
+		onResult = breaker.Report
+	}
 	return inquiry.NewService(inquiry.Options{
-		NoStore:        !cfg.DebugCacheInquiries,
-		Repository:     postgres.NewInquiryRepository(db),
-		Providers:      providers,
-		Adapters:       adapters,
-		CacheTTL:       func(billType string) time.Duration { return ttl[billType] }, // read-only map; no entry: 0, no cache
-		Logger:         flowLog,
-		OnInquiry:      onInquiry,
-		OnProviderCall: onCall,
-		OnProviderDown: onDown,
+		NoStore:          !cfg.DebugCacheInquiries,
+		Repository:       postgres.NewInquiryRepository(db),
+		Providers:        providers,
+		Adapters:         adapters,
+		CacheTTL:         func(billType string) time.Duration { return ttl[billType] }, // read-only map; no entry: 0, no cache
+		Logger:           flowLog,
+		OnInquiry:        onInquiry,
+		OnProviderCall:   onCall,
+		OnProviderResult: onResult,
 	})
-}
-
-// demoter is the Demote method of the Provider Switcher (provider.ProvidersService).
-type demoter interface {
-	Demote(id int64, period time.Duration) error
-}
-
-// demoteOnDown is the feature-ON hook of task 059 (debug.provider_switcher.demote_on_down, dev
-// only): with a period greater than 0 and a selector that can demote, each provider-down inquiry
-// that is not a trial demotes its row for the period (one warn line at start names the key). The
-// Provider Switcher writes the log line and counts the result (no_next too), so an error of Demote
-// is not logged again. 0, or a selector with no Demote: nil (no hook). Task 060 replaces it.
-func demoteOnDown(period time.Duration, providers inquiry.Selector, logger Logger) func(provider.Provider) {
-	d, ok := providers.(demoter)
-	if period <= 0 || !ok {
-		return nil
-	}
-	if logger != nil {
-		logger.Warn("provider switcher: debug.provider_switcher.demote_on_down is on: development only, each provider-down inquiry demotes its provider row",
-			"period_ms", float64(period)/float64(time.Millisecond))
-	}
-	return func(p provider.Provider) { _ = d.Demote(p.ID, period) }
 }
 
 // The provider call metrics (task 045: the status worker uses them too, with the action status).
@@ -963,7 +983,7 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 //   - qabz_order_settle_total{bill_type,provider,result,source}: each settlement (success, failed,
 //     pending, error, confirm_error, no_data), source payment (the settlement worker of task 046
 //     counts on the same metric with source worker).
-func newPayments(db *postgres.Client, adapters order.Adapters, groups order.Groups, metrics *prometheus.Server, logger Logger) (*order.Payments, error) {
+func newPayments(db *postgres.Client, adapters order.Adapters, groups order.Groups, metrics *prometheus.Server, logger Logger, breaker *provider.Breaker) (*order.Payments, error) {
 	var onPayment, onSettle, onFallback func(billType, providerName, result string)
 	var onPay func(providerName, status string, d time.Duration)
 	if reg := metrics.Registry(); reg != nil {
@@ -1006,6 +1026,10 @@ func newPayments(db *postgres.Client, adapters order.Adapters, groups order.Grou
 	if logger != nil {
 		payLog = logger
 	}
+	var onPayResult func(p provider.Provider, down bool) // nil: no breaker (task 060)
+	if breaker != nil {
+		onPayResult = breaker.Report
+	}
 	return order.NewPayments(order.PaymentOptions{
 		Repository:   postgres.NewOrderRepository(db),
 		Adapters:     adapters,
@@ -1016,6 +1040,7 @@ func newPayments(db *postgres.Client, adapters order.Adapters, groups order.Grou
 		Logger:       payLog,
 		OnPayment:    onPayment,
 		OnPay:        onPay,
+		OnPayResult:  onPayResult,
 		OnSettle:     onSettle,
 	})
 }

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- VERSION: 2.30 -->
+<!-- VERSION: 2.31 -->
 <!-- Last Updated: 2026-11-17 -->
 <!--
 System architecture reference (Critical File, CLAUDE.md § 4).
 CHANGE LOG
+v2.31 — 2026-11-17 — Task 060 circuit breaker: the breaker of each provider row (provider, bill type, action) counts the provider calls in a sliding window (20 buckets) and at the threshold (`min_calls` calls or more and `failure_ratio` percent or more provider down) asks the Provider Switcher to demote the row for `open_time`; it never blocks a call and demotes only with a next available row; a failed call is only provider down (a business answer is a good call); the inquiry flow (not a trial, not a saved answer) and each payment call report; the status workers do not; after `no_next` the row does not count for `open_time`; the keys `providers.general.circuit_breaker.*` and the overrides of each provider in the config example; the Hot Reload rows (every breaker key hot; a hot value out of range is ignored with one warn line); the metrics `qabz_circuit_breaker_state` and `qabz_circuit_breaker_transitions_total` with their labels; `debug.provider_switcher.demote_on_down` removed.
 v2.30 — 2026-11-17 — Task 059 Provider Switcher: `ProvidersService.Demote(id, period)` moves a provider row to the end of its group only when the group has a next available row (enabled, not demoted, with an adapter); a group with one available row is never demoted; `PickInquiry` gives one real inquiry the trial of a due demoted row (an order row is tried by an inquiry of the same provider and bill type; with no such inquiry row it returns with no trial when the period ends); a good trial puts the row back, a provider-down trial demotes it again; the state is in memory, kept through a load, cleared for a row that a load removes or disables; the `onlyProvider` rule of `core/inquiry` is removed (which providers answer is the `providers` rows); the `ProviderSwitcher` interface as built (no `Call` method); metrics `qabz_provider_switches_total`, `qabz_provider_demoted`, `qabz_provider_trial_total` with their labels; span attribute `provider.trial`; dev-only `debug.provider_switcher.demote_on_down` (the feature-ON hook until task 060); the Hot Reload rows.
 v2.29 — 2026-11-16 — Task 058 payment fallback: `OrderComplete` goes to the next enabled order row with a payment route when the payment did not reach the order provider for sure (`provider.ErrNotSent`: the switch off, no address, gRPC `Unavailable` before the request headers were sent), for every bill type; never after a timeout or an answer; no next row: `pending` as before. The Jiring Switch adapter pays (`PayBill`) and asks the status (`GetStatus`) of the MCI bill types; the Jiring Switch status worker (`providers.internal.jiring_switch.get_status.*`, new switch `enabled`, defaults); `debug.mocks.jiring_switch.pay_return_type` and `status_return_type`; the pending query of the status workers takes the newest row over all providers; the dev seed rows 29 and 30 are `enable`; new metric `qabz_order_payment_fallback_total`; span attribute `provider.first`; the Provider Switcher section names the one exception.
 v2.28 — 2026-11-16 — Task 056 Irancell payment over NATS: `OrderComplete` pays an Irancell order through the irancell service with one NATS request on `providers.internal.irancell.nats_subject` (bill's message bytes; the answer kept as bill, `ref_id` empty); new `system/nats` client and config section `nats`; `providers.internal.irancell.pay_timeout` (30s); `debug.mocks.irancell.pay_return_type`; the App starts when NATS does not answer; metrics `qabz_nats_requests_total`, `qabz_nats_request_duration_ms`, `qabz_nats_connected`; span `nats.Request`; compose service `nats` (profile `nats`).
@@ -223,6 +224,15 @@ Every provider has its own block under `providers` (the section is `providers`, 
 providers:
   general:
     load_interval: 1m
+    circuit_breaker:         # task 060; every key hot-reloadable
+      enabled: false         # false (default): no count, no demotion
+      failure_ratio: 30      # percent (1 to 100) of provider-down calls in the window
+      window: 2m             # the sliding window
+      min_calls: 20          # the smallest number of calls in the window for which the ratio is trusted
+      open_time: 1m          # the time a row stays demoted before its trial inquiry
+  # Each provider block (irancell, jiring_switch, parsian, karashop, qabzino, tavanir) can have
+  #   circuit_breaker: {failure_ratio: 0, window: 0s, min_calls: 0, open_time: 0s}
+  # (task 060): 0 (the default) takes the general value. No enabled key for each provider.
   internal:                  # our own services
     irancell:                      # the irancell service, our own service (task 035)
       enabled: false               # false (default): every Irancell call fails as "provider down", nothing is sent, the mock does not apply
@@ -393,8 +403,6 @@ Inquiry store switch (task 031). Development only, in the same `debug` section:
 ```yaml
 debug:
   cache_inquiries: true      # default true; false: the inquiry flow does not read or write bill_inquiries / bill_inquiry_requests
-  provider_switcher:         # task 059: the feature-ON hook of the Provider Switcher (task 060 replaces it)
-    demote_on_down: "0s"     # > 0: each provider-down inquiry (not a trial) demotes its provider row for this period; 0 = off
 ```
 
 `true` (the default, and always outside `dev`) is the flow as described: saved inquiries first, the provider only on a miss, the request row and the answer saved. `false` turns off every use of the two tables by the inquiry flow (`inquiry.Options.NoStore`, `core/inquiry`), for every bill type: no saved inquiry answers (the `caching.*` TTLs do not apply), and no request row, no inquiry and no copy for the user is written, also for a provider error or a refused answer. Every inquiry calls the provider; the answers, the error mapping, the log lines and the metrics are the same (a call is never `db_hit`). One warn line at start names the key. The raw gas inquiry (`billId` and `payId`) uses no table and does not change.
@@ -413,9 +421,9 @@ Only certain configs are hot reloadable. The new system must say which, and trea
 | Config | Hot reloadable | Why |
 |---|---|---|
 | Provider order, status and priority (the `providers` table) | Yes | It is read from the database every `providers.general.load_interval` (`ProvidersService`, `provider/selector.go`), so a change needs no restart. The interval itself is hot-reloadable and a change applies at once: `config.Holder.Changed()` wakes the reload routine, which stops the wait in progress when the effective interval (after the 1 s minimum) changed and runs the next load at (start of the last load + new interval), at once when that time is past; the same effective value restarts nothing and a load in progress is not interrupted. Each load has a fixed timeout of 10 s (`loadTimeout`, not a config key): a slower load fails, is counted as `error`, writes one error line and keeps the last list |
-| Switch demotion period | Yes | Each `Demote` call gets the period (task 059); its config key is `open_time` of the circuit breaker (task 060) |
+| Switch demotion period | Yes | Each `Demote` call gets the period (task 059): `open_time` of the circuit breaker (task 060), read at the threshold |
 | Cron intervals and the order time window | Yes | The runner can re-read them before each run |
-| Circuit breaker thresholds | Yes | Applied to the breaker's next count |
+| Circuit breaker (`providers.general.circuit_breaker.*` and `providers.<group>.<provider>.circuit_breaker.*`, task 060) | Yes | Every key is in `app_hot_configs` (the key is the field name in snake case, for example `circuit_breaker_window`, `qabzino_circuit_breaker_min_calls`) and applies at the next report of a call: the App builds its table again after each config change (`config.Holder.Changed`), so a report reads no config copy. A change of `window` starts the count of a row new. `enabled: false` stops the count and the demotions at once; a row that is demoted then returns by its trial. A hot value out of range is not used (a general value takes its default, an override the general value) with one warn line at the change; at start `Validate` refuses it |
 | Log level | Yes | A runtime flag |
 | Fee rules (the `fees` table) | Yes | It is read from the database |
 | JWT public keys | Yes | Already reloaded through etcd |
@@ -423,7 +431,6 @@ Only certain configs are hot reloadable. The new system must say which, and trea
 | Inquiry cache TTL of a bill type (`caching.water`, `caching.electricity`, `caching.gas`, `caching.irancell`, `caching.mobile`) | No | Read at startup (tasks 021, 022, 023, 035 and 036); hot reload would need an `app_hot_configs` key and a migration |
 | Provider mocks (`debug.mocks.<provider>`) | No | Applied when the adapters are built, in dev mode only |
 | Inquiry store switch (`debug.cache_inquiries`) | No | Read when the inquiry flow is built (task 031), in dev mode only |
-| Switcher hook (`debug.provider_switcher.demote_on_down`) | No | Read when the inquiry flow is built (task 059), in dev mode only |
 | Credentials and tokens | No | Held by the client built at startup |
 | Database, Redis, Kafka and NATS connections | No | The connections are made once, at startup |
 | Ports and the listening addresses | No | Bound once, at startup |
@@ -487,7 +494,7 @@ type ProviderRegistry interface {
 
 **Gap.** The current system has no automatic provider switcher. The new system must have one.
 
-The Provider Switcher (task 059) is part of `ProvidersService` (`src/provider/switcher.go`, the only owner of the provider list, conventions § 13). It moves a provider row (one provider, bill type and action) to the end of the order of its group (all rows of one bill type and action) for a period, and puts it back after a good trial. The circuit breaker of task 060 decides when to demote; until it lands, only the dev-only hook `debug.provider_switcher.demote_on_down` (below) calls it, so outside `dev` the behavior does not change.
+The Provider Switcher (task 059) is part of `ProvidersService` (`src/provider/switcher.go`, the only owner of the provider list, conventions § 13). It moves a provider row (one provider, bill type and action) to the end of the order of its group (all rows of one bill type and action) for a period, and puts it back after a good trial. The circuit breaker (task 060, `src/provider/breaker.go`, below) decides when to demote; with `providers.general.circuit_breaker.enabled: false` (the default) nothing calls it.
 
 **One generic rule for every bill type (operator, 2026-11-11, task 036).**
 - **The answer of a provider is the answer.** One request calls one provider: the first provider of the current order. What it returns is the answer of that request: a success, a business answer, an error, a timeout or an answer that cannot be used. The request does not call a second provider.
@@ -498,9 +505,17 @@ The Provider Switcher (task 059) is part of `ProvidersService` (`src/provider/sw
 - **The state is in memory**, in each instance of the App: a restart clears it. A demotion stays through the loads of the `providers` table for its period; a row that a load (or a runtime `Disable`) removes or disables loses its demotion (`cleared`). The stored `priority` never changes.
 - **One exception: a payment that was not sent (operator, 2026-11-16, task 058).** `OrderComplete` goes to the next enabled order row with a payment route only when the payment did not reach the provider for sure (`provider.ErrNotSent`; never after a timeout or an answer: the provider can have paid). It is generic and takes the order of the rows (conventions § 13).
 
-**Gap.** `bill` has no circuit breaker. Only `irancell` and `tavanir` have one. The new system must have one for every provider. Until then no provider adapter of `qabz` has one (operator decision of task 034: it is added to every provider at the end of the project); the keys `providers.external.tavanir.circuit_breaker.*` are parsed and not used.
+**Gap.** `bill` has no circuit breaker. Only `irancell` and `tavanir` have one (`gobreaker`: it counts in fixed intervals and blocks the calls while open). The new system must have one for every provider.
 
-A circuit breaker counts the recent failures of one provider. When too many calls fail, it opens and stops sending calls to that provider, so requests don't wait for a timeout one by one. After a short time it lets one test call through. If the test succeeds, it closes and the provider is used again.
+**The circuit breaker as built (task 060, `provider.Breaker`).** It does not block calls: it only asks the switcher to demote a row, so the next requests go to the next provider of the group.
+- **The count is for each provider row** (one provider, bill type and action), keyed by the row id: Qabzino can fail for one bill type and work for another. A load of the `providers` table keeps the count of a row that stays. The counts are in memory in each instance.
+- **The sliding window** is a ring of 20 time buckets, each `window/20` wide: old calls leave in steps of `window/20` (6 s for `2m`), and the memory is fixed at any traffic. A change of `window` starts the count of the row new.
+- **The rule to open:** in the window the row has `min_calls` calls or more, and the failed calls are `failure_ratio` percent or more (`failed*100 >= failure_ratio*total`: 29 % does not open, 30 % opens). `min_calls` is the smallest number of calls for which the percentage is trusted, not a number of failed calls.
+- **A failed call** is only a provider-down result: an error that wraps `provider.ErrProviderDown` (a timeout, a connection error, `provider.ErrNotSent`, an answer that maps to HTTP 503). Any answer of the provider (a business answer: no debt, a refused bill ID; a `failed` or `pending` payment) is a good call. A canceled call, a fault before the call and another error are not counted.
+- **Who reports.** The inquiry flow reports each provider call that is not a trial (`inquiry.Options.OnProviderResult`; a saved answer calls no provider; the trial result goes to the switcher). The payment step reports each payment call, also each call after a move to the next provider of task 058 (`order.PaymentOptions.OnPayResult`, the `order` row of the call). The status workers do not report (operator decision 1: a status call is another API, in batches). A report takes a short lock in memory: no database call and no wait.
+- **At the threshold** the breaker calls `Demote(id, open_time)` in its own goroutine, one at a time for each row. A good `Demote` opens the row (the switcher calls `OnDemoted(true)`): its results are not counted while it is demoted. The trial of the switcher decides the return: a good trial (or a return with no trial, or `cleared`) closes the breaker (`OnDemoted(false)`) and the count starts new; a failed trial demotes the row again and the breaker stays open.
+- **No next available row** (`ErrNoNextProvider`, `no_next`): nothing changes and the requests keep going to the row; the row does not count for `open_time`, then starts new (at most one `no_next` for each `open_time`; operator decision 7).
+- **`enabled: false`** (the default) is the behavior before task 060: no count, no demotion.
 
 A switch temporarily re-orders the providers: the row that failed moves to the end of the order (after every row that is not demoted). It comes back to its original order after a good trial. The original order itself, the `priority` of the `providers` table, is not changed.
 
@@ -529,9 +544,7 @@ How a provider switches back to normal:
 
 The trial is never a payment. **A demoted `order` row** is tried by one real inquiry of the same bill type through the available inquiry row (not demoted) of the same provider; its result applies to the order row. When the provider has no such inquiry row (for example `jiring-switch` `mobilemidterm`), the row returns with no trial when its period ends (operator, 2026-11-17).
 
-**Feature-ON hook (development only, until task 060).** `debug.provider_switcher.demote_on_down` (a duration; `0`, the default, is off; a mode other than `dev` removes it with the `debug` section): each provider-down inquiry that is not a trial demotes its row for that period (`inquiry.Options.OnProviderDown`). One warn line at start names the key.
-
-Each demotion, skip (`no_next`), trial result and return writes one info line of `ProvidersService` (`providers: row demoted`, `providers: demote skipped, no next available provider`, `providers: trial ok, row back in its place`, `providers: trial failed, row demoted again`, `providers: row back in its place with no trial (no inquiry row of the provider)`, `providers: demotion cleared, the row is removed or disabled`). The span `inquiry.Service.Inquire` of a trial has the attribute `provider.trial` (`true`).
+Each demotion, skip (`no_next`), trial result and return writes one info line of `ProvidersService` (`providers: row demoted`, `providers: demote skipped, no next available provider`, `providers: trial ok, row back in its place`, `providers: trial failed, row demoted again`, `providers: row back in its place with no trial (no inquiry row of the provider)`, `providers: demotion cleared, the row is removed or disabled`). The span `inquiry.Service.Inquire` of a trial has the attribute `provider.trial` (`true`). The breaker writes one info line for each open (`circuit breaker: open, row demoted`, with the counts `calls` and `failed`) and each close (`circuit breaker: closed, row back`).
 
 ### Cron Interface
 
@@ -693,8 +706,8 @@ Custom Prometheus metrics defined by `qabz`, on top of the default ones. Names s
 
 | Metric | Type | What it tells you |
 |---|---|---|
-| `qabz_circuit_breaker_state` | gauge | Breaker state per provider: closed, half-open or open |
-| `qabz_circuit_breaker_transitions_total` | counter | How often a breaker trips and recovers |
+| `qabz_circuit_breaker_state` | gauge | State of the breaker of each provider row (task 060) by `provider`, `bill_type`, `action` (`inquiry`, `order`): 0 closed (it counts), 1 open (the row is demoted). There is no half-open state: the trial of the switcher decides the return |
+| `qabz_circuit_breaker_transitions_total` | counter | Changes of the state of the breaker of each provider row (task 060) by `provider`, `bill_type`, `action` and `to` (`open`: the row was demoted; `closed`: the row returned). Alert on a high rate of `open` |
 | `qabz_provider_switches_total` | counter | Changes of the Provider Switcher (task 059) by `bill_type`, `action` (`inquiry`, `order`) and `result` (`demoted`; `no_next`: no next available row, nothing changed; `restored`: back in its place; `redemoted`: a failed trial; `cleared`: a load or `Disable` removed or disabled the row) |
 | `qabz_provider_demoted` | gauge | 1 while the row (`provider`, `bill_type`, `action`) is demoted, 0 after it returns (task 059). Alert when a row stays at 1 for long |
 | `qabz_provider_trial_total` | counter | Trial inquiries of a demoted row (task 059) by `bill_type`, `action` of the demoted row and `result` (`ok`: it returns; `failed`: demoted again; `released`: no verdict) |

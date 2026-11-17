@@ -123,7 +123,7 @@ func TestNewProvidersMetrics(t *testing.T) {
 	if !assert.NotNil(t, reg) {
 		return
 	}
-	s, err := newProviders(holder, repo, on, &fakeLogger{c: &calls{}}, nil)
+	s, err := newProviders(holder, repo, on, &fakeLogger{c: &calls{}}, nil, nil)
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		return
 	}
@@ -169,18 +169,18 @@ func TestNewProvidersMetrics(t *testing.T) {
 		}
 	}
 
-	_, err = newProviders(holder, repo, on, &fakeLogger{c: &calls{}}, nil)
+	_, err = newProviders(holder, repo, on, &fakeLogger{c: &calls{}}, nil, nil)
 	assert.ErrorContains(t, err, "providers: register metric")
 
 	off := prometheus.New("127.0.0.1:0", false)
 	for range 2 {
-		s, err := newProviders(holder, repo, off, &fakeLogger{c: &calls{}}, nil)
+		s, err := newProviders(holder, repo, off, &fakeLogger{c: &calls{}}, nil, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, s)
 	}
-	_, err = newProviders(nil, repo, off, &fakeLogger{c: &calls{}}, nil)
+	_, err = newProviders(nil, repo, off, &fakeLogger{c: &calls{}}, nil, nil)
 	assert.ErrorContains(t, err, "config holder is required")
-	_, err = newProviders(holder, nil, off, &fakeLogger{c: &calls{}}, nil)
+	_, err = newProviders(holder, nil, off, &fakeLogger{c: &calls{}}, nil, nil)
 	assert.ErrorContains(t, err, "repository is required")
 }
 
@@ -200,7 +200,7 @@ func TestNewProvidersReadsIntervalFromHolder(t *testing.T) {
 	cfg.ProvidersLoadInterval = time.Second
 	holder := config.NewHolder(cfg)
 	repo := &countingRepo{}
-	s, err := newProviders(holder, repo, prometheus.New("127.0.0.1:0", false), &fakeLogger{c: &calls{}}, nil)
+	s, err := newProviders(holder, repo, prometheus.New("127.0.0.1:0", false), &fakeLogger{c: &calls{}}, nil, nil)
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		return
 	}
@@ -234,7 +234,7 @@ func TestNewProvidersActiveCount(t *testing.T) {
 	if !assert.NotNil(t, reg) {
 		return
 	}
-	s, err := newProviders(config.NewHolder(testConfig(t)), repo, on, &fakeLogger{c: &calls{}}, nil)
+	s, err := newProviders(config.NewHolder(testConfig(t)), repo, on, &fakeLogger{c: &calls{}}, nil, nil)
 	if !assert.NoError(t, err) || !assert.NotNil(t, s) {
 		return
 	}

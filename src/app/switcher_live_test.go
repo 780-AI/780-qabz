@@ -15,11 +15,21 @@ import (
 )
 
 // Task 059: the Provider Switcher on the live stack (the seed providers in a run database, the
-// composition-root wiring: providerAvailable, the provider metrics, the dev-only hook
-// debug.provider_switcher.demote_on_down).
+// composition-root wiring: providerAvailable, the provider metrics). Task 060: the circuit breaker
+// starts the demotion (it replaced the dev-only hook debug.provider_switcher.demote_on_down).
+
+// liveBreaker turns the circuit breaker of c on: the first provider-down call opens the row
+// (min_calls 1), and the row stays demoted for openTime.
+func liveBreaker(c *config.Config, openTime time.Duration) {
+	c.CircuitBreakerEnabled = true
+	c.CircuitBreakerMinCalls = 1
+	c.CircuitBreakerFailureRatio = 30
+	c.CircuitBreakerWindow = time.Minute
+	c.CircuitBreakerOpenTime = openTime
+}
 
 // liveSwitcher is newLiveMCI with Jiring Switch row 28 enabled (priority 10: after Parsian row 39,
-// priority 2) and the demote hook on with period.
+// priority 2) and the circuit breaker on with the open time period (0: the breaker is off).
 func liveSwitcher(t *testing.T, ctx context.Context, parsianReturn string, period time.Duration) *liveWaterStack {
 	t.Helper()
 	return newLiveWaterCfg(t, ctx, config.MockReturnSuccess, `UPDATE providers SET status = 'enable' WHERE id = 28;`, func(c *config.Config) {
@@ -30,7 +40,9 @@ func liveSwitcher(t *testing.T, ctx context.Context, parsianReturn string, perio
 		c.DebugMockParsianEnabled = true
 		c.DebugMockParsianReturnType = parsianReturn
 		c.CachingMobile = time.Hour
-		c.DebugProviderSwitcherDemoteOnDown = period
+		if period > 0 {
+			liveBreaker(c, period)
+		}
 	})
 }
 
@@ -44,23 +56,37 @@ func groupIDs(s *liveWaterStack, billType, action string) (ids []int64, demoted 
 	return ids, demoted
 }
 
+// waitDemoted waits until the circuit breaker (its own goroutine) has demoted the rows want of the
+// group.
+func waitDemoted(t *testing.T, s *liveWaterStack, billType, action string, want []int64) {
+	t.Helper()
+	assert.Eventually(t, func() bool {
+		_, d := groupIDs(s, billType, action)
+		return assert.ObjectsAreEqual(want, d)
+	}, 3*time.Second, 5*time.Millisecond, "demoted %v", want)
+}
+
 // TestLiveSwitcherInquiry: Parsian (the first row of (mobile, inquiry)) is down: the request answers
-// 503 and the hook demotes row 39; the next requests go to Jiring Switch, also after a load; after
-// the period one request is the trial (Parsian, down again: demoted again); the request after it
+// 503 and the circuit breaker demotes row 39 (task 060); the next requests go to Jiring Switch, also
+// after a load; after the period one request is the trial (Parsian, down again: demoted again); the request after it
 // goes to Jiring Switch. One request calls one provider.
 func TestLiveSwitcherInquiry(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	const period = 400 * time.Millisecond
 	s := liveSwitcher(t, ctx, config.MockReturnError, period)
-	assert.Equal(t, 1, s.log.count("warn", "provider switcher: debug.provider_switcher.demote_on_down is on: development only, each provider-down inquiry demotes its provider row"))
 
 	_, err := s.askPhone(liveUserOne, mciPhoneReq(liveMCIPhone))
 	assert.Equal(t, codes.Unavailable, status.Code(err))
-	ids, dem := groupIDs(s, "mobile", "inquiry")
+	waitDemoted(t, s, "mobile", "inquiry", []int64{39})
+	ids, _ := groupIDs(s, "mobile", "inquiry")
 	assert.Equal(t, []int64{28, 39}, ids)
-	assert.Equal(t, []int64{39}, dem)
-	assert.Equal(t, 1, s.log.count("info", "providers: row demoted"))
+	// The Demote runs in the goroutine of the breaker: the line comes after the new order is stored.
+	assert.Eventually(t, func() bool { return s.log.count("info", "providers: row demoted") == 1 }, 3*time.Second, 5*time.Millisecond)
+	assert.Equal(t, 1, s.log.count("info", "circuit breaker: open, row demoted"))
+	breakerLabels := map[string]string{"provider": "parsian", "bill_type": "mobile", "action": "inquiry"}
+	assert.Equal(t, 1.0, s.metric(t, "qabz_circuit_breaker_state", breakerLabels))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_circuit_breaker_transitions_total", map[string]string{"provider": "parsian", "bill_type": "mobile", "action": "inquiry", "to": "open"}))
 	assert.Equal(t, 1.0, s.metric(t, "qabz_provider_switches_total", map[string]string{"bill_type": "mobile", "action": "inquiry", "result": "demoted"}))
 	assert.Equal(t, 1.0, s.metric(t, "qabz_provider_demoted", map[string]string{"provider": "parsian", "bill_type": "mobile", "action": "inquiry"}))
 
@@ -69,7 +95,7 @@ func TestLiveSwitcherInquiry(t *testing.T) {
 		assert.Equal(t, uint32(jiring.MockFinalTermAmount), res.GetFullTerm().GetPrice(), "Jiring Switch answers")
 	}
 	assert.NoError(t, s.providers.Load(ctx), "a load during the demotion")
-	_, dem = groupIDs(s, "mobile", "inquiry")
+	_, dem := groupIDs(s, "mobile", "inquiry")
 	assert.Equal(t, []int64{39}, dem, "kept through the load")
 	_, err = s.askPhone(liveUserTwo, mciPhoneReq(liveMCIPhone2))
 	assert.NoError(t, err)
@@ -82,9 +108,36 @@ func TestLiveSwitcherInquiry(t *testing.T) {
 	assert.Equal(t, 1.0, s.metric(t, "qabz_provider_trial_total", map[string]string{"bill_type": "mobile", "action": "inquiry", "result": "failed"}))
 	assert.Equal(t, 1.0, s.metric(t, "qabz_provider_switches_total", map[string]string{"bill_type": "mobile", "action": "inquiry", "result": "redemoted"}))
 	assert.Equal(t, 1, s.log.count("info", "providers: trial failed, row demoted again"))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_circuit_breaker_state", breakerLabels), "a failed trial: still open")
 	_, err = s.askPhone(liveUserOne, mciPhoneReq(liveMCIPhone2))
 	assert.NoError(t, err, "a new period: Jiring Switch")
 	assert.Equal(t, 2.0, s.metric(t, "qabz_provider_calls_total", map[string]string{"provider": "parsian", "action": "inquiry", "result": "down"}))
+}
+
+// TestLiveBreakerReturn (task 060, feature ON): a good answer opens nothing; a demotion of row 39
+// (the call of the breaker at its threshold; TestLiveSwitcherInquiry opens it by real down calls)
+// opens the breaker; after the open time the trial is good (the Parsian mock answers), the breaker
+// closes and the row is back in its place.
+func TestLiveBreakerReturn(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	const period = 300 * time.Millisecond
+	s := liveSwitcher(t, ctx, config.MockReturnSuccess, period)
+	breakerLabels := map[string]string{"provider": "parsian", "bill_type": "mobile", "action": "inquiry"}
+
+	// A good answer is a good call: nothing opens.
+	_, err := s.askPhone(liveUserOne, mciPhoneReq(liveMCIPhone))
+	assert.NoError(t, err)
+	assert.NoError(t, s.providers.Demote(39, period), "the open of the breaker (as after a provider-down call)")
+	waitDemoted(t, s, "mobile", "inquiry", []int64{39})
+	assert.Equal(t, 1.0, s.metric(t, "qabz_circuit_breaker_state", breakerLabels))
+	time.Sleep(period + 50*time.Millisecond)
+	_, err = s.askPhone(liveUserTwo, mciPhoneReq(liveMCIPhone2))
+	assert.NoError(t, err, "the trial: Parsian answers")
+	waitDemoted(t, s, "mobile", "inquiry", nil)
+	assert.Equal(t, 0.0, s.metric(t, "qabz_circuit_breaker_state", breakerLabels))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_circuit_breaker_transitions_total", map[string]string{"provider": "parsian", "bill_type": "mobile", "action": "inquiry", "to": "closed"}))
+	assert.Equal(t, 1, s.log.count("info", "circuit breaker: closed, row back"))
 }
 
 // TestLiveSwitcherOrderTrial: a demoted order row of Jiring Switch (30, mobile) returns by one
@@ -123,18 +176,22 @@ func TestLiveSwitcherOrderTrial(t *testing.T) {
 }
 
 // TestLiveSwitcherOneRow: the group of irancell has one row (38): a provider-down inquiry demotes
-// nothing (no_next) and the next request goes to the same row.
+// nothing (no_next) and the next request goes to the same row. Task 060 (decision 7): after no_next
+// the row does not count for the open time, so the second down call tries no demotion.
 func TestLiveSwitcherOneRow(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	s := newLiveWaterCfg(t, ctx, config.MockReturnError, "", func(c *config.Config) {
-		c.DebugProviderSwitcherDemoteOnDown = time.Hour
-	})
-	for range 2 {
-		_, err := s.askPhone(liveUserOne, irancellPhoneReq("989351112233"))
-		assert.Equal(t, codes.Unavailable, status.Code(err))
-	}
-	assert.Equal(t, 2.0, s.metric(t, "qabz_provider_switches_total", map[string]string{"bill_type": "irancell", "action": "inquiry", "result": "no_next"}))
+	s := newLiveWaterCfg(t, ctx, config.MockReturnError, "", func(c *config.Config) { liveBreaker(c, time.Hour) })
+	noNext := map[string]string{"bill_type": "irancell", "action": "inquiry", "result": "no_next"}
+	_, err := s.askPhone(liveUserOne, irancellPhoneReq("989351112233"))
+	assert.Equal(t, codes.Unavailable, status.Code(err))
+	assert.Eventually(t, func() bool { return s.metric(t, "qabz_provider_switches_total", noNext) == 1 }, 3*time.Second, 5*time.Millisecond)
+	_, err = s.askPhone(liveUserOne, irancellPhoneReq("989351112233"))
+	assert.Equal(t, codes.Unavailable, status.Code(err))
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, 1.0, s.metric(t, "qabz_provider_switches_total", noNext), "paused for the open time")
+	assert.Equal(t, 1, s.log.count("info", "providers: demote skipped, no next available provider"))
+	assert.Equal(t, 0, s.log.count("info", "circuit breaker: open, row demoted"))
 	assert.Equal(t, 2.0, s.metric(t, "qabz_provider_calls_total", map[string]string{"provider": "irancell", "action": "inquiry", "result": "down"}), "the same row both times")
 	p, err := s.providers.PickProvider("irancell", provider.ActionInquiry)
 	if assert.NoError(t, err) {

@@ -54,7 +54,7 @@ func TestNewInquiryFlowCacheInquiries(t *testing.T) {
 		}
 		log := &liveLogger{}
 		adapter := &cacheTestAdapter{}
-		flow, err := newInquiryFlow(cfg, db, cacheTestSelector{}, cacheTestAdapters{adapter}, prometheus.New("127.0.0.1:0", false), log)
+		flow, err := newInquiryFlow(cfg, db, cacheTestSelector{}, cacheTestAdapters{adapter}, prometheus.New("127.0.0.1:0", false), log, nil)
 		if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 			db.Close()
 			t.FailNow()

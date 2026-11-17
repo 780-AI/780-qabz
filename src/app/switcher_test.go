@@ -9,7 +9,6 @@ import (
 
 	"qabz/common/monitoring/prometheus"
 	"qabz/config"
-	"qabz/core/inquiry"
 	"qabz/provider"
 )
 
@@ -55,35 +54,6 @@ func TestProviderAvailable(t *testing.T) {
 	assert.True(t, payRoutes()["parsian"][provider.BillTypeWater], "a new map for each call")
 }
 
-// demoteSpy records the Demote calls.
-type demoteSpy struct {
-	inquiry.Selector
-	ids []int64
-	per []time.Duration
-}
-
-func (d *demoteSpy) Demote(id int64, period time.Duration) error {
-	d.ids, d.per = append(d.ids, id), append(d.per, period)
-	return provider.ErrNoNextProvider
-}
-
-// TestDemoteOnDown (task 059): the hook demotes the row of the call for the period (an error of
-// Demote is ignored: the switcher logs it); 0 or a selector with no Demote gives no hook; one warn
-// line at start.
-func TestDemoteOnDown(t *testing.T) {
-	log := &fakeLogger{c: &calls{}}
-	spy := &demoteSpy{}
-	hook := demoteOnDown(30*time.Second, spy, log)
-	if assert.NotNil(t, hook) {
-		hook(provider.Provider{ID: 39})
-		assert.Equal(t, []int64{39}, spy.ids)
-		assert.Equal(t, []time.Duration{30 * time.Second}, spy.per)
-	}
-	assert.Nil(t, demoteOnDown(0, spy, log))
-	assert.Nil(t, demoteOnDown(time.Second, cacheTestSelector{}, log), "no Demote method")
-	assert.NotNil(t, demoteOnDown(time.Second, spy, nil), "no logger")
-}
-
 // TestNewProvidersSwitcherMetrics (task 059): qabz_provider_switches_total, qabz_provider_demoted
 // and qabz_provider_trial_total count each change and each trial result.
 func TestNewProvidersSwitcherMetrics(t *testing.T) {
@@ -93,7 +63,7 @@ func TestNewProvidersSwitcherMetrics(t *testing.T) {
 		{ID: 3, Name: "karashop", BillType: "tel", Action: "inquiry", Priority: 1, Status: provider.StatusEnable},
 	}}
 	on := prometheus.New("127.0.0.1:0", true)
-	s, err := newProviders(config.NewHolder(testConfig(t)), repo, on, &fakeLogger{c: &calls{}}, nil)
+	s, err := newProviders(config.NewHolder(testConfig(t)), repo, on, &fakeLogger{c: &calls{}}, nil, nil)
 	if !assert.NoError(t, err) || !assert.NoError(t, s.Load(context.Background())) {
 		return
 	}
