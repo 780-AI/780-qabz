@@ -1,7 +1,8 @@
-<!-- VERSION: 3.60 -->
-<!-- Last Updated: 2026-11-16 -->
+<!-- VERSION: 3.61 -->
+<!-- Last Updated: 2026-11-17 -->
 <!--
 CHANGE LOG
+v3.61 — 2026-11-17 — Added session-wrap-up (task 058 session) entry.
 v3.60 — 2026-11-16 — Added 058-mci-jiring-fallback entry.
 v3.59 — 2026-11-16 — Added session-wrap-up (tasks 055 and 056 session) entry.
 v3.58 — 2026-11-16 — Added 056-irancell-payment entry.
@@ -176,6 +177,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-17] — Session wrap-up (task 058 session)
+- **Type:** Minor (the register only; no code).
+- **Files:** `docs/Plans/OPEN_TASKS.md` (4 lesson candidates, more evidence for 3); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. Task 058 was committed (`d4f7246`) and pushed (303d74e..d4f7246).
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Task 058: the payment fallback to the next provider (MCI: Parsian to Jiring Switch)
 - **Type:** Major (payment domain logic, new config keys, seed data, a worker, a conventions rule, a Critical File).

@@ -1,7 +1,8 @@
-<!-- VERSION: 1.93 -->
-<!-- Last Updated: 2026-11-16 -->
+<!-- VERSION: 1.94 -->
+<!-- Last Updated: 2026-11-17 -->
 <!--
 CHANGE LOG
+v1.94 — 2026-11-17 — Session wrap-up (task 058 session): 4 lesson candidates and more evidence for 3; push of 303d74e..d4f7246 done.
 v1.93 — 2026-11-16 — Task 058 payment fallback: QA scenario (feature-ON run done by the implementer; the operator QA on stage) and follow-ups (the stage and prod rows, the Jiring Switch worker switch); the task 054 follow-ups (a) and (b) are done by task 058.
 v1.92 — 2026-11-16 — Session wrap-up (tasks 055 and 056 session): 5 lesson candidates and more evidence for 2; push of 495f052..2aa2ca9 done.
 v1.91 — 2026-11-16 — Task 056 Irancell payment over NATS: QA scenario (feature-ON run done by the implementer; the operator QA is on stage with the real irancell service) and follow-ups (the NATS endpoints of stage and prod, the Irancell status worker switch, the old task 050 follow-up (a)).
@@ -580,3 +581,13 @@ Found in the 2026-11-16 session wrap-up (tasks 055 and 056 session):
 - **A status worker in a feature-ON run reads every pending order of the dev database.** The task 056 run turned the Irancell worker on with `start` 1s; the dev database had 8 older Irancell orders inside the 48 h window (all `initial`, so not touched). Candidate: before a worker runs in a feature-ON check, count the pending and in-progress orders of its provider in the window, as task 054 did for Parsian. Recommendation: queue (more evidence for **Shared local runtime**).
 - More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): the operator asked for the agent before both task commits of this session; for task 056 it found stale docs ("Qabz has no NATS" in four places), a wrong comment and a `null` decode that differed from bill, all fixed before the commit; for task 055 it found nothing. Recommendation: codify.
 - More evidence for **Shared local runtime** (2026-11-08): the operator's debug App stayed on 8080 / 8082 / 9090; the feature-ON runs used App copies on 18080 / 18082 / 18083 / 19090; only the compose `nats` container that this session started was stopped.
+
+Found in the 2026-11-17 session wrap-up (task 058 session):
+
+- **A binding convention that the task contradicts is found late.** The task 058 design was approved before the agent saw that conventions § 13 ("one request, one provider") forbids a fallback; the conflict was asked at the start of the implementation (the operator chose "Add an exception"). Candidate: the design step of a task reads `PROJECT_SPECIFIC_CONVENTIONS.md` against the design and names each conflict in the design, before the approval. Recommendation: codify (a design-step line in the conventions doc or the task template).
+- **The Bash tool shell is zsh.** `for t in "fullTerm 45000080" ...; do set -- $t` did not split the words (zsh), so the order calls had no pay ID. Candidate: a QA loop with word splitting goes in a `bash` script file (as `tmp/qa058/order.sh`). Recommendation: queue.
+- **The QA App starts from `src/`.** `providers.internal.payment_server.private_key_path` is relative (`paymentPrivateKey.pem`), so an App binary started from the repo root stops at the start. Candidate: a line in the feature-ON notes of the app README. Recommendation: queue.
+- **A config copy made by a text tool lost `""`.** The scratch config tool wrote `grpc_address: ` (YAML null), and the config load refused it (`null is not allowed`). Candidate: make the QA config copies with a YAML library (no `pyyaml` on this machine) or check them with `go run . --config` before the run. Recommendation: discard (the load error showed it at once).
+- More evidence for **The `committer` agent stops on the attribution line** (2026-11-16): it stopped again (task 058) at `Co-Authored-By: Claude Opus 5.5`; a second brief ("keep the Opus line") worked. Recommendation: codify the line in the brief of the commit-push skill ("the attribution of the parent session is correct").
+- More evidence for **Run the `code-reviewer` agent before the task commit** (2026-11-08): task 058 (`d4f7246`) was committed on the in-chat Rule 10 review and four positive controls; the agent did not run.
+- More evidence for **A status worker in a feature-ON run reads every pending order of the dev database** (2026-11-16): before the task 058 worker run the pending orders were counted (no Jiring Switch order; one older Parsian order, the Parsian worker off). Recommendation: codify (the count worked).
