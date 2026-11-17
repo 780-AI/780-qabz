@@ -1,7 +1,8 @@
-<!-- VERSION: 3.61 -->
+<!-- VERSION: 3.62 -->
 <!-- Last Updated: 2026-11-17 -->
 <!--
 CHANGE LOG
+v3.62 — 2026-11-17 — Added task-059-provider-switcher entry.
 v3.61 — 2026-11-17 — Added session-wrap-up (task 058 session) entry.
 v3.60 — 2026-11-16 — Added 058-mci-jiring-fallback entry.
 v3.59 — 2026-11-16 — Added session-wrap-up (tasks 055 and 056 session) entry.
@@ -177,6 +178,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-17] — Task 059 created: the Provider Switcher
+- **Type:** Minor (a task file only; no code).
+- **Files:** `docs/tasks/pending_tasks/059_provider_switcher.md` (new; task files are not manifest-tracked); `docs/tasks/pending_tasks/task_counter.json` (next ID 060); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The operator decisions of 2026-11-17 for the Provider Switcher: a demotion moves a provider row to the end of the order of its group for a period; a group with 1 provider is undemotable by nature and a group with 2 or more is demotable, with no rule for a bill type or a provider name; the backup comes only from the `providers` rows; the hard-coded `onlyProvider` rule of the inquiry flow is removed (the task 058 payment fallback stays as the one exception); the demotion state is in memory; the trial is only an inquiry, also for a demoted `order` row. Three open points stay for the design step. The circuit breaker that starts a demotion is task 060.
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-17] — Session wrap-up (task 058 session)
 - **Type:** Minor (the register only; no code).
