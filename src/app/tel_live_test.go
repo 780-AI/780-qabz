@@ -118,19 +118,20 @@ func TestLiveTelMockError(t *testing.T) {
 	assert.Equal(t, 2, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`))
 }
 
-// TestLiveTelOnlyKarashop (operator decision of 2026-11-14): with the Karashop tel row disabled and
-// the Qabzino tel row (id 52; Qabzino has an adapter) enabled, nobody is called: provider-down, no
-// row. With no enabled provider: the same answer. The raw inquiry needs no provider.
-func TestLiveTelOnlyKarashop(t *testing.T) {
+// TestLiveTelPickIsData (task 059: no onlyProvider rule): with the Karashop tel row disabled and
+// the Qabzino tel row (id 52) enabled, row 52 is the pick; the Qabzino adapter does not inquire tel,
+// so nobody is called: provider-down as "no adapter", no row. With no enabled provider:
+// provider-down as "no enabled provider". The raw inquiry needs no provider.
+func TestLiveTelPickIsData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	s := newLiveWater(t, ctx, config.MockReturnSuccess, `UPDATE providers SET status = 'disable' WHERE id = 124325; UPDATE providers SET status = 'enable' WHERE id = 52;`)
 	_, err := s.askTel(liveUserOne, &pb.InquiryTelRequest{Phone: liveTel})
 	assert.Equal(t, codes.Unavailable, status.Code(err))
 	assert.Equal(t, 0, s.log.count("info", mockInfoLine), "the other provider is not called")
-	assert.Equal(t, 1, s.log.count("error", "tel: no enabled provider for inquiry"))
+	assert.Equal(t, 1, s.log.count("error", "tel: provider inquiry failed"), "the pick has no adapter for tel")
 	assert.Equal(t, 0, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`))
-	assert.Equal(t, 1.0, s.metric(t, "qabz_inquiries_total", map[string]string{"bill_type": "tel", "provider": "none", "result": "no_provider"}))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_inquiries_total", map[string]string{"bill_type": "tel", "provider": "qabzino", "result": "error"}))
 
 	s = newLiveWater(t, ctx, config.MockReturnSuccess, `UPDATE providers SET status = 'disable' WHERE id = 124325;`)
 	_, err = s.askTel(liveUserOne, &pb.InquiryTelRequest{Phone: liveTel})

@@ -125,10 +125,11 @@ func TestLiveIrancellMockError(t *testing.T) {
 	assert.Equal(t, 1, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`), "no new request row")
 }
 
-// TestLiveIrancellOnlyIrancell (operator rule): when the Irancell row is disabled and another
-// provider is enabled for the bill type irancell, nobody is called: provider-down. With no enabled
-// provider: the same answer.
-func TestLiveIrancellOnlyIrancell(t *testing.T) {
+// TestLiveIrancellPickIsData (task 059: no onlyProvider rule): when the Irancell row is disabled and
+// another row is enabled for the bill type irancell, that row is the pick; its adapter (Qabzino)
+// does not inquire irancell, so nobody is called: provider-down as "no adapter". With no enabled
+// provider: provider-down as "no enabled provider".
+func TestLiveIrancellPickIsData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	// Another provider row for the bill type irancell, with an adapter (Qabzino), and the Irancell row disabled.
@@ -138,9 +139,9 @@ func TestLiveIrancellOnlyIrancell(t *testing.T) {
 	_, err := s.askPhone(liveUserOne, irancellPhoneReq(livePhone))
 	assert.Equal(t, codes.Unavailable, status.Code(err))
 	assert.Equal(t, 0, s.log.count("info", "provider mock: inquiry answered with no call to the provider"), "Qabzino is not called")
-	assert.Equal(t, 1, s.log.count("error", "irancell: no enabled provider for inquiry"))
+	assert.Equal(t, 1, s.log.count("error", "irancell: provider inquiry failed"), "the pick has no adapter for irancell")
 	assert.Equal(t, 0, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`))
-	assert.Equal(t, 1.0, s.metric(t, "qabz_inquiries_total", map[string]string{"bill_type": "irancell", "provider": "none", "result": "no_provider"}))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_inquiries_total", map[string]string{"bill_type": "irancell", "provider": "qabzino", "result": "error"}))
 
 	s = newLiveWater(t, ctx, config.MockReturnSuccess, `UPDATE providers SET status = 'disable' WHERE id = 38;`)
 	_, err = s.askPhone(liveUserOne, irancellPhoneReq(livePhone))

@@ -39,6 +39,7 @@ var allowedKeys = map[string]bool{
 	"bill_type": true, "provider": true, "operator": true, "result": true, "source": true, "cron": true,
 	"order.id": true, "exception.type": true,
 	"provider.first": true, // task 058: the order provider of a payment that went to the next provider (a provider name)
+	"provider.trial": true, // task 059: the inquiry is the trial of a demoted provider row (a bool)
 	// the keys of the instrumentation (otelgrpc, otelhttp, redisotel, the pgx tracer, kafka.Publish)
 	"db.system": true, "db.system.name": true, "db.operation.name": true, "db.redis.database_index": true,
 	"db.connection_string": true, "db.redis.num_cmd": true, // redisotel: "tcp://<host:port of the config>", a count

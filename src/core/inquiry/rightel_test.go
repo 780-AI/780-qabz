@@ -12,8 +12,8 @@ import (
 )
 
 // Task 037: the same flow answers the Rightel mobile bill (the bill type mobilemidtermRightel). The
-// inquiry ID is the phone; one answer has a mid-term and a final-term inquiry; only the Qabzino
-// provider may answer (operator rule).
+// inquiry ID is the phone; one answer has a mid-term and a final-term inquiry. The provider is the
+// one enabled row of the group (Qabzino in the seed; task 059: no rule in the code).
 
 const (
 	rtPhone  = "989201234567"
@@ -200,29 +200,17 @@ func TestRightelSameTypePairAnswers(t *testing.T) {
 	assert.Equal(t, 0, r.qabzino.calls)
 }
 
-// TestRightelOnlyQabzino (operator rule): when the pick for mobilemidtermRightel is another
-// provider, nobody is called and its saved rows are not read, also when that provider has an
-// adapter. The answer is the one of "no enabled provider".
-func TestRightelOnlyQabzino(t *testing.T) {
-	for _, other := range []provider.Provider{
-		{ID: 39, Name: "parsian", BillType: rtType, Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 28, Name: "jiring-switch", BillType: rtType, Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 38, Name: "irancell", BillType: rtType, Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 77, Name: "Qabzino", BillType: rtType, Action: "inquiry", Status: provider.StatusEnable}, // the name is exact
-	} {
-		r := newRightelRig(t, time.Hour)
-		r.selector.byType[rtType] = other
-		r.repo.seed(Row{ID: "old", InquiryID: rtPhone, ProviderID: other.ID, ProviderName: other.Name, BillType: rtType, InquiryType: provider.InquiryTypeMidterm, Amount: 9}, time.Minute, false)
-		res, err := r.ask(rtPhone, userA)
-		assert.Empty(t, res.Inquiries, other.Name)
-		if assert.ErrorIs(t, err, provider.ErrNoProvider, other.Name) {
-			assert.Contains(t, err.Error(), `only "qabzino" may answer`, other.Name)
-		}
-		assert.Equal(t, 0, r.qabzino.calls+r.otherCalls(), other.Name+": nobody is called")
-		assert.Equal(t, 0, r.repo.findCalls, other.Name+": its saved rows are not read")
-		assert.Empty(t, r.repo.requests, other.Name+": no request row")
-		assert.Equal(t, []string{rtType + "/none/no_provider"}, r.inquiry, other.Name)
-	}
+// TestRightelPickIsData (task 059: no onlyProvider rule): when the pick of mobilemidtermRightel is
+// another provider with an adapter, that provider is called, one time; Qabzino is not.
+func TestRightelPickIsData(t *testing.T) {
+	r := newRightelRig(t, time.Hour)
+	r.selector.byType[rtType] = provider.Provider{ID: 39, Name: "parsian", BillType: rtType, Action: "inquiry", Status: provider.StatusEnable}
+	_, err := r.ask(rtPhone, userA)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, r.others["parsian"].calls, "the pick answers")
+	assert.Equal(t, 1, r.otherCalls())
+	assert.Equal(t, 0, r.qabzino.calls)
+	assert.Equal(t, []string{rtType + "/parsian/provider_ok"}, r.inquiry)
 }
 
 // TestRightelNotAvailable: Qabzino disabled (no pick), Qabzino down and a Qabzino refusal. No other

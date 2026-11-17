@@ -1,7 +1,8 @@
-<!-- VERSION: 0.29 -->
-<!-- Last Updated: 2026-11-16 -->
+<!-- VERSION: 0.30 -->
+<!-- Last Updated: 2026-11-17 -->
 <!--
 CHANGE LOG
+v0.30 — 2026-11-17 — Task 059 (operator rules of 2026-11-17): § 13 — the Provider Switcher is part of `ProvidersService` (`Demote`, `PickInquiry`); a row is demoted only when its group has a next available row; "only one provider" is data (the enabled rows), never a provider name or bill type rule in code; the trial is one real inquiry, never a payment.
 v0.29 — 2026-11-16 — Task 058 (operator, 2026-11-16): § 13 gets one named exception to "one request, one provider": a payment that did not reach its provider for sure (`provider.ErrNotSent`) goes to the next enabled order row with a payment route; never after a timeout or an answer.
 v0.28 — 2026-11-16 — Task 057 (operator): new § 18 — every HTTP route of Qabz is `/v1`; no `/v2` and no `V2` method.
 v0.27 — 2026-11-16 — Task 050 (operator rule of 2026-11-15): § 10 — every failed step of a background worker writes one error line, also when the next run retries it (a failed read was "counted, no line"); the line has the worker name and the order ID when there is one; a call that the App stop canceled writes none.
@@ -328,7 +329,7 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 
 ## 13. Providers only through ProvidersService
 
-**`provider.ProvidersService` (`src/provider/selector.go`) is the only way to read providers.** Every other part of the code (order, inquiry, fee, the provider adapters, the Provider Switcher, later endpoints and crons) gets a single provider, a list or any other provider data from this service, through its methods (`PickProvider`, `List`, `Group`) or the `provider.ProviderSelector` interface.
+**`provider.ProvidersService` (`src/provider/selector.go`) is the only way to read providers.** Every other part of the code (order, inquiry, fee, the provider adapters, the Provider Switcher, later endpoints and crons) gets a single provider, a list or any other provider data from this service, through its methods (`PickProvider`, `PickInquiry`, `List`, `Group`) or the `provider.ProviderSelector` interface.
 
 **Forbidden outside the service and its wiring:**
 - A query on the `providers` table (raw SQL or any other access) in any package other than `postgres.ProviderRepository` (`src/system/postgres/provider_repository.go`).
@@ -339,7 +340,9 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 
 **Changes at runtime** (order, status) go through the service too (`MoveUp`, `MoveDown`, `Enable`, `Disable`), so every reader sees the same list. A load replaces the list with the database rows (the database wins, operator decision of task 020).
 
-**One request, one provider (operator, 2026-11-11, task 036).** A flow that calls a provider calls the pick of `PickProvider` once per request. What that provider returns is the answer of the request: a success, a business answer, an error, a timeout or an answer that cannot be used. The flow never calls the next provider of the list in the same request (no fallback loop in a flow, an adapter or a handler). A provider is switched only by the Provider Switcher (`system.html`, Provider Switcher), and only when the circuit breaker of that provider detects the condition. The switch is one generic mechanism: no rule for one bill type, one operator or one provider name; the order is the priority of the rows. A wanted order ("provider A first, B next") is set with the priority of the rows, not in code.
+**One request, one provider (operator, 2026-11-11, task 036).** A flow that calls a provider calls the pick of `PickProvider` once per request. What that provider returns is the answer of the request: a success, a business answer, an error, a timeout or an answer that cannot be used. The flow never calls the next provider of the list in the same request (no fallback loop in a flow, an adapter or a handler). A provider is switched only by the Provider Switcher (`system.html`, Provider Switcher), and only when the circuit breaker of that provider detects the condition (task 060). The switch is one generic mechanism: no rule for one bill type, one operator or one provider name; the order is the priority of the rows. A wanted order ("provider A first, B next") is set with the priority of the rows, not in code.
+
+**The Provider Switcher (operator, 2026-11-17, task 059).** The switcher is part of `ProvidersService` (`src/provider/switcher.go`): `Demote(id, period)` moves a row to the end of its group for a period and `PickInquiry` gives one real inquiry at a time the trial of a due row; the stored `priority` never changes and the state is in memory. A row is demoted only when its group has a next available row (enabled, not demoted, with an adapter for the bill type and action); with none, nothing changes. "Only one provider answers this bill type" is data — the enabled rows of the group — never an `if` on a provider name or a bill type in code (task 059 removed `onlyProvider`). The trial is an inquiry, never a payment; a trial request still calls one provider.
 
 **One exception: a payment that was not sent (operator, 2026-11-16, task 058).** The payment step (`order.Payments.Complete`) goes to the next provider only when the payment did not reach the order provider for sure: the adapter error wraps `provider.ErrNotSent` (the switch of the provider is off, it has no address, or gRPC answers `Unavailable` before the request headers went to a connection, `provider.SentHandler`). The next provider is the next enabled row of (bill type, `order`) of `ProvidersService.Group` that has a payment route and an adapter; the step saves an `in-progress` row with it (the same RRN) before the call. A timeout, a cancel, any other error and every answer of a provider stay with the provider (`pending` or the answer): the provider can have paid. The exception is generic (every bill type, no provider name, the order of the rows). No other flow may go to a second provider; a new exception needs an operator decision and a line here.
 

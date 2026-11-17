@@ -82,6 +82,9 @@ type Provider struct {
 	// TmpPriority is the sort key. It is not a column: each load sets it to Priority, and only
 	// MoveUp and MoveDown change it (system.html, Provider Switcher).
 	TmpPriority int
+	// Demoted is true while the Provider Switcher keeps the row at the end of its group (task 059,
+	// Demote). It is not a column: a new load keeps it only for a row that stays enabled.
+	Demoted     bool
 	Timeout     int
 	Status      string
 	UpdatedAt   time.Time
@@ -101,6 +104,7 @@ type Repository interface {
 // Logger is the logger the service needs.
 type Logger interface {
 	Debug(msg string, kv ...any)
+	Info(msg string, kv ...any)
 	Warn(msg string, kv ...any)
 	Error(msg string, kv ...any)
 }
@@ -115,6 +119,9 @@ type ProviderSelector interface {
 	MoveDown(id int64) error
 	Enable(id int64) error
 	Disable(id int64) error
+	// PickInquiry and Demote are the Provider Switcher (task 059, switcher.go).
+	PickInquiry(billType string) (Provider, Trial, error)
+	Demote(id int64, period time.Duration) error
 }
 
 // Options configures NewProvidersService.
@@ -143,6 +150,21 @@ type Options struct {
 	// and the last value always equals the current list. A failed load, a move and an unchanged
 	// Enable or Disable do not call it. Nil: no call.
 	OnActiveCount func(n int)
+	// Available reports whether an enabled row can serve its group: the provider has an adapter for
+	// the bill type and the action (task 059). Demote needs a next available row, and the trial of a
+	// demoted order row needs an available inquiry row of the same provider. Nil: every enabled row
+	// is available.
+	Available func(p Provider) bool
+	// OnSwitch is called once per change of the Provider Switcher with the bill type, the action of
+	// the row and one of the Switch values. Nil: no call.
+	OnSwitch func(billType, action, result string)
+	// OnDemoted is called with the row and true when it is demoted, and with false when it returns
+	// (restored or cleared). A demotion again (a failed trial) does not call it. It is called while
+	// the change holds the writer lock. Nil: no call.
+	OnDemoted func(p Provider, demoted bool)
+	// OnTrial is called once per end of a trial with the bill type and the action of the demoted
+	// row and one of the Trial values. Nil: no call.
+	OnTrial func(billType, action, result string)
 }
 
 // groupKey is one (bill_type, action).
@@ -160,6 +182,10 @@ type group struct {
 // snapshot is one whole list. It is never changed after it is stored: a change builds a new one
 // (copy on write), and unchanged groups are shared between snapshots.
 type snapshot struct {
+	// demoted is the demotion of each demoted id, and dueAt the earliest end time of them in Unix
+	// nanoseconds (0: no demotion). The map is a copy that is never changed (task 059).
+	demoted map[int64]*demotion
+	dueAt   int64
 	groups  map[groupKey]*group
 	keys    []groupKey         // every key, sorted by bill type, then action
 	byID    map[int64]groupKey // the group of each provider id
@@ -170,10 +196,11 @@ type snapshot struct {
 var emptySnapshot = &snapshot{groups: map[groupKey]*group{}, byID: map[int64]groupKey{}}
 
 // ProvidersService is the in-memory sorted list of the providers, grouped by (bill type, action).
-// In a group the order is TmpPriority ascending, then ID ascending; nothing else changes it.
+// In a group the order is TmpPriority ascending, then ID ascending; a demoted row (the Provider
+// Switcher, task 059: switcher.go) comes after every row that is not demoted.
 // It loads the rows at Start and again at each load interval; the database always wins: each load
 // replaces the whole list (TmpPriority = Priority, the stored status, new rows added, removed rows
-// dropped).
+// dropped); a demotion stays through a load for its period while the row stays enabled.
 //
 // ProvidersService is safe for concurrent use by any number of goroutines; a caller needs no lock.
 // Readers (PickProvider, List, Group) read one atomic pointer to an immutable snapshot and never
@@ -187,6 +214,16 @@ type ProvidersService struct {
 	onLoad   func(result string, d time.Duration)
 	onChange func(change, result string)
 	onActive func(n int)
+	// The Provider Switcher (task 059): see Options.
+	available func(p Provider) bool
+	onSwitch  func(billType, action, result string)
+	onDemoted func(p Provider, demoted bool)
+	onTrial   func(billType, action, result string)
+	// demotions is the demotion of each demoted id. Only a writer (with writeMu) reads or changes it.
+	demotions map[int64]*demotion
+	// trialTimeout is trialClaimTimeout and now is time.Now (tests set others).
+	trialTimeout time.Duration
+	now          func() time.Time
 	// minInterval is MinLoadInterval (tests set a shorter one).
 	minInterval time.Duration
 	// loadTimeout is the loadTimeout constant (tests set a shorter one).
@@ -218,7 +255,9 @@ func NewProvidersService(repo Repository, opts Options) (*ProvidersService, erro
 		return nil, errors.New("providers: logger is required")
 	}
 	s := &ProvidersService{repo: repo, interval: opts.Interval, changed: opts.Changed, log: opts.Logger, onLoad: opts.OnLoad,
-		onChange: opts.OnChange, onActive: opts.OnActiveCount, minInterval: MinLoadInterval, loadTimeout: loadTimeout}
+		onChange: opts.OnChange, onActive: opts.OnActiveCount, minInterval: MinLoadInterval, loadTimeout: loadTimeout,
+		available: opts.Available, onSwitch: opts.OnSwitch, onDemoted: opts.OnDemoted, onTrial: opts.OnTrial,
+		demotions: map[int64]*demotion{}, trialTimeout: trialClaimTimeout, now: time.Now}
 	s.snap.Store(emptySnapshot)
 	return s, nil
 }
@@ -232,10 +271,19 @@ func NewProvidersService(repo Repository, opts Options) (*ProvidersService, erro
 // for caching.provider. Qabz picks by the sorted order from memory and has no Redis cache. See
 // docs/this_vs_bill.md, item 13.
 func (s *ProvidersService) PickProvider(billType, action string) (Provider, error) {
-	snap := s.snap.Load()
-	if snap == nil {
-		snap = emptySnapshot // a zero service
+	return s.current().pick(billType, action)
+}
+
+// current is the snapshot that readers use.
+func (s *ProvidersService) current() *snapshot {
+	if snap := s.snap.Load(); snap != nil {
+		return snap
 	}
+	return emptySnapshot // a zero service
+}
+
+// pick is the first enabled provider of the group, or ErrNoProvider.
+func (snap *snapshot) pick(billType, action string) (Provider, error) {
 	g := snap.groups[groupKey{billType, action}]
 	if g == nil || g.first < 0 || g.first >= len(g.providers) {
 		return Provider{}, ErrNoProvider
@@ -316,7 +364,7 @@ func (s *ProvidersService) move(id int64, step int, change string) error {
 		ps[r].TmpPriority = r
 	}
 	ps[i].TmpPriority, ps[j].TmpPriority = ps[j].TmpPriority, ps[i].TmpPriority
-	sortProviders(ps)
+	sortProviders(ps) // a demoted row stays after the others (task 059)
 	s.snap.Store(cur.with(k, newGroup(ps)))
 	s.report(change, ResultChanged)
 	return nil
@@ -341,6 +389,12 @@ func (s *ProvidersService) setStatus(id int64, status, change string) error {
 	ps := slices.Clone(g.providers)
 	ps[i].Status = status
 	next := cur.with(k, newGroup(ps))
+	if status != StatusEnable {
+		// A disabled row loses its demotion, as at a load (task 059).
+		if d := s.demotions[id]; d != nil {
+			next = s.clear(next, d)
+		}
+	}
 	s.snap.Store(next)
 	s.reportActive(next.enabled)
 	s.report(change, ResultChanged)
@@ -405,6 +459,7 @@ func (s *ProvidersService) load(ctx, abort context.Context) error {
 	if prev == nil {
 		prev = emptySnapshot // a zero service
 	}
+	next = s.keepDemotions(next) // task 059: a demotion stays through the load for its period
 	s.snap.Store(next)
 	s.reportActive(next.enabled)
 	s.writeMu.Unlock()
@@ -452,7 +507,8 @@ func (s *ProvidersService) logOrderChanges(prev, next *snapshot) {
 	}
 }
 
-// sameOrder reports whether a and b have the same ids in the same order with the same status.
+// sameOrder reports whether a and b have the same ids in the same order with the same status and
+// the same demotion.
 func sameOrder(a, b *group) bool {
 	var pa, pb []Provider
 	if a != nil {
@@ -461,10 +517,13 @@ func sameOrder(a, b *group) bool {
 	if b != nil {
 		pb = b.providers
 	}
-	return slices.EqualFunc(pa, pb, func(x, y Provider) bool { return x.ID == y.ID && x.Status == y.Status })
+	return slices.EqualFunc(pa, pb, func(x, y Provider) bool {
+		return x.ID == y.ID && x.Status == y.Status && x.Demoted == y.Demoted
+	})
 }
 
-// orderText prints a group as "id:tmp_priority:status" items in order, joined by ",".
+// orderText prints a group as "id:tmp_priority:status" items in order, joined by ","; a demoted row
+// ends with ":demoted".
 func orderText(g *group) string {
 	if g == nil {
 		return ""
@@ -479,6 +538,9 @@ func orderText(g *group) string {
 		b.WriteString(strconv.Itoa(p.TmpPriority))
 		b.WriteByte(':')
 		b.WriteString(p.Status)
+		if p.Demoted {
+			b.WriteString(":demoted")
+		}
 	}
 	return b.String()
 }
@@ -650,7 +712,7 @@ func (s *snapshot) with(k groupKey, g *group) *snapshot {
 		groups = make(map[groupKey]*group, 1)
 	}
 	groups[k] = g
-	return &snapshot{groups: groups, keys: s.keys, byID: s.byID, size: s.size, enabled: enabled}
+	return &snapshot{groups: groups, keys: s.keys, byID: s.byID, size: s.size, enabled: enabled, demoted: s.demoted, dueAt: s.dueAt}
 }
 
 // find returns the group of id and the index of id in it.
@@ -684,9 +746,16 @@ func newGroup(ps []Provider) *group {
 	return g
 }
 
-// sortProviders sorts by TmpPriority ascending, then ID ascending.
+// sortProviders sorts the rows that are not demoted first, then the demoted rows (task 059); in each
+// part by TmpPriority ascending, then ID ascending.
 func sortProviders(ps []Provider) {
 	slices.SortFunc(ps, func(a, b Provider) int {
+		if a.Demoted != b.Demoted {
+			if b.Demoted {
+				return -1
+			}
+			return 1
+		}
 		if c := cmp.Compare(a.TmpPriority, b.TmpPriority); c != 0 {
 			return c
 		}

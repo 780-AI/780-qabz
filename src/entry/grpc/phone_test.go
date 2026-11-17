@@ -320,7 +320,6 @@ func TestPhoneInquiryFailures(t *testing.T) {
 		{"flow invalid", fmt.Errorf("%w: phone", inquiry.ErrInvalid), codes.InvalidArgument, "invalid parameter", ""},
 		{"refused", &inquiry.RefusedError{Message: "not an Irancell number"}, codes.FailedPrecondition, "not an Irancell number", ""},
 		{"no provider", fmt.Errorf("pick provider: %w", provider.ErrNoProvider), codes.Unavailable, providerDownText, "irancell: no enabled provider for inquiry"},
-		{"another provider was picked", fmt.Errorf("pick provider: %w: only %q may answer, the pick is %q", provider.ErrNoProvider, "irancell", "qabzino"), codes.Unavailable, providerDownText, "irancell: no enabled provider for inquiry"},
 		{"provider down", fmt.Errorf("irancellproxy: %w: %w", provider.ErrProviderDown, cause), codes.Unavailable, providerDownText, "irancell: provider inquiry failed"},
 		{"no adapter", fmt.Errorf("%w %q", inquiry.ErrNoAdapter, "irancell"), codes.Unavailable, providerDownText, "irancell: provider inquiry failed"},
 		{"database", fmt.Errorf("save request row: %w", cause), codes.Internal, "internal error", "irancell: inquiry failed"},

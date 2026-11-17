@@ -811,6 +811,34 @@ func TestParseCacheInquiries(t *testing.T) {
 	assert.Error(t, err, "not a bool")
 }
 
+// TestParseDemoteOnDown (task 059): debug.provider_switcher.demote_on_down is 0 by default, takes a
+// duration in dev, is ignored (0) in a mode other than dev (task 020c), and a negative value or a
+// value that is not a duration is an error.
+func TestParseDemoteOnDown(t *testing.T) {
+	const base = "database: {postgres: {password: pw}}\n"
+	const on = "debug: {provider_switcher: {demote_on_down: 30s}}\n"
+	for _, mode := range []string{ModeDev, ModeStage, ModeProd} {
+		c, err := Parse([]byte("mode: " + mode + "\n" + base))
+		if assert.NoError(t, err, mode) {
+			assert.Zero(t, c.DebugProviderSwitcherDemoteOnDown, "default, %s", mode)
+		}
+	}
+	c, err := Parse([]byte("mode: dev\n" + base + on))
+	if assert.NoError(t, err) {
+		assert.Equal(t, 30*time.Second, c.DebugProviderSwitcherDemoteOnDown)
+	}
+	for _, mode := range []string{ModeStage, ModeProd} {
+		c, err := Parse([]byte("mode: " + mode + "\n" + base + on))
+		if assert.NoError(t, err, mode) {
+			assert.Zero(t, c.DebugProviderSwitcherDemoteOnDown, "ignored outside dev, %s", mode)
+		}
+	}
+	_, err = Parse([]byte("mode: dev\n" + base + "debug: {provider_switcher: {demote_on_down: -1s}}\n"))
+	assert.ErrorContains(t, err, "debug.provider_switcher.demote_on_down must not be negative")
+	_, err = Parse([]byte("mode: dev\n" + base + "debug: {provider_switcher: {demote_on_down: soon}}\n"))
+	assert.ErrorContains(t, err, "debug.provider_switcher.demote_on_down")
+}
+
 // TestParsePaymentServerKeys (task 041): the payment_server keys (address, private_key_path,
 // snake_case) under providers.internal; the defaults are the zero values.
 func TestParsePaymentServerKeys(t *testing.T) {

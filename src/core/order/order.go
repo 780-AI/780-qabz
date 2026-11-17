@@ -109,7 +109,7 @@ type billType struct {
 //
 //   - mobilemidtermRightel (task 055, the Rightel operator; bill has only the mid term): the raw
 //     inquiry first, as MCI, else the mid-term inquiry of the inquiry of mobilemidtermRightel itself
-//     (bill: BillTypeInquiryType[MOBILEMIDTERMRIGHTEL] midterm; only Qabzino answers, task 037). The
+//     (bill: BillTypeInquiryType[MOBILEMIDTERMRIGHTEL] midterm; Qabzino in the seed, task 037). The
 //     saved inquiries answer for Options.OrderCacheTTL (caching.paid_mobile, as bill).
 //
 // A bill type with no order cache TTL (Options.OrderCacheTTL gives 0) never answers from saved

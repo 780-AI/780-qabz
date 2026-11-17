@@ -150,7 +150,7 @@ type (
 	noAdapters struct{}
 )
 
-func (noSelector) PickProvider(string, string) (provider.Provider, error) {
-	return provider.Provider{}, assert.AnError
+func (noSelector) PickInquiry(string) (provider.Provider, provider.Trial, error) {
+	return provider.Provider{}, provider.Trial{}, assert.AnError
 }
 func (noAdapters) Get(string) (provider.ProviderInterface, bool) { return nil, false }

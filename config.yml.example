@@ -233,3 +233,5 @@ debug:
       return_type: "success" # inquiry: "success" or "error"
       settle_return_type: "success" # settlement (SendPaymentInfo): "success" or "error"
   cache_inquiries: true      # development only: false = the inquiry flow does not read or write bill_inquiries / bill_inquiry_requests (every inquiry calls the provider)
+  provider_switcher:         # task 059, development only: the feature-ON hook of the Provider Switcher (task 060 replaces it)
+    demote_on_down: "0s"     # > 0: each provider-down inquiry (not a trial) demotes its provider row for this period; 0 = off

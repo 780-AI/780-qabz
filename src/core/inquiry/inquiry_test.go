@@ -112,11 +112,11 @@ type fakeSelector struct {
 	err error
 }
 
-func (f fakeSelector) PickProvider(billType, action string) (provider.Provider, error) {
-	if billType != "water" || action != "inquiry" {
-		return provider.Provider{}, errors.New("unexpected pick")
+func (f fakeSelector) PickInquiry(billType string) (provider.Provider, provider.Trial, error) {
+	if billType != "water" {
+		return provider.Provider{}, provider.Trial{}, errors.New("unexpected pick")
 	}
-	return f.p, f.err
+	return f.p, provider.Trial{}, f.err
 }
 
 type fakeAdapters map[string]provider.ProviderInterface

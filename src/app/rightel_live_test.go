@@ -98,10 +98,11 @@ func TestLiveRightelMockError(t *testing.T) {
 	assert.Equal(t, 1, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`), "no new request row")
 }
 
-// TestLiveRightelOnlyQabzino (operator rule): with the Qabzino row disabled and another provider
-// with an adapter enabled for mobilemidtermRightel, nobody is called: provider-down, no row. With no
-// enabled provider: the same answer.
-func TestLiveRightelOnlyQabzino(t *testing.T) {
+// TestLiveRightelPickIsData (task 059: no onlyProvider rule): with the Qabzino row disabled and
+// another row enabled for mobilemidtermRightel, that row is the pick; its adapter (Irancell) does not
+// inquire the bill type, so nobody is called: provider-down as "no adapter", no row. With no enabled
+// provider: provider-down as "no enabled provider".
+func TestLiveRightelPickIsData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	s := newLiveWater(t, ctx, config.MockReturnSuccess, `UPDATE providers SET status = 'disable' WHERE id = 34;
@@ -110,9 +111,9 @@ func TestLiveRightelOnlyQabzino(t *testing.T) {
 	_, err := s.askPhone(liveUserOne, rightelPhoneReq(liveRightelPhone))
 	assert.Equal(t, codes.Unavailable, status.Code(err))
 	assert.Equal(t, 0, s.log.count("info", "provider mock: inquiry answered with no call to the provider"), "the other provider is not called")
-	assert.Equal(t, 1, s.log.count("error", "mobilemidtermRightel: no enabled provider for inquiry"))
+	assert.Equal(t, 1, s.log.count("error", "mobilemidtermRightel: provider inquiry failed"), "the pick has no adapter for the bill type")
 	assert.Equal(t, 0, s.count(t, `SELECT count(*) FROM bill_inquiry_requests`))
-	assert.Equal(t, 1.0, s.metric(t, "qabz_inquiries_total", map[string]string{"bill_type": "mobilemidtermRightel", "provider": "none", "result": "no_provider"}))
+	assert.Equal(t, 1.0, s.metric(t, "qabz_inquiries_total", map[string]string{"bill_type": "mobilemidtermRightel", "provider": "irancell", "result": "error"}))
 
 	s = newLiveWater(t, ctx, config.MockReturnSuccess, `UPDATE providers SET status = 'disable' WHERE id = 34;`)
 	_, err = s.askPhone(liveUserOne, rightelPhoneReq(liveRightelPhone))

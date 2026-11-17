@@ -4,17 +4,17 @@
 // are in the bill_inquiries and bill_inquiry_requests tables of the bill database. The flow is the
 // same for every bill type: task 021 implements water, task 022 adds electricity and the details of
 // an answer (provider.Details), task 023 adds gas (the inquiry ID is the participate code), task 035
-// adds the Irancell mobile bill (the inquiry ID is the phone; only the Irancell provider answers),
-// task 036 adds the MCI mobile bill (the bill type "mobile"; the inquiry ID is the phone), task 037
-// adds the Rightel mobile bill (the bill type "mobilemidtermRightel"; only Qabzino answers), task 025
-// adds the landline bill (the bill type "tel"; the inquiry ID is the landline number; only Karashop
-// answers).
+// adds the Irancell mobile bill (the inquiry ID is the phone), task 036 adds the MCI mobile bill (the
+// bill type "mobile"; the inquiry ID is the phone), task 037 adds the Rightel mobile bill (the bill
+// type "mobilemidtermRightel"), task 025 adds the landline bill (the bill type "tel"; the inquiry ID
+// is the landline number). Which providers answer a bill type is data: the enabled rows of the
+// providers table (task 059 removed the onlyProvider rule).
 //
-// One request calls one provider: the first enabled provider of the sorted list (PickProvider).
-// What that provider returns is the answer, also when it is an error or an answer that cannot be
-// used. The flow never calls a second provider in the same request: moving a bill type to the next
-// provider is the job of the Provider Switcher, only when the circuit breaker of the provider
-// detects the condition, for every bill type in the same way (system.html, Provider Switcher;
+// One request calls one provider: the pick of ProvidersService.PickInquiry (the first enabled
+// provider of the current order, or the demoted row of a trial). What that provider returns is the
+// answer, also when it is an error or an answer that cannot be used. The flow never calls a second
+// provider in the same request: moving a bill type to the next provider is the job of the Provider
+// Switcher (task 059), for every bill type in the same way (system.html, Provider Switcher;
 // conventions § 13).
 package inquiry
 
@@ -92,10 +92,6 @@ type billType struct {
 	validInquiryID func(id string) bool
 	// invalid names the inquiry ID in the text of the ErrInvalid error.
 	invalid string
-	// onlyProvider is the providers.name of the one provider that may answer the bill type, or ""
-	// when every provider of the sorted list may. When the pick gives another provider, the flow
-	// answers as "no enabled provider" and calls nobody.
-	onlyProvider string
 	// skipSameTypePair makes two saved rows of the same inquiry type (two mid-term or two
 	// final-term rows) a miss: the pair is not one answer of a provider, so the provider is asked
 	// again (bill: shouldSkipCache, for the bill types mobile and tel).
@@ -111,40 +107,29 @@ type billType struct {
 //     (VARCHAR(15)) fails at the request row, as in bill (a database error, Internal).
 //   - irancell (task 035): the inquiry ID is the phone of the request, a mobile number in the 98 form
 //     (bill: controller/phone validateInquiryRequest needs a valid phone, so SetInquiryID always
-//     gives the phone). Only the Irancell provider may answer (operator rule of task 035).
+//     gives the phone).
 //   - mobile (task 036, the MCI operator): the inquiry ID is the phone, as irancell. Every provider
 //     of the sorted list of (mobile, inquiry) may answer (the seed has Jiring Switch and Parsian);
 //     the flow has no rule that is special to this bill type but the cache skip of bill.
 //   - mobilemidtermRightel (task 037, the Rightel operator): the inquiry ID is the phone, as
-//     irancell. Only the Qabzino provider may answer (operator rule of task 037). bill has no cache
-//     skip for this bill type (shouldSkipCache: only mobile and tel).
+//     irancell. bill has no cache skip for this bill type (shouldSkipCache: only mobile and tel).
 //   - tel (task 025, the landline bill): the inquiry ID is the landline number in the 98 form
-//     (helpers.ValidTel). Only the Karashop provider may answer (operator decision of 2026-11-14).
-//     One answer has a mid-term and a final-term inquiry, and the cache skip of bill applies
-//     (shouldSkipCache: mobile and tel).
+//     (helpers.ValidTel). One answer has a mid-term and a final-term inquiry, and the cache skip of
+//     bill applies (shouldSkipCache: mobile and tel).
+//
+// No entry names a provider (task 059): the one provider of Irancell (task 035), Rightel (Qabzino,
+// task 037) and the landline bill (Karashop, task 025) is the one enabled row of its group.
 var billTypes = map[string]billType{
 	provider.BillTypeWater:       {tidPrefix: 1, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeElectricity: {tidPrefix: 2, validInquiryID: helpers.ValidBillID, invalid: "bill id"},
 	provider.BillTypeGas:         {tidPrefix: 3, validInquiryID: notEmpty, invalid: "participate code"},
-	provider.BillTypeIrancell:    {tidPrefix: 8, validInquiryID: helpers.ValidMobile, invalid: "phone", onlyProvider: irancellProvider},
+	provider.BillTypeIrancell:    {tidPrefix: 8, validInquiryID: helpers.ValidMobile, invalid: "phone"},
 	provider.BillTypeMobile:      {tidPrefix: 5, validInquiryID: helpers.ValidMobile, invalid: "phone", skipSameTypePair: true},
 	// bill: pkg/reference RightelMobileReference (6).
-	provider.BillTypeMobileMidTermRightel: {tidPrefix: 6, validInquiryID: helpers.ValidMobile, invalid: "phone", onlyProvider: qabzinoProvider},
+	provider.BillTypeMobileMidTermRightel: {tidPrefix: 6, validInquiryID: helpers.ValidMobile, invalid: "phone"},
 	// bill: pkg/reference TelephoneReference (4).
-	provider.BillTypeTel: {tidPrefix: 4, validInquiryID: helpers.ValidTel, invalid: "phone", onlyProvider: karashopProvider, skipSameTypePair: true},
+	provider.BillTypeTel: {tidPrefix: 4, validInquiryID: helpers.ValidTel, invalid: "phone", skipSameTypePair: true},
 }
-
-// irancellProvider is the providers.name of the Irancell provider (the adapter
-// provider/irancellproxy has the same name).
-const irancellProvider = "irancell"
-
-// qabzinoProvider is the providers.name of the Qabzino provider (the adapter provider/qabzino has
-// the same name). The package does not import the adapter: the flow knows only provider names.
-const qabzinoProvider = "qabzino"
-
-// karashopProvider is the providers.name of the Karashop provider (the adapter provider/karashop
-// has the same name).
-const karashopProvider = "karashop"
 
 // notEmpty is the rule of an inquiry ID that only has to be there.
 func notEmpty(id string) bool { return id != "" }
@@ -251,9 +236,10 @@ type Repository interface {
 	FinishRequest(ctx context.Context, id, status, providerTraceID string) error
 }
 
-// Selector picks the provider of a bill type and an action (provider.ProvidersService).
+// Selector picks the inquiry provider of a bill type (provider.ProvidersService.PickInquiry): the
+// plain pick, or the trial of a demoted row (task 059).
 type Selector interface {
-	PickProvider(billType, action string) (provider.Provider, error)
+	PickInquiry(billType string) (provider.Provider, provider.Trial, error)
 }
 
 // Adapters gives the adapter of a provider name (provider.ProviderRegistry).
@@ -285,6 +271,11 @@ type Options struct {
 	// OnProviderCall is called once per provider call with the provider name, the action, one of
 	// the Call values and the duration of the call. Nil: no call.
 	OnProviderCall func(providerName, action, result string, d time.Duration)
+	// OnProviderDown is called after each provider-down result (ResultProviderDown) of a call that is
+	// not a trial, with the row of the call (task 059: the App demotes the row with the dev-only key
+	// debug.provider_switcher.demote_on_down; task 060 counts it in the circuit breaker). It runs on
+	// the request path after the call. Nil: no call.
+	OnProviderDown func(p provider.Provider)
 	// NoStore turns off every use of the Repository (task 031, debug.cache_inquiries: false):
 	// no read of saved inquiries (CacheTTL does not apply), no request row, no saved answer. Every
 	// call goes to the provider. False (the zero value): the flow as before. The Repository is
@@ -301,6 +292,7 @@ type Service struct {
 	log            Logger
 	onInquiry      func(billType, providerName, result string)
 	onProviderCall func(providerName, action, result string, d time.Duration)
+	onProviderDown func(p provider.Provider)
 	noStore        bool
 
 	// newID and newTID are replaced by tests.
@@ -320,7 +312,7 @@ func NewService(o Options) (*Service, error) {
 	}
 	return &Service{
 		repo: o.Repository, providers: o.Providers, adapters: o.Adapters, cacheTTL: o.CacheTTL,
-		log: o.Logger, onInquiry: o.OnInquiry, onProviderCall: o.OnProviderCall, noStore: o.NoStore,
+		log: o.Logger, onInquiry: o.OnInquiry, onProviderCall: o.OnProviderCall, onProviderDown: o.OnProviderDown, noStore: o.NoStore,
 		newID: uuid.NewString, newTID: generateTID,
 	}, nil
 }
@@ -337,10 +329,12 @@ func generateTID(billType string) (string, error) {
 
 // Inquire answers the inquiry of a bill:
 //  1. A request that breaks a rule (the inquiry ID of the bill type, user) gives an error that wraps ErrInvalid.
-//  2. It picks the provider of the bill type (an error that wraps provider.ErrNoProvider when none
-//     is enabled, or when the bill type has one provider that may answer and the pick is another
-//     one) and its adapter (ErrNoAdapter, also when the adapter does not support the bill type:
-//     ProviderInterface.SupportsInquiry).
+//  2. It picks the provider of the bill type (PickInquiry; an error that wraps
+//     provider.ErrNoProvider when none is enabled) and its adapter (ErrNoAdapter, also when the
+//     adapter does not support the bill type: ProviderInterface.SupportsInquiry). A trial pick of
+//     the Provider Switcher (task 059) skips step 3 (the provider must be called) and reports the
+//     result of step 4 to the trial: a good or a business answer is TrialOK, provider down is
+//     TrialFailed, any other result is TrialReleased.
 //  3. Saved inquiries of the same bill and provider that are valid answer the call with no
 //     provider call, with the details that were saved with them; copies for the user are saved
 //     (is_cached true). For the bill types mobile and tel, two saved rows of the same inquiry type
@@ -395,7 +389,7 @@ func (s *Service) Inquire(ctx context.Context, req Request) (Result, error) {
 // inquire is steps 2 to 4 of Inquire with the span in ctx. It returns the provider name
 // (NoProviderLabel when none was picked) and the Result value of the call.
 func (s *Service) inquire(ctx context.Context, req Request, bt billType) (Result, string, string, error) {
-	pro, err := s.providers.PickProvider(req.BillType, provider.ActionInquiry)
+	pro, trial, err := s.providers.PickInquiry(req.BillType)
 	if err != nil {
 		result := ResultError
 		if errors.Is(err, provider.ErrNoProvider) {
@@ -403,31 +397,52 @@ func (s *Service) inquire(ctx context.Context, req Request, bt billType) (Result
 		}
 		return Result{}, NoProviderLabel, result, fmt.Errorf("pick provider for %s %s: %w", req.BillType, provider.ActionInquiry, err)
 	}
-	if bt.onlyProvider != "" && pro.Name != bt.onlyProvider {
-		// The bill type has one provider that may answer. Another provider is never called: the
-		// answer is the one of "no enabled provider".
-		return Result{}, NoProviderLabel, ResultNoProvider, fmt.Errorf("pick provider for %s %s: %w: only %q may answer, the pick is %q",
-			req.BillType, provider.ActionInquiry, provider.ErrNoProvider, bt.onlyProvider, pro.Name)
+	if trial.Active() {
+		trace.SpanFromContext(ctx).SetAttributes(attribute.Bool("provider.trial", true))
 	}
+	res, result, err := s.inquireWith(ctx, req, bt, pro, trial.Active())
+	switch {
+	case trial.Active():
+		trial.Done(trialResult(result))
+	case result == ResultProviderDown && s.onProviderDown != nil:
+		s.onProviderDown(pro)
+	}
+	return res, pro.Name, result, err
+}
+
+// trialResult maps the Result of a trial call to its provider.Trial value: the provider answered
+// (TrialOK), was down (TrialFailed), or the call gave no verdict (TrialReleased).
+func trialResult(result string) string {
+	switch result {
+	case ResultProviderOK, ResultProviderRefused:
+		return provider.TrialOK
+	case ResultProviderDown:
+		return provider.TrialFailed
+	}
+	return provider.TrialReleased
+}
+
+// inquireWith is steps 2 (the adapter) to 4 of Inquire for the picked provider. A trial skips the
+// saved inquiries.
+func (s *Service) inquireWith(ctx context.Context, req Request, bt billType, pro provider.Provider, trial bool) (Result, string, error) {
 	adapter, ok := s.adapters.Get(pro.Name)
 	if !ok || adapter == nil {
-		return Result{}, pro.Name, ResultError, fmt.Errorf("%w %q", ErrNoAdapter, pro.Name)
+		return Result{}, ResultError, fmt.Errorf("%w %q", ErrNoAdapter, pro.Name)
 	}
 	if !adapter.SupportsInquiry(req.BillType) {
 		// The adapter does not inquire this bill type: the same answer as no adapter (no saved
 		// inquiry read, no request row, no call), as before the adapter existed (task 036).
-		return Result{}, pro.Name, ResultError, fmt.Errorf("%w %q for the bill type %q", ErrNoAdapter, pro.Name, req.BillType)
+		return Result{}, ResultError, fmt.Errorf("%w %q for the bill type %q", ErrNoAdapter, pro.Name, req.BillType)
 	}
 
 	// @todo this_vs_bill item 34: bill has no switch that turns off the inquiry tables (task 031,
 	// Options.NoStore).
-	if !s.noStore && !req.NoCache {
+	if !s.noStore && !req.NoCache && !trial {
 		if res, ok := s.tracedFromDatabase(ctx, req, pro, bt.skipSameTypePair); ok {
-			return res, pro.Name, ResultDBHit, nil
+			return res, ResultDBHit, nil
 		}
 	}
-	res, result, err := s.tracedFromProvider(ctx, req, pro, adapter)
-	return res, pro.Name, result, err
+	return s.tracedFromProvider(ctx, req, pro, adapter)
 }
 
 // tracedFromDatabase is fromDatabase in the span fromDatabaseSpan, with the result hit, miss or

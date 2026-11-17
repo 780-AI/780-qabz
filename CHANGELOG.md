@@ -1,7 +1,8 @@
-<!-- VERSION: 3.63 -->
+<!-- VERSION: 3.64 -->
 <!-- Last Updated: 2026-11-17 -->
 <!--
 CHANGE LOG
+v3.64 — 2026-11-17 — Added 059-provider-switcher entry.
 v3.63 — 2026-11-17 — Added task-060-circuit-breaker entry.
 v3.62 — 2026-11-17 — Added task-059-provider-switcher entry.
 v3.61 — 2026-11-17 — Added session-wrap-up (task 058 session) entry.
@@ -179,6 +180,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-17] — Task 059: the Provider Switcher (demote a provider row, trial inquiry, return)
+- **Type:** Major (provider domain logic, a public interface, a new config key, metrics, a conventions rule, a Critical File).
+- **Files:** `src/provider/switcher.go` (new: `Demote`, `PickInquiry`, `Trial`, the demotion state, the order-row timer) and `switcher_test.go` (new); `src/provider/selector.go` (`Provider.Demoted`, `Options.Available`, `OnSwitch`, `OnDemoted`, `OnTrial`, the demoted order in each group, a load and `Disable` keep or clear a demotion, `ProviderSelector` gets `PickInquiry` and `Demote`) and `helpers_test.go`; `src/core/inquiry/inquiry.go` (`Selector.PickInquiry`, the trial skips the saved answers and reports its result, `Options.OnProviderDown`, the span attribute `provider.trial`; `onlyProvider` removed) and `switcher_test.go` (new), `inquiry_test.go`, `electricity_test.go`, `irancell_test.go`, `rightel_test.go`, `tel_test.go`, `tracing_test.go`; `src/core/order/order.go` (a comment); `src/config/config.go` (`debug.provider_switcher.demote_on_down`) and `config_test.go`; `src/app/defaults.go` (the provider list after the adapters, `providerAvailable`, `payRoutes`, the three switcher metrics, `demoteOnDown`), `src/app/switcher_test.go` and `switcher_live_test.go` (new), `defaults_test.go`, `providers_test.go`, `cacheinquiries_test.go`, `phone_live_test.go`, `providers_live_test.go`, `rightel_live_test.go`, `tel_live_test.go`, `water_live_test.go`; `src/common/monitoring/jaeger/jaegertest/jaegertest.go` (`provider.trial` allowed); `src/entry/grpc/tel.go` (a comment), `src/entry/grpc/phone_test.go`, `src/entry/http/gas_test.go`; `src/system/postgres/provider_live_test.go`; `config.yml.example`; `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (item 51; items 31, 32, 33, 36), `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (§ 13), `docs/folder_structure.md`, `src/app/README.md`, `docs/Plans/OPEN_TASKS.md`, `docs/documents_manifest.md`; the task file moved to `done_tasks/`.
+- **Impact:** **Yes, behavior changes.** (1) The Irancell, Rightel and landline inquiries no longer refuse a pick of another provider in code (`onlyProvider` removed, operator rule of 2026-11-17): the provider is the first enabled row of the group, so a second enabled row with an adapter for the bill type now answers (before: HTTP 503 with no call); with the seed and the dev database each group has one enabled row, so nothing changes there. (2) The inquiry flow picks with `PickInquiry`: with no demotion it is the pick of `PickProvider` (the same order, no database, no allocation). (3) The Provider Switcher exists in `ProvidersService`, but until task 060 nothing calls `Demote` at runtime, except the new development key `debug.provider_switcher.demote_on_down` (default `0` = off; removed outside `dev`). (4) New metrics `qabz_provider_switches_total`, `qabz_provider_demoted`, `qabz_provider_trial_total`. (5) The provider list is built after the adapter registry in `NewDefaultBuilder` (no change of the start order of the App). No API change (no Postman change).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 059 Provider Switcher" (Go tests with `-race`; feature ON on the dev database with a fake jiring-switch service and the Parsian mock: demotion, good trial and return, failed trial and demotion again). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-17] — Task 060 created: the circuit breaker
 - **Type:** Minor (a task file only; no code).

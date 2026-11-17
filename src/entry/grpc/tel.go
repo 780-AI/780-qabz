@@ -73,8 +73,8 @@ func validTelRequest(phone, billID, payID string) bool {
 }
 
 // Inquiry answers the inquiry of a landline bill (POST /v1/tel/inquiry, task 025): the saved
-// inquiries of the number when they are still valid, else Karashop (inquiry.Service; the bill type
-// tel has one provider that may answer). The flow and the answers of every failure are those of
+// inquiries of the number when they are still valid, else the provider of the group (inquiry.Service;
+// Karashop, the one enabled row of the seed). The flow and the answers of every failure are those of
 // Water.Inquiry (answerInquiryError; the log lines start with "tel:"). The answer is the one of a
 // mobile inquiry (phoneInquiryResponse): a mid-term and a full-term part.
 //

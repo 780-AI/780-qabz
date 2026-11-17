@@ -16,8 +16,8 @@ import (
 // cacheTestSelector always picks one water inquiry provider.
 type cacheTestSelector struct{}
 
-func (cacheTestSelector) PickProvider(string, string) (provider.Provider, error) {
-	return provider.Provider{ID: 36, Name: "stub", BillType: provider.BillTypeWater, Action: provider.ActionInquiry, Status: provider.StatusEnable}, nil
+func (cacheTestSelector) PickInquiry(string) (provider.Provider, provider.Trial, error) {
+	return provider.Provider{ID: 36, Name: "stub", BillType: provider.BillTypeWater, Action: provider.ActionInquiry, Status: provider.StatusEnable}, provider.Trial{}, nil
 }
 
 // cacheTestAdapter answers every inquiry and counts the calls.

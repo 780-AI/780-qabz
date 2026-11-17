@@ -79,13 +79,6 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	b.WithCache(cache)
 	b.WithMetrics(metrics)
 
-	providers, err := newProviders(holder, postgres.NewProviderRepository(db), metrics, logger)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	b.WithProviders(providers)
-
 	svc, err := newService(cfg, db, metrics, logger)
 	if err != nil {
 		db.Close()
@@ -119,6 +112,14 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
+	// The provider list after the adapters (task 059): the Provider Switcher asks which rows have an
+	// adapter (providerAvailable).
+	providers, err := newProviders(holder, postgres.NewProviderRepository(db), metrics, logger, providerAvailable(registry, payRoutes()))
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	b.WithProviders(providers)
 	flow, err := newInquiryFlow(cfg, db, providers, registry, metrics, logger)
 	if err != nil {
 		db.Close()
@@ -359,13 +360,21 @@ func newMyBills(cfg config.Config, db *postgres.Client, metrics *prometheus.Serv
 // to the number of enabled providers in all groups after each good load and each Enable or Disable
 // that changed the list (a failed load keeps the last value). A failed load writes one error log
 // line.
-func newProviders(holder *config.Holder[config.Config], repo provider.Repository, metrics *prometheus.Server, logger Logger) (*provider.ProvidersService, error) {
+//
+// The Provider Switcher (task 059): available tells which rows have an adapter (nil: every enabled
+// row). With metrics on, each change adds 1 to qabz_provider_switches_total{bill_type,action,result}
+// (demoted, no_next, restored, redemoted, cleared); qabz_provider_demoted{provider,bill_type,action}
+// is 1 while the row is demoted and 0 after it returns; each end of a trial adds 1 to
+// qabz_provider_trial_total{bill_type,action,result} (ok, failed, released).
+func newProviders(holder *config.Holder[config.Config], repo provider.Repository, metrics *prometheus.Server, logger Logger, available func(provider.Provider) bool) (*provider.ProvidersService, error) {
 	if holder == nil {
 		return nil, errors.New("providers: config holder is required")
 	}
-	var onLoad func(result string, d time.Duration) // nil: metrics are off, nothing is recorded
-	var onChange func(change, result string)        // nil: metrics are off, nothing is recorded
-	var onActive func(n int)                        // nil: metrics are off, nothing is recorded
+	var onLoad func(result string, d time.Duration)             // nil: metrics are off, nothing is recorded
+	var onChange func(change, result string)                    // nil: metrics are off, nothing is recorded
+	var onActive func(n int)                                    // nil: metrics are off, nothing is recorded
+	var onSwitch, onTrial func(billType, action, result string) // nil: metrics are off
+	var onDemoted func(p provider.Provider, demoted bool)       // nil: metrics are off
 	if reg := metrics.Registry(); reg != nil {
 		loads := promclient.NewCounterVec(promclient.CounterOpts{
 			Name: "qabz_providers_loads_total",
@@ -388,7 +397,19 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 			Name: "qabz_providers_active_count",
 			Help: "Enabled providers in all groups of the current provider list (set after each good load and each Enable or Disable that changed the list).",
 		})
-		for _, c := range []promclient.Collector{loads, duration, lastOK, changes, active} {
+		switches := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_provider_switches_total",
+			Help: "Changes of the Provider Switcher (task 059) by bill type, action (inquiry, order) and result (demoted; no_next: no next available row, nothing changed; restored: back in its place; redemoted: a failed trial; cleared: a load or Disable removed or disabled the row).",
+		}, []string{"bill_type", "action", "result"})
+		demoted := promclient.NewGaugeVec(promclient.GaugeOpts{
+			Name: "qabz_provider_demoted",
+			Help: "1 while the provider row (provider, bill type, action) is demoted by the Provider Switcher (task 059), 0 after it returns.",
+		}, []string{"provider", "bill_type", "action"})
+		trials := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_provider_trial_total",
+			Help: "Trial inquiries of a demoted provider row (task 059) by bill type, action of the demoted row (inquiry, order) and result (ok: the row returns; failed: demoted again; released: no verdict, the next request can try).",
+		}, []string{"bill_type", "action", "result"})
+		for _, c := range []promclient.Collector{loads, duration, lastOK, changes, active, switches, demoted, trials} {
 			if err := reg.Register(c); err != nil {
 				return nil, fmt.Errorf("providers: register metric: %w", err)
 			}
@@ -402,6 +423,15 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 		}
 		onChange = func(change, result string) { changes.WithLabelValues(change, result).Inc() }
 		onActive = func(n int) { active.Set(float64(n)) }
+		onSwitch = func(billType, action, result string) { switches.WithLabelValues(billType, action, result).Inc() }
+		onTrial = func(billType, action, result string) { trials.WithLabelValues(billType, action, result).Inc() }
+		onDemoted = func(p provider.Provider, on bool) {
+			v := 0.0
+			if on {
+				v = 1
+			}
+			demoted.WithLabelValues(p.Name, p.BillType, p.Action).Set(v)
+		}
 	}
 	return provider.NewProvidersService(repo, provider.Options{
 		Interval:      func() time.Duration { return holder.Get().ProvidersLoadInterval },
@@ -410,7 +440,31 @@ func newProviders(holder *config.Holder[config.Config], repo provider.Repository
 		OnLoad:        onLoad,
 		OnChange:      onChange,
 		OnActiveCount: onActive,
+		Available:     available,
+		OnSwitch:      onSwitch,
+		OnDemoted:     onDemoted,
+		OnTrial:       onTrial,
 	})
+}
+
+// providerAvailable is the Available callback of the Provider Switcher (task 059): an inquiry row
+// needs an adapter that inquires its bill type (SupportsInquiry), an order row an adapter and a
+// payment route of its bill type (routes, as the payment fallback of task 058). Any other action is
+// not available.
+func providerAvailable(adapters inquiry.Adapters, routes map[string]map[string]bool) func(provider.Provider) bool {
+	return func(p provider.Provider) bool {
+		a, ok := adapters.Get(p.Name)
+		if !ok || a == nil {
+			return false
+		}
+		switch p.Action {
+		case provider.ActionInquiry:
+			return a.SupportsInquiry(p.BillType)
+		case order.ActionOrder:
+			return routes[p.Name][p.BillType]
+		}
+		return false
+	}
 }
 
 // newProviderRegistry builds the provider adapters: Qabzino (task 021; since task 030 the direct
@@ -658,6 +712,7 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 	if !cfg.DebugCacheInquiries && logger != nil {
 		logger.Warn("inquiry store disabled (debug.cache_inquiries: false): development only, every inquiry calls the provider and nothing is saved")
 	}
+	onDown := demoteOnDown(cfg.DebugProviderSwitcherDemoteOnDown, providers, logger)
 	return inquiry.NewService(inquiry.Options{
 		NoStore:        !cfg.DebugCacheInquiries,
 		Repository:     postgres.NewInquiryRepository(db),
@@ -667,7 +722,30 @@ func newInquiryFlow(cfg config.Config, db *postgres.Client, providers inquiry.Se
 		Logger:         flowLog,
 		OnInquiry:      onInquiry,
 		OnProviderCall: onCall,
+		OnProviderDown: onDown,
 	})
+}
+
+// demoter is the Demote method of the Provider Switcher (provider.ProvidersService).
+type demoter interface {
+	Demote(id int64, period time.Duration) error
+}
+
+// demoteOnDown is the feature-ON hook of task 059 (debug.provider_switcher.demote_on_down, dev
+// only): with a period greater than 0 and a selector that can demote, each provider-down inquiry
+// that is not a trial demotes its row for the period (one warn line at start names the key). The
+// Provider Switcher writes the log line and counts the result (no_next too), so an error of Demote
+// is not logged again. 0, or a selector with no Demote: nil (no hook). Task 060 replaces it.
+func demoteOnDown(period time.Duration, providers inquiry.Selector, logger Logger) func(provider.Provider) {
+	d, ok := providers.(demoter)
+	if period <= 0 || !ok {
+		return nil
+	}
+	if logger != nil {
+		logger.Warn("provider switcher: debug.provider_switcher.demote_on_down is on: development only, each provider-down inquiry demotes its provider row",
+			"period_ms", float64(period)/float64(time.Millisecond))
+	}
+	return func(p provider.Provider) { _ = d.Demote(p.ID, period) }
 }
 
 // The provider call metrics (task 045: the status worker uses them too, with the action status).
@@ -929,15 +1007,9 @@ func newPayments(db *postgres.Client, adapters order.Adapters, groups order.Grou
 		payLog = logger
 	}
 	return order.NewPayments(order.PaymentOptions{
-		Repository: postgres.NewOrderRepository(db),
-		Adapters:   adapters,
-		PayRoutes: map[string]map[string]bool{
-			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true, provider.BillTypeElectricity: true, provider.BillTypeGas: true,
-				provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true, // task 054; task 058: also jiring-switch
-				provider.BillTypeMobileMidTermRightel: true}, // task 055: Parsian only (operator); bill also has EWaysRightelMobile (NATS)
-			irancellproxy.Name: {provider.BillTypeIrancell: true},                                     // task 056: the irancell service over NATS (bill: IrancellMobile)
-			jiring.Name:        {provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true}, // task 058 (bill: JiringSwitchMCIMobile)
-		},
+		Repository:   postgres.NewOrderRepository(db),
+		Adapters:     adapters,
+		PayRoutes:    payRoutes(),
 		Providers:    groups,
 		OnFallback:   onFallback,
 		SettleRoutes: settleRoutes(),
@@ -946,6 +1018,18 @@ func newPayments(db *postgres.Client, adapters order.Adapters, groups order.Grou
 		OnPay:        onPay,
 		OnSettle:     onSettle,
 	})
+}
+
+// payRoutes are the bill types that each order provider pays (order.PaymentOptions.PayRoutes; the
+// Provider Switcher reads them too: providerAvailable, task 059). A new map for each call.
+func payRoutes() map[string]map[string]bool {
+	return map[string]map[string]bool{
+		parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true, provider.BillTypeElectricity: true, provider.BillTypeGas: true,
+			provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true, // task 054; task 058: also jiring-switch
+			provider.BillTypeMobileMidTermRightel: true}, // task 055: Parsian only (operator); bill also has EWaysRightelMobile (NATS)
+		irancellproxy.Name: {provider.BillTypeIrancell: true},                                     // task 056: the irancell service over NATS (bill: IrancellMobile)
+		jiring.Name:        {provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true}, // task 058 (bill: JiringSwitchMCIMobile)
+	}
 }
 
 // settleOpts and settleLabels describe qabz_order_settle_total, which the payment step and the

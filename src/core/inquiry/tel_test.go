@@ -14,8 +14,8 @@ import (
 
 // Task 025: the same flow answers the landline bill (the bill type tel). The inquiry ID is the
 // landline number in the 98 form; one answer has a mid-term and a final-term inquiry, each can have
-// its own bill ID (Karashop asks each part with its own call); only Karashop may answer (operator
-// decision of 2026-11-14); two saved rows of the same inquiry type are a miss (bill: shouldSkipCache).
+// its own bill ID (Karashop asks each part with its own call); the provider is the one enabled row of
+// the group (Karashop in the seed; task 059: no rule in the code); two saved rows of the same inquiry type are a miss (bill: shouldSkipCache).
 
 const (
 	telNumber  = "982188776655"
@@ -217,28 +217,17 @@ func TestTelSavedRowsThatDoNotAnswer(t *testing.T) {
 	assert.Equal(t, 2, r.karashop.calls, "caching.tel 0: no cache")
 }
 
-// TestTelOnlyKarashop (operator decision of 2026-11-14): when the pick for tel is another provider,
-// nobody is called and its saved rows are not read. The answer is the one of "no enabled provider".
-func TestTelOnlyKarashop(t *testing.T) {
-	for _, other := range []provider.Provider{
-		{ID: 40, Name: "parsian", BillType: telType, Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 52, Name: "qabzino", BillType: telType, Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 21, Name: "eways2", BillType: telType, Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 77, Name: "Karashop", BillType: telType, Action: "inquiry", Status: provider.StatusEnable}, // the name is exact
-	} {
-		r := newTelRig(t, time.Hour)
-		r.selector.byType[telType] = other
-		r.repo.seed(Row{ID: "old", InquiryID: telNumber, ProviderID: other.ID, ProviderName: other.Name, BillType: telType, InquiryType: provider.InquiryTypeMidterm, Amount: 9}, time.Minute, false)
-		res, err := r.ask(telNumber, userA)
-		assert.Empty(t, res.Inquiries, other.Name)
-		if assert.ErrorIs(t, err, provider.ErrNoProvider, other.Name) {
-			assert.Contains(t, err.Error(), `only "karashop" may answer`, other.Name)
-		}
-		assert.Equal(t, 0, r.karashop.calls+r.otherCalls(), other.Name+": nobody is called")
-		assert.Equal(t, 0, r.repo.findCalls, other.Name+": its saved rows are not read")
-		assert.Empty(t, r.repo.requests, other.Name+": no request row")
-		assert.Equal(t, []string{"tel/none/no_provider"}, r.inquiry, other.Name)
-	}
+// TestTelPickIsData (task 059: no onlyProvider rule): when the pick of tel is another provider with
+// an adapter, that provider is called, one time; Karashop is not.
+func TestTelPickIsData(t *testing.T) {
+	r := newTelRig(t, time.Hour)
+	r.selector.byType[telType] = provider.Provider{ID: 52, Name: "qabzino", BillType: telType, Action: "inquiry", Status: provider.StatusEnable}
+	_, err := r.ask(telNumber, userA)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, r.others["qabzino"].calls, "the pick answers")
+	assert.Equal(t, 1, r.otherCalls())
+	assert.Equal(t, 0, r.karashop.calls)
+	assert.Equal(t, []string{"tel/qabzino/provider_ok"}, r.inquiry)
 }
 
 // TestTelNotAvailable: Karashop disabled (no pick), Karashop down and a Karashop refusal. No other

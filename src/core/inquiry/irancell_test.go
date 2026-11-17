@@ -12,7 +12,8 @@ import (
 )
 
 // Task 035: the same flow answers the Irancell mobile bill. The inquiry ID is the phone; one
-// answer has a mid-term and a final-term inquiry; only the Irancell provider may answer.
+// answer has a mid-term and a final-term inquiry. The provider is the one enabled row of the group
+// (Irancell in the seed; task 059: no rule in the code).
 
 const (
 	irPhone  = "989351234567"
@@ -217,39 +218,18 @@ func TestIrancellInvalidInquiryID(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalid)
 }
 
-// TestIrancellOnlyTheIrancellProvider (operator rule): when the pick for the bill type irancell is
-// another provider, nobody is called, also when that provider has an adapter. The answer is the one
-// of "no enabled provider".
-func TestIrancellOnlyTheIrancellProvider(t *testing.T) {
-	for _, other := range []provider.Provider{
-		{ID: 31, Name: "qabzino", BillType: "irancell", Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 39, Name: "parsian", BillType: "irancell", Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 28, Name: "jiring-switch", BillType: "irancell", Action: "inquiry", Status: provider.StatusEnable},
-		{ID: 77, Name: "Irancell", BillType: "irancell", Action: "inquiry", Status: provider.StatusEnable}, // the name is exact
-	} {
-		r := newIrancellRig(t, time.Hour)
-		r.selector.byType["irancell"] = other
-		// A saved row of that provider must not answer either.
-		r.repo.seed(Row{ID: "old", InquiryID: irPhone, ProviderID: other.ID, ProviderName: other.Name, BillType: "irancell", InquiryType: provider.InquiryTypeMidterm, Amount: 9}, time.Minute, false)
-		res, err := r.ask(irPhone, userA)
-		assert.Empty(t, res.Inquiries, other.Name)
-		if assert.ErrorIs(t, err, provider.ErrNoProvider, other.Name) {
-			assert.Contains(t, err.Error(), `only "irancell" may answer`, other.Name)
-			assert.Contains(t, err.Error(), other.Name)
-		}
-		assert.Equal(t, 0, r.irancell.calls, other.Name)
-		assert.Equal(t, 0, r.qabzino.calls, other.Name+": the other provider is not called")
-		assert.Equal(t, 0, r.repo.findCalls, other.Name+": its saved rows are not read")
-		assert.Empty(t, r.repo.requests, other.Name+": no request row")
-		assert.Equal(t, []string{"irancell/none/no_provider"}, r.inquiry, other.Name)
-		assert.Empty(t, r.calls, other.Name)
-	}
-	// The other bill types are free: Qabzino still answers water in the same Service.
+// TestIrancellPickIsData (task 059: no onlyProvider rule): the providers that answer irancell are
+// the enabled rows of its group. When the pick is another provider with an adapter, that provider
+// is called, one time; the Irancell adapter is not.
+func TestIrancellPickIsData(t *testing.T) {
 	r := newIrancellRig(t, time.Hour)
-	_, err := r.svc.Inquire(context.Background(), Request{BillType: "water", InquiryID: validBill, UserID: userA})
+	r.selector.byType["irancell"] = provider.Provider{ID: 31, Name: "qabzino", BillType: "irancell", Action: "inquiry", Status: provider.StatusEnable}
+	r.qabzino.resp = irancellResp()
+	_, err := r.ask(irPhone, userA)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, r.qabzino.calls)
+	assert.Equal(t, 1, r.qabzino.calls, "the pick answers")
 	assert.Equal(t, 0, r.irancell.calls)
+	assert.Equal(t, []string{"irancell/qabzino/provider_ok"}, r.inquiry)
 }
 
 // TestIrancellNotAvailable: no enabled provider, a provider that is down and a missing adapter. No

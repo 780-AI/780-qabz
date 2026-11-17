@@ -21,7 +21,12 @@ type typeSelector struct {
 	picks  []string
 }
 
-func (s *typeSelector) PickProvider(billType, action string) (provider.Provider, error) {
+func (s *typeSelector) PickInquiry(billType string) (provider.Provider, provider.Trial, error) {
+	p, err := s.pick(billType, provider.ActionInquiry)
+	return p, provider.Trial{}, err
+}
+
+func (s *typeSelector) pick(billType, action string) (provider.Provider, error) {
 	s.picks = append(s.picks, billType+"/"+action)
 	p, ok := s.byType[billType]
 	if !ok {

@@ -16,6 +16,7 @@ import (
 	"qabz/config"
 	"qabz/core/order"
 	grpcserver "qabz/entry/grpc"
+	"qabz/provider"
 	"qabz/provider/irancellproxy"
 	"qabz/system/postgres"
 	"qabz/system/postgres/postgrestest"
@@ -42,7 +43,8 @@ type liveWaterStack struct {
 	signer      *crypto.Signer // the order token key of phone (task 039)
 	metrics     *prometheus.Server
 	log         *liveLogger
-	payments    *order.Payments // the payment step (task 044)
+	payments    *order.Payments            // the payment step (task 044)
+	providers   *provider.ProvidersService // the provider list and the Provider Switcher (task 059)
 }
 
 func newLiveWater(t *testing.T, ctx context.Context, returnType, setupSQL string) *liveWaterStack {
@@ -92,16 +94,18 @@ func newLiveStack(t *testing.T, ctx context.Context, returnType, setupSQL string
 		change(&cfg)
 	}
 	log := &liveLogger{}
-	providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), prometheus.New("127.0.0.1:0", false), log)
-	if !assert.NoError(t, err) || !assert.NotNil(t, providers) || !assert.NoError(t, providers.Start(ctx)) {
-		t.FailNow()
-	}
-	t.Cleanup(func() { assert.NoError(t, providers.Stop(context.Background())) })
 	registry, err := newProviderRegistryWith(cfg, log, payer)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 	metrics := prometheus.New("127.0.0.1:0", true)
+	// As the composition root (task 059): the provider metrics on and the Available callback of the
+	// Provider Switcher.
+	providers, err := newProviders(config.NewHolder(cfg), postgres.NewProviderRepository(db), metrics, log, providerAvailable(registry, payRoutes()))
+	if !assert.NoError(t, err) || !assert.NotNil(t, providers) || !assert.NoError(t, providers.Start(ctx)) {
+		t.FailNow()
+	}
+	t.Cleanup(func() { assert.NoError(t, providers.Stop(context.Background())) })
 	flow, err := newInquiryFlow(cfg, db, providers, registry, metrics, log)
 	if !assert.NoError(t, err) || !assert.NotNil(t, flow) {
 		t.FailNow()
@@ -121,7 +125,7 @@ func newLiveStack(t *testing.T, ctx context.Context, returnType, setupSQL string
 	}
 	return &liveWaterStack{db: db, water: newWater(flow, orders, signer, 105, log), electricity: newElectricity(flow, orders, signer, 105, log), gas: newGas(flow, orders, signer, 105, log),
 		phone: newPhone(flow, orders, signer, 105, log), tel: newTel(flow, orders, signer, 105, log), signer: signer, metrics: metrics, log: log,
-		payments: payments}
+		payments: payments, providers: providers}
 }
 
 func (s *liveWaterStack) ask(user, bill string) (*pb.InquiryBillPayResponse, error) {

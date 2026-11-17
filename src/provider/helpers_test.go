@@ -83,6 +83,7 @@ func (l *fakeLog) add(level, msg string, kv []any) {
 }
 
 func (l *fakeLog) Debug(msg string, kv ...any) { l.add("debug", msg, kv) }
+func (l *fakeLog) Info(msg string, kv ...any)  { l.add("info", msg, kv) }
 func (l *fakeLog) Warn(msg string, kv ...any)  { l.add("warn", msg, kv) }
 func (l *fakeLog) Error(msg string, kv ...any) { l.add("error", msg, kv) }
 

@@ -145,6 +145,7 @@ type liveLog struct {
 }
 
 func (l *liveLog) Debug(string, ...any) { l.mu.Lock(); l.debug++; l.mu.Unlock() }
+func (l *liveLog) Info(string, ...any)  {}
 func (l *liveLog) Warn(string, ...any)  {}
 func (l *liveLog) Error(string, ...any) { l.mu.Lock(); l.errors++; l.mu.Unlock() }
 

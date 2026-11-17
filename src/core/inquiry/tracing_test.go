@@ -24,7 +24,9 @@ type anySelector struct {
 	err error
 }
 
-func (a anySelector) PickProvider(string, string) (provider.Provider, error) { return a.p, a.err }
+func (a anySelector) PickInquiry(string) (provider.Provider, provider.Trial, error) {
+	return a.p, provider.Trial{}, a.err
+}
 
 // tracedProvider is stubProvider with one client span "provider call", a child of the span in ctx
 // (the client span that the shared instrumentation of task 047 makes for a real adapter).
@@ -74,10 +76,10 @@ func TestInquireSpanTree(t *testing.T) {
 		{provider.BillTypeWater, "qabzino", validBill},
 		{provider.BillTypeElectricity, "tavanir", validBill},
 		{provider.BillTypeGas, "qabzino", gasCode},
-		{provider.BillTypeTel, karashopProvider, telNumber},
-		{provider.BillTypeIrancell, irancellProvider, irPhone},
+		{provider.BillTypeTel, "karashop", telNumber},
+		{provider.BillTypeIrancell, "irancell", irPhone},
 		{provider.BillTypeMobile, "jiring", irPhone},
-		{provider.BillTypeMobileMidTermRightel, qabzinoProvider, irPhone},
+		{provider.BillTypeMobileMidTermRightel, "qabzino", irPhone},
 	} {
 		t.Run(tc.billType, func(t *testing.T) {
 			sr := jaegertest.Install(t)

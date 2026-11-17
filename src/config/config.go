@@ -510,6 +510,12 @@ type Config struct {
 	// mode other than dev removes the debug section, so the key is true there. Not hot-reloadable:
 	// read at start (as the caching.* keys).
 	DebugCacheInquiries bool `path:"debug.cache_inquiries"`
+	// DebugProviderSwitcherDemoteOnDown is the feature-ON hook of the Provider Switcher (task 059):
+	// a value greater than 0 makes each provider-down inquiry that is not a trial demote its provider
+	// row for this period (ProvidersService.Demote). 0 (the default): no demotion, the behavior
+	// before task 059. Development only: a mode other than dev removes the debug section, so the key
+	// is 0 there. Task 060 (the circuit breaker) replaces it. Not hot-reloadable: read at start.
+	DebugProviderSwitcherDemoteOnDown time.Duration `path:"debug.provider_switcher.demote_on_down"`
 }
 
 func defaults() Config {
@@ -797,6 +803,9 @@ func (c Config) validate() error {
 	}
 	if c.CachingPaidTel < 0 {
 		errs = append(errs, errors.New("caching.paid_tel must not be negative (0: every order asks the provider)"))
+	}
+	if c.DebugProviderSwitcherDemoteOnDown < 0 {
+		errs = append(errs, errors.New("debug.provider_switcher.demote_on_down must not be negative (0 turns it off)"))
 	}
 	if c.ParsianSettlementInquiryTelephone < 0 {
 		errs = append(errs, errors.New("providers.internal.parsian.settlement_inquiry_telephone must not be negative (0: no window)"))
