@@ -1,7 +1,8 @@
-<!-- VERSION: 3.62 -->
+<!-- VERSION: 3.63 -->
 <!-- Last Updated: 2026-11-17 -->
 <!--
 CHANGE LOG
+v3.63 — 2026-11-17 — Added task-060-circuit-breaker entry.
 v3.62 — 2026-11-17 — Added task-059-provider-switcher entry.
 v3.61 — 2026-11-17 — Added session-wrap-up (task 058 session) entry.
 v3.60 — 2026-11-16 — Added 058-mci-jiring-fallback entry.
@@ -178,6 +179,12 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-17] — Task 060 created: the circuit breaker
+- **Type:** Minor (a task file only; no code).
+- **Files:** `docs/tasks/pending_tasks/060_circuit_breaker.md` (new; task files are not manifest-tracked); `docs/tasks/pending_tasks/task_counter.json` (next ID 061); `CHANGELOG.md`; `docs/documents_manifest.md`.
+- **Impact:** None on runtime behavior. The operator decisions of 2026-11-17 for the circuit breaker: the error rate is counted for each provider row (one provider, bill type and action) on a sliding window; the breaker opens when the window has `min_calls` calls or more and `failure_ratio` percent or more of them failed; a failed call is only a provider-down result; the breaker never blocks a call, it only starts a demotion of task 059; the keys `providers.general.circuit_breaker.*` (`enabled` false, `failure_ratio` 30, `window` 2m, `min_calls` 20, `open_time` 1m), hot-reloadable, with an optional override for each provider. Four open points stay for the design step. The task needs task 059.
+- **Author:** Mostafa Talebi / Claude Fable 5.2
 
 ## [2026-11-17] — Task 059 created: the Provider Switcher
 - **Type:** Minor (a task file only; no code).

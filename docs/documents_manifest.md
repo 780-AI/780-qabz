@@ -1,4 +1,4 @@
-<!-- VERSION: 2.63 -->
+<!-- VERSION: 2.64 -->
 # Document & Code Manifest
 
 ## Module Quick Index
@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | 1 | Operating Contract | v1.8 | Governance | `CLAUDE.md` |
 | 2 | Project README | v1.1 | Docs | `README.md` |
-| 3 | Changelog | v3.62 | Governance | `CHANGELOG.md` |
+| 3 | Changelog | v3.63 | Governance | `CHANGELOG.md` |
 | 4 | Docs README | v1.2 | Docs | `docs/README.md` |
-| 5 | Document & Code Manifest | v2.63 | Governance | `docs/documents_manifest.md` |
+| 5 | Document & Code Manifest | v2.64 | Governance | `docs/documents_manifest.md` |
 | 6 | Folder Structure | v0.60 | Governance | `docs/folder_structure.md` |
 | 7 | Session Opener | v1.9 | Governance | `docs/SESSION_OPENER.md` |
 | 8 | Session Closer | v1.8 | Governance | `docs/SESSION_CLOSER.md` |
@@ -55,8 +55,9 @@
 ## Last Updated
 
 - **Date**: 2026-11-17
-- **Change**: 2026-11-17 — Task 059 `provider_switcher` created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 060; no code. Bumped #3 CHANGELOG v3.62, #5 manifest v2.63.
-- **Previous change**: 2026-11-17 — Session wrap-up (task 058 session): 4 lesson candidates and more evidence for 3 in `OPEN_TASKS.md`; push of 303d74e..d4f7246 done. Bumped #3 CHANGELOG v3.61, #5 manifest v2.62, #28 OPEN_TASKS v1.94.
+- **Change**: 2026-11-17 — Task 060 `circuit_breaker` created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 061; no code. Bumped #3 CHANGELOG v3.63, #5 manifest v2.64.
+- **Previous change**: 2026-11-17 — Task 059 `provider_switcher` created in `docs/tasks/pending_tasks/` (task files are not manifest-tracked); task counter 060; no code. Bumped #3 CHANGELOG v3.62, #5 manifest v2.63.
+- **Earlier change**: 2026-11-17 — Session wrap-up (task 058 session): 4 lesson candidates and more evidence for 3 in `OPEN_TASKS.md`; push of 303d74e..d4f7246 done. Bumped #3 CHANGELOG v3.61, #5 manifest v2.62, #28 OPEN_TASKS v1.94.
 - **Earlier change**: 2026-11-16 — Task 058 `mci_jiring_fallback`: the payment fallback to the next enabled order row after a payment that did not reach its provider for sure (`provider.ErrNotSent`, every bill type; MCI today: Parsian to Jiring Switch), the Jiring Switch `Pay` and `Status`, the Jiring Switch status worker, the pending query of the workers, conventions § 13 exception, dev seed rows 29 and 30 `enable`; new `src/provider/sent.go` and new test files `src/provider/sent_test.go`, `src/provider/jiring/pay_test.go`, `src/provider/parsianproxy/notsent_test.go`, `src/core/order/fallback_test.go`, `src/app/mci_fallback_live_test.go` (Go files have no VERSION header, so no rows); `config.yml.example` and the seed SQL (no VERSION header, no rows); the task file moved to `done_tasks/` (not manifest-tracked). Bumped #3 CHANGELOG v3.60, #5 manifest v2.61, #6 folder_structure v0.60, #21 system.html v2.29, #28 OPEN_TASKS v1.93, #30 PROJECT_SPECIFIC_CONVENTIONS v0.29, #34 app README v0.48, #35 this_vs_bill v0.33.
 - **Earlier change**: 2026-11-16 — Session wrap-up (tasks 055 and 056 session): 5 lesson candidates and more evidence for 2 in `OPEN_TASKS.md`; push of 495f052..2aa2ca9 done. Bumped #3 CHANGELOG v3.59, #5 manifest v2.60, #28 OPEN_TASKS v1.92.
 - **Earlier change**: 2026-11-16 — Task 056 `irancell_payment`: `OrderComplete` pays an Irancell order over NATS (new `src/system/nats/nats.go`, `src/app/nats.go`; `irancellproxy.Pay` with bill's message), config section `nats`, `providers.internal.irancell.pay_timeout`, `debug.mocks.irancell.pay_return_type`, nats.go v1.55.0, compose service `nats`; `config.yml.example`, `docker-compose.yml`, `src/go.mod`, `src/go.sum` (no VERSION header, no rows); new test files `src/system/nats/nats_test.go`, `src/provider/irancellproxy/pay_test.go`, `src/app/nats_test.go`, `src/app/irancell_payment_live_test.go` (Go files are not manifest-tracked). Bumped #3 CHANGELOG v3.58, #5 manifest v2.59, #6 folder structure v0.59, #21 system.html v2.28, #28 OPEN_TASKS v1.91, #34 app README v0.47, #35 this_vs_bill v0.32.
