@@ -541,3 +541,22 @@ func TestStopWritesNoReportOrSaveLine(t *testing.T) {
 		assert.Empty(t, wd.log.errs, "%s: no line at the App stop", name)
 	}
 }
+
+// TestCheckOtherProvider (task 058): an order whose newest row has another provider (the payment
+// went to the next provider) is skipped: no status call, no save, no report, no line.
+func TestCheckOtherProvider(t *testing.T) {
+	wd := newWorld(t, 10*time.Hour)
+	wd.repo.pages = [][]string{{"moved"}}
+	moved := wd.row("moved", order.StatusPending, time.Hour)
+	moved.ProviderName = "jiring-switch"
+	wd.repo.rows["moved"] = moved
+	wd.adapter.answers["moved"] = &provider.StatusResponse{Status: "failed"}
+
+	assert.NoError(t, wd.w.Run(context.Background(), &fakeCharger{}))
+	assert.Equal(t, map[string]int{ResultSkipped: 1}, wd.results)
+	assert.Empty(t, wd.adapter.reqs, "the Parsian worker does not ask an order of Jiring Switch")
+	assert.Empty(t, wd.repo.finals)
+	assert.Empty(t, wd.reporter.reports)
+	assert.Empty(t, wd.log.errs)
+	assert.Empty(t, wd.log.infos)
+}

@@ -110,7 +110,7 @@ func newLiveStack(t *testing.T, ctx context.Context, returnType, setupSQL string
 	if !assert.NoError(t, err) || !assert.NotNil(t, orders) {
 		t.FailNow()
 	}
-	payments, err := newPayments(db, registry, metrics, log)
+	payments, err := newPayments(db, registry, providers, metrics, log) // task 058: the next provider of a payment that was not sent
 	if !assert.NoError(t, err) || !assert.NotNil(t, payments) {
 		t.FailNow()
 	}

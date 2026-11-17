@@ -22,6 +22,37 @@ type fakeClient struct {
 	err   error
 	block bool // wait for the context
 	dl    bool // the context had a deadline
+
+	pays       []*pb.PayRequest // task 058
+	payResp    *pb.PayResponse
+	payErr     error
+	statuses   []*pb.GetStatusRequest
+	statusResp *pb.GetStatusResponse
+	statusErr  error
+}
+
+func (f *fakeClient) PayBill(ctx context.Context, in *pb.PayRequest, _ ...grpc.CallOption) (*pb.PayResponse, error) {
+	f.mu.Lock()
+	f.pays = append(f.pays, in)
+	_, f.dl = ctx.Deadline()
+	f.mu.Unlock()
+	if f.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return f.payResp, f.payErr
+}
+
+func (f *fakeClient) GetStatus(ctx context.Context, in *pb.GetStatusRequest, _ ...grpc.CallOption) (*pb.GetStatusResponse, error) {
+	f.mu.Lock()
+	f.statuses = append(f.statuses, in)
+	_, f.dl = ctx.Deadline()
+	f.mu.Unlock()
+	if f.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return f.statusResp, f.statusErr
 }
 
 func (f *fakeClient) BillInquiry(ctx context.Context, in *pb.BillInquiryRequest, _ ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
@@ -73,9 +104,7 @@ func TestNameAndNotSupported(t *testing.T) {
 	var nilAdapter *Adapter
 	assert.False(t, nilAdapter.Enabled())
 	_, err := a.Pay(context.Background(), provider.PaymentRequest{})
-	assert.ErrorIs(t, err, provider.ErrNotSupported)
-	_, err = a.Status(context.Background(), provider.StatusRequest{})
-	assert.ErrorIs(t, err, provider.ErrNotSupported)
+	assert.ErrorIs(t, err, provider.ErrNotSupported, "no bill type")
 	_, err = a.GetDocument(context.Background(), provider.DocumentRequest{})
 	assert.ErrorIs(t, err, provider.ErrNotSupported)
 	_, err = a.Settle(context.Background(), provider.SettleRequest{})

@@ -129,7 +129,7 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 		db.Close()
 		return nil, err
 	}
-	payments, err := newPayments(db, registry, metrics, logger)
+	payments, err := newPayments(db, registry, providers, metrics, logger)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -224,7 +224,10 @@ func NewDefaultBuilder(ctx context.Context, cfg config.Config) (*Builder, error)
 	if !cfg.ConfirmPaymentTelephoneEnabled {
 		logger.Info("settlement worker off (confirm_payment.telephone.enabled: false)")
 	}
-	if cfg.ParsianGetStatusEnabled || cfg.IrancellGetStatusEnabled || cfg.ConfirmPaymentTelephoneEnabled {
+	if !cfg.JiringSwitchGetStatusEnabled {
+		logger.Info("jiring switch status worker off (providers.internal.jiring_switch.get_status.enabled: false)")
+	}
+	if cfg.StatusWorkerEnabled() || cfg.ConfirmPaymentTelephoneEnabled {
 		jobs, err := newCrons(cfg, db, cache, registry, cronMetrics, logger)
 		if err != nil {
 			db.Close()
@@ -513,7 +516,8 @@ func newProviderRegistryWith(cfg config.Config, logger Logger, payer irancellpro
 		return nil, err
 	}
 	// providers.internal.jiring_switch.enabled: false wins over the mock, as for the other providers.
-	jiringMock := provider.MockSettings{Enable: dev && cfg.DebugMockJiringSwitchEnabled && cfg.JiringSwitchEnabled, ReturnType: cfg.DebugMockJiringSwitchReturnType}
+	jiringMock := provider.MockSettings{Enable: dev && cfg.DebugMockJiringSwitchEnabled && cfg.JiringSwitchEnabled, ReturnType: cfg.DebugMockJiringSwitchReturnType,
+		PayReturnType: cfg.DebugMockJiringSwitchPayReturnType, StatusReturnType: cfg.DebugMockJiringSwitchStatusReturnType} // task 058: the payment and the status
 	if err := registerAdapter(registry, jiringAdapter, "Jiring Switch", disabledNotice("internal.jiring_switch", "Jiring Switch", cfg.JiringSwitchEnabled),
 		jiringMock, jiring.MockFixtures(), logger); err != nil {
 		return nil, err
@@ -855,6 +859,8 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 
 				provider.BillTypeMobileMidTermRightel: cfg.ParsianSettlementInquiryRightelMobile, // task 055 (bill: parsian.settlementInquiryRightelMobile)
 			},
+			// Task 058: bill's fixed 0 of Jiring Switch for both MCI terms (no config key in bill).
+			jiring.Name: {provider.BillTypeMobile: 0, provider.BillTypeMobileMidterm: 0},
 		},
 	})
 }
@@ -864,18 +870,23 @@ func newOrders(cfg config.Config, db *postgres.Client, providers order.Selector,
 // bill types tel, telmidterm, water, electricity, gas, mobile, mobilemidterm and mobilemidtermRightel
 // (parsianproxy.Pay; water since task 048, electricity since task 052, gas since task 053, the MCI
 // bill types since task 054, Rightel since task 055), and the order provider irancell pays the bill
-// type irancell (irancellproxy.Pay over NATS, task 056); after a success of tel or telmidterm the Karashop
+// type irancell (irancellproxy.Pay over NATS, task 056), and the order provider jiring-switch pays the
+// bill types mobile and mobilemidterm (jiring.Pay, task 058). A payment that did not reach its
+// provider for sure (provider.ErrNotSent) goes to the next enabled order row of groups with a
+// payment route (task 058; groups nil: no next provider); after a success of tel or telmidterm the Karashop
 // settlement runs in the background (karashop.Settle) for the order providers parsian, eways and
 // eways2, as bill (water, electricity, gas, MCI, Rightel and Irancell have no settlement). With
 // metrics on:
 //   - qabz_order_payment_total{bill_type,provider,status}: each OrderComplete call (success, failed,
 //     pending, processed, wrong_price, error; provider "none" when the order was not read);
 //   - qabz_provider_pay_duration_ms{provider,status}: each payment call to a provider;
+//   - qabz_order_payment_fallback_total{bill_type,from,to}: each move of a payment to the next
+//     provider (task 058);
 //   - qabz_order_settle_total{bill_type,provider,result,source}: each settlement (success, failed,
 //     pending, error, confirm_error, no_data), source payment (the settlement worker of task 046
 //     counts on the same metric with source worker).
-func newPayments(db *postgres.Client, adapters order.Adapters, metrics *prometheus.Server, logger Logger) (*order.Payments, error) {
-	var onPayment, onSettle func(billType, providerName, result string)
+func newPayments(db *postgres.Client, adapters order.Adapters, groups order.Groups, metrics *prometheus.Server, logger Logger) (*order.Payments, error) {
+	var onPayment, onSettle, onFallback func(billType, providerName, result string)
 	var onPay func(providerName, status string, d time.Duration)
 	if reg := metrics.Registry(); reg != nil {
 		payments := promclient.NewCounterVec(promclient.CounterOpts{
@@ -887,10 +898,17 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 			Help:    "Duration of each payment call to a provider in milliseconds, by provider and the status of the payment (success, failed, pending).",
 			Buckets: []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000},
 		}, []string{"provider", "status"})
-		for _, c := range []promclient.Collector{payments, duration} {
+		fallbacks := promclient.NewCounterVec(promclient.CounterOpts{
+			Name: "qabz_order_payment_fallback_total",
+			Help: "OrderComplete payments that went to the next provider (task 058) because the payment did not reach the provider for sure (the switch off, no address, gRPC Unavailable before the request was sent), by bill type, from (the provider that was not reached) and to (the next enabled order provider with a payment route).",
+		}, []string{"bill_type", "from", "to"})
+		for _, c := range []promclient.Collector{payments, duration, fallbacks} {
 			if err := reg.Register(c); err != nil {
 				return nil, fmt.Errorf("payment: register metric: %w", err)
 			}
+		}
+		onFallback = func(billType, from, to string) {
+			fallbacks.WithLabelValues(billType, from, to).Inc()
 		}
 		settles, err := registerOrExisting[*promclient.CounterVec](reg, promclient.NewCounterVec(settleOpts, settleLabels))
 		if err != nil {
@@ -915,10 +933,13 @@ func newPayments(db *postgres.Client, adapters order.Adapters, metrics *promethe
 		Adapters:   adapters,
 		PayRoutes: map[string]map[string]bool{
 			parsianproxy.Name: {provider.BillTypeTel: true, provider.BillTypeTelMidterm: true, provider.BillTypeWater: true, provider.BillTypeElectricity: true, provider.BillTypeGas: true,
-				provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true, // task 054: Parsian only (task 058: the fallback)
+				provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true, // task 054; task 058: also jiring-switch
 				provider.BillTypeMobileMidTermRightel: true}, // task 055: Parsian only (operator); bill also has EWaysRightelMobile (NATS)
-			irancellproxy.Name: {provider.BillTypeIrancell: true}, // task 056: the irancell service over NATS (bill: IrancellMobile)
+			irancellproxy.Name: {provider.BillTypeIrancell: true},                                     // task 056: the irancell service over NATS (bill: IrancellMobile)
+			jiring.Name:        {provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true}, // task 058 (bill: JiringSwitchMCIMobile)
 		},
+		Providers:    groups,
+		OnFallback:   onFallback,
 		SettleRoutes: settleRoutes(),
 		Logger:       payLog,
 		OnPayment:    onPayment,

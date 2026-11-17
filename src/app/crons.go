@@ -14,6 +14,7 @@ import (
 	"qabz/core/reconcile"
 	"qabz/entry/cron"
 	"qabz/provider/irancellproxy"
+	"qabz/provider/jiring"
 	"qabz/provider/parsianproxy"
 	"qabz/system/kafka"
 	"qabz/system/postgres"
@@ -184,6 +185,10 @@ func (c settleCron) Run(ctx context.Context, ext cron.Extender) error {
 //   - the Irancell status worker (task 050; bill: IrancellGetStatusTask) with
 //     providers.internal.irancell.get_status.enabled: the same worker for the provider irancell,
 //     with its own get_status keys, and the same Kafka producer and reporter;
+//   - the Jiring Switch status worker (task 058; bill: JiringSwitchGetStatusTask) with
+//     providers.internal.jiring_switch.get_status.enabled: the same worker for the provider
+//     jiring-switch (the orders of an MCI payment that Jiring Switch left pending, also after a
+//     fallback from Parsian), with its own get_status keys, and the same Kafka producer and reporter;
 //   - the settlement worker (task 046; bill: ConfirmPaymentTelephone) with
 //     confirm_payment.telephone.enabled: the paid landline orders that Karashop did not confirm,
 //     settled with the Karashop adapter of the registry (the mock in dev mode) by order.Settler.
@@ -207,7 +212,7 @@ func newCrons(cfg config.Config, db *postgres.Client, cache *redis.Client, adapt
 		return nil, err
 	}
 	var reporter *reconcile.PaymentReporter
-	if cfg.ParsianGetStatusEnabled || cfg.IrancellGetStatusEnabled {
+	if cfg.StatusWorkerEnabled() {
 		var err error
 		producer, err = kafka.New(kafka.Options{Brokers: cfg.KafkaBrokers, ClientID: cfg.ServiceEcosystemName, OnPublish: m.onPublish})
 		if err != nil {
@@ -254,6 +259,20 @@ func newCrons(cfg config.Config, db *postgres.Client, cache *redis.Client, adapt
 			ReverseDeadline: cfg.IrancellGetStatusReverseDeadline,
 			SyncOperations:  []time.Duration{cfg.IrancellGetStatusSyncAPICall, cfg.IrancellGetStatusSyncGetOrder, cfg.IrancellGetStatusSyncInsertOrder},
 		}, cfg.IrancellGetStatusLockTime); err != nil {
+			return fail(err)
+		}
+	}
+	if cfg.JiringSwitchGetStatusEnabled {
+		if err := statusWorker(reconcile.StatusOptions{
+			Name:            cfg.JiringSwitchGetStatusName,
+			Provider:        jiring.Name,
+			Interval:        cfg.JiringSwitchGetStatusCronTime,
+			Start:           cfg.JiringSwitchGetStatusStart,
+			End:             cfg.JiringSwitchGetStatusEnd,
+			Chunk:           cfg.JiringSwitchGetStatusChunk,
+			ReverseDeadline: cfg.JiringSwitchGetStatusReverseDeadline,
+			SyncOperations:  []time.Duration{cfg.JiringSwitchGetStatusSyncAPICall, cfg.JiringSwitchGetStatusSyncGetOrder, cfg.JiringSwitchGetStatusSyncInsertOrder},
+		}, cfg.JiringSwitchGetStatusLockTime); err != nil {
 			return fail(err)
 		}
 	}

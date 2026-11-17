@@ -1,7 +1,8 @@
-<!-- VERSION: 3.59 -->
+<!-- VERSION: 3.60 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v3.60 — 2026-11-16 — Added 058-mci-jiring-fallback entry.
 v3.59 — 2026-11-16 — Added session-wrap-up (tasks 055 and 056 session) entry.
 v3.58 — 2026-11-16 — Added 056-irancell-payment entry.
 v3.57 — 2026-11-16 — Added 055-rightel-mobile-payment entry.
@@ -175,6 +176,13 @@ v1.0 — 2026-10-28 — Initial.
 -->
 
 # CHANGELOG
+
+## [2026-11-16] — Task 058: the payment fallback to the next provider (MCI: Parsian to Jiring Switch)
+- **Type:** Major (payment domain logic, new config keys, seed data, a worker, a conventions rule, a Critical File).
+- **Files:** `src/provider/sent.go` (new: `ErrNotSent`, `DownError`, `TrackSent`, `SentHandler`) and `sent_test.go` (new); `src/provider/parsianproxy/parsianproxy.go` (`Pay` returns `ErrNotSent` for the switch off, no address, gRPC `Unavailable` before the headers; `SentHandler` on the client), `pay_test.go`, `notsent_test.go` (new); `src/provider/jiring/jiring.go` (`Pay` = `PayBill`, `Status` = `GetStatus`, `SupportsPay`, the mock fixtures `Pay` and `Status`, `SentHandler`), `jiring_test.go`, `pay_test.go` (new); `src/core/order/complete.go` (the fallback in `Payments.complete`, `nextProvider`, `payStatus`, `PaymentOptions.Providers` and `OnFallback`, the span attribute `provider.first`) and `fallback_test.go` (new); `src/core/reconcile/status.go` (an order of another provider is skipped) and `status_test.go`; `src/system/postgres/order_repository.go` (`pendingIDsSQL`: the newest row over all providers, then the provider) and `order_status_live_test.go`; `src/config/config.go` (`providers.internal.jiring_switch.get_status.enabled` and the defaults of its keys, `debug.mocks.jiring_switch.pay_return_type` and `status_return_type`, `StatusWorkerEnabled`, the checks) and `config_test.go`; `src/app/defaults.go` (`newPayments` gets the providers, the `jiring-switch` payment route and "already paid" windows, `qabz_order_payment_fallback_total`, the Jiring mock settings, the worker line), `src/app/crons.go` (the Jiring Switch status worker), `src/app/mci_fallback_live_test.go` (new), `water_live_test.go`, `water_order_live_test.go` (the worker helper for any provider); `src/common/monitoring/jaeger/jaegertest/jaegertest.go` (`provider.first` allowed); `src/system/postgres/devdb/seed_providers.sql` (rows 29 and 30 `enable`); `config.yml.example`; `docs/initial-discovery/system.html`, `docs/this_vs_bill.md` (item 50, item 43), `docs/standards/PROJECT_SPECIFIC_CONVENTIONS.md` (§ 13 exception), `docs/folder_structure.md`, `src/app/README.md`, `docs/Plans/OPEN_TASKS.md`, `docs/documents_manifest.md`; the task file moved to `done_tasks/`.
+- **Impact:** **Yes, behavior changes.** (1) `OrderComplete`: when the payment did not reach the order provider for sure (the switch of the provider is off, it has no address, or gRPC answers `Unavailable` before the request headers went to a connection), the step goes to the next enabled row of (bill type, `order`) with a payment route and an adapter (every bill type; the order of the rows; no provider name in the code): a new `in-progress` row with that provider and the same RRN, then its payment; a next provider that is not reached either goes to the one after it. With no next row the answer is `pending`, as before. A timeout, a cancel, any other error and every answer of a provider do not change (operator rule). With the seed only the MCI groups have a second provider: an MCI payment that did not reach Parsian is paid through Jiring Switch. (2) The order provider `jiring-switch` pays `mobile` and `mobilemidterm` (was: `failed`, no payment route), with bill's fields; its "already paid" window is 0. (3) New Jiring Switch status worker (off by default). (4) Every status worker reads only the orders whose newest row (over all providers) has its provider, and skips an order of another provider; for an order with rows of one provider nothing changes. (5) The dev seed rows 29 and 30 are `enable` (a database seeded before keeps `disable`). (6) Conventions § 13 has the one named exception. No API change (no Postman change).
+- **QA scenarios:** `docs/Plans/OPEN_TASKS.md` "Task 058 payment fallback" (Go tests; feature ON with the Parsian switch off and the Jiring Switch mock, a Parsian timeout, the Jiring Switch worker with the compose Kafka; the operator QA on stage). Feature-ON run done by the implementer.
+- **Author:** Mostafa Talebi / Claude Opus 5.5
 
 ## [2026-11-16] — Session wrap-up (tasks 055 and 056 session)
 - **Type:** Minor (governance: the register; no code).

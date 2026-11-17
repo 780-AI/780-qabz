@@ -1,7 +1,8 @@
-<!-- VERSION: 0.28 -->
+<!-- VERSION: 0.29 -->
 <!-- Last Updated: 2026-11-16 -->
 <!--
 CHANGE LOG
+v0.29 — 2026-11-16 — Task 058 (operator, 2026-11-16): § 13 gets one named exception to "one request, one provider": a payment that did not reach its provider for sure (`provider.ErrNotSent`) goes to the next enabled order row with a payment route; never after a timeout or an answer.
 v0.28 — 2026-11-16 — Task 057 (operator): new § 18 — every HTTP route of Qabz is `/v1`; no `/v2` and no `V2` method.
 v0.27 — 2026-11-16 — Task 050 (operator rule of 2026-11-15): § 10 — every failed step of a background worker writes one error line, also when the next run retries it (a failed read was "counted, no line"); the line has the worker name and the order ID when there is one; a call that the App stop canceled writes none.
 v0.26 — 2026-11-15 — Task 051 (operator, decisions D1 to D4): § 8 — an on/off switch is a bool key named `enabled` (the one exception: `debug.auth.disable`), a renamed key goes in `renamedKeys`, checked by tests; § 15 — the mock switch is `debug.mocks.<provider>.enabled`; § 17 — the off switch is `logs.tracing.enabled` (with `logs.tracing.otlp_endpoint`).
@@ -340,9 +341,11 @@ python3 -m json.tool qabz.postman_collection.json >/dev/null && echo OK
 
 **One request, one provider (operator, 2026-11-11, task 036).** A flow that calls a provider calls the pick of `PickProvider` once per request. What that provider returns is the answer of the request: a success, a business answer, an error, a timeout or an answer that cannot be used. The flow never calls the next provider of the list in the same request (no fallback loop in a flow, an adapter or a handler). A provider is switched only by the Provider Switcher (`system.html`, Provider Switcher), and only when the circuit breaker of that provider detects the condition. The switch is one generic mechanism: no rule for one bill type, one operator or one provider name; the order is the priority of the rows. A wanted order ("provider A first, B next") is set with the priority of the rows, not in code.
 
+**One exception: a payment that was not sent (operator, 2026-11-16, task 058).** The payment step (`order.Payments.Complete`) goes to the next provider only when the payment did not reach the order provider for sure: the adapter error wraps `provider.ErrNotSent` (the switch of the provider is off, it has no address, or gRPC answers `Unavailable` before the request headers went to a connection, `provider.SentHandler`). The next provider is the next enabled row of (bill type, `order`) of `ProvidersService.Group` that has a payment route and an adapter; the step saves an `in-progress` row with it (the same RRN) before the call. A timeout, a cancel, any other error and every answer of a provider stay with the provider (`pending` or the answer): the provider can have paid. The exception is generic (every bill type, no provider name, the order of the rows). No other flow may go to a second provider; a new exception needs an operator decision and a line here.
+
 **Why.** Operator decision, 2026-11-08 (task 020). One sorted, concurrent-safe list gives every caller the same deterministic pick, without a database read on the hot path. A second read path would pick a different provider (`bill` picks any enabled row, with no order) or bypass the runtime changes.
 
-**Review.** The `code-reviewer` agent searches each change for `providers` in SQL text and for uses of `ProviderRepository` and `ListProviders`. A use outside the places above is a defect. A second provider call in one request, or a provider name in a switch or order rule, is a defect too. The verdict is NOT READY.
+**Review.** The `code-reviewer` agent searches each change for `providers` in SQL text and for uses of `ProviderRepository` and `ListProviders`. A use outside the places above is a defect. A second provider call in one request (other than the exception of the payment step above), or a provider name in a switch or order rule, is a defect too. The verdict is NOT READY.
 
 ## 14. Tests never touch the development database
 

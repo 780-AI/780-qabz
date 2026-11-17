@@ -21,6 +21,7 @@ import (
 	"qabz/core/reconcile"
 	"qabz/entry/cron"
 	"qabz/provider"
+	"qabz/provider/parsianproxy"
 	"qabz/system/postgres"
 	"qabz/system/postgres/postgrestest"
 	"qabz/system/redis"
@@ -178,6 +179,16 @@ func TestLiveWaterStatusWorker(t *testing.T) {
 // use it.
 func liveStatusWorker(t *testing.T, billType string, providerID int64, billID, payID, tag string) {
 	t.Helper()
+	liveProviderStatusWorker(t, parsianproxy.Name, func(cfg *config.Config) {
+		cfg.ParsianGetStatusEnabled = true
+		cfg.ParsianGetStatusCronTime = time.Hour // one run, at the start
+	}, billType, providerID, billID, payID, tag)
+}
+
+// liveProviderStatusWorker is liveStatusWorker for the worker of providerName that on turns on
+// (task 058: the Jiring Switch worker too).
+func liveProviderStatusWorker(t *testing.T, providerName string, on func(*config.Config), billType string, providerID int64, billID, payID, tag string) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	addr, password, prefix := liveRedisOf(t)
@@ -192,7 +203,7 @@ func liveStatusWorker(t *testing.T, billType string, providerID int64, billID, p
 	for i, id := range []string{okID, failID} {
 		o := order.Order{ID: "dddddddd-0000-4000-8000-000000000" + tag + []string{"1", "2"}[i], OrderID: id,
 			BillType: billType, BillID: billID, PayID: payID, Data: billID, Price: 25_009_000,
-			ProviderID: providerID, ProviderName: "parsian", Status: order.StatusPending, RRN: "778899", BasePrice: 25_000_000}
+			ProviderID: providerID, ProviderName: providerName, Status: order.StatusPending, RRN: "778899", BasePrice: 25_000_000}
 		if !assert.NoError(t, repo.Insert(ctx, o)) {
 			return
 		}
@@ -210,8 +221,7 @@ func liveStatusWorker(t *testing.T, billType string, providerID int64, billID, p
 		return
 	}
 	cfg := testConfig(t)
-	cfg.ParsianGetStatusEnabled = true
-	cfg.ParsianGetStatusCronTime = time.Hour // one run, at the start
+	on(&cfg)
 	cfg.KafkaBrokers = []string{mc.BootstrapServers()}
 	adapter := &statusByOrder{statuses: map[string]string{okID: provider.StatusSuccess, failID: provider.StatusFailed}}
 
@@ -224,7 +234,7 @@ func liveStatusWorker(t *testing.T, billType string, providerID int64, billID, p
 	}}
 	cache := redis.New(addr, password, prefix)
 	t.Cleanup(cache.Close)
-	jobs, err := newCrons(cfg, db, cache, oneAdapter{adapter}, m, &liveLogger{})
+	jobs, err := newCrons(cfg, db, cache, namedAdapter{name: providerName, a: adapter}, m, &liveLogger{})
 	if !assert.NoError(t, err) || !assert.NotNil(t, jobs) || !assert.NoError(t, jobs.Start(ctx)) {
 		return
 	}
@@ -244,7 +254,7 @@ func liveStatusWorker(t *testing.T, billType string, providerID int64, billID, p
 	assert.ElementsMatch(t, []provider.StatusRequest{{OrderID: okID, BillType: billType}, {OrderID: failID, BillType: billType}}, adapter.reqs)
 	adapter.mu.Unlock()
 
-	c, err := ckafka.NewConsumer(&ckafka.ConfigMap{"bootstrap.servers": mc.BootstrapServers(), "group.id": "qabz-live-" + billType, "enable.auto.commit": false})
+	c, err := ckafka.NewConsumer(&ckafka.ConfigMap{"bootstrap.servers": mc.BootstrapServers(), "group.id": "qabz-live-" + providerName + "-" + billType, "enable.auto.commit": false})
 	if !assert.NoError(t, err) || !assert.NotNil(t, c) {
 		return
 	}
@@ -274,7 +284,7 @@ func liveStatusWorker(t *testing.T, billType string, providerID int64, billID, p
 	assert.Error(t, err, "two messages only")
 
 	// The worker saved the failed row: OrderComplete now answers failed (task 048 D11), no new row.
-	payments, err := newPayments(db, oneAdapter{adapter}, nil, nil)
+	payments, err := newPayments(db, oneAdapter{adapter}, nil, nil, nil)
 	if !assert.NoError(t, err) {
 		return
 	}

@@ -92,16 +92,28 @@ WHERE bill_id = $1 AND type = $2`
 // order_id) after the cursor $4, $5, in place of bill's OFFSET (task 050 D4). The key of an order only
 // grows, so an order that leaves the list or the window during the run does not move the other
 // orders back past the page, and no pending order of the window is skipped in a run.
+//
+// @todo docs/this_vs_bill.md item 43 (task 058): the newest row of each order is taken over all
+// providers, then the provider filters (bill filters the rows by the provider first). An order that
+// went to the next provider (task 058) has rows of two providers: the old in-progress row of the
+// first provider is then not the newest row, so the worker of that provider does not ask it and
+// cannot save a final row over the answer of the next provider. Only the orders with a row of the
+// provider in the window are ranked.
 const pendingIDsSQL = `WITH ranked AS (
-  SELECT order_id, status, created_at,
+  SELECT order_id, provider_name, status, created_at,
     ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY created_at DESC) AS rn
   FROM orders
-  WHERE provider_name = $1
-    AND created_at >= NOW() - make_interval(secs => $2::double precision)
+  WHERE created_at >= NOW() - make_interval(secs => $2::double precision)
     AND created_at <= NOW() - make_interval(secs => $3::double precision)
+    AND order_id IN (
+      SELECT order_id FROM orders
+      WHERE provider_name = $1
+        AND created_at >= NOW() - make_interval(secs => $2::double precision)
+        AND created_at <= NOW() - make_interval(secs => $3::double precision)
+    )
 )
 SELECT order_id::text, created_at FROM ranked
-WHERE rn = 1 AND status IN ('pending', 'in-progress')
+WHERE rn = 1 AND provider_name = $1 AND status IN ('pending', 'in-progress')
   AND (created_at, order_id) > ($4::timestamptz, $5::uuid)
 ORDER BY created_at ASC, order_id ASC
 LIMIT $6`

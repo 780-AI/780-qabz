@@ -181,16 +181,19 @@ func TestPayDown(t *testing.T) {
 	f := &fakeClient{payErr: errors.New("unavailable")}
 	_, err := newAdapter(t, f).Pay(context.Background(), payRequest())
 	assert.ErrorIs(t, err, provider.ErrProviderDown)
+	assert.NotErrorIs(t, err, provider.ErrNotSent, "task 058: an error that is not a gRPC Unavailable can have reached the service")
 
 	f = &fakeClient{}
 	_, err = newAdapter(t, f).Pay(context.Background(), payRequest())
 	assert.ErrorIs(t, err, provider.ErrProviderDown, "a nil answer")
+	assert.NotErrorIs(t, err, provider.ErrNotSent, "a nil answer")
 
 	f = &fakeClient{payResp: &pb.PayResponse{Status: "success"}}
 	a, _ := New(Options{Enabled: false, Client: f, Timeout: time.Second})
 	_, err = a.Pay(context.Background(), payRequest())
 	assert.ErrorIs(t, err, provider.ErrProviderDown)
 	assert.ErrorIs(t, err, errDisabled)
+	assert.ErrorIs(t, err, provider.ErrNotSent, "task 058: the switch is off")
 	assert.Empty(t, f.pays, "the switch is off: no call")
 
 	c, _ := Dial("")
@@ -198,12 +201,14 @@ func TestPayDown(t *testing.T) {
 	_, err = a.Pay(context.Background(), payRequest())
 	assert.ErrorIs(t, err, provider.ErrProviderDown)
 	assert.ErrorIs(t, err, errNoAddress)
+	assert.ErrorIs(t, err, provider.ErrNotSent, "task 058: no address")
 
 	f = &fakeClient{block: true}
 	a, _ = New(Options{Enabled: true, Client: f, Timeout: 20 * time.Millisecond})
 	_, err = a.Pay(context.Background(), payRequest())
 	assert.ErrorIs(t, err, provider.ErrProviderDown)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.NotErrorIs(t, err, provider.ErrNotSent, "task 058: a timeout is not a fallback")
 
 	f = &fakeClient{payResp: &pb.PayResponse{Status: "success"}}
 	// Not paid: gas since task 053, mobile and mobilemidterm since task 054, mobilemidtermRightel since

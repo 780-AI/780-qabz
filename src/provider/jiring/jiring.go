@@ -1,16 +1,20 @@
 // Package jiring is the Jiring Switch adapter (task 036): it calls the jiring-switch service, one
-// of our own services, over gRPC (InternalInquiryService/BillInquiry, pb/proto/jiringSwitch). The
-// jiring-switch service calls Jiring; Qabz does not. Only Inquiry of an MCI mobile bill (the bill
-// type "mobile") is implemented; every other method returns provider.ErrNotSupported. The rules
-// copy the old bill service (gateway/inquiry/mobile_mci.go, JiringSwitchMCIMobile, and base.go
-// handlePhoneResponseWithoutInquiry).
+// of our own services, over gRPC (InternalInquiryService/BillInquiry, PayBill and GetStatus,
+// pb/proto/jiringSwitch). The jiring-switch service calls Jiring; Qabz does not. Inquiry of an MCI
+// mobile bill (the bill type "mobile"), Pay of an MCI mobile bill (the bill types mobile and
+// mobilemidterm) and Status of a paid order (task 058) are implemented; every other method returns
+// provider.ErrNotSupported. The rules copy the old bill service (gateway/inquiry/mobile_mci.go,
+// gateway/payment/mobile_mci.go and gateway/paymentInquiry/jiringSwitch.go, JiringSwitchMCIMobile
+// and JiringSwitchPaymentInquiry, and base.go handlePhoneResponseWithoutInquiry).
 package jiring
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
+	_ "time/tzdata" // the Asia/Tehran zone also where the system has no zone files
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -26,6 +30,19 @@ const Name = "jiring-switch"
 // successMessage is the message of an answer with inquiries (bill: "the operation was done successfully").
 const successMessage = "عملیات با موفقیت انجام شد"
 
+// purchaseTypeBill is the purchase type of a status call of a bill payment (bill:
+// JiringSwitchPaymentInquiry, PurchaseType "bill").
+const purchaseTypeBill = "bill"
+
+// tehran is the zone of the day of the year in provider_order_id (bill: time.Now() of a process in
+// Tehran).
+var tehran = func() *time.Location {
+	if loc, err := time.LoadLocation("Asia/Tehran"); err == nil {
+		return loc
+	}
+	return time.FixedZone("IRST", 3*3600+1800)
+}()
+
 var (
 	// errNoAddress is the cause of every call of a client made with no address.
 	errNoAddress = errors.New("providers.internal.jiring_switch.grpc_address is not set")
@@ -37,6 +54,8 @@ var (
 // adapter uses. Tests give a fake.
 type Client interface {
 	BillInquiry(ctx context.Context, in *pb.BillInquiryRequest, opts ...grpc.CallOption) (*pb.BillInquiryResponse, error)
+	PayBill(ctx context.Context, in *pb.PayRequest, opts ...grpc.CallOption) (*pb.PayResponse, error)
+	GetStatus(ctx context.Context, in *pb.GetStatusRequest, opts ...grpc.CallOption) (*pb.GetStatusResponse, error)
 }
 
 // Options configure New.
@@ -55,6 +74,7 @@ type Adapter struct {
 	enabled bool
 	client  Client
 	timeout time.Duration
+	now     func() time.Time // the clock of provider_order_id; tests replace it
 }
 
 var _ provider.ProviderInterface = (*Adapter)(nil)
@@ -67,7 +87,7 @@ func New(opts Options) (*Adapter, error) {
 	if opts.Timeout <= 0 {
 		return nil, errors.New("jiring: timeout must be positive")
 	}
-	return &Adapter{enabled: opts.Enabled, client: opts.Client, timeout: opts.Timeout}, nil
+	return &Adapter{enabled: opts.Enabled, client: opts.Client, timeout: opts.Timeout, now: time.Now}, nil
 }
 
 // Dial returns a client for the jiring-switch service at addr (host:port of its internal gRPC
@@ -79,8 +99,9 @@ func Dial(addr string) (Client, error) {
 		return noClient{}, nil
 	}
 	// A client span for each call, and traceparent in the metadata (task 047, conventions § 17).
+	// provider.SentHandler tells a payment that did not reach the service (task 058).
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()), grpc.WithStatsHandler(provider.SentHandler{}))
 	if err != nil {
 		return nil, fmt.Errorf("jiring: grpc client for %s: %w", addr, err)
 	}
@@ -90,6 +111,14 @@ func Dial(addr string) (Client, error) {
 type noClient struct{}
 
 func (noClient) BillInquiry(context.Context, *pb.BillInquiryRequest, ...grpc.CallOption) (*pb.BillInquiryResponse, error) {
+	return nil, errNoAddress
+}
+
+func (noClient) PayBill(context.Context, *pb.PayRequest, ...grpc.CallOption) (*pb.PayResponse, error) {
+	return nil, errNoAddress
+}
+
+func (noClient) GetStatus(context.Context, *pb.GetStatusRequest, ...grpc.CallOption) (*pb.GetStatusResponse, error) {
 	return nil, errNoAddress
 }
 
@@ -172,14 +201,98 @@ func (a *Adapter) Inquiry(ctx context.Context, req provider.InquiryRequest) (*pr
 	return out, nil
 }
 
-// Pay is not supported yet.
-func (*Adapter) Pay(context.Context, provider.PaymentRequest) (*provider.PaymentResponse, error) {
-	return nil, provider.ErrNotSupported
+// payBillTypes are the bill types that Pay pays (task 058; bill: JiringSwitchMCIMobile for mobile
+// and mobilemidterm). Read-only.
+var payBillTypes = map[string]bool{provider.BillTypeMobile: true, provider.BillTypeMobileMidterm: true}
+
+// SupportsPay reports whether Pay pays the bill type: mobile and mobilemidterm.
+func SupportsPay(billType string) bool { return payBillTypes[billType] }
+
+// Pay pays an MCI mobile bill through the jiring-switch service (InternalInquiryService/PayBill;
+// task 058; bill: JiringSwitchMCIMobile.Execute of gateway/payment/mobile_mci.go). The request has
+// the fields of bill: provider_order_id is the day of the year (Tehran) followed by the RRN, as
+// text; payment_rrn the RRN; amount the base price; inquiry_id the phone; inquiry_type the inquiry
+// type of the order (final_term or midterm). bill sends no bill type, and does not check the RRN.
+//   - A call that fails (the switch is off, no address, a connection error, a timeout, a nil answer)
+//     returns an error that wraps provider.ErrProviderDown: the status is not known (bill: pending).
+//     When the call did not reach the service for sure (the switch is off, no address, gRPC
+//     Unavailable before the request headers went to a connection), it also wraps
+//     provider.ErrNotSent: the payment step can go to the next provider.
+//   - Else the answer of the service as it came (code, status, message, provider_trace_id).
+//
+// Each call has providers.internal.jiring_switch.timeout (bill sets none; docs/this_vs_bill.md item
+// 40 says the same of Parsian).
+func (a *Adapter) Pay(ctx context.Context, req provider.PaymentRequest) (*provider.PaymentResponse, error) {
+	if a == nil || a.client == nil {
+		return nil, errors.New("jiring: adapter not created with New")
+	}
+	if !SupportsPay(req.BillType) {
+		return nil, fmt.Errorf("jiring: pay of %q: %w", req.BillType, provider.ErrNotSupported)
+	}
+	if !a.enabled {
+		return nil, provider.DownError("jiring: pay", errDisabled, true)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
+	defer cancel()
+	ctx, sent := provider.TrackSent(ctx)
+	resp, err := a.client.PayBill(ctx, &pb.PayRequest{
+		UserId:          req.UserID,
+		Dialer:          req.Dialer,
+		OrderId:         req.OrderID,
+		ProviderOrderId: fmt.Sprintf("%d%s", a.now().In(tehran).YearDay(), req.RRN),
+		InquiryId:       req.InquiryID,
+		InquiryType:     req.InquiryType,
+		BillId:          req.BillID,
+		PayId:           req.PayID,
+		Amount:          req.Amount,
+		PaymentRrn:      req.RRN,
+	})
+	if err != nil {
+		return nil, provider.DownError("jiring: pay", err, errors.Is(err, errNoAddress) || provider.GRPCNotSent(err, sent))
+	}
+	if resp == nil {
+		return nil, provider.DownError("jiring: pay", errEmptyAnswer, false)
+	}
+	return &provider.PaymentResponse{
+		Code:            resp.GetCode(),
+		Status:          resp.GetStatus(),
+		Message:         resp.GetMessage(),
+		ProviderTraceID: resp.GetProviderTraceId(),
+	}, nil
 }
 
-// Status is not supported yet.
-func (*Adapter) Status(context.Context, provider.StatusRequest) (*provider.StatusResponse, error) {
-	return nil, provider.ErrNotSupported
+// errEmptyAnswer is the cause of a call that gave no answer and no error.
+var errEmptyAnswer = errors.New("empty answer")
+
+// Status asks the jiring-switch service the status of a paid order (GetStatus with the order ID and
+// the purchase type "bill"; task 058; bill: JiringSwitchPaymentInquiry). The status of the answer is
+// given as it came, with tid as the trace ID; only success and failed are final. A gRPC error (a
+// timeout too), an empty answer and providers.internal.jiring_switch.enabled false are
+// provider.ErrProviderDown (bill: pending, the error text as the message). Each call has
+// providers.internal.jiring_switch.timeout (bill sets none).
+func (a *Adapter) Status(ctx context.Context, req provider.StatusRequest) (*provider.StatusResponse, error) {
+	if a == nil || a.client == nil {
+		return nil, errors.New("jiring: adapter not created with New")
+	}
+	if !a.enabled {
+		return nil, provider.DownError("jiring: get status", errDisabled, false)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
+	defer cancel()
+	resp, err := a.client.GetStatus(ctx, &pb.GetStatusRequest{OrderId: req.OrderID, PurchaseType: purchaseTypeBill})
+	if err != nil {
+		return nil, provider.DownError("jiring: get status", err, false)
+	}
+	if resp == nil {
+		return nil, provider.DownError("jiring: get status", errEmptyAnswer, false)
+	}
+	return &provider.StatusResponse{Status: resp.GetStatus(), Message: resp.GetMessage(), ProviderTraceID: resp.GetTid()}, nil
 }
 
 // GetDocument is not supported yet.
@@ -203,10 +316,16 @@ const (
 	MockFinalTermAmount = 610_000
 )
 
+// MockPayTrace is the provider trace ID of a payment and of a status that the Jiring Switch mock
+// answers as a success (task 058). It differs from the Parsian mock, so a run shows which provider
+// paid.
+const MockPayTrace = "8800000058"
+
 // MockFixtures returns the fixed answers of the Jiring Switch mock (debug.mocks.jiring_switch):
-// Inquiry answers with the two inquiries above.
+// Inquiry answers with the two inquiries above; Pay and Status (task 058) answer a success with the
+// trace ID MockPayTrace (pay_return_type and status_return_type give the other answers).
 func MockFixtures() provider.MockFixtures {
-	return provider.MockFixtures{Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
+	return provider.MockFixtures{Pay: mockPay, Status: mockStatus, Inquiry: func(provider.InquiryRequest) *provider.InquiryResponse {
 		return &provider.InquiryResponse{
 			Status:  provider.ResponseSuccess,
 			Code:    200,
@@ -218,4 +337,14 @@ func MockFixtures() provider.MockFixtures {
 			},
 		}
 	}}
+}
+
+// mockPay is the success answer of the Jiring Switch mock to a payment (task 058).
+func mockPay(provider.PaymentRequest) *provider.PaymentResponse {
+	return &provider.PaymentResponse{Code: http.StatusOK, Status: provider.StatusSuccess, Message: successMessage, ProviderTraceID: MockPayTrace}
+}
+
+// mockStatus is the success answer of the Jiring Switch mock to a status call (task 058).
+func mockStatus(provider.StatusRequest) *provider.StatusResponse {
+	return &provider.StatusResponse{Status: provider.StatusSuccess, Message: successMessage, ProviderTraceID: MockPayTrace}
 }

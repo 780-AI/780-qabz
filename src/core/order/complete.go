@@ -114,6 +114,12 @@ type Adapters interface {
 	Get(name string) (provider.ProviderInterface, bool)
 }
 
+// Groups gives the sorted providers of a bill type and an action, enabled and disabled
+// (provider.ProvidersService.Group; task 058: the next provider of a payment that was not sent).
+type Groups interface {
+	Group(billType, action string) []provider.Provider
+}
+
 // PaymentLogger writes the lines of the payment step (the App logger has it).
 type PaymentLogger interface {
 	Info(msg string, kv ...any)
@@ -128,6 +134,9 @@ type PaymentOptions struct {
 	// PayRoutes are the bill types that each order provider pays (bill: the payment gateway
 	// map; task 044: parsian, tel and telmidterm). Read-only.
 	PayRoutes map[string]map[string]bool
+	// Providers gives the next provider of a payment that did not reach its provider for sure
+	// (provider.ErrNotSent; task 058). Nil: no next provider (the answer of before task 058).
+	Providers Groups
 	// SettleRoutes give the provider of the settlement by bill type and order provider (bill: the
 	// confirm payment gateway map; task 044: tel and telmidterm, providers parsian, eways and eways2,
 	// Karashop). No entry: no settlement. Read-only.
@@ -142,6 +151,9 @@ type PaymentOptions struct {
 	// OnPay is called after each provider payment call with the provider, the status of the
 	// answer and the duration. Nil: no call.
 	OnPay func(providerName, status string, d time.Duration)
+	// OnFallback is called once for each move of a payment to the next provider (task 058) with the
+	// bill type, the provider that was not reached and the next provider. Nil: no call.
+	OnFallback func(billType, from, to string)
 	// OnSettle is called once per settlement with the bill type, the settlement provider and the
 	// result (a settlement status or a Settle value). Nil: no call.
 	OnSettle func(billType, providerName, result string)
@@ -152,6 +164,8 @@ type Payments struct {
 	repo          PaymentRepository
 	adapters      Adapters
 	payRoutes     map[string]map[string]bool
+	groups        Groups
+	onFallback    func(billType, from, to string)
 	settler       *Settler
 	settleTimeout time.Duration
 	log           PaymentLogger
@@ -189,7 +203,7 @@ func NewPayments(o PaymentOptions) (*Payments, error) {
 		return nil, err
 	}
 	p := &Payments{
-		repo: o.Repository, adapters: o.Adapters, payRoutes: o.PayRoutes, settler: settler,
+		repo: o.Repository, adapters: o.Adapters, payRoutes: o.PayRoutes, groups: o.Providers, onFallback: o.OnFallback, settler: settler,
 		settleTimeout: o.SettleTimeout, log: o.Logger, onPayment: o.OnPayment, onPay: o.OnPay,
 		newID: uuid.NewString, now: time.Now,
 	}
@@ -222,6 +236,11 @@ type CompleteRequest struct {
 //     other than success, failed and pending is pending (bill: validStatuses). It saves the status,
 //     ref_id, message and status_code. A failed write is answered pending (MessageInsertFailed,
 //  500. with no saved row, as bill.
+//     Task 058: an error that wraps provider.ErrNotSent (the payment did not reach the provider for
+//     sure) goes to the next provider (nextProvider) when one is defined: a new in-progress row
+//     with that provider and the same RRN, then its payment. A provider that is not reached again
+//     goes to the one after it. With no next provider the error is pending, as before. A timeout or
+//     any answer of a provider never goes to the next provider (operator rule).
 //  7. On success it starts the background job (settle): the side effects and the settlement.
 //
 // The returned Order is the last status (its Status and Message go back to the payment service).
@@ -230,9 +249,10 @@ type CompleteRequest struct {
 // saved as failed before its payment was sent. Only the provider call takes ctx.
 //
 // One span completeSpan, a child of the span in ctx (conventions § 17; task 048), has the order ID,
-// the bill type, the order provider and the result (a status or a Payment value), and the status
-// Error for an error and for a failed payment. The background job keeps its link to the span of the
-// request (task 047 D11).
+// the bill type, the order provider (the provider of the last payment call) and the result (a status
+// or a Payment value), and the status Error for an error and for a failed payment. When the payment
+// went to the next provider (task 058), provider.first is the order provider that was not reached.
+// The background job keeps its link to the span of the request (task 047 D11).
 func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, error) {
 	if p == nil || p.repo == nil || p.adapters == nil {
 		return Order{}, errors.New("order payment: not created with NewPayments")
@@ -241,8 +261,8 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 		ctx = context.Background()
 	}
 	sctx, span := otel.Tracer("qabz/core/order").Start(ctx, completeSpan)
-	billType, providerName, result := "", NoProviderLabel, PaymentError
-	o, err := p.complete(sctx, ctx, req, func(bt, pro, r string) {
+	billType, providerName, result, first := "", NoProviderLabel, PaymentError, ""
+	o, err := p.complete(sctx, ctx, req, &first, func(bt, pro, r string) {
 		billType, providerName, result = bt, pro, r
 		p.countPayment(bt, pro, r)
 	})
@@ -253,6 +273,9 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 		span.SetAttributes(attribute.String("bill_type", billType))
 	}
 	span.SetAttributes(attribute.String("provider", providerName), attribute.String("result", result))
+	if first != "" && first != providerName {
+		span.SetAttributes(attribute.String("provider.first", first))
+	}
 	switch {
 	case err != nil:
 		jaeger.Fail(span, result, err)
@@ -264,8 +287,9 @@ func (p *Payments) Complete(ctx context.Context, req CompleteRequest) (Order, er
 }
 
 // complete is Complete with the span in ctx; requestCtx is the context of the request (the link of
-// the background job); done gets the bill type, the provider and the result once per call.
-func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest, done func(billType, providerName, result string)) (Order, error) {
+// the background job); first gets the order provider of the first payment call; done gets the bill
+// type, the provider and the result once per call.
+func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest, first *string, done func(billType, providerName, result string)) (Order, error) {
 	o, err := p.repo.Latest(ctx, req.OrderID, LatestWindow)
 	if err != nil {
 		done("", NoProviderLabel, PaymentError)
@@ -330,12 +354,48 @@ func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest
 		return Order{}, fmt.Errorf("%w: %s %s", ErrPaymentRoute, name, billType)
 	}
 
-	start := time.Now()
-	resp, payErr := adapter.Pay(ctx, provider.PaymentRequest{
-		BillType: o.BillType, InquiryType: InquiryTypeOf(o.BillType), OrderID: o.OrderID, UserID: o.UserID,
-		Dialer: req.Dialer, InquiryID: o.Data, BillID: o.BillID, PayID: o.PayID, Amount: uint64(max(o.BasePrice, 0)), RRN: o.RRN,
-		Option: o.Option, // task 056: bill sends ord.Option in the payment request
-	})
+	*first = name
+	tried := map[string]bool{name: true}
+	var resp *provider.PaymentResponse
+	var payErr error
+	for {
+		start := time.Now()
+		resp, payErr = adapter.Pay(ctx, provider.PaymentRequest{
+			BillType: o.BillType, InquiryType: InquiryTypeOf(o.BillType), OrderID: o.OrderID, UserID: o.UserID,
+			Dialer: req.Dialer, InquiryID: o.Data, BillID: o.BillID, PayID: o.PayID, Amount: uint64(max(o.BasePrice, 0)), RRN: o.RRN,
+			Option: o.Option, // task 056: bill sends ord.Option in the payment request
+		})
+		if p.onPay != nil {
+			p.onPay(name, payStatus(resp, payErr), time.Since(start))
+		}
+		if payErr == nil || !errors.Is(payErr, provider.ErrNotSent) {
+			break
+		}
+		next, nextAdapter, ok := p.nextProvider(o.BillType, billType, tried)
+		if !ok {
+			break // no next provider: pending, as before task 058
+		}
+		// @todo bill has no payment fallback (one provider row, one gateway call); Qabz goes to the
+		// next provider only after a payment that did not reach its provider for sure (task 058,
+		// conventions § 13). See docs/this_vs_bill.md, item 50.
+		moved := o
+		moved.ProviderID, moved.ProviderName, moved.Status, moved.Message = next.ID, next.Name, StatusInProgress, payErr.Error()
+		if err := p.insert(wctx, &moved); err != nil {
+			if p.log != nil {
+				p.log.Error("order complete: save the next provider failed", "order_id", o.OrderID, "from", name, "to", next.Name, "error", err)
+			}
+			break // not paid through the next provider: the error of the last call is the answer
+		}
+		if p.log != nil {
+			p.log.Info("order complete: payment not sent, next provider", "order_id", o.OrderID, "bill_type", o.BillType,
+				"from", name, "to", next.Name, "error", payErr)
+		}
+		if p.onFallback != nil {
+			p.onFallback(o.BillType, name, next.Name)
+		}
+		o, name, adapter = moved, next.Name, nextAdapter
+		tried[name] = true
+	}
 	o.Status, o.RefID, o.Message, o.StatusCode = StatusPending, "", "", http.StatusInternalServerError
 	switch {
 	case payErr != nil:
@@ -347,9 +407,6 @@ func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest
 			o.Status = resp.Status
 		}
 		o.RefID, o.Message, o.StatusCode = resp.ProviderTraceID, resp.Message, resp.Code
-	}
-	if p.onPay != nil {
-		p.onPay(name, o.Status, time.Since(start))
 	}
 	if err := p.insert(wctx, &o); err != nil {
 		if p.log != nil {
@@ -364,6 +421,38 @@ func (p *Payments) complete(ctx, requestCtx context.Context, req CompleteRequest
 		p.background(requestCtx, o)
 	}
 	return o, nil
+}
+
+// payStatus is the status that the step saves for the answer of one payment call (the label of
+// OnPay): pending for an error, no answer or an unknown status text.
+func payStatus(resp *provider.PaymentResponse, err error) string {
+	if err != nil || resp == nil {
+		return StatusPending
+	}
+	switch resp.Status {
+	case StatusSuccess, StatusFailed, StatusPending:
+		return resp.Status
+	}
+	return StatusPending
+}
+
+// nextProvider gives the next provider of a payment that did not reach its provider (task 058):
+// the first enabled row of (bill type, order) in the order of ProvidersService (priority, then id)
+// that is not in tried, has a payment route for routeType and has an adapter. The order comes only
+// from the rows (operator rule): no provider name is in the code. None, or no Providers: false.
+func (p *Payments) nextProvider(billType, routeType string, tried map[string]bool) (provider.Provider, provider.ProviderInterface, bool) {
+	if p.groups == nil {
+		return provider.Provider{}, nil, false
+	}
+	for _, pr := range p.groups.Group(billType, ActionOrder) {
+		if !pr.Enabled() || tried[pr.Name] || !p.payRoutes[pr.Name][routeType] {
+			continue
+		}
+		if a, ok := p.adapters.Get(pr.Name); ok && a != nil {
+			return pr, a, true
+		}
+	}
+	return provider.Provider{}, nil, false
 }
 
 // insert saves o as a new row (a new uuid, the created_at of the database).

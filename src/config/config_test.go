@@ -729,21 +729,21 @@ func TestParseJiringSwitchAndParsianBillKeys(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Equal(t, []string{"", "", ""}, []string{c.JiringSwitchName, c.JiringSwitchGetStatusName, c.ParsianName})
-	for _, d := range []time.Duration{
-		c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
-		c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder,
-		c.ParsianSettlementInquiryMCIMobile, // task 054: read, bill's default 0
-	} {
-		assert.Zero(t, d)
-	}
+	assert.Equal(t, []string{"", "jiring-switch-getstatus", ""}, []string{c.JiringSwitchName, c.JiringSwitchGetStatusName, c.ParsianName}, "task 058: the worker name has a default")
+	assert.Zero(t, c.ParsianSettlementInquiryMCIMobile, "task 054: read, bill's default 0")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryTelephone, "task 044: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryWater, "task 048: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryElectricity, "task 052: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryGas, "task 053: bill's default")
 	assert.Equal(t, 360*time.Hour, c.ParsianSettlementInquiryRightelMobile, "task 055: bill's default")
-	assert.Zero(t, c.JiringSwitchGetStatusChunk)
-	assert.False(t, c.JiringSwitchGetStatusIsLockable)
+	// Task 058: the defaults of the Jiring Switch status worker are the Parsian ones; off by default.
+	assert.False(t, c.JiringSwitchGetStatusEnabled)
+	assert.Equal(t, 100, c.JiringSwitchGetStatusChunk)
+	assert.True(t, c.JiringSwitchGetStatusIsLockable)
+	assert.Equal(t, []time.Duration{30 * time.Minute, 10 * time.Hour, 15 * time.Minute, 30 * time.Minute, 10 * time.Hour, 30 * time.Second, 3 * time.Millisecond, 3 * time.Millisecond},
+		[]time.Duration{c.JiringSwitchGetStatusStart, c.JiringSwitchGetStatusEnd, c.JiringSwitchGetStatusCronTime, c.JiringSwitchGetStatusLockTime,
+			c.JiringSwitchGetStatusReverseDeadline, c.JiringSwitchGetStatusSyncAPICall, c.JiringSwitchGetStatusSyncGetOrder, c.JiringSwitchGetStatusSyncInsertOrder})
+	assert.Equal(t, []string{"success", "success"}, []string{c.DebugMockJiringSwitchPayReturnType, c.DebugMockJiringSwitchStatusReturnType})
 	// Task 045: the defaults of the Parsian status worker.
 	assert.False(t, c.ParsianGetStatusEnabled)
 	assert.Equal(t, "parsian-getstatus", c.ParsianGetStatusName)
@@ -1263,4 +1263,55 @@ func TestIrancellGetStatusRules(t *testing.T) {
 	assert.ErrorContains(t, err, "kafka.timeout must be a positive duration", "the Parsian worker checks the timeout too")
 	_, err = Parse([]byte(base + "debug: {mocks: {irancell: {status_return_type: \"error\"}}}\n"))
 	assert.ErrorContains(t, err, "debug.mocks.irancell.status_return_type must be")
+}
+
+// TestJiringSwitchGetStatusRules (task 058): the Jiring Switch worker keys are checked only while
+// the worker is on; its name differs from the other workers that are on; it needs the Kafka keys;
+// the payment and status answers of the mock are success, failed or pending.
+func TestJiringSwitchGetStatusRules(t *testing.T) {
+	const base = "mode: dev\ndatabase: {postgres: {password: pw}}\n"
+	c, err := Parse([]byte(base + "providers: {internal: {jiring_switch: {get_status: {enabled: true}}}}\n"))
+	if assert.NoError(t, err, "the defaults are valid") {
+		assert.True(t, c.JiringSwitchGetStatusEnabled)
+		assert.True(t, c.StatusWorkerEnabled())
+	}
+	for gs, want := range map[string]string{
+		`name: ""`:                "jiring_switch.get_status.name must not be empty",
+		`cron_time: "0s"`:         "jiring_switch.get_status.cron_time must be a positive",
+		`chunk: 0`:                "jiring_switch.get_status.chunk must be positive",
+		`start: "-1s"`:            "jiring_switch.get_status.start must not be negative",
+		`start: "2h", end: "1h"`:  "end must be greater than start",
+		`end: "49h"`:              "providers.internal.jiring_switch.get_status.end must not be greater than 48h0m0s",
+		`reverse_deadline: "-1s"`: "jiring_switch.get_status.reverse_deadline must not be negative",
+		`sync_operations: {api_call_get_status: "-1s"}`: "jiring_switch.get_status.sync_operations must not be negative",
+	} {
+		_, err := Parse([]byte(base + "providers: {internal: {jiring_switch: {get_status: {enabled: true, " + gs + "}}}}\n"))
+		assert.ErrorContains(t, err, want, gs)
+		_, err = Parse([]byte(base + "providers: {internal: {jiring_switch: {get_status: {enabled: false, " + gs + "}}}}\n"))
+		assert.NoError(t, err, "off: %s", gs)
+	}
+	for other, want := range map[string]string{
+		"parsian":  "jiring_switch.get_status.name must differ from providers.internal.parsian.get_status.name",
+		"irancell": "jiring_switch.get_status.name must differ from providers.internal.irancell.get_status.name",
+	} {
+		const same = "providers: {internal: {jiring_switch: {get_status: {enabled: true, name: w}}, %s: {get_status: {enabled: %t, name: w}}}}\n"
+		_, err := Parse([]byte(base + fmt.Sprintf(same, other, true)))
+		assert.ErrorContains(t, err, want, other)
+		_, err = Parse([]byte(base + fmt.Sprintf(same, other, false)))
+		assert.NoError(t, err, "the %s worker off: the same name is not a conflict", other)
+	}
+	_, err = Parse([]byte(base + "providers: {internal: {jiring_switch: {get_status: {enabled: true}}}}\nkafka: {brokers: []}\n"))
+	assert.ErrorContains(t, err, "kafka.brokers must have at least one address", "the Jiring Switch worker reports on Kafka")
+	c, err = Parse([]byte(base))
+	if assert.NoError(t, err) {
+		assert.False(t, c.StatusWorkerEnabled())
+	}
+	for _, key := range []string{"pay_return_type", "status_return_type"} {
+		for _, v := range []string{"success", "failed", "pending"} {
+			_, err := Parse([]byte(base + "debug: {mocks: {jiring_switch: {" + key + ": " + v + "}}}\n"))
+			assert.NoError(t, err, key+" "+v)
+		}
+		_, err := Parse([]byte(base + "debug: {mocks: {jiring_switch: {" + key + ": error}}}\n"))
+		assert.ErrorContains(t, err, "debug.mocks.jiring_switch."+key+" must be")
+	}
 }

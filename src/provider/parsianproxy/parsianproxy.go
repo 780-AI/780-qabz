@@ -105,8 +105,9 @@ func Dial(addr string) (Client, error) {
 		return noClient{}, nil
 	}
 	// A client span for each call, and traceparent in the metadata (task 047, conventions § 17).
+	// provider.SentHandler tells a payment that did not reach the service (task 058).
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()), grpc.WithStatsHandler(provider.SentHandler{}))
 	if err != nil {
 		return nil, fmt.Errorf("parsianproxy: grpc client for %s: %w", addr, err)
 	}
@@ -248,7 +249,9 @@ func SupportsPay(billType string) bool { return payBillTypes[billType] }
 //     error text as the message) with no call.
 //   - A call that fails (the switch is off, no address, a connection error, a timeout, a nil answer)
 //     returns an error that wraps provider.ErrProviderDown: the status is not known (bill: pending,
-//     code 500, the error text).
+//     code 500, the error text). When the call did not reach the service for sure (the switch is
+//     off, no address, gRPC Unavailable before the request headers went to a connection), the error
+//     also wraps provider.ErrNotSent (task 058): the payment step can go to the next provider.
 //   - Else the answer of the service as it came (code, status, message, provider_trace_id as text).
 //
 // @todo bill sets no timeout of its own (the deadline of the payment service applies); Qabz limits
@@ -265,13 +268,14 @@ func (a *Adapter) Pay(ctx context.Context, req provider.PaymentRequest) (*provid
 		return &provider.PaymentResponse{Code: http.StatusBadRequest, Status: provider.StatusFailed, Message: err.Error()}, nil
 	}
 	if !a.enabled {
-		return nil, fmt.Errorf("parsianproxy: pay: %w: %w", provider.ErrProviderDown, errDisabled)
+		return nil, provider.DownError("parsianproxy: pay", errDisabled, true)
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
+	ctx, sent := provider.TrackSent(ctx)
 	resp, err := a.client.Pay(ctx, &pb.PayRequest{
 		UserId:          req.UserID,
 		Dialer:          req.Dialer,
@@ -286,7 +290,7 @@ func (a *Adapter) Pay(ctx context.Context, req provider.PaymentRequest) (*provid
 		PaymentRrn:      req.RRN,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("parsianproxy: pay: %w: %w", provider.ErrProviderDown, err)
+		return nil, provider.DownError("parsianproxy: pay", err, errors.Is(err, errNoAddress) || provider.GRPCNotSent(err, sent))
 	}
 	if resp == nil {
 		return nil, fmt.Errorf("parsianproxy: pay: %w: empty answer", provider.ErrProviderDown)

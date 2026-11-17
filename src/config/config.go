@@ -223,11 +223,17 @@ type Config struct {
 	// env generator scripts/yml_to_env rejects a key with a hyphen).
 	// The other keys are bill's keys of the two service clients (bill: jiringSwitch.* and
 	// parsian.*: name, the getStatus block, and for Parsian the settlementInquiry* durations), in the
-	// layout of this project, as for Irancell. The Jiring Switch keys have no default (the real values
-	// are only in config.yml) and are not read yet: they belong to the order flow and its status cron.
-	// The Parsian get_status keys are read since task 045 (see ParsianGetStatusEnabled). The three
-	// sync_operations keys are bill's list getStatus.syncOperations as three keys, as for Irancell.
-	// Not hot-reloadable.
+	// layout of this project, as for Irancell. The Parsian get_status keys are read since task 045
+	// (see ParsianGetStatusEnabled). The three sync_operations keys are bill's list
+	// getStatus.syncOperations as three keys, as for Irancell. Not hot-reloadable.
+	//
+	// The Jiring Switch status worker (task 058; bill: JiringSwitchGetStatusTask, InquiryCron) reads
+	// the jiring_switch get_status keys as the Parsian worker reads its own: JiringSwitchGetStatusEnabled
+	// (not a bill key) turns it on; false (the default): no worker. The defaults are the values of the
+	// operator's config (the Parsian values). End is not greater than StatusMaxEnd, and the name must
+	// differ from the names of the other workers that are on. LockTime is only logged, IsLockable and
+	// JiringSwitchName are not read. bill's jiringSwitch.retry block is not a key of Qabz (bill's retry
+	// cron is commented out).
 	JiringSwitchEnabled     bool          `path:"providers.internal.jiring_switch.enabled"`
 	JiringSwitchTimeout     time.Duration `path:"providers.internal.jiring_switch.timeout"`
 	JiringSwitchGRPCAddress string        `path:"providers.internal.jiring_switch.grpc_address"`
@@ -235,6 +241,7 @@ type Config struct {
 	ParsianTimeout          time.Duration `path:"providers.internal.parsian.timeout"`
 	ParsianGRPCAddress      string        `path:"providers.internal.parsian.grpc_address"`
 
+	JiringSwitchGetStatusEnabled         bool          `path:"providers.internal.jiring_switch.get_status.enabled"`
 	JiringSwitchName                     string        `path:"providers.internal.jiring_switch.name"`
 	JiringSwitchGetStatusName            string        `path:"providers.internal.jiring_switch.get_status.name"`
 	JiringSwitchGetStatusChunk           int           `path:"providers.internal.jiring_switch.get_status.chunk"`
@@ -419,8 +426,14 @@ type Config struct {
 	// return types are MockReturnSuccess or MockReturnError; no effect while the mock is off.
 	DebugMockJiringSwitchEnabled    bool   `path:"debug.mocks.jiring_switch.enabled"`
 	DebugMockJiringSwitchReturnType string `path:"debug.mocks.jiring_switch.return_type"`
-	DebugMockParsianEnabled         bool   `path:"debug.mocks.parsian.enabled"`
-	DebugMockParsianReturnType      string `path:"debug.mocks.parsian.return_type"`
+	// DebugMockJiringSwitchPayReturnType and DebugMockJiringSwitchStatusReturnType are the answers of
+	// the Jiring Switch mock to a payment and a status call (task 058): MockReturnSuccess,
+	// MockReturnFailed or MockReturnPending (the answer of a timeout: never a fallback). No effect
+	// while the mock is off. Development only.
+	DebugMockJiringSwitchPayReturnType    string `path:"debug.mocks.jiring_switch.pay_return_type"`
+	DebugMockJiringSwitchStatusReturnType string `path:"debug.mocks.jiring_switch.status_return_type"`
+	DebugMockParsianEnabled               bool   `path:"debug.mocks.parsian.enabled"`
+	DebugMockParsianReturnType            string `path:"debug.mocks.parsian.return_type"`
 	// DebugMockParsianPayReturnType is the answer of the Parsian mock to a payment (task 044,
 	// conventions § 15: one return-type key for each method): MockReturnSuccess, MockReturnFailed or
 	// MockReturnPending (the answer of a timeout). No effect while the mock is off. Development only.
@@ -585,6 +598,23 @@ func defaults() Config {
 		DebugMockIrancellReturnType:       MockReturnSuccess,
 		DebugMockIrancellStatusReturnType: MockReturnSuccess,
 		DebugMockJiringSwitchReturnType:   MockReturnSuccess,
+
+		// Task 058: the Jiring Switch status worker (the values of the operator's config, as Parsian)
+		// and the payment and status answers of its mock.
+		JiringSwitchGetStatusName:             "jiring-switch-getstatus",
+		JiringSwitchGetStatusChunk:            100,
+		JiringSwitchGetStatusStart:            30 * time.Minute,
+		JiringSwitchGetStatusEnd:              10 * time.Hour,
+		JiringSwitchGetStatusCronTime:         15 * time.Minute,
+		JiringSwitchGetStatusLockTime:         30 * time.Minute,
+		JiringSwitchGetStatusIsLockable:       true,
+		JiringSwitchGetStatusReverseDeadline:  10 * time.Hour,
+		JiringSwitchGetStatusSyncAPICall:      30 * time.Second,
+		JiringSwitchGetStatusSyncGetOrder:     3 * time.Millisecond,
+		JiringSwitchGetStatusSyncInsertOrder:  3 * time.Millisecond,
+		DebugMockJiringSwitchPayReturnType:    MockReturnSuccess,
+		DebugMockJiringSwitchStatusReturnType: MockReturnSuccess,
+
 		DebugMockParsianReturnType:        MockReturnSuccess,
 		DebugMockParsianPayReturnType:     MockReturnSuccess,
 		DebugMockKarashopReturnType:       MockReturnSuccess,
@@ -816,7 +846,16 @@ func (c Config) validate() error {
 	if c.IrancellGetStatusEnabled {
 		errs = append(errs, c.validateIrancellGetStatus()...)
 	}
-	if c.ParsianGetStatusEnabled || c.IrancellGetStatusEnabled {
+	if c.JiringSwitchGetStatusEnabled {
+		errs = append(errs, c.validateJiringSwitchGetStatus()...)
+	}
+	if !ValidMockPayReturnType(c.DebugMockJiringSwitchPayReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.jiring_switch.pay_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
+	}
+	if !ValidMockPayReturnType(c.DebugMockJiringSwitchStatusReturnType) {
+		errs = append(errs, fmt.Errorf("debug.mocks.jiring_switch.status_return_type must be %q, %q or %q", MockReturnSuccess, MockReturnFailed, MockReturnPending))
+	}
+	if c.StatusWorkerEnabled() {
 		errs = append(errs, c.validateKafkaProducer()...)
 	}
 	if c.ConfirmPaymentTelephoneEnabled {
@@ -923,6 +962,34 @@ func (c Config) validateIrancellGetStatus() []error {
 		errs = append(errs, errors.New("providers.internal.irancell.get_status.name must differ from providers.internal.parsian.get_status.name (the lock key and the metric label)"))
 	}
 	return errs
+}
+
+// validateJiringSwitchGetStatus checks the keys of the Jiring Switch status worker (task 058).
+// validate calls it only while the worker is on. Its name must differ from the name of each other
+// status worker that is on (the lock key and the metric label).
+func (c Config) validateJiringSwitchGetStatus() []error {
+	errs := validateStatusWorker(statusWorkerKeys{
+		prefix: "providers.internal.jiring_switch.get_status.", name: c.JiringSwitchGetStatusName,
+		cronTime: c.JiringSwitchGetStatusCronTime, start: c.JiringSwitchGetStatusStart, end: c.JiringSwitchGetStatusEnd,
+		deadline: c.JiringSwitchGetStatusReverseDeadline, chunk: c.JiringSwitchGetStatusChunk,
+		syncAPI: c.JiringSwitchGetStatusSyncAPICall, syncGetOrder: c.JiringSwitchGetStatusSyncGetOrder, syncSave: c.JiringSwitchGetStatusSyncInsertOrder,
+		maxEnd: StatusMaxEnd,
+	})
+	if c.JiringSwitchGetStatusName != "" {
+		if c.ParsianGetStatusEnabled && c.JiringSwitchGetStatusName == c.ParsianGetStatusName {
+			errs = append(errs, errors.New("providers.internal.jiring_switch.get_status.name must differ from providers.internal.parsian.get_status.name (the lock key and the metric label)"))
+		}
+		if c.IrancellGetStatusEnabled && c.JiringSwitchGetStatusName == c.IrancellGetStatusName {
+			errs = append(errs, errors.New("providers.internal.jiring_switch.get_status.name must differ from providers.internal.irancell.get_status.name (the lock key and the metric label)"))
+		}
+	}
+	return errs
+}
+
+// StatusWorkerEnabled reports whether a status worker is on (Parsian, Irancell or Jiring Switch):
+// the workers report on Kafka (task 058: one place for the three switches).
+func (c Config) StatusWorkerEnabled() bool {
+	return c.ParsianGetStatusEnabled || c.IrancellGetStatusEnabled || c.JiringSwitchGetStatusEnabled
 }
 
 // validateKafkaProducer checks the keys of the Kafka producer of the status workers (task 045; the

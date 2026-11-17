@@ -241,6 +241,11 @@ func (w *StatusWorker) check(ctx context.Context, adapter provider.ProviderInter
 	if o.Status == order.StatusSuccess || o.Status == order.StatusFailed {
 		return ResultSkipped
 	}
+	if o.ProviderName != w.o.Provider {
+		// Task 058: the payment went to the next provider after the page was read; the worker of
+		// that provider asks it.
+		return ResultSkipped
+	}
 	status := w.status(ctx, adapter, o)
 	if status != order.StatusSuccess && status != order.StatusFailed {
 		return ResultPending

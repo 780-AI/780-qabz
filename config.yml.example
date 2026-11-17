@@ -77,20 +77,21 @@ providers:
       enabled: false           # false: every Jiring Switch call fails as "provider down", nothing is sent to the jiring-switch service, the mock does not apply
       timeout: "10s"           # limit of each call to the jiring-switch service; positive
       grpc_address: ""         # host:port of the internal gRPC server of the jiring-switch service (no TLS); empty: every call fails as "provider down"
-      name: ""                 # name of the provider (bill: jiringSwitch.name); not read yet
-      get_status:              # cron that asks the status of pending orders; not read yet (order flow)
-        name: ""
-        chunk: 0
-        start: "0s"
-        end: "0s"
-        cron_time: "0s"
-        lock_time: "0s"
-        is_lockable: false
-        reverse_deadline: "0s"
-        sync_operations:
-          api_call_get_status: "0s"
-          get_order_query: "0s"
-          insert_order_query: "0s"
+      name: ""                 # name of the provider (bill: jiringSwitch.name); not read
+      get_status:              # the worker that asks Jiring Switch the status of the pending and in-progress Jiring Switch orders (task 058; bill: jiringSwitch.getStatus)
+        enabled: false         # false: no worker; true: the keys below are checked at start
+        name: "jiring-switch-getstatus" # the lock key, the metric label cron and the log lines; not the name of another worker
+        chunk: 100             # orders in one page; positive
+        start: "30m"           # the window of the orders: created from now-end to now-start; end greater than start
+        end: "10h"             # not greater than 48h (the worker reads the newest row of an order of the last 48h)
+        cron_time: "15m"       # the interval; positive
+        lock_time: "30m"       # only logged, as bill (the lock TTL comes from sync_operations)
+        is_lockable: true      # not read (bill has it): Qabz always takes the lock
+        reverse_deadline: "10h" # a final status of an order older than this is saved as reverse_deadline_exceeded and not reported; 0: every final status
+        sync_operations:       # the lock TTL: sum x 1.1 x chunk + 5m (bill)
+          api_call_get_status: "30s"
+          get_order_query: "3ms"
+          insert_order_query: "3ms"
     parsian:                   # the parsian-v2 service (our own service); answers the MCI mobile bill (bill type mobile)
       enabled: false           # false: every Parsian call fails as "provider down", nothing is sent to the parsian-v2 service, the mock does not apply
       timeout: "10s"           # limit of each call to the parsian-v2 service; positive
@@ -220,6 +221,8 @@ debug:
     jiring_switch:           # the Jiring Switch mock: a fixed answer, no call to the jiring-switch service
       enabled: false
       return_type: "success" # "success" or "error"
+      pay_return_type: "success" # task 058: "success", "failed" or "pending" (the answer of a timeout: no fallback)
+      status_return_type: "success" # task 058: the status worker; "success", "failed" or "pending"
     parsian:                 # the Parsian mock: a fixed answer, no call to the parsian-v2 service
       enabled: false
       return_type: "success" # inquiry: "success" or "error"

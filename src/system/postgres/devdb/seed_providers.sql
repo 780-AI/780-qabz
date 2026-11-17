@@ -7,6 +7,10 @@
 -- Task 055 (operator, 2026-11-16): row 500 (parsian, mobilemidtermRightel, order) is 'enable' (was
 -- 'disable'), so a Rightel order goes to Parsian (priority 9, before row 37 eways2). A dev database
 -- seeded before keeps its row (ON CONFLICT).
+-- Task 058 (operator, 2026-11-16): rows 29 (jiring-switch, mobilemidterm, order) and 30 (jiring-switch,
+-- mobile, order) are 'enable' (were 'disable'): with priority 10 Parsian (9) stays first, and Jiring
+-- Switch is the next provider of an MCI payment that did not reach Parsian. A dev database seeded
+-- before keeps its rows (ON CONFLICT).
 INSERT INTO providers ("id", "name", "subject", "bill_type", "action", "type", "priority", "timeout", "status", "updated_at", "use_nats") VALUES
 (2, 'tavanir', 'tavanir-inquiry', 'electricity', 'inquiry', 'retryable', 9, 100, 'enable', '2022-05-23T08:03:28.988789+04:30', true),
 (17, 'eways2', 'eways2-bill', 'electricity', 'order', 'retryable', 10, 500, 'disable', '2026-10-13T17:15:37.270428+03:30', true),
@@ -20,8 +24,8 @@ INSERT INTO providers ("id", "name", "subject", "bill_type", "action", "type", "
 (26, 'irancell', 'irancell-bill', 'irancell', 'order', 'retryable', 10, 500, 'enable', '2022-04-20T21:32:06.0725+04:30', true),
 (27, 'jiring-switch', 'jiring-switch-bill-inquiry', 'mobilemidterm', 'inquiry', 'retryable', 10, 100, 'enable', '2026-10-26T18:41:03.33415+03:30', true),
 (28, 'jiring-switch', 'jiring-switch-bill-inquiry', 'mobile', 'inquiry', 'retryable', 10, 100, 'disable', '2022-07-04T10:29:48.373168+04:30', true),
-(29, 'jiring-switch', 'jiring-switch-bill-payment', 'mobilemidterm', 'order', 'retryable', 10, 500, 'disable', '2026-10-26T19:46:20.796405+03:30', true),
-(30, 'jiring-switch', 'jiring-switch-bill-payment', 'mobile', 'order', 'retryable', 10, 500, 'disable', '2026-10-13T17:51:31.691191+03:30', true),
+(29, 'jiring-switch', 'jiring-switch-bill-payment', 'mobilemidterm', 'order', 'retryable', 10, 500, 'enable', '2026-10-26T19:46:20.796405+03:30', true),
+(30, 'jiring-switch', 'jiring-switch-bill-payment', 'mobile', 'order', 'retryable', 10, 500, 'enable', '2026-10-13T17:51:31.691191+03:30', true),
 (31, 'qabzino', 'qabzino-irancell-inquiry', 'mobileIrancell', 'inquiry', 'retryable', 10, 1000, 'enable', '2026-10-24T10:16:46.558778+03:30', false),
 (32, 'qabzino', 'qabzino-rightel-inquiry', 'mobileRightel', 'inquiry', 'retryable', 10, 1000, 'disable', '2026-10-24T16:12:14.604445+03:30', false),
 (33, 'qabzino', 'qabzino-irancell-inquiry', 'mobilemidtermIrancell', 'inquiry', 'retryable', 10, 1000, 'disable', '2023-07-02T09:29:48.373168+03:30', false),

@@ -103,6 +103,39 @@ func TestLivePendingIDs(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestLivePendingIDsFallback (task 058): an order that went from Parsian to Jiring Switch has rows of
+// two providers. Only the provider of its newest row in the window gets it: the Parsian worker does
+// not see the old Parsian in-progress row, the Jiring Switch worker sees the pending order.
+func TestLivePendingIDsFallback(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	c := seededClient(t, ctx)
+	r := postgres.NewOrderRepository(c)
+	const start, end = 30 * time.Minute, 10 * time.Hour
+	insertRows(t, ctx, c, []statusRow{
+		// 31: Parsian not reached, Jiring Switch pending: the Jiring order.
+		{31, order.StatusInitial, "parsian", 2 * time.Hour}, {31, order.StatusInProgress, "parsian", 2*time.Hour - time.Second},
+		{31, order.StatusInProgress, "jiring-switch", 2*time.Hour - 2*time.Second}, {31, order.StatusPending, "jiring-switch", 2*time.Hour - 3*time.Second},
+		// 32: Parsian not reached, Jiring Switch success: no worker.
+		{32, order.StatusInProgress, "parsian", 3 * time.Hour}, {32, order.StatusInProgress, "jiring-switch", 3*time.Hour - time.Second},
+		{32, order.StatusSuccess, "jiring-switch", 3*time.Hour - 2*time.Second},
+		// 33: a plain Parsian pending order.
+		{33, order.StatusPending, "parsian", 4 * time.Hour},
+		// 34: the Jiring rows are newer than start: the newest row in the window is the Parsian
+		// in-progress row, as before task 058 for a row out of the window. The worker skips it: its
+		// read of the order (Latest, 48 h) gives the Jiring row (reconcile TestCheckOtherProvider).
+		{34, order.StatusInProgress, "parsian", 2 * time.Hour}, {34, order.StatusPending, "jiring-switch", 10 * time.Minute},
+	})
+	parsian, err := r.PendingIDs(ctx, "parsian", 100, order.Cursor{}, start, end)
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{statusOrderID(33), statusOrderID(34)}, cursorIDs(parsian), "no order whose newest row is of Jiring Switch")
+	}
+	jiring, err := r.PendingIDs(ctx, "jiring-switch", 100, order.Cursor{}, start, end)
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{statusOrderID(31)}, cursorIDs(jiring))
+	}
+}
+
 // TestLivePendingIDsSameTime (task 050 D4): orders whose newest rows have the same created_at are
 // ordered and paged by order_id, so a page boundary in such a group skips and repeats nothing.
 func TestLivePendingIDsSameTime(t *testing.T) {
